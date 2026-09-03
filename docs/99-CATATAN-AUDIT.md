@@ -13,20 +13,20 @@
 > 🔧 Hasil kerja engineering ada di [`../spec/`](../spec/README.md) —
 > **bukan kata pemilik**, dan sengaja di luar `docs/`.
 
-Diperbarui: 3 September 2026 · Mencakup **delapan naskah**:
+Diperbarui: 3 September 2026 · Mencakup **sembilan naskah**:
 **1 HumanOS** · **2 HumanVerse X** · **3 Phase 2 Enterprise Blueprint** ·
 **4 Phase 3 AI-Native Human Ecosystem** · **5 Blueprint Engineering v1.0** ·
-**6 Peta 14 lapisan engineering** · **7 Phase 4 Enterprise OS (Layer 21–50)** · **8 Peta Phase 5–12**.
+**6 Peta 14 lapisan engineering** · **7 Phase 4 Enterprise OS (Layer 21–50)** · **8 Peta Phase 5–12** · **9 Phase 5 Research Lab**.
 
 | Bagian | Isi | Jumlah |
 |---|---|---|
 | [H](#h-sudah-diputuskan--ditutup) | **Sudah diputuskan / ditutup** | 14 |
 | [A](#a-perlu-jawaban-pemilik) | Pertanyaan yang memblokir | 18 |
-| [B](#b-risiko-teknis) | Risiko teknis | 19 |
-| [C](#c-risiko-hukum--kepatuhan) | Risiko hukum & kepatuhan | 12 |
+| [B](#b-risiko-teknis) | Risiko teknis | 21 |
+| [C](#c-risiko-hukum--kepatuhan) | Risiko hukum & kepatuhan | 13 |
 | [D](#d-celah-yang-belum-tertutup) | Celah yang belum tertutup | 5 |
-| [E](#e-ketidakcocokan-antar-naskah) | **Ketidakcocokan antar-naskah** | 52 |
-| [F](#f-yang-sudah-saya-periksa-dan-ternyata-benar) | Sudah diperiksa, ternyata benar | 28 |
+| [E](#e-ketidakcocokan-antar-naskah) | **Ketidakcocokan antar-naskah** | 57 |
+| [F](#f-yang-sudah-saya-periksa-dan-ternyata-benar) | Sudah diperiksa, ternyata benar | 33 |
 | [G](#g-lubang-di-dalam-naskah-sendiri) | Lubang di dalam naskah sendiri | 5 |
 
 ---
@@ -88,6 +88,8 @@ Diurutkan dari yang paling menghambat.
 | # | Catatan |
 |---|---|
 | B-12 | **Ratusan agen pada satu graf.** Tanpa aturan kepemilikan simpul dan penyelesaian konflik, graf akan saling menimpa. §13 memberi protocol antar-agent yang *authenticated, logged, traceable, permission-controlled* — itu mengatur **percakapan**, bukan **tulisan ke graf**. Risiko ini masih utuh; dilunakkan oleh §58 (jangan langsung 50 agent). |
+| B-21 | 🆕🛑 **Research Lab tidak bisa dimulai sebelum V0 mengumpulkan datanya.** Seluruh dataset Pillar 1 (`behavior_events`, `habit_events`, `sleep_events`, `mood_events`, `calendar_events`, `context_snapshots`) baru terisi **setelah V0 dipakai orang berbulan-bulan** — dan dua di antaranya tidak ada di V0 sama sekali (**E-58**). Roadmap R1–R8 dimulai dari **R1 Behavior Prediction**, justru yang paling bergantung pada data. Yang bisa dikerjakan lebih dulu tanpa data pengguna: **R8 Benchmark**, **R5 Explainability**, lalu **R3 Memory Compression** (aturan retensi, bukan pembelajaran). Ini temuan urutan, bukan temuan isi — isinya baik. |
+| B-20 | 🆕 **Compression Policy tidak mengompres apa pun.** Masalah yang dinyatakan Pillar 4 adalah *"jutaan event, tidak bisa dikirim semuanya ke LLM"*, tetapi kebijakannya menyimpan **Raw, Episode, dan Summary sama-sama "penuh"** tanpa jendela waktu, dan Chapter + Identity *"permanen"*. Kalau Raw disimpan penuh selamanya, tingkatan ini **menambah** data, bukan menguranginya. Yang membuatnya benar-benar mengompres adalah batas waktu per tingkat (mis. Raw 90 hari → Episode 2 tahun → Summary 5 tahun) — angkanya belum ada. |
 | B-19 | 🆕 **Phase 10 adalah ujian pertama janji "Act di bawah kontrol pengguna".** *Cross-App Actions*, *Calendar Automation*, dan terutama **Email Automation** berarti agent bertindak **keluar**, atas nama pengguna, kepada orang lain. Di tangga risiko naskah 5 §16 itu **Level 3** (*"kirim pesan kepada seseorang"*) — tingkat yang **sengaja tidak ada satu pun tool-nya di V0**. Sampai Phase 10, seluruh janji kendali manusia belum pernah benar-benar diuji, karena belum ada aksi yang bisa merugikan kalau salah. Ambang, konfirmasi, dan pembatalan untuk Level 3 harus ditetapkan **sebelum** fase ini, bukan di dalamnya. |
 | B-18 | 🆕 **Target 99,9 % uptime tidak bisa dijanjikan tanpa orang yang berjaga.** Layer 44 menetapkannya sebagai target SRE. 99,9 % = **±43 menit mati per bulan**, dan menuntut giliran *on-call* yang bisa membangunkan seseorang tengah malam. Untuk satu orang tanpa tim, itu bukan target melainkan janji yang akan dilanggar. Selama penggunanya baru pemiliknya sendiri hal ini tidak perlu diselesaikan — tapi angkanya sebaiknya **tidak ditulis sebagai janji** sampai ada yang berjaga. |
 | B-14 | 🆕 **Context Engine harus hidup terus-menerus.** §2–§3 menuntut Real-Time + Historical + Predicted Context untuk setiap permintaan — pipeline yang tidak pernah tidur, menyentuh cuaca, kalender, lokasi, dan wearable. Belum ada **perilaku cadangan** ketika salah satu sinyal mati, dan kegagalannya akan senyap: rekomendasi tetap keluar, hanya jadi salah. |
@@ -114,6 +116,7 @@ Diurutkan dari yang paling menghambat.
 | # | Catatan |
 |---|---|
 | C-7 | **Marketplace agen pihak ketiga.** Begitu orang lain bisa menulis agent yang membaca data tidur, keuangan, dan foto tubuh, Anda menjadi **pemroses data untuk pihak ketiga**. §14–§16 memberi fondasi teknisnya; **beban hukumnya belum disentuh sama sekali**. Dilunakkan karena §58 memindahkannya ke V3/V6. |
+| C-13 | 🆕 **"Identity Memory" permanen adalah karakterisasi yang tidak bisa kedaluwarsa.** Contoh Pillar 4: *"User is consistently committed to strength training"* — klaim tentang **siapa seseorang**, disimpan **permanen**, dan membentuk setiap rekomendasi sesudahnya. Tiga masalah: **(a)** menguatkan dirinya sendiri — kalau salah, rekomendasi yang lahir darinya menghasilkan data yang seolah membenarkannya; **(b)** orang berubah, dan pilar di sebelahnya sendiri berkata *"preferensi manusia berubah"*; **(c)** bertabrakan dengan hak hapus (**C-9**) dan mendekati garis prinsip penutup naskah 4 (*"jangan menilai apakah seseorang manusia yang baik atau buruk"*) — ini belum penilaian, tapi sudah karakterisasi permanen. Usul: Identity Memory tetap ada, tetapi **tidak permanen** — wajib punya `confidence`, `evidence_count`, `valid_until`, dan bisa dilihat serta **dibantah** pengguna di Privacy Center. |
 | C-12 | 🆕 **"Company Wellness" berarti pemberi kerja menyentuh data kesehatan pekerja.** Phase 9 mendaftarkannya bersama *Team Workspace* dan *Enterprise Admin*. Ini berbeda dari **C-10** (*Coaches*) karena ada **ketimpangan kekuasaan**: persetujuan yang diberikan kepada atasan tidak pernah sepenuhnya bebas, dan di banyak yurisdiksi program kesehatan tempat kerja punya aturan sendiri tentang apa yang boleh dilihat pemberi kerja — umumnya **hanya agregat, tidak pernah per orang**. Kalau *Enterprise Admin* bisa melihat data tidur atau mood satu pekerja, itu masalah sejak baris pertama kodenya. |
 | C-10 | 🆕 **"Coaches" adalah manusia yang melihat data manusia lain.** Layer 49 menambahkan *Coaches* sebagai peserta ekosistem. Sepanjang tujuh naskah, seluruh model izin dirancang untuk **agent**, bukan orang: `permissions.subject_type` hanya mengenal `agent`, `tool`, `integration`. Pelatih yang melihat data tidur, kebiasaan, dan mungkin jurnal kliennya butuh **jenis persetujuan yang berbeda** — berjangka waktu, bisa dicabut, tercatat, dan lingkupnya sempit. **Brands** menambah masalah lain: kepentingan komersial di dalam rekomendasi yang sudah berjanji *"popular ≠ suitable for the user"*. |
 | C-11 | 🆕 **Melatih model di atas data pengguna ≠ memakainya.** Phase 5 butir 1, 2, dan 6 (Behavior Foundation Model, Human GNN, Federated Personal AI) berarti **melatih model** di atas data tidur, mood, dan jurnal. Di banyak yurisdiksi itu dasar hukum yang **berbeda** dari sekadar memberi rekomendasi, dan sering menuntut persetujuan terpisah yang bisa ditolak tanpa kehilangan layanan. Kalau `consents.kind` tidak memuat `model_training` sejak awal, seluruh data yang sudah terkumpul tidak bisa dipakai untuk itu nanti. |
@@ -163,7 +166,7 @@ Ini kelompok temuan paling serius, karena **seluruh produk berdiri di atas graf 
 
 | # | Temuan |
 |---|---|
-| **E-16** | **Arah sebab-akibat berbeda.** Naskah 1: `Tidur → Mood → Produktivitas → Olahraga`. Naskah 3 (Layer 8): `Sleep → Energy → Workout → Mood → Productivity → Career`. Urutan **Mood** dan **Workout terbalik**. ⚠️ **Naskah 4 §7 mengubah pertanyaannya**: keduanya seharusnya tidak ditulis sebagai *causal* sama sekali, melainkan sebagai *Causal Hypothesis* yang diuji per pengguna. Keputusan yang tersisa: **arah mana yang jadi hipotesis awal.** |
+| **E-16** | **Arah sebab-akibat berbeda.** Naskah 1: `Tidur → Mood → Produktivitas → Olahraga`. Naskah 3 (Layer 8): `Sleep → Energy → Workout → Mood → Productivity → Career`. Urutan **Mood** dan **Workout terbalik**. ⚠️ **Naskah 4 §7 mengubah pertanyaannya**: keduanya seharusnya tidak ditulis sebagai *causal* sama sekali, melainkan sebagai *Causal Hypothesis* yang diuji per pengguna. ⭐ **Naskah 9 Pillar 7 memakai urutan naskah 3** (`Sleep → Energy → Workout → Mood → Productivity`) dan menambahkan *"semua node memiliki confidence"*. Sekarang **dua naskah memakai urutan itu, satu memakai urutan lama** — dan yang dua adalah yang lebih baru. Praktis tertutup; tinggal konfirmasi. |
 | **E-17** | **Daftar node tidak lengkap.** Naskah 2 menetapkan 10 node. Rantai Layer 8 memakai **Energy**, **Productivity**, **Career** yang tidak ada di daftar itu. Naskah 4 menambah lagi: **Goal**, **Milestone**, **Project**, **Skill**, **Wardrobe item**, **Experiment**. |
 | **E-18** | **Dua set relasi yang terputus.** Naskah 2 memakai relasi **kausal** (`improves`, `causes`, `influences`, `blocks`, `predicts`). Ontology naskah 3 memakai relasi **struktural** (`hasHabit`, `prefersStyle`, …). Naskah 4 §9 menambah set **ketiga**: `Goal → Habit → Behavior → Outcome`. Belum ada aturan bagaimana ketiganya hidup dalam satu graf. |
 | **E-11** | **Ontology tidak memuat Habit sebagai domain** — padahal `hasHabit` adalah relasinya, dan Habit adalah sinyal **terberat** di mesin rekomendasi (25 %). Ontology juga menambah **Identity**, **Travel**, **Hobby** yang tidak pernah jadi modul. |
@@ -172,6 +175,11 @@ Ini kelompok temuan paling serius, karena **seluruh produk berdiri di atas graf 
 
 | # | Temuan |
 |---|---|
+| **E-56** | 🆕⭐ **Model angka pengguna keenam — tetapi kali ini hampir menyatu.** *Personal Representation Layer* (Pillar 9): Learning · Career · Health · Recovery · Lifestyle · Social · Finance, masing-masing dengan `confidence`, `trend`, `evidence`. **Enam dari tujuh dimensinya identik** dengan Human Dashboard naskah 4 §28; bedanya hanya *Discipline* ↔ *Lifestyle*. Ini kandidat jawaban terkuat untuk **A-19/#2**, dan bentuknya langsung muat di `human_states.metrics jsonb`. Yang tersisa: pilih *Discipline* atau *Lifestyle* (atau keduanya → 8 dimensi), dan tegaskan bahwa **HumanState** (keadaan hari ini) tetap terpisah dari **Personal Representation** (kecenderungan jangka panjang). |
+| **E-54** | 🆕 **Dua pohon `research/` berbeda di dalam naskah yang sama.** Awal naskah: `behavior/ preference/ recommendation/ simulation/ world-model/ embeddings/ graph/ evaluation/ benchmarks/ experiments/ papers/ notebooks/`. Akhir naskah: `behavior-lab/ preference-lab/ simulation-lab/ world-model-lab/ graph-lab/ memory-lab/ explainability-lab/ intervention-lab/ benchmark-lab/ experiment-registry/ evaluation/ papers/`. **Hilang:** `recommendation/`, `embeddings/`, `notebooks/`. **Muncul:** `memory-lab/`, `explainability-lab/`, `intervention-lab/`. Keduanya berjumlah 12 sehingga sekilas terlihat cocok — pola yang sama persis dengan **E-13**. |
+| **E-55** | 🆕 **Daftar node dan relasi graf keempat.** Node (Pillar 3): User, Goal, Habit, Skill, Outfit, Food, Friend, Place, Activity — **Mood, Sleep, Workout, Meeting, Money, Learning hilang** dari daftar naskah 2, padahal *Mood* dipakai di contoh query pada halaman yang sama. Relasi: `improves`, `supports`, `blocks`, `related_to`, `frequently_used`. ⭐ **Kabar baiknya: `causes`, `influences`, dan `predicts` DIBUANG** — sejalan dengan naskah 4 §7 yang melarang menulis kausal untuk data observasional. |
+| **E-58** | 🆕 **Dataset BFM menyebut dua sumber yang tidak ada di V0.** `sleep_events` dan `calendar_events` membutuhkan integrasi tidur dan kalender yang **tidak ada di V0 sama sekali** (12 fitur V0 tidak memuat keduanya), dan `context_snapshots` belum pernah punya tabel di 23 tabel spesifikasi. Bertaut **B-21**. |
+| **E-57** | 🆕 **Skema penomoran ketiga.** Sekarang ada **V0–V6** (versi produk), **Sprint 0–6** (sprint V0), dan **R1–R8** (sprint riset) yang berjalan berdampingan tanpa aturan hubungan. R1 tidak bisa mulai sebelum V0 selesai dan dipakai — hubungan itu perlu ditulis, bukan disimpulkan. |
 | **E-51** | 🆕 **Phase 5 berbeda sepuluh kali lipat antara dua naskah.** Naskah 7 menulis Phase 5 sebagai **"500+ spesifikasi tingkat riset"**; naskah 8 menulisnya **"50+ dokumen"**. Salah satu keliru — dan bisa dipastikan dari aritmetika naskah 8 sendiri: total 8 fase = 380 dokumen, jadi Phase 5 tidak mungkin 500+. Kemungkinan besar **50+ yang benar** dan angka di naskah 7 salah ketik, tetapi butuh konfirmasi karena selisihnya menentukan apakah Phase 5 pekerjaan sebulan atau setahun. |
 | **E-52** | 🆕 **Dua arah riset hilang dari Phase 5.** Naskah 7 mendaftar 9 arah; naskah 8 hanya 7. Yang hilang: **Multi-Agent Collective Intelligence** dan **HumanVerse Research Roadmap (5 tahun)**. (*Agent Marketplace Protocol* wajar pindah ke Phase 6 *Marketplace*.) Yang pertama serius: *"ratusan AI Agent bekerja secara bersamaan"* adalah janji pembuka naskah 2 dan alasan seluruh AgentOS ada — kalau risetnya dibuang, janji itu perlu diturunkan juga. Bertaut **B-12**. |
 | **E-53** | 🆕 **Phase 8, 11, dan 12 sebagian mengulang yang sudah ditulis.** *Consent Framework* = Layer 25 §25 · *Explainable AI* = naskah 4 §29 · *Privacy Vault* = naskah 4 §44 · *Safety Guardrails* = naskah 4 §17 · *Multi-region* = Layer 46 · *Disaster Recovery* = Layer 44 · *Cost Optimization* = Layer 32 & naskah 4 §48. Dan **Phase 12** (*Event Schema, Agent Contracts, Sprint Backlog, CI/CD, Docker*) adalah pekerjaan yang **sudah selesai untuk V0** di [`../spec/`](../spec/README.md) — bedanya hanya skala (23 tabel vs 100+, ~40 endpoint vs 500+). Yang benar-benar baru di Phase 8 hanya **Bias Detection** dan **Human Override**. Konsekuensinya: **angka 380 dokumen tidak bisa dijumlahkan begitu saja dengan hitungan naskah sebelumnya** — lingkupnya tumpang tindih. |
@@ -295,6 +303,23 @@ Ini kelompok temuan paling serius, karena **seluruh produk berdiri di atas graf 
   (`events` + projector Sprint 5), Agent OS (`agents`, `agent_tools`,
   `agent_runs`, `permissions`). Hanya fondasi ke-4 (Knowledge + Simulation)
   yang belum ada bentuknya sama sekali — lihat **E-49**.
+
+**Diperiksa di naskah kesembilan:**
+
+- ✅ **Format preferensi `{score, confidence, last_updated}`** (Pillar 2) sama
+  persis dengan Confidence Layer naskah 5 §19, dan **langsung muat** di tabel
+  `memories` yang sudah dirancang — tidak butuh tabel baru.
+- ✅ **Fashion Benchmark Pillar 13 sama persis dengan Layer 35 naskah 7**
+  (hot weather · office · minimal → breathable · formal · dark shoes).
+  Konsisten antar naskah, hal yang jarang terjadi di proyek ini.
+- ✅ **Kesepuluh deliverable Phase 5 jujur ditandai "Blueprint", bukan "Done".**
+  Ini pertama kalinya sebuah naskah menyertakan kolom status yang mengakui
+  isinya belum dibangun.
+- ✅ **Lima jenis embedding Pillar 8 cocok dengan koleksi Qdrant naskah 5 §5**
+  — hanya `goal` yang belum punya koleksi.
+- ✅ **Keluaran Human Experiment Framework tidak memuat kata *Conclusion***
+  (hanya Observation, Trend, Confidence) — lebih ketat daripada naskah 4 §36
+  yang masih menuliskannya, dan sejalan dengan *"bukan klaim ilmiah universal"*.
 
 **Diperiksa di naskah kedelapan:**
 

@@ -23,10 +23,10 @@ manusia + agent + data + knowledge + simulation + automation**.
 | Tahap | **Spesifikasi engineering siap** — belum ada kode (disengaja) |
 | Berkas kode | 0 |
 | Repo git | belum diinisialisasi |
-| Dokumen | **100 berkas** di `docs/` (naskah + audit + catatan sesi) + **8 berkas** di `spec/` |
-| Naskah pemilik | **8** — terakhir: peta Phase 5–12 (≈380 dokumen tersisa) |
+| Dokumen | **109 berkas** di `docs/` (naskah + audit + catatan sesi) + **8 berkas** di `spec/` |
+| Naskah pemilik | **9** — terakhir: **Phase 5 Research Lab**, 15 pilar riset |
 | Keputusan tertutup | **14 butir H** — nama · MVP · struktur repo · rencana kanonik V0–V6 |
-| Keputusan terbuka | **18 pertanyaan A** · **52 ketidakcocokan E** · **5 lubang G** |
+| Keputusan terbuka | **18 pertanyaan A** · **57 ketidakcocokan E** · **5 lubang G** |
 | Tanggal dokumen | 3 September 2026 |
 
 > ⚠️ **Nol baris kode itu disengaja — dan penghambatnya terus berkurang.**
@@ -118,7 +118,7 @@ Selengkapnya: [`docs/75-URUTAN-PEMBANGUNAN-V0-V6.md`](docs/75-URUTAN-PEMBANGUNAN
 
 ---
 
-## Delapan naskah
+## Sembilan naskah
 
 ```
   NASKAH 1   HumanOS — visi & 12 modul manusia          berkas 01–07
@@ -146,8 +146,11 @@ Selengkapnya: [`docs/75-URUTAN-PEMBANGUNAN-V0-V6.md`](docs/75-URUTAN-PEMBANGUNAN
      │       Layer 21–50 · standards · design system · AI Ops
      │
   NASKAH 8   Peta Phase 5–12                            berkas 113
-             ≈380 dokumen tersisa · taksiran kemajuan 45 %
-             "tidak ingin memperpanjang hanya demi panjang"
+     │       ≈380 dokumen tersisa · taksiran kemajuan 45 %
+     │
+  NASKAH 9   Phase 5 — HumanVerse Research Lab         berkas 114–122
+             15 research pillar · BFM · memory compression
+             roadmap R1–R8 · 10 deliverable (semua "Blueprint")
 ```
 
 > ℹ️ Penomoran berkas melewati 99. `99-CATATAN-AUDIT.md` tetap di tempatnya
@@ -157,7 +160,7 @@ Selengkapnya: [`docs/75-URUTAN-PEMBANGUNAN-V0-V6.md`](docs/75-URUTAN-PEMBANGUNAN
 
 ## Aturan berkas dokumen
 
-1. Berkas `01`–`113` merekam **kata pemilik apa adanya**. Susunannya dirapikan,
+1. Berkas `01`–`122` merekam **kata pemilik apa adanya**. Susunannya dirapikan,
    isinya tidak ditambah-tambahi. Bagian yang hilang di naskah **ditandai
    sebagai hilang**, bukan ditambal.
 2. Setiap keraguan, koreksi, risiko, atau usulan dari pihak lain (termasuk AI)
@@ -331,6 +334,30 @@ Phase 12  Blueprint Implementation 100+ ERD 100+ tabel · API 500+ endpoint
 > **Phase 8/11/12 sebagian mengulang** yang sudah ditulis — Phase 12 justru
 > pekerjaan yang **sudah selesai untuk V0** di [`spec/`](spec/README.md), hanya
 > beda skala. Lihat **E-51** dan **E-53**.
+
+---
+
+### Naskah 9 — Phase 5: HumanVerse Research Lab
+
+| Berkas | Pillar | Isi |
+|---|---|---|
+| [`114-PHASE-5-IKHTISAR.md`](docs/114-PHASE-5-IKHTISAR.md) | — | 4 prinsip riset · repo `research/` · peta 15 pilar |
+| [`115-R1-BEHAVIOR-FOUNDATION-MODEL.md`](docs/115-R1-BEHAVIOR-FOUNDATION-MODEL.md) | 1 | **BFM** — struktur model, dataset, evaluasi (**Calibration**) |
+| [`116-R2-R3-PREFERENCE-DAN-GRAPH.md`](docs/116-R2-R3-PREFERENCE-DAN-GRAPH.md) | 2–3 | Preference Learning · Graph Intelligence |
+| [`117-R4-MEMORY-COMPRESSION.md`](docs/117-R4-MEMORY-COMPRESSION.md) | 4 | Raw → Episode → Summary → Chapter → **Identity** |
+| [`118-R5-R7-WORLD-MODEL-SIMULASI.md`](docs/118-R5-R7-WORLD-MODEL-SIMULASI.md) | 5–7 | World Model · Counterfactual · Simulation |
+| [`119-R8-R9-EMBEDDING-REPRESENTASI.md`](docs/119-R8-R9-EMBEDDING-REPRESENTASI.md) | 8–9 | Embedding · ⭐ **Personal Representation Layer** |
+| [`120-R10-R12-INTERVENSI-XAI-EKSPERIMEN.md`](docs/120-R10-R12-INTERVENSI-XAI-EKSPERIMEN.md) | 10–12 | Adaptive Intervention (**annoyance**) · XAI · eksperimen |
+| [`121-R13-R15-BENCHMARK-REGISTRY-GOVERNANCE.md`](docs/121-R13-R15-BENCHMARK-REGISTRY-GOVERNANCE.md) | 13–15 | Benchmark · Experiment Registry · **Research Governance** |
+| [`122-PHASE-5-ROADMAP-DAN-DELIVERABLE.md`](docs/122-PHASE-5-ROADMAP-DAN-DELIVERABLE.md) | — | Repo final · roadmap R1–R8 · 10 deliverable |
+
+> ⭐ **Pillar 9 hampir menutup issue [#2](../../issues/2)** — *Personal
+> Representation Layer* punya **6 dari 7 dimensi identik** dengan Human
+> Dashboard naskah 4, plus `confidence`/`trend`/`evidence` per dimensi.
+>
+> 🛑 **Tapi Research Lab tidak bisa dimulai sebelum V0 mengumpulkan datanya.**
+> Seluruh dataset BFM baru ada setelah V0 dipakai berbulan-bulan, dan
+> `sleep_events` + `calendar_events` tidak ada di V0 sama sekali (**B-21**).
 
 ---
 

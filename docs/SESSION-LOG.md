@@ -4,6 +4,63 @@
 
 ---
 
+## Sesi 7 — 3 September 2026
+
+**Phase 5 Research Lab direkam — 15 pilar, dan satu masalah urutan.**
+
+| Hal | Hasil |
+|---|---|
+| Naskah baru | **Phase 5: HumanVerse Research Lab**, 15 research pillar |
+| Dokumen ditambah | **9 berkas** (`114`–`122`) |
+| Dokumen total | 100 → **109** di `docs/`, + 8 di `spec/` |
+| Berkas kode | tetap **0** |
+
+### ⭐ Kabar terbaik: Pillar 9 hampir menutup #2
+
+*Personal Representation Layer* punya **6 dari 7 dimensi identik** dengan Human
+Dashboard naskah 4 §28 — bedanya cuma *Discipline* ↔ *Lifestyle* — dan
+menambahkan tepat apa yang selama ini kurang: **`confidence`, `trend`,
+`evidence` per dimensi**. Bentuknya langsung muat di `human_states.metrics
+jsonb` yang sudah dirancang.
+
+Setelah enam naskah beradu model angka pengguna, ini yang pertama **mendekat**,
+bukan menjauh.
+
+### ⭐ Pillar 7 praktis menutup #7 (arah sebab-akibat)
+
+Rantai `Sleep → Energy → Workout → Mood → Productivity` **sama persis** dengan
+Layer 8 naskah 3, dan berbeda dari naskah 1. Sekarang **2 naskah vs 1**, dan
+yang dua adalah yang lebih baru. Ditambah *"semua node memiliki confidence"*.
+
+Pillar 3 juga **membuang `causes`, `influences`, `predicts`** dari daftar
+relasi graf — sejalan dengan naskah 4 §7.
+
+### 🛑 Temuan terpenting: urutannya, bukan isinya (B-21)
+
+Roadmap dimulai dari **R1 Behavior Prediction** — justru pilar yang paling
+bergantung pada data. Seluruh dataset BFM (`behavior_events`, `habit_events`,
+`sleep_events`, `mood_events`, `calendar_events`, `context_snapshots`) baru ada
+**setelah V0 dipakai berbulan-bulan**, dan `sleep_events` + `calendar_events`
+**tidak ada di V0 sama sekali**.
+
+Yang bisa dikerjakan lebih dulu tanpa data: **R8 Benchmark**, **R5
+Explainability**, lalu **R3 Memory Compression**.
+
+### Temuan lain
+
+- **B-20** — Compression Policy **tidak mengompres apa pun**: Raw, Episode,
+  dan Summary sama-sama disimpan *"penuh"* tanpa jendela waktu, padahal
+  masalahnya justru *"jutaan event tidak bisa dikirim semuanya ke LLM"*.
+- **C-13** — **Identity Memory permanen** (*"User is consistently committed to
+  strength training"*) adalah karakterisasi yang tidak bisa kedaluwarsa,
+  menguatkan dirinya sendiri, dan bertabrakan dengan hak hapus.
+- **E-54** — dua pohon `research/` berbeda **di dalam naskah yang sama**;
+  keduanya berjumlah 12 sehingga sekilas terlihat cocok (pola **E-13**).
+- **E-57** — sekarang ada tiga skema penomoran berjalan berdampingan:
+  V0–V6 · Sprint 0–6 · R1–R8.
+
+---
+
 ## Sesi 6 — 3 September 2026
 
 **Naskah kedelapan direkam — peta Phase 5–12, dan satu angka bertabrakan 10×.**
