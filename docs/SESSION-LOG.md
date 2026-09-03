@@ -4,6 +4,50 @@
 
 ---
 
+## Sesi 4 — 3 September 2026
+
+**Naskah keenam direkam — lalu lapisan 04 dikerjakan: Engineering Spec v1.0.**
+
+| Hal | Hasil |
+|---|---|
+| Naskah baru | **Peta 14 lapisan engineering + Operating Model** → berkas `98` |
+| Hasil kerja baru | **`spec/`** — 8 berkas, **bukan kata pemilik** |
+| Dokumen total | 85 → **86** di `docs/`, + 8 di `spec/` |
+| Berkas kode | tetap **0** |
+
+### Isi `spec/`
+
+23 tabel PostgreSQL dengan DDL lengkap · ERD + 6 aturan kepemilikan data ·
+22 event dengan versi/urutan/idempotensi · endpoint REST V0 + Privacy Center ·
+manifest agent dengan 6 aturan validasi + risk gate · batas modul yang
+ditegakkan CI · **51 tugas** dalam 7 sprint.
+
+### Temuan terbesar sesi ini
+
+**Tiga issue yang saya kira memblokir ternyata tidak perlu diputuskan sekarang** —
+skemanya bisa menampung kedua kemungkinan tanpa biaya:
+
+| Issue | Ternyata |
+|---|---|
+| #33 memory: jenis atau scope | **keduanya** — menjawab pertanyaan berbeda (`kind` = pengambilan, `scope` = izin) |
+| #32 tiga skala skor | simpan **0–1** — 100-poin & persen lossless ke sini, sebaliknya tidak |
+| #2 lima model angka | `metrics jsonb`, bukan 7 kolom tetap |
+| #7 model graf | **tidak menyentuh V0** — Neo4j baru V2 |
+
+Artinya **V0 bisa dimulai sekarang**; penghambat nyata tinggal #3 (waktu) dan
+#20 (merek). ⚠️ Tapi menunda bukan menjawab — selama #2 belum dipilih, tidak
+ada yang bisa **menghitung** angkanya.
+
+### Cacat yang ditemukan dari menulis spesifikasi (E-42)
+
+Daftar 19 tabel V0 naskah 5 §31 **tidak cukup untuk arsitektur V0 sendiri**:
+tidak ada `events` (padahal §30 menggambar *Event System* sebagai lapisan wajib
+dan §7 berkata *"setiap aktivitas menjadi event"*), dan `agent_runs` menunjuk
+tabel `agents` yang tidak ada. Ditemukan hanya karena mencoba menulis DDL-nya —
+tidak terlihat saat membaca naskah.
+
+---
+
 ## Sesi 3 — 3 September 2026
 
 **Blueprint Engineering v1.0 direkam — lima butir ditutup, satu dibatalkan.**

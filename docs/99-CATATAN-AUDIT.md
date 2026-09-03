@@ -11,19 +11,20 @@
 > 30 terbuka, 5 ditutup oleh naskah kelima. Baca issue-nya, jangan analisis
 > ulang naskahnya.
 
-Diperbarui: 3 September 2026 · Mencakup **lima naskah**:
+Diperbarui: 3 September 2026 · Mencakup **enam naskah**:
 **1 HumanOS** · **2 HumanVerse X** · **3 Phase 2 Enterprise Blueprint** ·
-**4 Phase 3 AI-Native Human Ecosystem** · **5 Blueprint Engineering v1.0**.
+**4 Phase 3 AI-Native Human Ecosystem** · **5 Blueprint Engineering v1.0** ·
+**6 Peta 14 lapisan engineering**.
 
 | Bagian | Isi | Jumlah |
 |---|---|---|
 | [H](#h-sudah-diputuskan--ditutup) | **Sudah diputuskan / ditutup** | 14 |
-| [A](#a-perlu-jawaban-pemilik) | Pertanyaan yang memblokir | 16 |
+| [A](#a-perlu-jawaban-pemilik) | Pertanyaan yang memblokir | 17 |
 | [B](#b-risiko-teknis) | Risiko teknis | 17 |
 | [C](#c-risiko-hukum--kepatuhan) | Risiko hukum & kepatuhan | 9 |
 | [D](#d-celah-yang-belum-tertutup) | Celah yang belum tertutup | 5 |
-| [E](#e-ketidakcocokan-antar-naskah) | **Ketidakcocokan antar-naskah** | 40 |
-| [F](#f-yang-sudah-saya-periksa-dan-ternyata-benar) | Sudah diperiksa, ternyata benar | 19 |
+| [E](#e-ketidakcocokan-antar-naskah) | **Ketidakcocokan antar-naskah** | 41 |
+| [F](#f-yang-sudah-saya-periksa-dan-ternyata-benar) | Sudah diperiksa, ternyata benar | 21 |
 | [G](#g-lubang-di-naskah-3-sendiri) | Lubang di naskah 3 sendiri | 3 |
 
 ---
@@ -59,8 +60,9 @@ Diurutkan dari yang paling menghambat.
 
 | # | Pertanyaan | Kenapa penting |
 |---|---|---|
-| **A-19** | ⚠️ **Sekarang LIMA model angka pengguna — memburuk, bukan membaik.** *Human Genome of Behavior* 6 skor · *Profile Engine* 5 atribut · *HumanState* **7 field** (naskah 5 membuang `mood`) · *Human Dashboard* 7 batang · *DigitalTwin* 8 model. Tidak satu pun saling merujuk, tidak satu pun punya rumus. | Ini akan **mengunci skema basis data** — tabel `profiles`, `memories`, dan state harian bergantung padanya. **Confidence Layer (H-14) menjawab cara MENYAJIKAN angka, bukan angka mana yang dipakai.** Engineering Spec tidak bisa ditulis sebelum ini dipilih. Lihat **E-34**. |
+| **A-19** | ⚠️ **Sekarang LIMA model angka pengguna — memburuk, bukan membaik.** *Human Genome of Behavior* 6 skor · *Profile Engine* 5 atribut · *HumanState* **7 field** (naskah 5 membuang `mood`) · *Human Dashboard* 7 batang · *DigitalTwin* 8 model. Tidak satu pun saling merujuk, tidak satu pun punya rumus. | Ini akan **mengunci skema basis data** — tabel `profiles`, `memories`, dan state harian bergantung padanya. **Confidence Layer (H-14) menjawab cara MENYAJIKAN angka, bukan angka mana yang dipakai.** ⚠️ **Spesifikasi menundanya tanpa biaya** — `human_states.metrics` dibuat `jsonb` sehingga model mana pun muat tanpa migrasi ([`../spec/01`](../spec/01-DATABASE-SCHEMA.md)). Tapi penundaan bukan jawaban: selama belum dipilih, **tidak ada yang bisa menghitung angkanya**. Lihat **E-34**. |
 | **A-17** | ⚠️ **Diperjelas dan makin berat.** Naskah 5 §32 memecah V0 jadi **7 sprint** (Foundation → Identity → Human Core → Memory → AI → Intelligence → Product), dan §29 **menambah dua fitur V0** (Activity Tracking, Recommendation) — sementara targetnya tetap **4–6 minggu**. | 7 sprint dalam 4–6 minggu ≈ **4–6 hari per sprint**, termasuk Sprint 0 (repo, Docker, CI/CD) dan Sprint 4 (AI Gateway + Model Router + 3 agent). Ini klaim jadwal, bukan arsitektur — dan sekarang cakupannya bertambah tanpa waktunya bertambah. Lihat **E-40**. |
+| **A-23** | 🆕 **Empat belas lapisan engineering — berapa yang benar-benar dibutuhkan sebelum V0?** Naskah 6 memperkirakan **~10–14 dokumen engineering utama**. Dari peta itu, **hanya lapisan 04** (Engineering Specification) yang menghalangi baris kode pertama; 05–14 sebagian besar baru relevan V1+. | Ini pengulangan pola **A-13**: dokumentasi bertambah 100 → 160 → 300+ → ≈460, sekarang +14 lapisan. Kalau semuanya ditulis dulu, V0 yang 4–6 minggu tidak akan pernah dimulai. Usul: tulis 05–14 **setelah** V0 jalan, karena V0 akan mengubah isinya. |
 | **A-20** | 🆕 **Mental Wellness dan Lifestyle: dibuang atau ditunda?** Registry §12 berisi 14 agent dan **memulihkan** Grooming, Nutrition, Productivity — tetapi **Mental Wellness dan Lifestyle tetap tanpa agent** (padahal Lifestyle muncul lagi di §56). | Menyempitkan **A-8** dari empat modul jadi dua. Mental Wellness punya beban hukum tertinggi (**C-3**) — kalau memang dibuang, hapus dari `03-MODUL.md` supaya dokumen tidak berbohong. |
 | **A-22** | 🆕 **Sampai level risiko berapa agent boleh bertindak otomatis?** §16 memberi Level 0–4 dan mewajibkan konfirmasi eksplisit di Level 4. Level 2 dan 3 belum ditetapkan default-nya. | *"Act selalu di bawah kontrol pengguna"* adalah janji pembuka naskah 4. Tanpa default yang tertulis, janji itu tidak bisa diuji. |
 | **A-21** | 🆕 **Experiment Engine: berapa hari minimum, dan kapan sistem menolak menyimpulkan?** §35 memberi contoh 14 hari tanpa kelompok kontrol. | §36 sudah memisahkan Observation → Correlation → Hypothesis → Evidence → Conclusion. Yang belum ada adalah **ambangnya**. Lihat **B-16** dan **C-8**. |
@@ -162,6 +164,7 @@ Ini kelompok temuan paling serius, karena **seluruh produk berdiri di atas graf 
 
 | # | Temuan |
 |---|---|
+| **E-42** | 🆕 **Daftar tabel V0 tidak cukup untuk arsitektur V0 sendiri.** Naskah 6 meminta `events`, `agents`, dan `agent_tools` — **ketiganya tidak ada** di 19 tabel §31. Padahal §30 menggambar *Event System* sebagai lapisan wajib V0, §7 berkata *"setiap aktivitas menjadi event"*, dan `agent_runs` yang **ada** di §31 jelas menunjuk agent yang tabelnya tidak ada. Tanpa `events`, Behavior Engine Sprint 5 tidak punya bahan. Ditambahkan di [`../spec/01`](../spec/01-DATABASE-SCHEMA.md) → **23 tabel**. |
 | **E-35** | 🆕 **Daftar agent berubah untuk KEEMPAT kalinya — dan Grooming hilang lagi.** Naskah 5 §12 mendaftar **22 agent** (12 inti + 10 domain). Dibanding registry 14 di naskah 4: **HealthAgent, GroomingAgent, ProductivityAgent, EntertainmentAgent, dan ResearchAgent hilang**; **WardrobeAgent dan TrendAgent muncul**; dan 12 agent sistem (Planner, Behavior, Context, Goal, Evaluation, **Safety**, Personalization, …) masuk daftar untuk pertama kalinya. ⚠️ **Health dan Lifestyle adalah *domain* di §3 tapi tidak punya agent di §12.** Ini membatalkan **H-8**. |
 | **E-34** | 🆕 **Model pengguna bergeser lagi di dalam naskah 5.** *HumanState* turun dari **8 field jadi 7** — **`mood` keluar**; itu kemungkinan besar benar dan disengaja (mood punya event `mood.logged` dan tabel `mood_entries` sendiri — **dilaporkan pengguna**, bukan **ditaksir sistem**), tapi belum pernah dinyatakan. *DigitalTwin* tetap 8 model tetapi **`SocialModel` diganti `LifestyleModel`**. Lihat **A-19**. |
 | **E-37** | 🆕 **Tiga sistem skoring rekomendasi yang tidak sepadan.** Naskah 2: bobot persen berjumlah **100 %**. Naskah 3: Outfit Score berjumlah **100 poin**. Naskah 5 §11: *Recommendation Score* sebagai **rata-rata 0–1**. Tabel `recommendations` di V0 harus menyimpan salah satunya. Rumus §11 juga menyebut **7 komponen** sementara contohnya memakai **5** (*Occasion Fit* dan *Availability* tidak muncul), dan **belum ada bobot**. |
@@ -247,6 +250,14 @@ Ini kelompok temuan paling serius, karena **seluruh produk berdiri di atas graf 
 - ✅ **Sepuluh agent pengembangan (§28) sengaja terpisah dari 22 agent produk
   (§12)** — sempat saya kira daftar yang bertabrakan, ternyata dua ekosistem
   berbeda: satu membangun produk, satu berjalan di dalam produk.
+
+**Diperiksa di naskah keenam:**
+
+- ✅ **Naskah 6 tidak menambah satu pun gagasan produk baru.** Setelah lima
+  naskah yang selalu melebar, ini yang pertama hanya **meminta hasil**. Kalimat
+  *"jangan lompat ke fitur baru lagi"* ditepati di naskahnya sendiri.
+- ✅ **Peta 14 lapisan konsisten dengan isi naskah 1–5** — tiap lapisan punya
+  bahan yang sudah tertulis; tidak ada lapisan yang mengarang kebutuhan baru.
 
 ---
 

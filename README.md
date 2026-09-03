@@ -20,13 +20,13 @@ manusia + agent + data + knowledge + simulation + automation**.
 
 | Hal | Keadaan |
 |---|---|
-| Tahap | **Kerangka / visi** — belum ada kode (disengaja) |
+| Tahap | **Spesifikasi engineering siap** — belum ada kode (disengaja) |
 | Berkas kode | 0 |
 | Repo git | belum diinisialisasi |
-| Dokumen | **85 berkas** di `docs/` — 83 naskah + audit + catatan sesi |
-| Naskah pemilik | **5** (HumanOS → HumanVerse X → Phase 2 → Phase 3 → **Blueprint Engineering v1.0**) |
+| Dokumen | **86 berkas** di `docs/` (naskah + audit + catatan sesi) + **8 berkas** di `spec/` |
+| Naskah pemilik | **6** — terakhir: peta 14 lapisan engineering |
 | Keputusan tertutup | **14 butir H** — nama · MVP · struktur repo · rencana kanonik V0–V6 |
-| Keputusan terbuka | **16 pertanyaan A** · **40 ketidakcocokan E** · **3 lubang G** |
+| Keputusan terbuka | **17 pertanyaan A** · **41 ketidakcocokan E** · **3 lubang G** |
 | Tanggal dokumen | 3 September 2026 |
 
 > ⚠️ **Nol baris kode itu disengaja — dan penghambatnya terus berkurang.**
@@ -67,6 +67,36 @@ skema basis data: [#2](../../issues/2) lima model angka pengguna ·
 
 ---
 
+## 🔧 Engineering Specification v1.0 — [`spec/`](spec/README.md)
+
+Lapisan **04** dari peta 14 lapisan naskah 6, dikerjakan penuh. **Bukan kata
+pemilik** — sengaja di luar `docs/` supaya berkas naskah tetap murni.
+
+| Berkas | Isi |
+|---|---|
+| [`spec/01-DATABASE-SCHEMA.md`](spec/01-DATABASE-SCHEMA.md) | DDL PostgreSQL — **23 tabel**, tipe, PK, FK, index, constraint, prosedur hapus akun |
+| [`spec/02-ERD.md`](spec/02-ERD.md) | Relasi + 6 aturan kepemilikan data |
+| [`spec/03-EVENT-CONTRACTS.md`](spec/03-EVENT-CONTRACTS.md) | Envelope, **versi · urutan · idempotensi**, 22 event, consumer |
+| [`spec/04-API-CONTRACTS.md`](spec/04-API-CONTRACTS.md) | Endpoint REST V0 + Privacy Center |
+| [`spec/05-AGENT-CONTRACTS.md`](spec/05-AGENT-CONTRACTS.md) | Manifest schema (6 aturan validasi), tool registry, risk gate |
+| [`spec/06-MODULE-BOUNDARIES.md`](spec/06-MODULE-BOUNDARIES.md) | Batas modul + 6 aturan yang **ditegakkan CI** |
+| [`spec/07-BACKLOG-V0.md`](spec/07-BACKLOG-V0.md) | **51 tugas** dalam 7 sprint, siap diberikan ke AI coding agent |
+
+**Tiga issue pengunci ternyata tidak perlu diputuskan sekarang** — skemanya
+menampung kedua kemungkinan tanpa biaya:
+
+| Issue | Cara ditangani |
+|---|---|
+| [#33](../../issues/33) memory: jenis atau scope | **keduanya** — `kind` untuk pengambilan, `scope` untuk izin |
+| [#32](../../issues/32) tiga skala skor | simpan **0–1** + `scoring_version` + `score_breakdown` |
+| [#2](../../issues/2) lima model angka pengguna | `human_states.metrics jsonb`, bukan kolom tetap |
+| [#7](../../issues/7) model graf | **tidak menyentuh V0** — Neo4j baru masuk V2 |
+
+> ⚠️ Menunda bukan menjawab. Selama #2 belum dipilih, tidak ada yang bisa
+> **menghitung** angkanya — tabelnya hanya siap menampungnya.
+
+---
+
 ## ⭐ MVP sudah ada namanya: V0 — HumanVerse Foundation
 
 Untuk pertama kalinya dalam empat naskah, ada **daftar tertutup** yang bisa
@@ -83,7 +113,7 @@ Selengkapnya: [`docs/75-URUTAN-PEMBANGUNAN-V0-V6.md`](docs/75-URUTAN-PEMBANGUNAN
 
 ---
 
-## Lima naskah
+## Enam naskah
 
 ```
   NASKAH 1   HumanOS — visi & 12 modul manusia          berkas 01–07
@@ -100,15 +130,19 @@ Selengkapnya: [`docs/75-URUTAN-PEMBANGUNAN-V0-V6.md`](docs/75-URUTAN-PEMBANGUNAN
      │       "arsitektur boleh besar, implementasinya bertahap"
      │
   NASKAH 5   Blueprint Engineering v1.0                 berkas 80–97
-             34 bagian · monorepo final · 22 agent · 7 sprint V0
-             "berhenti menambah visi/fitur"
+     │       34 bagian · monorepo final · 22 agent · 7 sprint V0
+     │       "berhenti menambah visi/fitur"
+     │
+  NASKAH 6   Peta 14 lapisan engineering               berkas 98
+             Operating Model · "jangan lompat ke fitur baru lagi"
+             └──► lapisan 04 dikerjakan → spec/
 ```
 
 ---
 
 ## Aturan berkas dokumen
 
-1. Berkas `01`–`97` merekam **kata pemilik apa adanya**. Susunannya dirapikan,
+1. Berkas `01`–`98` merekam **kata pemilik apa adanya**. Susunannya dirapikan,
    isinya tidak ditambah-tambahi. Bagian yang hilang di naskah **ditandai
    sebagai hilang**, bukan ditambal.
 2. Setiap keraguan, koreksi, risiko, atau usulan dari pihak lain (termasuk AI)
