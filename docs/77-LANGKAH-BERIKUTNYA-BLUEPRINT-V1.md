@@ -34,11 +34,32 @@ urutan task yang dapat langsung diberikan kepada AI coding agents
 
 ---
 
+## ✅ Sudah ditulis — 3 September 2026
+
+Pemilik menulis sendiri **Blueprint Engineering v1.0** pada hari yang sama,
+sebagai **naskah kelima**. Isinya ada di berkas
+[`80`](80-BLUEPRINT-IKHTISAR.md)–[`96`](96-SESUDAH-V0-DAN-TARGET-AKHIR.md).
+
+Yang ia tutup: struktur repo final (**H-10**), Weather/Calendar sebagai tool
+(**H-11**), empat penyimpanan bukan enam (**H-12**), V0–V6 sebagai rencana
+kanonik (**H-13**), dan **Confidence Layer** sebagai jawaban angka-yang-tampak-
+seperti-fakta (**H-14**).
+
+Yang ia **belum** tutup, dan justru menjadi lebih mendesak karena Engineering
+Spec akan mengunci skema: **A-19** (kini lima model angka pengguna),
+**E-16..E-18** (model graf), **E-39** (memory: jenis atau nama scope), dan
+**E-37** (tiga sistem skoring).
+
+Langkah berikutnya menurut pemilik:
+[`97-LANGKAH-BERIKUTNYA-ENGINEERING-SPEC.md`](97-LANGKAH-BERIKUTNYA-ENGINEERING-SPEC.md).
+
+---
+
 ## Status
 
 | Hal | Keadaan |
 |---|---|
-| Blueprint Engineering v1.0 | **belum ditulis** |
+| Blueprint Engineering v1.0 | ✅ **selesai** — naskah 5, berkas `80`–`96` |
 | Kode | **masih nol** |
 | Keputusan pemblokir | lihat [`99-CATATAN-AUDIT.md`](99-CATATAN-AUDIT.md) |
 

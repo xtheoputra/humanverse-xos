@@ -4,6 +4,54 @@
 
 ---
 
+## Sesi 3 — 3 September 2026
+
+**Blueprint Engineering v1.0 direkam — lima butir ditutup, satu dibatalkan.**
+
+| Hal | Hasil |
+|---|---|
+| Naskah baru | **Blueprint Engineering v1.0**, 34 bagian |
+| Dokumen ditambah | **18 berkas** (`80`–`97`) |
+| Dokumen total | 67 → **85 berkas** di `docs/` |
+| Berkas kode | tetap **0** |
+
+### Yang naskah 5 tutup
+
+| # | Butir | Jawaban |
+|---|---|---|
+| H-10 | E-27 struktur repo | Monorepo final — **menggabungkan** struktur naskah 2 dan naskah 4 |
+| H-11 | E-2/E-28 Weather & Calendar | **Tool**, bukan agent |
+| H-12 | A-10 Kafka vs Redis Streams | **Empat penyimpanan**: PostgreSQL · Qdrant · Neo4j · Redis |
+| H-13 | A-18 Phase vs V0–V6 | **V0–V6** — Phase 1/2/3 tidak disebut sekali pun |
+| H-14 | B-15/B-1 angka taksiran & cold start | **Confidence Layer** — `confidence` + `evidence_count`, low → tanya pengguna |
+
+### ❌ Yang dibatalkan
+
+**H-8 gugur.** GroomingAgent yang kembali di naskah 4 **hilang lagi** di daftar
+22 agent naskah 5, bersama HealthAgent, ProductivityAgent, EntertainmentAgent,
+dan ResearchAgent. Satu naskah memulihkan sesuatu bukan berarti sudah tetap.
+
+### Yang naskah 5 buka (E-34..E-41)
+
+- **A-19 memburuk**: kini **lima** model angka pengguna, HumanState turun jadi
+  7 field (`mood` keluar), DigitalTwin tukar Social → Lifestyle.
+- **E-37** tiga sistem skoring dengan skala berbeda (100 % · 100 poin · 0–1).
+- **E-39** memory: 6 jenis (§17) vs nama scope (§14) — tabel `memories` butuh
+  salah satunya.
+- **E-40** V0 bertambah jadi **12 fitur**, targetnya tetap 4–6 minggu, dan
+  §32 memecahnya jadi **7 sprint** ≈ 4–6 hari per sprint.
+- **E-38** `PreparationAgent` di §13 tidak ada di daftar 22 agent.
+- **E-41** `Billing` muncul sebagai domain platform tanpa pernah dibahas.
+
+### Langkah berikutnya menurut pemilik
+
+**Engineering Specification v1.0** — schema PostgreSQL lengkap, ERD, event
+contract, API endpoint, Agent Registry schema, MCP Tool Registry, permission
+schema, prompt architecture, Docker Compose, CI/CD, backlog task V0.
+Lihat [`97-LANGKAH-BERIKUTNYA-ENGINEERING-SPEC.md`](97-LANGKAH-BERIKUTNYA-ENGINEERING-SPEC.md).
+
+---
+
 ## Sesi 2 — 3 September 2026
 
 **Naskah keempat direkam · nama diputuskan · repo dibuat.**

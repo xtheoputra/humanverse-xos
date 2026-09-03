@@ -23,18 +23,24 @@ manusia + agent + data + knowledge + simulation + automation**.
 | Tahap | **Kerangka / visi** — belum ada kode (disengaja) |
 | Berkas kode | 0 |
 | Repo git | belum diinisialisasi |
-| Dokumen | **67 berkas** di `docs/` — 65 naskah + audit + catatan sesi |
-| Naskah pemilik | **4** (HumanOS → HumanVerse X → Phase 2 Blueprint → Phase 3 Ecosystem) |
-| Keputusan tertutup | **9 butir H** — termasuk **nama** dan **MVP** |
-| Keputusan terbuka | **18 pertanyaan A** · **32 ketidakcocokan E** · **3 lubang G** |
+| Dokumen | **85 berkas** di `docs/` — 83 naskah + audit + catatan sesi |
+| Naskah pemilik | **5** (HumanOS → HumanVerse X → Phase 2 → Phase 3 → **Blueprint Engineering v1.0**) |
+| Keputusan tertutup | **14 butir H** — nama · MVP · struktur repo · rencana kanonik V0–V6 |
+| Keputusan terbuka | **16 pertanyaan A** · **40 ketidakcocokan E** · **3 lubang G** |
 | Tanggal dokumen | 3 September 2026 |
 
-> ⚠️ **Nol baris kode itu disengaja.** Tapi penghambatnya sudah berkurang:
-> naskah keempat menjawab **A-2 (mana MVP-nya)** dan pemilik menjawab
-> **A-7 (nama)**. Yang tersisa sebelum kode ditulis:
-> **A-18** (Phase 1/2/3 atau V0–V6?), **A-19** (empat model angka pengguna),
-> **A-17** (siapa yang mengerjakan V0 dalam 4–6 minggu), **A-14/A-4** (privasi
-> & cloud), **A-20** (Mental Wellness & Lifestyle dibuang atau ditunda).
+> ⚠️ **Nol baris kode itu disengaja — dan penghambatnya terus berkurang.**
+> Lima naskah sudah menjawab: **nama** (A-7), **MVP** (A-2), **struktur repo**
+> (E-27), **Weather/Calendar = tool** (E-2/E-28), **empat penyimpanan bukan
+> enam** (A-10), **V0–V6 sebagai rencana kanonik** (A-18), dan **Confidence
+> Layer** untuk angka taksiran (B-15/B-1).
+>
+> Yang **masih mengunci Engineering Spec** — karena keempatnya menentukan
+> skema basis data:
+> **A-19** (kini **lima** model angka pengguna, tak satu pun berumus) ·
+> **E-16..E-18** (model graf) · **E-39** (memory: jenis atau nama scope) ·
+> **E-37** (tiga sistem skoring dengan skala berbeda).
+> Ditambah **A-17** — V0 bertambah 2 fitur jadi 12, waktunya tetap 4–6 minggu.
 > Semuanya di [`docs/99-CATATAN-AUDIT.md`](docs/99-CATATAN-AUDIT.md).
 
 ---
@@ -71,7 +77,7 @@ Selengkapnya: [`docs/75-URUTAN-PEMBANGUNAN-V0-V6.md`](docs/75-URUTAN-PEMBANGUNAN
 
 ---
 
-## Empat naskah
+## Lima naskah
 
 ```
   NASKAH 1   HumanOS — visi & 12 modul manusia          berkas 01–07
@@ -84,15 +90,19 @@ Selengkapnya: [`docs/75-URUTAN-PEMBANGUNAN-V0-V6.md`](docs/75-URUTAN-PEMBANGUNAN
      │       160 dokumen engineering
      │
   NASKAH 4   Phase 3 AI-Native Human Ecosystem          berkas 50–77
-             58 bagian · V0–V6 · HumanVerse Economy
-             "arsitektur boleh besar, implementasinya bertahap"
+     │       58 bagian · V0–V6 · HumanVerse Economy
+     │       "arsitektur boleh besar, implementasinya bertahap"
+     │
+  NASKAH 5   Blueprint Engineering v1.0                 berkas 80–97
+             34 bagian · monorepo final · 22 agent · 7 sprint V0
+             "berhenti menambah visi/fitur"
 ```
 
 ---
 
 ## Aturan berkas dokumen
 
-1. Berkas `01`–`77` merekam **kata pemilik apa adanya**. Susunannya dirapikan,
+1. Berkas `01`–`97` merekam **kata pemilik apa adanya**. Susunannya dirapikan,
    isinya tidak ditambah-tambahi. Bagian yang hilang di naskah **ditandai
    sebagai hilang**, bukan ditambal.
 2. Setiap keraguan, koreksi, risiko, atau usulan dari pihak lain (termasuk AI)
@@ -194,6 +204,31 @@ Selengkapnya: [`docs/75-URUTAN-PEMBANGUNAN-V0-V6.md`](docs/75-URUTAN-PEMBANGUNAN
 | [`76-HUMANVERSE-ECONOMY.md`](docs/76-HUMANVERSE-ECONOMY.md) | — | HumanVerse Economy · bentuk akhir · prinsip penutup |
 | [`77-LANGKAH-BERIKUTNYA-BLUEPRINT-V1.md`](docs/77-LANGKAH-BERIKUTNYA-BLUEPRINT-V1.md) | — | Langkah berikutnya: **Blueprint Engineering v1.0** |
 
+### Naskah 5 — Blueprint Engineering v1.0
+
+| Berkas | § | Isi |
+|---|---|---|
+| [`80-BLUEPRINT-IKHTISAR.md`](docs/80-BLUEPRINT-IKHTISAR.md) | 1 | **Modular Monolith → Distributed Services → Agent Platform** |
+| [`81-SYSTEM-CONTEXT.md`](docs/81-SYSTEM-CONTEXT.md) | 2 | System Context — apps → gateway → 3 blok → event bus → 3 penyimpanan |
+| [`82-DOMAIN-ARCHITECTURE.md`](docs/82-DOMAIN-ARCHITECTURE.md) | 3 | 10 bounded context + 8 domain platform |
+| [`83-STRUKTUR-REPO-FINAL.md`](docs/83-STRUKTUR-REPO-FINAL.md) | 4 | ⭐ **Monorepo final** — menutup E-27 |
+| [`84-DATABASE-ARCHITECTURE.md`](docs/84-DATABASE-ARCHITECTURE.md) | 5–6 | PostgreSQL · Qdrant · Neo4j · Redis — **Kafka & ClickHouse dibuang** |
+| [`85-BEHAVIOR-DAN-EVENT.md`](docs/85-BEHAVIOR-DAN-EVENT.md) | 7–8 | **21 event** + arsitektur event bus |
+| [`86-HUMAN-STATE-DAN-CONTEXT.md`](docs/86-HUMAN-STATE-DAN-CONTEXT.md) | 9–10 | HumanState 7 field (`mood` keluar) · Context Engine |
+| [`87-RECOMMENDATION-ENGINE.md`](docs/87-RECOMMENDATION-ENGINE.md) | 11 | Recommendation Score — 7 komponen |
+| [`88-ARSITEKTUR-AGEN.md`](docs/88-ARSITEKTUR-AGEN.md) | 12–16 | **22 agent** · Orchestrator · Manifest · Permission · Risk 0–4 |
+| [`89-MEMORY-ARCHITECTURE.md`](docs/89-MEMORY-ARCHITECTURE.md) | 17 | Memory 6 jenis, dengan contoh |
+| [`90-DIGITAL-TWIN-DAN-CONFIDENCE.md`](docs/90-DIGITAL-TWIN-DAN-CONFIDENCE.md) | 18–19 | ⭐ **Confidence Layer** — low confidence → tanya pengguna |
+| [`91-PERSONALIZATION-DAN-TREND.md`](docs/91-PERSONALIZATION-DAN-TREND.md) | 20–21 | Flywheel · *Popular ≠ suitable for the user* |
+| [`92-MODEL-ROUTER-EVALUASI-AUDIT.md`](docs/92-MODEL-ROUTER-EVALUASI-AUDIT.md) | 22–24 | Model Router · Evaluation + rollback · Audit metadata |
+| [`93-SECURITY-DAN-PRIVACY.md`](docs/93-SECURITY-DAN-PRIVACY.md) | 25–26 | Rantai keamanan · Privacy Center + izin per agent |
+| [`94-DEVELOPMENT-LIFECYCLE.md`](docs/94-DEVELOPMENT-LIFECYCLE.md) | 27–28 | *Governance tetap manusia* · 10 agent pengembangan |
+| [`95-V0-SPESIFIKASI.md`](docs/95-V0-SPESIFIKASI.md) | 29–32 | ⭐ **12 fitur · 4 agent · 19 tabel · 7 sprint** |
+| [`96-SESUDAH-V0-DAN-TARGET-AKHIR.md`](docs/96-SESUDAH-V0-DAN-TARGET-AKHIR.md) | 33–34 | V1–V6 · target akhir dengan lapisan **HUMAN CONTROL** |
+| [`97-LANGKAH-BERIKUTNYA-ENGINEERING-SPEC.md`](docs/97-LANGKAH-BERIKUTNYA-ENGINEERING-SPEC.md) | — | Langkah berikutnya: **Engineering Specification v1.0** |
+
+---
+
 ### Catatan
 
 | Berkas | Isi |
@@ -275,8 +310,8 @@ NASKAH 1 — 12 modul               NASKAH 4 — Agent Registry §12
 | Backend | FastAPI · 12 microservice |
 | AgentOS | Registry · Scheduler · Task Queue · Workflow · Tool Registry · Memory Manager · Event Bus · Policy Engine |
 | AI | LangGraph · MCP · Tool Calling · **Model Router** (small/medium/large) |
-| Data | PostgreSQL · Neo4j · Qdrant · ClickHouse · Redis · S3 |
-| Event | Kafka · Redis Streams · Event Bus |
+| Data | **PostgreSQL · Qdrant · Neo4j · Redis** — naskah 5 membuang ClickHouse & Kafka |
+| Event | Event Bus; antrean di **Redis** (Kafka baru bila skalanya menuntut) |
 | Infra | **V0: Docker Compose** → Cloud VM → Kubernetes · ArgoCD · Terraform · Vault |
 | Observability | OpenTelemetry · Prometheus · Grafana · Loki · Tempo · Sentry · **Agent Health** |
 | Keamanan | OAuth · RBAC · Vault · AES-256 · TLS · Immutable Log · Permission Engine · Risk Engine |
