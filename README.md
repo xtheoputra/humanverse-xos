@@ -23,7 +23,7 @@ manusia + agent + data + knowledge + simulation + automation**.
 | Tahap | **Kerangka / visi** — belum ada kode (disengaja) |
 | Berkas kode | 0 |
 | Repo git | belum diinisialisasi |
-| Dokumen | **66 berkas** di `docs/` |
+| Dokumen | **67 berkas** di `docs/` — 65 naskah + audit + catatan sesi |
 | Naskah pemilik | **4** (HumanOS → HumanVerse X → Phase 2 Blueprint → Phase 3 Ecosystem) |
 | Keputusan tertutup | **9 butir H** — termasuk **nama** dan **MVP** |
 | Keputusan terbuka | **18 pertanyaan A** · **32 ketidakcocokan E** · **3 lubang G** |
