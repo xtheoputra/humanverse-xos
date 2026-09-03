@@ -4,6 +4,61 @@
 
 ---
 
+## Sesi 9 — 3 September 2026
+
+**Phase 7 Data & AI Infrastructure direkam — dan satu keputusan lama tergerus.**
+
+| Hal | Hasil |
+|---|---|
+| Naskah baru | **Phase 7: Data & AI Infrastructure**, §7.0–§7.35 |
+| Dokumen ditambah | **10 berkas** (`132`–`141`) |
+| Dokumen total | 118 → **128** di `docs/`, + 8 di `spec/` |
+| Berkas kode | tetap **0** |
+
+### ⭐ Dua bagian terkuat
+
+**§7.24 Privacy metadata.** Data membawa `data_class`, `purpose`, `retention`,
+`consent_required`. Ini **pembatasan tujuan yang bisa ditegakkan mesin** — data
+ber-`purpose: [personalization]` tidak bisa dipakai melatih model tanpa
+`purpose` baru. Persis yang diminta **C-11**.
+
+**§7.25 Deletion Engine.** Cascade ke 7 tempat, memperluas prosedur hapus akun
+di `spec/01` dengan **empat tempat yang belum saya cakup**: Lakehouse (Parquet
+tidak punya `DELETE`), Features (nilai turunan tetap membawa jejak), Graph
+(simpul yatim), Caches (Redis tidak ikut transaksi). Saya tambahkan satu lagi
+yang belum disebut siapa pun: **backup**.
+
+### 🛑 H-10 perlu ditinjau ulang — keputusan yang saya tutup, tergerus
+
+Naskah 5 §4 menetapkan monorepo final, dan saya menutup **E-27** sebagai
+**H-10**. Sejak itu **tiga naskah menambah pohon tingkat-atas sendiri**:
+`research/` (naskah 9), `developer-platform/` (naskah 10), `data-platform/`
+(naskah 11, 21 folder) — tanpa satu pun menempatkannya di dalam monorepo.
+`data/` dan `data-platform/` bahkan tumpang tindih di tiga folder.
+
+### 🛑 Dua tabrakan penomoran baru
+
+- **E-63** — tangga V0–V5 §7.0 memberi **makna ketiga** untuk nomor versi
+  (V3 = *Lakehouse* di sini, *Multi-Agent Platform* di naskah 5 §33,
+  *Agent Platform* di §1). Butir **A-18** ditutup dengan *"V0–V6 kanonik"* —
+  tapi kalau nomornya sendiri berarti tiga hal, itu tidak menolong.
+- **E-64** — **`D1`–`D8` dipakai dua kali**: Developer Platform (naskah 10) dan
+  Data Platform (naskah 11). *"Kita di D4"* berarti *Agent SDK* **dan**
+  *AI Data*.
+
+### Temuan lain
+
+- **G-6** — Level 4 *Highly Sensitive* **tanpa satu contoh pun**, padahal
+  justru level ini yang menentukan aturan paling ketat.
+- **E-65** — envelope event ketiga. ⭐ `actor{type,id}` adalah perbaikan nyata
+  (membedakan event dari agent vs dari orang), ⚠️ tapi `idempotency_key` dan
+  `recorded_at` hilang.
+- 🔧 **Koreksi saya sendiri:** di #7 saya menulis Neo4j relevan di **V2**;
+  §7.0 menempatkan Knowledge Graph di **V4**. Kesimpulan tidak berubah (tidak
+  menghalangi V0), tapi jaraknya lebih jauh.
+
+---
+
 ## Sesi 8 — 3 September 2026
 
 **Phase 6 Developer Platform direkam — satu issue tertutup, dua pengaman hilang.**

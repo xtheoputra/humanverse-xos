@@ -13,10 +13,11 @@
 > 🔧 Hasil kerja engineering ada di [`../spec/`](../spec/README.md) —
 > **bukan kata pemilik**, dan sengaja di luar `docs/`.
 
-Diperbarui: 3 September 2026 · Mencakup **sepuluh naskah**:
+Diperbarui: 3 September 2026 · Mencakup **sebelas naskah**:
 **1 HumanOS** · **2 HumanVerse X** · **3 Phase 2 Enterprise Blueprint** ·
 **4 Phase 3 AI-Native Human Ecosystem** · **5 Blueprint Engineering v1.0** ·
-**6 Peta 14 lapisan engineering** · **7 Phase 4 Enterprise OS (Layer 21–50)** · **8 Peta Phase 5–12** · **9 Phase 5 Research Lab** · **10 Phase 6 Developer Platform**.
+**6 Peta 14 lapisan engineering** · **7 Phase 4 Enterprise OS (Layer 21–50)** · **8 Peta Phase 5–12** · **9 Phase 5 Research Lab** · **10 Phase 6 Developer Platform** ·
+**11 Phase 7 Data & AI Infrastructure**.
 
 | Bagian | Isi | Jumlah |
 |---|---|---|
@@ -25,9 +26,9 @@ Diperbarui: 3 September 2026 · Mencakup **sepuluh naskah**:
 | [B](#b-risiko-teknis) | Risiko teknis | 21 |
 | [C](#c-risiko-hukum--kepatuhan) | Risiko hukum & kepatuhan | 14 |
 | [D](#d-celah-yang-belum-tertutup) | Celah yang belum tertutup | 5 |
-| [E](#e-ketidakcocokan-antar-naskah) | **Ketidakcocokan antar-naskah** | 61 |
-| [F](#f-yang-sudah-saya-periksa-dan-ternyata-benar) | Sudah diperiksa, ternyata benar | 38 |
-| [G](#g-lubang-di-dalam-naskah-sendiri) | Lubang di dalam naskah sendiri | 5 |
+| [E](#e-ketidakcocokan-antar-naskah) | **Ketidakcocokan antar-naskah** | 65 |
+| [F](#f-yang-sudah-saya-periksa-dan-ternyata-benar) | Sudah diperiksa, ternyata benar | 44 |
+| [G](#g-lubang-di-dalam-naskah-sendiri) | Lubang di dalam naskah sendiri | 6 |
 
 ---
 
@@ -47,7 +48,7 @@ butir-butir ini. ⚠️ **H-8 dibatalkan** — lihat barisnya.
 | **H-7** | **B-13 — self-improving agent sulit diaudit** | ✅ Sebagian. §45 menyimpan **audit metadata**, bukan chain-of-thought mentah; §47 memberi versi agent + skor + **automatic rollback**. Self-Improving Agents sendiri tidak diulang di naskah 4. |
 | **H-8** | ~~E-5 — Grooming hilang di naskah 3~~ | ❌ **DIBATALKAN.** Grooming sempat kembali di registry naskah 4, lalu **hilang lagi** di daftar 22 agent naskah 5. Butir **E-5** dibuka kembali sebagai **E-35**. Ini pengingat: satu naskah memulihkan sesuatu bukan berarti sudah tetap. |
 | **H-9** | **A-1 — angka liar di judul** | ✅ Artefak salin-tempel; dibuang dari dokumen rapi. ⚠️ **Muncul lagi di naskah 4 dan 7** (`6`, `7` menempel di judul) — gejalanya berulang tiap naskah panjang, jadi selalu periksa. |
-| **H-10** | **E-27 — dua struktur repo** | ✅ Naskah 5 §4 **menggabungkan keduanya**: monorepo naskah 2 (`apps/ services/ agents/`) ditambah berkas wajib AI coding agent dari naskah 4 (`AGENTS.md`, `ARCHITECTURE.md`, `CONTRIBUTING.md`, `SECURITY.md`), dan `adr/` menjadi `docs/decisions/`. Lihat [`83`](83-STRUKTUR-REPO-FINAL.md). |
+| **H-10** | **E-27 — dua struktur repo** | ⚠️ **PERLU DITINJAU ULANG.** Naskah 9, 10, dan 11 masing-masing menambah pohon tingkat-atas sendiri (`research/`, `developer-platform/`, `data-platform/`) tanpa menempatkannya di dalam monorepo — lihat **E-66**. Penutupan aslinya: naskah 5 §4 **menggabungkan keduanya**: monorepo naskah 2 (`apps/ services/ agents/`) ditambah berkas wajib AI coding agent dari naskah 4 (`AGENTS.md`, `ARCHITECTURE.md`, `CONTRIBUTING.md`, `SECURITY.md`), dan `adr/` menjadi `docs/decisions/`. Lihat [`83`](83-STRUKTUR-REPO-FINAL.md). |
 | **H-11** | **E-2 / E-28 — Weather & Calendar: tool atau agent** | ✅ **Tool.** §13 menyebut "Calendar Tool" dan §14 mendaftarkan `weather.get`, `calendar.get`, `wardrobe.search`, `trend.search` di blok `tools:` manifest. Tidak ada WeatherAgent di daftar 22 agent. |
 | **H-12** | **A-10 — Kafka *dan* Redis Streams sekaligus?** | ✅ **Empat penyimpanan, bukan enam.** §5 menetapkan PostgreSQL · Qdrant · Neo4j · Redis; **Kafka dan ClickHouse hilang**, antrean pindah ke Redis. Lihat **E-36**. |
 | **H-13** | **A-18 — Phase 1/2/3 atau V0–V6** | ✅ **V0–V6.** Naskah 5 memakai tangga V dari awal sampai akhir (§1, §33) dan **tidak menyebut Phase 1/2/3 satu kali pun**. Phase 1–3 menjadi sejarah penyusunan, bukan rencana kerja. ⚠️ Butuh satu konfirmasi lisan dari pemilik sebelum dokumen lama diberi tanda. |
@@ -176,6 +177,10 @@ Ini kelompok temuan paling serius, karena **seluruh produk berdiri di atas graf 
 
 | # | Temuan |
 |---|---|
+| **E-63** | 🆕🛑 **Tangga V0–V5 memberi makna KETIGA untuk nomor versi.** §7.0: V1 *Event-Driven* · V2 *Streaming+Analytics* · V3 *Lakehouse+Feature Store* · V4 *Knowledge Graph* · V5 *Multi-region*. Bandingkan naskah 5 §33 (V1 *Behavior Intelligence* … V4 *Digital Twin* … V6 *Ecosystem*) dan naskah 5 §1 (V1 *Modular Backend* · V2 *Domain Services* · V3+ *Agent Platform*). Butir **A-18** ditutup dengan kesimpulan *"V0–V6 kanonik"* — tapi kalau nomor V-nya sendiri berarti tiga hal, kesimpulan itu tidak menolong siapa pun. Yang dibutuhkan bukan tangga baru, melainkan **satu tabel yang memetakan ketiganya**. |
+| **E-64** | 🆕🛑 **`D1`–`D8` dipakai dua kali untuk hal berbeda.** Naskah 10: D1 *Developer Portal* … D7 *Marketplace*. Naskah 11: D1 *Event Foundation* … D7 *Governance*. Pengulangan **E-59** di sumbu berbeda — sekarang *"kita di D4"* berarti *Agent SDK* **dan** *AI Data*. Dengan V0–V6, Sprint 0–6, R1–R8, dan dua D1–D8, ini penomoran kelima yang bertabrakan. |
+| **E-66** | 🆕 **Empat pohon tingkat-atas tanpa aturan komposisi — dan ini menggerus H-10.** `humanverse-x/` (naskah 5 §4, monorepo final) · `research/` (naskah 9) · `developer-platform/` (naskah 10) · `data-platform/` (naskah 11, 21 folder). `data/` di monorepo dan `data-platform/` mengurus hal yang sama dan tumpang tindih di `pipelines/`, `datasets/`, `feature-store/`; begitu pula `research/` dengan `intelligence/`. Butir **E-27** ditutup sebagai **H-10** ketika naskah 5 menetapkan monorepo final; tiga naskah sesudahnya menambah pohon sendiri tanpa menempatkannya di dalamnya. **Penutupan H-10 perlu ditinjau ulang.** |
+| **E-65** | 🆕 **Canonical Event Envelope ketiga.** §7.4 memakai `event_id`, `version`, `actor{type,id}`, `data`, `metadata.correlation_id`. ⭐ **`actor{type,id}` adalah perbaikan nyata** — ia membedakan event yang dihasilkan agent dari yang dihasilkan orang, dan itu justru yang dibutuhkan begitu agent mulai menulis dan Behavior Model belajar dari event. ⚠️ Tapi **`idempotency_key` dan `recorded_at` hilang** — keduanya ditambahkan di [`../spec/03`](../spec/03-EVENT-CONTRACTS.md) khusus untuk menutup celah bagian **D** (kejadian luring yang masuk belakangan, sinkron ulang yang menggandakan). Nama field juga bergeser: `data` vs `payload`, `version` vs `schema_version` — padahal kalimat penjelasnya sendiri menyebut `schema_version`. Envelope terbaik adalah gabungan keduanya. |
 | **E-60** | 🆕🛑 **Manifest agent versi keempat — dan dua pengaman terpentingnya hilang justru di standar marketplace.** DP-L8 membuang **`risk_level`** dan **`requires_confirmation`** yang ada di naskah 5 §14, serta `purpose` dan `memory.write`. Keduanya adalah field yang membuat aksi agent bisa dikendalikan, dan mereka menghilang tepat di manifest yang ditetapkan sebagai *"standar marketplace"* — tempat agent **pihak ketiga** masuk. `permissions: [wardrobe.read]` juga menduplikasi `memory.read: [wardrobe]`. Skema validasi di [`../spec/05`](../spec/05-AGENT-CONTRACTS.md) mempertahankan keduanya. |
 | **E-61** | 🆕🛑 **`journal.read` ditawarkan sebagai scope untuk developer pihak ketiga** (DP-L4). Bertabrakan langsung dengan naskah 5 §15 (*private journal* ada di daftar **DENY** bahkan untuk agent internal) dan dengan aturan 6 [`../spec/05`](../spec/05-AGENT-CONTRACTS.md) (agent `third_party` tidak boleh meminta `journal`, `finance`, `health`). Jurnal adalah satu-satunya tempat yang **C-3** tandai sebagai kemungkinan memuat isyarat krisis. Kalau disengaja, ia butuh persetujuan terpisah, masa berlaku, pencatatan tiap akses, dan larangan menyimpan salinan di server developer. |
 | **E-59** | 🆕 **Tabrakan penomoran Layer.** Phase 6 memulai **Layer 1** lagi, padahal Layer 6–20 dipakai naskah 3 dan Layer 21–50 dipakai naskah 7. Sekarang *"Layer 22"* berarti **Engineering Standards** (naskah 7) **dan** **Example Library** (naskah 10); *"Layer 14"* berarti Evaluation Framework **dan** Testing Sandbox. Untuk dokumentasi yang tujuannya dibaca AI coding agent tanpa kehilangan konteks (Layer 41 naskah 7), ini masalah nyata. Di berkas rapi dipakai awalan **DP-L**. |
@@ -309,6 +314,29 @@ Ini kelompok temuan paling serius, karena **seluruh produk berdiri di atas graf 
   `agent_runs`, `permissions`). Hanya fondasi ke-4 (Knowledge + Simulation)
   yang belum ada bentuknya sama sekali — lihat **E-49**.
 
+**Diperiksa di naskah kesebelas:**
+
+- ✅⭐ **Deletion Engine §7.25 memperluas prosedur hapus akun spesifikasi dengan
+  empat tempat yang belum saya cakup**: Lakehouse (berkas Parquet tidak punya
+  `DELETE`), Features (nilai turunan tetap membawa jejak), Graph (simpul yatim
+  menyimpan hubungan), dan Caches (Redis tidak ikut transaksi). Kalimat
+  *"tidak boleh hanya menghapus row di PostgreSQL"* tepat sasaran.
+- ✅⭐ **Privacy metadata §7.24** (`data_class`, `purpose`, `retention`,
+  `consent_required`) adalah **pembatasan tujuan yang bisa ditegakkan mesin** —
+  data ber-`purpose: [personalization]` tidak bisa dipakai melatih model tanpa
+  `purpose` baru. Persis yang diminta **C-11**.
+- ✅ **RPO/RTO sengaja tidak diberi angka** (§7.28: *"ditentukan berdasarkan
+  kebutuhan bisnis dan biaya"*) — berbeda dari Layer 44 naskah 7 yang menetapkan
+  99,9 % tanpa ada yang berjaga (**B-18**). Menolak menuliskan angka yang belum
+  bisa didukung adalah keputusan yang benar.
+- ✅ **Ketujuh event §7.3 dua segmen** — tiga naskah berturut-turut sekarang
+  memakai format yang sama, memperkuat penutupan **E-43**/#38.
+- ✅ **Pemisahan Offline/Online Feature (§7.8)** menyebut masalah nyata yang
+  paling sering dilewatkan: *training/serving skew*.
+- ✅ **Deliverable pertama yang ditandai berbeda** — *Multi-region* diberi
+  🔭 **Future**, bukan ✅ Blueprint. Gradasi itu membedakan "belum dibangun"
+  dari "belum waktunya dipikirkan".
+
 **Diperiksa di naskah kesepuluh:**
 
 - ✅⭐ **Format nama event dua segmen menang telak.** DP-L12 dan DP-L13 memakai
@@ -366,6 +394,7 @@ Ini kelompok temuan paling serius, karena **seluruh produk berdiri di atas graf 
 
 | # | Temuan |
 |---|---|
+| **G-6** | 🆕 **Level 4 "Highly Sensitive" tanpa satu contoh pun.** §7.2 memberi contoh untuk Level 1–3 (*fashion trends*, *habits*, *journal/location/financial/health*) tetapi Level 4 hanya punya definisi: *"data yang membutuhkan perlindungan dan kontrol paling ketat"*. Padahal justru level ini yang menentukan aturan paling ketat. Kandidat yang sudah disebut naskah lain dan belum punya tempat: **data biometrik** (**C-1**), isyarat krisis dari jurnal (**C-3**), dan data anak di bawah umur bila *Family Mode* jadi dibangun. Ditandai kosong, tidak ditambal. |
 | **G-4** | 🆕 **Layer 44 terpotong di tengah tabel — gejala yang sama terulang.** Yang terbaca hanya `Uptime 99.9%` lalu `Latency` **tanpa angka target**, dan metrik ketiga dan seterusnya hilang. Bentuknya **persis** seperti **G-1** di naskah 3. Dua naskah panjang, dua tabel terpotong di tempat yang sama macamnya — kemungkinan besar batas salin-tempel, bukan kelalaian menulis. Disimpan apa adanya di [`110`](110-L44-46-RELIABILITY-INFRA.md). |
 | **G-5** | 🆕 **Layer 45 tidak pernah muncul, dan ada fragmen tanpa judul.** Setelah Layer 44 yang terpotong, naskah melompat ke Layer 46. Di antaranya berdiri satu kalimat tanpa judul dan tanpa nomor: *"Jangan lompat ke Kubernetes pada hari pertama."* Kemungkinan besar itu sisa Layer 45 (infrastruktur/scaling). **Persis pola G-2** di naskah 3 (Layer 15/16 hilang + Profile Engine tanpa judul). Disimpan apa adanya, tidak ditambal. |
 | **G-1** | **Layer 14 terpotong di tengah tabel.** Yang terbaca hanya `Accuracy 95%` lalu `Latency` — tanpa angka target. ⚠️ Naskah 4 §47 memberi **8 metrik evaluasi** yang jauh lebih lengkap; lubang naskah 3 tetap dicatat, tapi sudah ada penggantinya. Dicatat di [`39-L14-EVALUATION-FRAMEWORK.md`](39-L14-EVALUATION-FRAMEWORK.md). |

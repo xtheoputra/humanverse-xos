@@ -23,10 +23,10 @@ manusia + agent + data + knowledge + simulation + automation**.
 | Tahap | **Spesifikasi engineering siap** — belum ada kode (disengaja) |
 | Berkas kode | 0 |
 | Repo git | belum diinisialisasi |
-| Dokumen | **118 berkas** di `docs/` (naskah + audit + catatan sesi) + **8 berkas** di `spec/` |
-| Naskah pemilik | **10** — terakhir: **Phase 6 Developer Platform**, 25 layer |
+| Dokumen | **128 berkas** di `docs/` (naskah + audit + catatan sesi) + **8 berkas** di `spec/` |
+| Naskah pemilik | **11** — terakhir: **Phase 7 Data & AI Infrastructure** |
 | Keputusan tertutup | **14 butir H** — nama · MVP · struktur repo · rencana kanonik V0–V6 |
-| Keputusan terbuka | **18 pertanyaan A** · **61 ketidakcocokan E** · **5 lubang G** |
+| Keputusan terbuka | **18 pertanyaan A** · **65 ketidakcocokan E** · **6 lubang G** |
 | Tanggal dokumen | 3 September 2026 |
 
 > ⚠️ **Nol baris kode itu disengaja — dan penghambatnya terus berkurang.**
@@ -117,7 +117,7 @@ Selengkapnya: [`docs/75-URUTAN-PEMBANGUNAN-V0-V6.md`](docs/75-URUTAN-PEMBANGUNAN
 
 ---
 
-## Sepuluh naskah
+## Sebelas naskah
 
 ```
   NASKAH 1   HumanOS — visi & 12 modul manusia          berkas 01–07
@@ -151,8 +151,11 @@ Selengkapnya: [`docs/75-URUTAN-PEMBANGUNAN-V0-V6.md`](docs/75-URUTAN-PEMBANGUNAN
      │       15 research pillar · BFM · memory compression
      │
   NASKAH 10  Phase 6 — Developer Platform              berkas 123–131
-             25 layer · OAuth · SDK 7 bahasa · marketplace
-             roadmap D1–D8 · 13 deliverable (semua "Blueprint")
+     │       25 layer · OAuth · SDK 7 bahasa · marketplace
+     │
+  NASKAH 11  Phase 7 — Data & AI Infrastructure        berkas 132–141
+             event platform · lakehouse · feature store
+             deletion engine · 18 deliverable (1 "Future")
 ```
 
 > ℹ️ Penomoran berkas melewati 99. `99-CATATAN-AUDIT.md` tetap di tempatnya
@@ -162,7 +165,7 @@ Selengkapnya: [`docs/75-URUTAN-PEMBANGUNAN-V0-V6.md`](docs/75-URUTAN-PEMBANGUNAN
 
 ## Aturan berkas dokumen
 
-1. Berkas `01`–`131` merekam **kata pemilik apa adanya**. Susunannya dirapikan,
+1. Berkas `01`–`141` merekam **kata pemilik apa adanya**. Susunannya dirapikan,
    isinya tidak ditambah-tambahi. Bagian yang hilang di naskah **ditandai
    sebagai hilang**, bukan ditambal.
 2. Setiap keraguan, koreksi, risiko, atau usulan dari pihak lain (termasuk AI)
@@ -388,6 +391,33 @@ Phase 12  Blueprint Implementation 100+ ERD 100+ tabel · API 500+ endpoint
 > 🛑 Tapi dua pengaman hilang justru di tempat paling dibutuhkan: manifest
 > marketplace **membuang `risk_level` dan `requires_confirmation`**, dan
 > **`journal.read` ditawarkan sebagai scope pihak ketiga**.
+
+---
+
+### Naskah 11 — Phase 7: Data & AI Infrastructure
+
+| Berkas | § | Isi |
+|---|---|---|
+| [`132-PHASE-7-IKHTISAR.md`](docs/132-PHASE-7-IKHTISAR.md) | 7.0–7.1 | Tangga evolusi V0–V5 · data backbone |
+| [`133-DATA-CLASSIFICATION.md`](docs/133-DATA-CLASSIFICATION.md) | 7.2 | 4 tingkat sensitivitas ⚠️ **Level 4 kosong** |
+| [`134-EVENT-PLATFORM.md`](docs/134-EVENT-PLATFORM.md) | 7.3–7.5 | Streaming · **canonical envelope** · schema registry |
+| [`135-LAKEHOUSE-WAREHOUSE-FEATURE.md`](docs/135-LAKEHOUSE-WAREHOUSE-FEATURE.md) | 7.6–7.9 | Lakehouse · warehouse · **feature store offline/online** |
+| [`136-VECTOR-RETRIEVAL-GRAPH.md`](docs/136-VECTOR-RETRIEVAL-GRAPH.md) | 7.10–7.13 | Vector · **hybrid retrieval** · knowledge graph |
+| [`137-PIPELINE-QUALITY-LINEAGE.md`](docs/137-PIPELINE-QUALITY-LINEAGE.md) | 7.14–7.16 | Processing · 6 metrik kualitas · lineage |
+| [`138-ML-PLATFORM-DAN-INFERENCE.md`](docs/138-ML-PLATFORM-DAN-INFERENCE.md) | 7.17–7.23 | Training · registry · serving · batch · flywheel |
+| [`139-PRIVACY-DELETION-RETENTION.md`](docs/139-PRIVACY-DELETION-RETENTION.md) | 7.24–7.26 | ⭐ **Privacy metadata · cascade deletion 7 tempat** |
+| [`140-SKALA-OBSERVABILITY-RESEARCH.md`](docs/140-SKALA-OBSERVABILITY-RESEARCH.md) | 7.27–7.32 | Multi-region · DR · **Production ≠ Research** |
+| [`141-PHASE-7-REPO-ROADMAP-DELIVERABLE.md`](docs/141-PHASE-7-REPO-ROADMAP-DELIVERABLE.md) | 7.33–7.35 | Repo 21 folder · roadmap D1–D8 · teaser Phase 8 |
+
+> ⭐ **Bagian terkuat:** metadata privasi yang menempel pada datanya
+> (`purpose`, `retention`, `consent_required`) — pembatasan tujuan yang bisa
+> ditegakkan mesin — dan **cascade deletion ke 7 tempat**, yang memperluas
+> prosedur hapus akun di [`spec/`](spec/README.md) dengan empat tempat yang
+> belum tercakup.
+>
+> 🛑 **Dua tabrakan penomoran baru:** tangga V0–V5 memberi makna **ketiga**
+> untuk nomor versi, dan **`D1`–`D8` dipakai dua kali** (Developer Platform
+> naskah 10 vs Data Platform naskah 11).
 
 ---
 
