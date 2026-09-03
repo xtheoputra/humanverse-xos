@@ -47,14 +47,14 @@ manusia + agent + data + knowledge + simulation + automation**.
 
 ## 📌 Pekerjaan terbuka = GitHub Issues
 
-**47 issue** dalam 3 milestone — **6 ditutup**. Baca issue-nya, jangan analisis
+**51 issue** dalam 3 milestone — **6 ditutup**. Baca issue-nya, jangan analisis
 ulang naskahnya.
 
 | Milestone | Isi | Issue |
 |---|---|---|
 | **M1 — Keputusan sebelum kode** | 9 terbuka, 1 ditutup | [#1](../../issues/1)–[#9](../../issues/9), [#38](../../issues/38) |
-| **M2 — Blueprint & Engineering Spec** | 30 terbuka, 5 ditutup | [#10](../../issues/10)–[#19](../../issues/19), [#26](../../issues/26)–[#37](../../issues/37), [#39](../../issues/39), [#41](../../issues/41)–[#45](../../issues/45), [#47](../../issues/47) |
-| **M3 — Sebelum ada pengguna nyata** | 8 terbuka | [#20](../../issues/20)–[#25](../../issues/25), [#40](../../issues/40), [#46](../../issues/46) |
+| **M2 — Blueprint & Research** | 33 terbuka, 5 ditutup | [#10](../../issues/10)–[#19](../../issues/19), [#26](../../issues/26)–[#37](../../issues/37), [#39](../../issues/39), [#41](../../issues/41)–[#45](../../issues/45), [#47](../../issues/47)–[#49](../../issues/49), [#51](../../issues/51) |
+| **M3 — Sebelum ada pengguna nyata** | 9 terbuka | [#20](../../issues/20)–[#25](../../issues/25), [#40](../../issues/40), [#46](../../issues/46), [#50](../../issues/50) |
 
 ✅ **Ditutup:** [#1](../../issues/1) rencana kanonik → V0–V6 ·
 [#8](../../issues/8) struktur repo · [#12](../../issues/12) Weather/Calendar = tool ·
