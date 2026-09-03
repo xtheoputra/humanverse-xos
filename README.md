@@ -47,17 +47,23 @@ manusia + agent + data + knowledge + simulation + automation**.
 
 ## 📌 Pekerjaan terbuka = GitHub Issues
 
-**30 issue** dalam 3 milestone. Baca issue-nya, jangan analisis ulang naskahnya.
+**35 issue** dalam 3 milestone — **5 sudah ditutup naskah 5**. Baca issue-nya,
+jangan analisis ulang naskahnya.
 
 | Milestone | Isi | Issue |
 |---|---|---|
-| **M1 — Keputusan sebelum kode** | 9 butir yang harus dijawab pemilik sebelum baris kode pertama V0 | [#1](../../issues/1)–[#9](../../issues/9) |
-| **M2 — Blueprint Engineering v1.0** | 15 butir yang mengunci isi blueprint | [#10](../../issues/10)–[#19](../../issues/19), [#26](../../issues/26)–[#30](../../issues/30) |
-| **M3 — Sebelum ada pengguna nyata** | 6 butir hukum, privasi, dan keselamatan | [#20](../../issues/20)–[#25](../../issues/25) |
+| **M1 — Keputusan sebelum kode** | 8 terbuka, 1 ditutup | [#1](../../issues/1)–[#9](../../issues/9) |
+| **M2 — Blueprint & Engineering Spec** | 21 terbuka, 4 ditutup | [#10](../../issues/10)–[#19](../../issues/19), [#26](../../issues/26)–[#35](../../issues/35) |
+| **M3 — Sebelum ada pengguna nyata** | 6 terbuka | [#20](../../issues/20)–[#25](../../issues/25) |
 
-Empat yang paling menghambat: [#1](../../issues/1) rencana kanonik (Phase vs V) ·
-[#2](../../issues/2) empat model angka pengguna · [#7](../../issues/7) model graf ·
-[#20](../../issues/20) cek merek (satu-satunya yang bisa membatalkan nama).
+✅ **Ditutup naskah 5:** [#1](../../issues/1) rencana kanonik → V0–V6 ·
+[#8](../../issues/8) struktur repo · [#12](../../issues/12) Weather/Calendar = tool ·
+[#17](../../issues/17) empat penyimpanan · [#10](../../issues/10) blueprint ditulis pemilik.
+
+🛑 **Empat yang mengunci Engineering Spec** (#31), karena semuanya menentukan
+skema basis data: [#2](../../issues/2) lima model angka pengguna ·
+[#7](../../issues/7) model graf · [#33](../../issues/33) memory: jenis atau scope ·
+[#32](../../issues/32) tiga skala skor.
 
 ---
 
