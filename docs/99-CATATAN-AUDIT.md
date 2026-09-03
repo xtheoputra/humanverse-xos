@@ -7,6 +7,9 @@
 > Cara pakai: kalau pemilik memutuskan sebuah butir, keputusannya **naik** ke
 > berkas visi yang sesuai, lalu butirnya turun ke bagian **H**.
 
+> 📌 **Butir terbuka di berkas ini sudah jadi 30 GitHub Issue** dalam 3
+> milestone. Baca issue-nya, jangan analisis ulang naskahnya.
+
 Diperbarui: 3 September 2026 · Mencakup **empat naskah**:
 **1 HumanOS** · **2 HumanVerse X** · **3 Phase 2 Enterprise Blueprint** ·
 **4 Phase 3 AI-Native Human Ecosystem**.
