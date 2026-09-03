@@ -47,25 +47,24 @@ manusia + agent + data + knowledge + simulation + automation**.
 
 ## 📌 Pekerjaan terbuka = GitHub Issues
 
-**51 issue** dalam 3 milestone — **6 ditutup**. Baca issue-nya, jangan analisis
+**54 issue** dalam 3 milestone — **7 ditutup**. Baca issue-nya, jangan analisis
 ulang naskahnya.
 
 | Milestone | Isi | Issue |
 |---|---|---|
-| **M1 — Keputusan sebelum kode** | 9 terbuka, 1 ditutup | [#1](../../issues/1)–[#9](../../issues/9), [#38](../../issues/38) |
-| **M2 — Blueprint & Research** | 33 terbuka, 5 ditutup | [#10](../../issues/10)–[#19](../../issues/19), [#26](../../issues/26)–[#37](../../issues/37), [#39](../../issues/39), [#41](../../issues/41)–[#45](../../issues/45), [#47](../../issues/47)–[#49](../../issues/49), [#51](../../issues/51) |
-| **M3 — Sebelum ada pengguna nyata** | 9 terbuka | [#20](../../issues/20)–[#25](../../issues/25), [#40](../../issues/40), [#46](../../issues/46), [#50](../../issues/50) |
+| **M1 — Keputusan sebelum kode** | 8 terbuka, 2 ditutup | [#1](../../issues/1)–[#9](../../issues/9), [#38](../../issues/38) |
+| **M2 — Blueprint & Research** | 34 terbuka, 5 ditutup | [#10](../../issues/10)–[#19](../../issues/19), [#26](../../issues/26)–[#37](../../issues/37), [#39](../../issues/39), [#41](../../issues/41)–[#45](../../issues/45), [#47](../../issues/47)–[#49](../../issues/49), [#51](../../issues/51), [#54](../../issues/54) |
+| **M3 — Sebelum ada pengguna nyata** | 11 terbuka | [#20](../../issues/20)–[#25](../../issues/25), [#40](../../issues/40), [#46](../../issues/46), [#50](../../issues/50), [#52](../../issues/52)–[#53](../../issues/53) |
 
 ✅ **Ditutup:** [#1](../../issues/1) rencana kanonik → V0–V6 ·
 [#8](../../issues/8) struktur repo · [#12](../../issues/12) Weather/Calendar = tool ·
 [#17](../../issues/17) empat penyimpanan · [#10](../../issues/10) blueprint ·
 [#31](../../issues/31) Engineering Specification.
 
-🛑 **Penghambat V0 yang tersisa — tiga:**
-[#38](../../issues/38) format nama event (**batas: sebelum Sprint 3** — nama
-event tidak boleh diganti setelah dipakai) ·
+🛑 **Penghambat V0 yang tersisa — tinggal dua, keduanya bukan soal teknis:**
 [#3](../../issues/3) 12 fitur & 7 sprint dalam 4–6 minggu ·
 [#20](../../issues/20) cek merek.
+*(#38 format nama event ✅ ditutup naskah 10 — dua segmen.)*
 Yang masih menunggu jawaban tapi tidak menahan Sprint 0–4:
 [#2](../../issues/2) model angka pengguna (menahan Sprint 5) ·
 [#21](../../issues/21) eskalasi krisis Journal (menahan rilis ke orang lain).
