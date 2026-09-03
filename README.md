@@ -23,10 +23,10 @@ manusia + agent + data + knowledge + simulation + automation**.
 | Tahap | **Spesifikasi engineering siap** — belum ada kode (disengaja) |
 | Berkas kode | 0 |
 | Repo git | belum diinisialisasi |
-| Dokumen | **109 berkas** di `docs/` (naskah + audit + catatan sesi) + **8 berkas** di `spec/` |
-| Naskah pemilik | **9** — terakhir: **Phase 5 Research Lab**, 15 pilar riset |
+| Dokumen | **118 berkas** di `docs/` (naskah + audit + catatan sesi) + **8 berkas** di `spec/` |
+| Naskah pemilik | **10** — terakhir: **Phase 6 Developer Platform**, 25 layer |
 | Keputusan tertutup | **14 butir H** — nama · MVP · struktur repo · rencana kanonik V0–V6 |
-| Keputusan terbuka | **18 pertanyaan A** · **57 ketidakcocokan E** · **5 lubang G** |
+| Keputusan terbuka | **18 pertanyaan A** · **61 ketidakcocokan E** · **5 lubang G** |
 | Tanggal dokumen | 3 September 2026 |
 
 > ⚠️ **Nol baris kode itu disengaja — dan penghambatnya terus berkurang.**
@@ -118,7 +118,7 @@ Selengkapnya: [`docs/75-URUTAN-PEMBANGUNAN-V0-V6.md`](docs/75-URUTAN-PEMBANGUNAN
 
 ---
 
-## Sembilan naskah
+## Sepuluh naskah
 
 ```
   NASKAH 1   HumanOS — visi & 12 modul manusia          berkas 01–07
@@ -149,8 +149,11 @@ Selengkapnya: [`docs/75-URUTAN-PEMBANGUNAN-V0-V6.md`](docs/75-URUTAN-PEMBANGUNAN
      │       ≈380 dokumen tersisa · taksiran kemajuan 45 %
      │
   NASKAH 9   Phase 5 — HumanVerse Research Lab         berkas 114–122
-             15 research pillar · BFM · memory compression
-             roadmap R1–R8 · 10 deliverable (semua "Blueprint")
+     │       15 research pillar · BFM · memory compression
+     │
+  NASKAH 10  Phase 6 — Developer Platform              berkas 123–131
+             25 layer · OAuth · SDK 7 bahasa · marketplace
+             roadmap D1–D8 · 13 deliverable (semua "Blueprint")
 ```
 
 > ℹ️ Penomoran berkas melewati 99. `99-CATATAN-AUDIT.md` tetap di tempatnya
@@ -160,7 +163,7 @@ Selengkapnya: [`docs/75-URUTAN-PEMBANGUNAN-V0-V6.md`](docs/75-URUTAN-PEMBANGUNAN
 
 ## Aturan berkas dokumen
 
-1. Berkas `01`–`122` merekam **kata pemilik apa adanya**. Susunannya dirapikan,
+1. Berkas `01`–`131` merekam **kata pemilik apa adanya**. Susunannya dirapikan,
    isinya tidak ditambah-tambahi. Bagian yang hilang di naskah **ditandai
    sebagai hilang**, bukan ditambal.
 2. Setiap keraguan, koreksi, risiko, atau usulan dari pihak lain (termasuk AI)
@@ -358,6 +361,34 @@ Phase 12  Blueprint Implementation 100+ ERD 100+ tabel · API 500+ endpoint
 > 🛑 **Tapi Research Lab tidak bisa dimulai sebelum V0 mengumpulkan datanya.**
 > Seluruh dataset BFM baru ada setelah V0 dipakai berbulan-bulan, dan
 > `sleep_events` + `calendar_events` tidak ada di V0 sama sekali (**B-21**).
+
+---
+
+### Naskah 10 — Phase 6: Developer Platform
+
+| Berkas | Layer | Isi |
+|---|---|---|
+| [`123-PHASE-6-IKHTISAR.md`](docs/123-PHASE-6-IKHTISAR.md) | — | 3 tipe pengguna · 5 prinsip · ⚠️ **tabrakan penomoran Layer** |
+| [`124-DP-L1-L3-PORTAL-API-GATEWAY.md`](docs/124-DP-L1-L3-PORTAL-API-GATEWAY.md) | 1–3 | Developer Portal · REST API · API Gateway |
+| [`125-DP-L4-L5-AUTH-DAN-KEY.md`](docs/125-DP-L4-L5-AUTH-DAN-KEY.md) | 4–5 | OAuth 2.1 + PKCE · 🛑 scope `journal.read` · API key |
+| [`126-DP-L6-L9-SDK-AGENT-PLUGIN.md`](docs/126-DP-L6-L9-SDK-AGENT-PLUGIN.md) | 6–9 | SDK 7 bahasa · Agent SDK · 🛑 **manifest tanpa `risk_level`** |
+| [`127-DP-L10-L11-MCP-TOOL-REGISTRY.md`](docs/127-DP-L10-L11-MCP-TOOL-REGISTRY.md) | 10–11 | MCP · Tool Registry · Capability Discovery |
+| [`128-DP-L12-L16-WEBHOOK-SANDBOX-CLI.md`](docs/128-DP-L12-L16-WEBHOOK-SANDBOX-CLI.md) | 12–16 | ⭐ **Webhook menutup #38** · Sandbox · CLI · `.hvap` |
+| [`129-DP-L17-L20-MARKETPLACE-REVIEW-REVENUE.md`](docs/129-DP-L17-L20-MARKETPLACE-REVIEW-REVENUE.md) | 17–20 | Marketplace · **Review System** · revenue · analytics |
+| [`130-DP-L21-L25-DOKUMENTASI-KOMUNITAS-ENTERPRISE.md`](docs/130-DP-L21-L25-DOKUMENTASI-KOMUNITAS-ENTERPRISE.md) | 21–25 | Dokumentasi · contoh · sertifikasi · komunitas · enterprise |
+| [`131-PHASE-6-ROADMAP-DAN-DELIVERABLE.md`](docs/131-PHASE-6-ROADMAP-DAN-DELIVERABLE.md) | — | Repo · roadmap D1–D8 · 13 deliverable |
+
+> ⭐ **Menutup [#38](../../issues/38):** DP-L12 memakai `outfit.selected` untuk
+> event yang naskah 7 tulis `fashion.outfit.selected` — dua naskah dua segmen
+> melawan satu naskah tiga segmen.
+>
+> ⭐ **Sandbox + Review System** adalah jawaban terbesar untuk beban hukum
+> marketplace ([#24](../../issues/24)) setelah enam naskah hanya berupa
+> kekhawatiran.
+>
+> 🛑 Tapi dua pengaman hilang justru di tempat paling dibutuhkan: manifest
+> marketplace **membuang `risk_level` dan `requires_confirmation`**, dan
+> **`journal.read` ditawarkan sebagai scope pihak ketiga**.
 
 ---
 

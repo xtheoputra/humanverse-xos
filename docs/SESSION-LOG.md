@@ -4,6 +4,61 @@
 
 ---
 
+## Sesi 8 — 3 September 2026
+
+**Phase 6 Developer Platform direkam — satu issue tertutup, dua pengaman hilang.**
+
+| Hal | Hasil |
+|---|---|
+| Naskah baru | **Phase 6: Developer Platform**, 25 layer |
+| Dokumen ditambah | **9 berkas** (`123`–`131`) |
+| Dokumen total | 109 → **118** di `docs/`, + 8 di `spec/` |
+| Berkas kode | tetap **0** |
+
+### ⭐ #38 tertutup — format nama event dua segmen
+
+DP-L12 memakai `habit.completed`, `goal.completed`, **`outfit.selected`**,
+`journal.created`. Yang menentukan: naskah 7 Layer 22 menulis event yang **sama
+persis** sebagai `fashion.outfit.selected` (tiga segmen); naskah ini menulisnya
+`outfit.selected`.
+
+**Dua naskah dua segmen melawan satu naskah tiga segmen** — dan dua segmen
+sudah dipakai di `spec/03`. Batas waktu "sebelum Sprint 3" tidak lagi jadi
+soal.
+
+### ⭐ Sandbox + Review System menjawab beban hukum marketplace
+
+DP-L14 (**Testing Sandbox** dengan mock data) dan DP-L18 (**Review System**:
+Security, Permission, Stability, Documentation, Testing) adalah jawaban
+terbesar untuk **A-15/C-7** setelah enam naskah hanya berupa kekhawatiran.
+
+Yang masih hilang: perjanjian pemroses data, jalur banding, dan tanggung jawab
+saat agent pihak ketiga berbuat salah.
+
+### 🛑 Dua pengaman hilang justru di tempat paling dibutuhkan
+
+- **E-60** — Manifest marketplace (DP-L8) **membuang `risk_level` dan
+  `requires_confirmation`** yang ada di naskah 5 §14. Keduanya adalah field yang
+  membuat aksi agent bisa dikendalikan, dan menghilang tepat di manifest untuk
+  agent **pihak ketiga**.
+- **E-61** — **`journal.read` ditawarkan sebagai scope developer pihak ketiga**,
+  bertabrakan dengan naskah 5 §15 (jurnal ada di daftar DENY bahkan untuk agent
+  internal) dan aturan 6 `spec/05`.
+- **C-14** — webhook **`journal.created`** dikirim ke server developer;
+  meski muatannya hanya `word_count`, keberadaan event itu memberi tahu pihak
+  ketiga **kapan seseorang menulis jurnal**.
+
+### Temuan lain
+
+- **E-59** — tabrakan penomoran: Phase 6 memulai **Layer 1** lagi, sehingga
+  *"Layer 22"* berarti Engineering Standards **dan** Example Library.
+- **E-62** — SDK naik dari 5 bahasa jadi 7 (+ go, rust).
+- **E-57** — skema penomoran keempat: V0–V6 · Sprint 0–6 · R1–R8 · D1–D8.
+- Format API `/v1/<resource>` cocok dengan naskah 7; yang menyimpang justru
+  `spec/04` (`/api/v1/...`) — itu bagian saya, perlu diselaraskan.
+
+---
+
 ## Sesi 7 — 3 September 2026
 
 **Phase 5 Research Lab direkam — 15 pilar, dan satu masalah urutan.**

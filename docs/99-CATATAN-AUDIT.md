@@ -13,20 +13,20 @@
 > 🔧 Hasil kerja engineering ada di [`../spec/`](../spec/README.md) —
 > **bukan kata pemilik**, dan sengaja di luar `docs/`.
 
-Diperbarui: 3 September 2026 · Mencakup **sembilan naskah**:
+Diperbarui: 3 September 2026 · Mencakup **sepuluh naskah**:
 **1 HumanOS** · **2 HumanVerse X** · **3 Phase 2 Enterprise Blueprint** ·
 **4 Phase 3 AI-Native Human Ecosystem** · **5 Blueprint Engineering v1.0** ·
-**6 Peta 14 lapisan engineering** · **7 Phase 4 Enterprise OS (Layer 21–50)** · **8 Peta Phase 5–12** · **9 Phase 5 Research Lab**.
+**6 Peta 14 lapisan engineering** · **7 Phase 4 Enterprise OS (Layer 21–50)** · **8 Peta Phase 5–12** · **9 Phase 5 Research Lab** · **10 Phase 6 Developer Platform**.
 
 | Bagian | Isi | Jumlah |
 |---|---|---|
 | [H](#h-sudah-diputuskan--ditutup) | **Sudah diputuskan / ditutup** | 14 |
 | [A](#a-perlu-jawaban-pemilik) | Pertanyaan yang memblokir | 18 |
 | [B](#b-risiko-teknis) | Risiko teknis | 21 |
-| [C](#c-risiko-hukum--kepatuhan) | Risiko hukum & kepatuhan | 13 |
+| [C](#c-risiko-hukum--kepatuhan) | Risiko hukum & kepatuhan | 14 |
 | [D](#d-celah-yang-belum-tertutup) | Celah yang belum tertutup | 5 |
-| [E](#e-ketidakcocokan-antar-naskah) | **Ketidakcocokan antar-naskah** | 57 |
-| [F](#f-yang-sudah-saya-periksa-dan-ternyata-benar) | Sudah diperiksa, ternyata benar | 33 |
+| [E](#e-ketidakcocokan-antar-naskah) | **Ketidakcocokan antar-naskah** | 61 |
+| [F](#f-yang-sudah-saya-periksa-dan-ternyata-benar) | Sudah diperiksa, ternyata benar | 38 |
 | [G](#g-lubang-di-dalam-naskah-sendiri) | Lubang di dalam naskah sendiri | 5 |
 
 ---
@@ -116,6 +116,7 @@ Diurutkan dari yang paling menghambat.
 | # | Catatan |
 |---|---|
 | C-7 | **Marketplace agen pihak ketiga.** Begitu orang lain bisa menulis agent yang membaca data tidur, keuangan, dan foto tubuh, Anda menjadi **pemroses data untuk pihak ketiga**. §14–§16 memberi fondasi teknisnya; **beban hukumnya belum disentuh sama sekali**. Dilunakkan karena §58 memindahkannya ke V3/V6. |
+| C-14 | 🆕 **Webhook `journal.created` dikirim ke server developer pihak ketiga.** Meski muatannya hanya `word_count` (aturan [`../spec/03`](../spec/03-EVENT-CONTRACTS.md)), **keberadaan event itu sendiri** memberi tahu pihak ketiga kapan seseorang menulis jurnal — pola waktu yang cukup mengungkap, apalagi bila digabung dengan `mood.logged`. Bersama **E-61** (`journal.read`), ini membuat jurnal jadi permukaan pihak ketiga di dua jalur sekaligus: baca langsung dan pemberitahuan waktu. Minimal, event bertanda jurnal sebaiknya tidak masuk daftar langganan publik. |
 | C-13 | 🆕 **"Identity Memory" permanen adalah karakterisasi yang tidak bisa kedaluwarsa.** Contoh Pillar 4: *"User is consistently committed to strength training"* — klaim tentang **siapa seseorang**, disimpan **permanen**, dan membentuk setiap rekomendasi sesudahnya. Tiga masalah: **(a)** menguatkan dirinya sendiri — kalau salah, rekomendasi yang lahir darinya menghasilkan data yang seolah membenarkannya; **(b)** orang berubah, dan pilar di sebelahnya sendiri berkata *"preferensi manusia berubah"*; **(c)** bertabrakan dengan hak hapus (**C-9**) dan mendekati garis prinsip penutup naskah 4 (*"jangan menilai apakah seseorang manusia yang baik atau buruk"*) — ini belum penilaian, tapi sudah karakterisasi permanen. Usul: Identity Memory tetap ada, tetapi **tidak permanen** — wajib punya `confidence`, `evidence_count`, `valid_until`, dan bisa dilihat serta **dibantah** pengguna di Privacy Center. |
 | C-12 | 🆕 **"Company Wellness" berarti pemberi kerja menyentuh data kesehatan pekerja.** Phase 9 mendaftarkannya bersama *Team Workspace* dan *Enterprise Admin*. Ini berbeda dari **C-10** (*Coaches*) karena ada **ketimpangan kekuasaan**: persetujuan yang diberikan kepada atasan tidak pernah sepenuhnya bebas, dan di banyak yurisdiksi program kesehatan tempat kerja punya aturan sendiri tentang apa yang boleh dilihat pemberi kerja — umumnya **hanya agregat, tidak pernah per orang**. Kalau *Enterprise Admin* bisa melihat data tidur atau mood satu pekerja, itu masalah sejak baris pertama kodenya. |
 | C-10 | 🆕 **"Coaches" adalah manusia yang melihat data manusia lain.** Layer 49 menambahkan *Coaches* sebagai peserta ekosistem. Sepanjang tujuh naskah, seluruh model izin dirancang untuk **agent**, bukan orang: `permissions.subject_type` hanya mengenal `agent`, `tool`, `integration`. Pelatih yang melihat data tidur, kebiasaan, dan mungkin jurnal kliennya butuh **jenis persetujuan yang berbeda** — berjangka waktu, bisa dicabut, tercatat, dan lingkupnya sempit. **Brands** menambah masalah lain: kepentingan komersial di dalam rekomendasi yang sudah berjanji *"popular ≠ suitable for the user"*. |
@@ -175,11 +176,15 @@ Ini kelompok temuan paling serius, karena **seluruh produk berdiri di atas graf 
 
 | # | Temuan |
 |---|---|
+| **E-60** | 🆕🛑 **Manifest agent versi keempat — dan dua pengaman terpentingnya hilang justru di standar marketplace.** DP-L8 membuang **`risk_level`** dan **`requires_confirmation`** yang ada di naskah 5 §14, serta `purpose` dan `memory.write`. Keduanya adalah field yang membuat aksi agent bisa dikendalikan, dan mereka menghilang tepat di manifest yang ditetapkan sebagai *"standar marketplace"* — tempat agent **pihak ketiga** masuk. `permissions: [wardrobe.read]` juga menduplikasi `memory.read: [wardrobe]`. Skema validasi di [`../spec/05`](../spec/05-AGENT-CONTRACTS.md) mempertahankan keduanya. |
+| **E-61** | 🆕🛑 **`journal.read` ditawarkan sebagai scope untuk developer pihak ketiga** (DP-L4). Bertabrakan langsung dengan naskah 5 §15 (*private journal* ada di daftar **DENY** bahkan untuk agent internal) dan dengan aturan 6 [`../spec/05`](../spec/05-AGENT-CONTRACTS.md) (agent `third_party` tidak boleh meminta `journal`, `finance`, `health`). Jurnal adalah satu-satunya tempat yang **C-3** tandai sebagai kemungkinan memuat isyarat krisis. Kalau disengaja, ia butuh persetujuan terpisah, masa berlaku, pencatatan tiap akses, dan larangan menyimpan salinan di server developer. |
+| **E-59** | 🆕 **Tabrakan penomoran Layer.** Phase 6 memulai **Layer 1** lagi, padahal Layer 6–20 dipakai naskah 3 dan Layer 21–50 dipakai naskah 7. Sekarang *"Layer 22"* berarti **Engineering Standards** (naskah 7) **dan** **Example Library** (naskah 10); *"Layer 14"* berarti Evaluation Framework **dan** Testing Sandbox. Untuk dokumentasi yang tujuannya dibaca AI coding agent tanpa kehilangan konteks (Layer 41 naskah 7), ini masalah nyata. Di berkas rapi dipakai awalan **DP-L**. |
+| **E-62** | 🆕 **SDK naik dari 5 bahasa jadi 7** (+ `go`, `rust`). Butir **B-11** (tiap perubahan kontrak agen harus dirilis ke semua bahasa sekaligus) menjadi ×7. Naskah 5 §58 menempatkan Developer SDK di **V6**, jadi bebannya jauh — tapi jumlahnya sebaiknya diputuskan saat memilih, bukan bertambah tiap naskah. |
 | **E-56** | 🆕⭐ **Model angka pengguna keenam — tetapi kali ini hampir menyatu.** *Personal Representation Layer* (Pillar 9): Learning · Career · Health · Recovery · Lifestyle · Social · Finance, masing-masing dengan `confidence`, `trend`, `evidence`. **Enam dari tujuh dimensinya identik** dengan Human Dashboard naskah 4 §28; bedanya hanya *Discipline* ↔ *Lifestyle*. Ini kandidat jawaban terkuat untuk **A-19/#2**, dan bentuknya langsung muat di `human_states.metrics jsonb`. Yang tersisa: pilih *Discipline* atau *Lifestyle* (atau keduanya → 8 dimensi), dan tegaskan bahwa **HumanState** (keadaan hari ini) tetap terpisah dari **Personal Representation** (kecenderungan jangka panjang). |
 | **E-54** | 🆕 **Dua pohon `research/` berbeda di dalam naskah yang sama.** Awal naskah: `behavior/ preference/ recommendation/ simulation/ world-model/ embeddings/ graph/ evaluation/ benchmarks/ experiments/ papers/ notebooks/`. Akhir naskah: `behavior-lab/ preference-lab/ simulation-lab/ world-model-lab/ graph-lab/ memory-lab/ explainability-lab/ intervention-lab/ benchmark-lab/ experiment-registry/ evaluation/ papers/`. **Hilang:** `recommendation/`, `embeddings/`, `notebooks/`. **Muncul:** `memory-lab/`, `explainability-lab/`, `intervention-lab/`. Keduanya berjumlah 12 sehingga sekilas terlihat cocok — pola yang sama persis dengan **E-13**. |
 | **E-55** | 🆕 **Daftar node dan relasi graf keempat.** Node (Pillar 3): User, Goal, Habit, Skill, Outfit, Food, Friend, Place, Activity — **Mood, Sleep, Workout, Meeting, Money, Learning hilang** dari daftar naskah 2, padahal *Mood* dipakai di contoh query pada halaman yang sama. Relasi: `improves`, `supports`, `blocks`, `related_to`, `frequently_used`. ⭐ **Kabar baiknya: `causes`, `influences`, dan `predicts` DIBUANG** — sejalan dengan naskah 4 §7 yang melarang menulis kausal untuk data observasional. |
 | **E-58** | 🆕 **Dataset BFM menyebut dua sumber yang tidak ada di V0.** `sleep_events` dan `calendar_events` membutuhkan integrasi tidur dan kalender yang **tidak ada di V0 sama sekali** (12 fitur V0 tidak memuat keduanya), dan `context_snapshots` belum pernah punya tabel di 23 tabel spesifikasi. Bertaut **B-21**. |
-| **E-57** | 🆕 **Skema penomoran ketiga.** Sekarang ada **V0–V6** (versi produk), **Sprint 0–6** (sprint V0), dan **R1–R8** (sprint riset) yang berjalan berdampingan tanpa aturan hubungan. R1 tidak bisa mulai sebelum V0 selesai dan dipakai — hubungan itu perlu ditulis, bukan disimpulkan. |
+| **E-57** | 🆕 **Skema penomoran keempat.** Sekarang berjalan berdampingan: **V0–V6** (versi produk), **Sprint 0–6** (sprint V0), **R1–R8** (sprint riset), dan **D1–D8** (sprint developer platform). Belum ada aturan hubungan; "kita di D3" tidak memberi tahu apa pun tentang posisi produk. Dan seperti dicatat di **B-21**, R1 tidak bisa mulai sebelum V0 dipakai — hubungan itu perlu ditulis, bukan disimpulkan pembaca. |
 | **E-51** | 🆕 **Phase 5 berbeda sepuluh kali lipat antara dua naskah.** Naskah 7 menulis Phase 5 sebagai **"500+ spesifikasi tingkat riset"**; naskah 8 menulisnya **"50+ dokumen"**. Salah satu keliru — dan bisa dipastikan dari aritmetika naskah 8 sendiri: total 8 fase = 380 dokumen, jadi Phase 5 tidak mungkin 500+. Kemungkinan besar **50+ yang benar** dan angka di naskah 7 salah ketik, tetapi butuh konfirmasi karena selisihnya menentukan apakah Phase 5 pekerjaan sebulan atau setahun. |
 | **E-52** | 🆕 **Dua arah riset hilang dari Phase 5.** Naskah 7 mendaftar 9 arah; naskah 8 hanya 7. Yang hilang: **Multi-Agent Collective Intelligence** dan **HumanVerse Research Roadmap (5 tahun)**. (*Agent Marketplace Protocol* wajar pindah ke Phase 6 *Marketplace*.) Yang pertama serius: *"ratusan AI Agent bekerja secara bersamaan"* adalah janji pembuka naskah 2 dan alasan seluruh AgentOS ada — kalau risetnya dibuang, janji itu perlu diturunkan juga. Bertaut **B-12**. |
 | **E-53** | 🆕 **Phase 8, 11, dan 12 sebagian mengulang yang sudah ditulis.** *Consent Framework* = Layer 25 §25 · *Explainable AI* = naskah 4 §29 · *Privacy Vault* = naskah 4 §44 · *Safety Guardrails* = naskah 4 §17 · *Multi-region* = Layer 46 · *Disaster Recovery* = Layer 44 · *Cost Optimization* = Layer 32 & naskah 4 §48. Dan **Phase 12** (*Event Schema, Agent Contracts, Sprint Backlog, CI/CD, Docker*) adalah pekerjaan yang **sudah selesai untuk V0** di [`../spec/`](../spec/README.md) — bedanya hanya skala (23 tabel vs 100+, ~40 endpoint vs 500+). Yang benar-benar baru di Phase 8 hanya **Bias Detection** dan **Human Override**. Konsekuensinya: **angka 380 dokumen tidak bisa dijumlahkan begitu saja dengan hitungan naskah sebelumnya** — lingkupnya tumpang tindih. |
@@ -303,6 +308,26 @@ Ini kelompok temuan paling serius, karena **seluruh produk berdiri di atas graf 
   (`events` + projector Sprint 5), Agent OS (`agents`, `agent_tools`,
   `agent_runs`, `permissions`). Hanya fondasi ke-4 (Knowledge + Simulation)
   yang belum ada bentuknya sama sekali — lihat **E-49**.
+
+**Diperiksa di naskah kesepuluh:**
+
+- ✅⭐ **Format nama event dua segmen menang telak.** DP-L12 dan DP-L13 memakai
+  `habit.completed`, `goal.completed`, `outfit.selected`, `journal.created`,
+  `workout.completed` — semuanya **dua segmen**. Yang menentukan: naskah 7
+  Layer 22 menulis event yang **sama persis** sebagai `fashion.outfit.selected`
+  (tiga segmen), naskah ini menulisnya `outfit.selected`. Dua naskah dua segmen
+  melawan satu naskah tiga segmen. Menutup **E-43** / issue #38.
+- ✅ **Weather dan Calendar muncul lagi sebagai TOOL** (DP-L11), menguatkan
+  **H-11**. Tiga naskah sekarang sepakat.
+- ✅ **Testing Sandbox + Review System adalah jawaban terbesar untuk A-15/C-7**
+  yang selama enam naskah hanya berupa kekhawatiran. Proses review akhirnya
+  punya bentuk, dan sandbox berarti developer bisa membangun tanpa pernah
+  menyentuh data orang sungguhan.
+- ✅ **Ketiga belas deliverable jujur ditandai "Blueprint"**, konsisten dengan
+  Phase 5.
+- ✅ **Format API `/v1/<resource>` cocok dengan Layer 22 naskah 7.** Dua naskah
+  sepakat; yang menyimpang justru spesifikasi V0 (`/api/v1/...`), dan itu
+  bagian saya — perlu diselaraskan.
 
 **Diperiksa di naskah kesembilan:**
 
