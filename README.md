@@ -46,7 +46,7 @@ manusia + agent + data + knowledge + simulation + automation**.
 | Milestone | Isi | Issue |
 |---|---|---|
 | **M1 — Keputusan sebelum kode** | 9 butir yang harus dijawab pemilik sebelum baris kode pertama V0 | [#1](../../issues/1)–[#9](../../issues/9) |
-| **M2 — Blueprint Engineering v1.0** | 16 butir yang mengunci isi blueprint | [#10](../../issues/10)–[#19](../../issues/19), [#26](../../issues/26)–[#30](../../issues/30) |
+| **M2 — Blueprint Engineering v1.0** | 15 butir yang mengunci isi blueprint | [#10](../../issues/10)–[#19](../../issues/19), [#26](../../issues/26)–[#30](../../issues/30) |
 | **M3 — Sebelum ada pengguna nyata** | 6 butir hukum, privasi, dan keselamatan | [#20](../../issues/20)–[#25](../../issues/25) |
 
 Empat yang paling menghambat: [#1](../../issues/1) rencana kanonik (Phase vs V) ·
