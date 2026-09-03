@@ -1,7 +1,7 @@
 # 99 — Catatan Audit & Keputusan Terbuka
 
 > ⚠️ **Berkas ini BUKAN kata pemilik.** Isinya catatan, keraguan, dan
-> pertanyaan dari sisi teknis. Sengaja dipisah supaya berkas `01`–`77` tetap
+> pertanyaan dari sisi teknis. Sengaja dipisah supaya berkas `01`–`112` tetap
 > murni merekam visi pemilik.
 >
 > Cara pakai: kalau pemilik memutuskan sebuah butir, keputusannya **naik** ke
@@ -13,21 +13,21 @@
 > 🔧 Hasil kerja engineering ada di [`../spec/`](../spec/README.md) —
 > **bukan kata pemilik**, dan sengaja di luar `docs/`.
 
-Diperbarui: 3 September 2026 · Mencakup **enam naskah**:
+Diperbarui: 3 September 2026 · Mencakup **tujuh naskah**:
 **1 HumanOS** · **2 HumanVerse X** · **3 Phase 2 Enterprise Blueprint** ·
 **4 Phase 3 AI-Native Human Ecosystem** · **5 Blueprint Engineering v1.0** ·
-**6 Peta 14 lapisan engineering**.
+**6 Peta 14 lapisan engineering** · **7 Phase 4 Enterprise OS (Layer 21–50)**.
 
 | Bagian | Isi | Jumlah |
 |---|---|---|
 | [H](#h-sudah-diputuskan--ditutup) | **Sudah diputuskan / ditutup** | 14 |
-| [A](#a-perlu-jawaban-pemilik) | Pertanyaan yang memblokir | 17 |
-| [B](#b-risiko-teknis) | Risiko teknis | 17 |
-| [C](#c-risiko-hukum--kepatuhan) | Risiko hukum & kepatuhan | 9 |
+| [A](#a-perlu-jawaban-pemilik) | Pertanyaan yang memblokir | 18 |
+| [B](#b-risiko-teknis) | Risiko teknis | 18 |
+| [C](#c-risiko-hukum--kepatuhan) | Risiko hukum & kepatuhan | 11 |
 | [D](#d-celah-yang-belum-tertutup) | Celah yang belum tertutup | 5 |
-| [E](#e-ketidakcocokan-antar-naskah) | **Ketidakcocokan antar-naskah** | 41 |
-| [F](#f-yang-sudah-saya-periksa-dan-ternyata-benar) | Sudah diperiksa, ternyata benar | 21 |
-| [G](#g-lubang-di-naskah-3-sendiri) | Lubang di naskah 3 sendiri | 3 |
+| [E](#e-ketidakcocokan-antar-naskah) | **Ketidakcocokan antar-naskah** | 49 |
+| [F](#f-yang-sudah-saya-periksa-dan-ternyata-benar) | Sudah diperiksa, ternyata benar | 25 |
+| [G](#g-lubang-di-dalam-naskah-sendiri) | Lubang di dalam naskah sendiri | 5 |
 
 ---
 
@@ -46,7 +46,7 @@ butir-butir ini. ⚠️ **H-8 dibatalkan** — lihat barisnya.
 | **H-6** | **B-8 — biaya inferensi berlipat** | ✅ §48 AI Cost Engine + §49 Model Router. Lihat [`71`](71-COST-ENGINE-DAN-MODEL-ROUTER.md). |
 | **H-7** | **B-13 — self-improving agent sulit diaudit** | ✅ Sebagian. §45 menyimpan **audit metadata**, bukan chain-of-thought mentah; §47 memberi versi agent + skor + **automatic rollback**. Self-Improving Agents sendiri tidak diulang di naskah 4. |
 | **H-8** | ~~E-5 — Grooming hilang di naskah 3~~ | ❌ **DIBATALKAN.** Grooming sempat kembali di registry naskah 4, lalu **hilang lagi** di daftar 22 agent naskah 5. Butir **E-5** dibuka kembali sebagai **E-35**. Ini pengingat: satu naskah memulihkan sesuatu bukan berarti sudah tetap. |
-| **H-9** | **A-1 — angka liar di judul** | ✅ Artefak salin-tempel. Naskah 4 masih menyisakan angka `6` yang menempel di dua judul — juga dibuang dari dokumen rapi. |
+| **H-9** | **A-1 — angka liar di judul** | ✅ Artefak salin-tempel; dibuang dari dokumen rapi. ⚠️ **Muncul lagi di naskah 4 dan 7** (`6`, `7` menempel di judul) — gejalanya berulang tiap naskah panjang, jadi selalu periksa. |
 | **H-10** | **E-27 — dua struktur repo** | ✅ Naskah 5 §4 **menggabungkan keduanya**: monorepo naskah 2 (`apps/ services/ agents/`) ditambah berkas wajib AI coding agent dari naskah 4 (`AGENTS.md`, `ARCHITECTURE.md`, `CONTRIBUTING.md`, `SECURITY.md`), dan `adr/` menjadi `docs/decisions/`. Lihat [`83`](83-STRUKTUR-REPO-FINAL.md). |
 | **H-11** | **E-2 / E-28 — Weather & Calendar: tool atau agent** | ✅ **Tool.** §13 menyebut "Calendar Tool" dan §14 mendaftarkan `weather.get`, `calendar.get`, `wardrobe.search`, `trend.search` di blok `tools:` manifest. Tidak ada WeatherAgent di daftar 22 agent. |
 | **H-12** | **A-10 — Kafka *dan* Redis Streams sekaligus?** | ✅ **Empat penyimpanan, bukan enam.** §5 menetapkan PostgreSQL · Qdrant · Neo4j · Redis; **Kafka dan ClickHouse hilang**, antrean pindah ke Redis. Lihat **E-36**. |
@@ -65,6 +65,7 @@ Diurutkan dari yang paling menghambat.
 | **A-19** | ⚠️ **Sekarang LIMA model angka pengguna — memburuk, bukan membaik.** *Human Genome of Behavior* 6 skor · *Profile Engine* 5 atribut · *HumanState* **7 field** (naskah 5 membuang `mood`) · *Human Dashboard* 7 batang · *DigitalTwin* 8 model. Tidak satu pun saling merujuk, tidak satu pun punya rumus. | Ini akan **mengunci skema basis data** — tabel `profiles`, `memories`, dan state harian bergantung padanya. **Confidence Layer (H-14) menjawab cara MENYAJIKAN angka, bukan angka mana yang dipakai.** ⚠️ **Spesifikasi menundanya tanpa biaya** — `human_states.metrics` dibuat `jsonb` sehingga model mana pun muat tanpa migrasi ([`../spec/01`](../spec/01-DATABASE-SCHEMA.md)). Tapi penundaan bukan jawaban: selama belum dipilih, **tidak ada yang bisa menghitung angkanya**. Lihat **E-34**. |
 | **A-17** | ⚠️ **Diperjelas dan makin berat.** Naskah 5 §32 memecah V0 jadi **7 sprint** (Foundation → Identity → Human Core → Memory → AI → Intelligence → Product), dan §29 **menambah dua fitur V0** (Activity Tracking, Recommendation) — sementara targetnya tetap **4–6 minggu**. | 7 sprint dalam 4–6 minggu ≈ **4–6 hari per sprint**, termasuk Sprint 0 (repo, Docker, CI/CD) dan Sprint 4 (AI Gateway + Model Router + 3 agent). Ini klaim jadwal, bukan arsitektur — dan sekarang cakupannya bertambah tanpa waktunya bertambah. Lihat **E-40**. |
 | **A-23** | 🆕 **Empat belas lapisan engineering — berapa yang benar-benar dibutuhkan sebelum V0?** Naskah 6 memperkirakan **~10–14 dokumen engineering utama**. Dari peta itu, **hanya lapisan 04** (Engineering Specification) yang menghalangi baris kode pertama; 05–14 sebagian besar baru relevan V1+. | Ini pengulangan pola **A-13**: dokumentasi bertambah 100 → 160 → 300+ → ≈460, sekarang +14 lapisan. Kalau semuanya ditulis dulu, V0 yang 4–6 minggu tidak akan pernah dimulai. Usul: tulis 05–14 **setelah** V0 jalan, karena V0 akan mengubah isinya. |
+| **A-24** | 🆕 **Berapa sebenarnya "keseluruhan proyek", dan berapa yang sudah selesai?** Naskah 7 menaksir **35 % selesai**. Tapi penyebutnya berubah tiap naskah: naskah 3 berkata Phase 1 baru **20–25 %** dari blueprint; sekarang 35 % dari *keseluruhan proyek*. Sementara itu hitungan spesifikasi menumpuk: **100 → 160 → 300+ → 14 lapisan → +500 riset** = lewat **900 dokumen**, dengan **0 baris kode**. | Angka kemajuan yang penyebutnya berubah tidak bisa dipakai memutuskan apa pun. Usul: ukur kemajuan terhadap **V0** (12 fitur, 23 tabel, 51 tugas) — satu-satunya lingkup tertutup yang pernah ditetapkan. Terhadap V0, kemajuan kode = **0 %**, dan itu angka yang berguna. Bertaut **A-13**, **A-23**. |
 | **A-20** | 🆕 **Mental Wellness dan Lifestyle: dibuang atau ditunda?** Registry §12 berisi 14 agent dan **memulihkan** Grooming, Nutrition, Productivity — tetapi **Mental Wellness dan Lifestyle tetap tanpa agent** (padahal Lifestyle muncul lagi di §56). | Menyempitkan **A-8** dari empat modul jadi dua. Mental Wellness punya beban hukum tertinggi (**C-3**) — kalau memang dibuang, hapus dari `03-MODUL.md` supaya dokumen tidak berbohong. |
 | **A-22** | 🆕 **Sampai level risiko berapa agent boleh bertindak otomatis?** §16 memberi Level 0–4 dan mewajibkan konfirmasi eksplisit di Level 4. Level 2 dan 3 belum ditetapkan default-nya. | *"Act selalu di bawah kontrol pengguna"* adalah janji pembuka naskah 4. Tanpa default yang tertulis, janji itu tidak bisa diuji. |
 | **A-21** | 🆕 **Experiment Engine: berapa hari minimum, dan kapan sistem menolak menyimpulkan?** §35 memberi contoh 14 hari tanpa kelompok kontrol. | §36 sudah memisahkan Observation → Correlation → Hypothesis → Evidence → Conclusion. Yang belum ada adalah **ambangnya**. Lihat **B-16** dan **C-8**. |
@@ -87,6 +88,7 @@ Diurutkan dari yang paling menghambat.
 | # | Catatan |
 |---|---|
 | B-12 | **Ratusan agen pada satu graf.** Tanpa aturan kepemilikan simpul dan penyelesaian konflik, graf akan saling menimpa. §13 memberi protocol antar-agent yang *authenticated, logged, traceable, permission-controlled* — itu mengatur **percakapan**, bukan **tulisan ke graf**. Risiko ini masih utuh; dilunakkan oleh §58 (jangan langsung 50 agent). |
+| B-18 | 🆕 **Target 99,9 % uptime tidak bisa dijanjikan tanpa orang yang berjaga.** Layer 44 menetapkannya sebagai target SRE. 99,9 % = **±43 menit mati per bulan**, dan menuntut giliran *on-call* yang bisa membangunkan seseorang tengah malam. Untuk satu orang tanpa tim, itu bukan target melainkan janji yang akan dilanggar. Selama penggunanya baru pemiliknya sendiri hal ini tidak perlu diselesaikan — tapi angkanya sebaiknya **tidak ditulis sebagai janji** sampai ada yang berjaga. |
 | B-14 | 🆕 **Context Engine harus hidup terus-menerus.** §2–§3 menuntut Real-Time + Historical + Predicted Context untuk setiap permintaan — pipeline yang tidak pernah tidur, menyentuh cuaca, kalender, lokasi, dan wearable. Belum ada **perilaku cadangan** ketika salah satu sinyal mati, dan kegagalannya akan senyap: rekomendasi tetap keluar, hanya jadi salah. |
 | B-15 | ⚠️ **Sebagian terjawab → H-14.** **Tujuh** angka HumanState (naskah 5 membuang `mood`) tanpa satu pun rumus — tapi Confidence Layer §19 kini mewajibkan setiap taksiran membawa `confidence` + `evidence_count`, jadi masalah "terlihat seperti fakta" punya jalan keluar. Yang tersisa: rumusnya sendiri, dan ambang High/Medium/Low. `"energy": 0.62` terlihat presisi padahal estimasi. §4 sudah menyebutnya "model internal", tapi antarmuka yang menampilkannya sebagai angka desimal akan tetap dibaca sebagai fakta. Sama persis dengan 6 skor Behavior Genome. |
 | B-16 | 🆕 **Eksperimen n-of-1 mudah salah simpul.** 14 hari, tanpa kelompok kontrol, dengan cuaca, beban kerja, dan musim sebagai perancu. §36 sudah memisahkan Observation → Conclusion; yang belum ada adalah **ambang statistik dan kalimat penolakan** ketika data tidak cukup. Lihat **A-21**. |
@@ -111,6 +113,8 @@ Diurutkan dari yang paling menghambat.
 | # | Catatan |
 |---|---|
 | C-7 | **Marketplace agen pihak ketiga.** Begitu orang lain bisa menulis agent yang membaca data tidur, keuangan, dan foto tubuh, Anda menjadi **pemroses data untuk pihak ketiga**. §14–§16 memberi fondasi teknisnya; **beban hukumnya belum disentuh sama sekali**. Dilunakkan karena §58 memindahkannya ke V3/V6. |
+| C-10 | 🆕 **"Coaches" adalah manusia yang melihat data manusia lain.** Layer 49 menambahkan *Coaches* sebagai peserta ekosistem. Sepanjang tujuh naskah, seluruh model izin dirancang untuk **agent**, bukan orang: `permissions.subject_type` hanya mengenal `agent`, `tool`, `integration`. Pelatih yang melihat data tidur, kebiasaan, dan mungkin jurnal kliennya butuh **jenis persetujuan yang berbeda** — berjangka waktu, bisa dicabut, tercatat, dan lingkupnya sempit. **Brands** menambah masalah lain: kepentingan komersial di dalam rekomendasi yang sudah berjanji *"popular ≠ suitable for the user"*. |
+| C-11 | 🆕 **Melatih model di atas data pengguna ≠ memakainya.** Phase 5 butir 1, 2, dan 6 (Behavior Foundation Model, Human GNN, Federated Personal AI) berarti **melatih model** di atas data tidur, mood, dan jurnal. Di banyak yurisdiksi itu dasar hukum yang **berbeda** dari sekadar memberi rekomendasi, dan sering menuntut persetujuan terpisah yang bisa ditolak tanpa kehilangan layanan. Kalau `consents.kind` tidak memuat `model_training` sejak awal, seluruh data yang sudah terkumpul tidak bisa dipakai untuk itu nanti. |
 | C-8 | 🆕 **Experiment Engine mendekati riset kesehatan mandiri.** Menyusun hipotesis tidur → fokus → produktivitas, menjalankannya 14 hari pada satu manusia, lalu menyimpulkan, secara bentuk adalah *self-experimentation*. Bahasa keluarannya harus tetap asosiatif (§7), dan sistem **tidak boleh menyarankan eksperimen yang menyangkut obat, puasa ekstrem, atau pembatasan tidur**. |
 | C-9 | 🆕 **Hak hapus vs jejak audit.** §43 menjanjikan **Delete**; §45 AI Audit Trail dan *Immutable Log* (naskah 2) menyimpan jejak keputusan. Harus ditulis sejak awal: **apa yang tetap tersimpan setelah pengguna menghapus**, berapa lama, dan dalam bentuk apa. |
 | C-1 | **Data biometrik.** Foto wajah, bentuk tubuh, warna kulit adalah kategori data khusus (GDPR Pasal 9; BIPA di Illinois). §20 menjadikan **kamera sebagai antarmuka utama** — permukaannya melebar, bukan menyempit. §41 (proses lokal bila perangkat mampu) meredakan sebagian, tapi baru ada di V5. |
@@ -166,6 +170,14 @@ Ini kelompok temuan paling serius, karena **seluruh produk berdiri di atas graf 
 
 | # | Temuan |
 |---|---|
+| **E-43** | 🆕 **Format nama event bertabrakan.** Layer 22 menetapkan **tiga segmen** (`fashion.outfit.selected`); naskah 5 §7 memakai **dua segmen** untuk seluruh 21 event-nya (`workout.completed`, `habit.completed`). Nama event **tidak boleh diganti setelah dipakai**, jadi ini harus dipilih sebelum Sprint 3. Format API juga berbeda: `/v1/fashion/outfits` vs endpoint di [`../spec/04`](../spec/04-API-CONTRACTS.md). |
+| **E-48** | 🆕 **Dua daftar persona di dua lapisan berdampingan.** Layer 36: Student · Office Worker · Gym Enthusiast · Freelancer · Traveler. Layer 37: Student · Young Professional · Creator · Athlete · Minimalist. **Hanya *Student* yang sama.** Beberapa pasangan jelas maksudnya sama (*Office Worker* ≈ *Young Professional*), tapi *Freelancer*, *Traveler*, *Creator*, dan *Minimalist* tidak berpasangan. Ini akan jadi nama berkas uji. |
+| **E-49** | 🆕 **Knowledge Platform muncul tanpa batas yang ditulis.** Layer 40 memisahkan *Memory = pengalaman pengguna* dari *Knowledge = pengetahuan dunia* — pemisahan yang benar dan menjelaskan kekaburan lama *Semantic Memory*. Tapi konsekuensinya belum ditulis: pengetahuan dunia **tidak** ikut terhapus saat akun dihapus, **tidak** butuh izin per pengguna, dan **tidak** boleh tercampur di koleksi Qdrant yang sama. Ini fondasi ke-4 di Layer 50 dan satu-satunya yang belum punya bentuk teknis sama sekali. |
+| **E-47** | 🆕 **Lapisan evaluasi ketiga.** Layer 14 (naskah 3, terpotong) · §23 Agent Evaluation (naskah 5) · Layer 35 AI Evaluation Laboratory (naskah 7). Ketiganya menjelaskan hal yang sama dengan daftar metrik berbeda. Perlu satu tempat kanonik. |
+| **E-46** | 🆕 **Folder `prompts/` berubah lagi.** Naskah 3: planner, fashion, health, **finance**, career, **social**, evaluation. Naskah 7 Layer 30: planner, fashion, health, career, evaluation, **system**, **safety**. Tetap 7 folder, isinya bergeser — sementara daftar agent sudah **22**. Perluasan **E-23**. |
+| **E-45** | 🆕 **AI Conversation Framework tidak punya langkah keselamatan.** Sembilan langkah Layer 29 (Intent → Context → Memory → Planning → Execution → Response → Feedback → Memory Update) **melewati** Safety Classifier / Risk Engine / Policy Engine yang diwajibkan naskah 4 §17, dan tidak menyebut SafetyAgent (naskah 5 §12). Risk gate ada di [`../spec/05`](../spec/05-AGENT-CONTRACTS.md) — rantai percakapan harus melewatinya juga. |
+| **E-50** | 🆕 **Peserta ekonomi bertambah dari 3 jadi 5.** Naskah 4: Users, Developers, Partners. Layer 49: + **Brands** dan **Coaches**. Keduanya berbeda jenis dari Developers: *Brands* membawa kepentingan komersial ke dalam rekomendasi yang sudah berjanji *"popular ≠ suitable for the user"*; *Coaches* adalah **manusia** yang melihat data tidur dan kebiasaan orang lain. Lihat **C-10**. |
+| **E-44** | 🆕 **Berkas kontrak per folder vs per repo.** Layer 22 mewajibkan `README.md`, `AGENTS.md`, `OWNERS.md`, `CONTRACT.md` di **setiap** folder (8 folder = **32 berkas** yang harus dijaga tetap benar). Naskah 5 §4 hanya meminta 4 berkas di akar repo. `OWNERS.md` juga ganjil untuk proyek satu orang. |
 | **E-42** | 🆕 **Daftar tabel V0 tidak cukup untuk arsitektur V0 sendiri.** Naskah 6 meminta `events`, `agents`, dan `agent_tools` — **ketiganya tidak ada** di 19 tabel §31. Padahal §30 menggambar *Event System* sebagai lapisan wajib V0, §7 berkata *"setiap aktivitas menjadi event"*, dan `agent_runs` yang **ada** di §31 jelas menunjuk agent yang tabelnya tidak ada. Tanpa `events`, Behavior Engine Sprint 5 tidak punya bahan. Ditambahkan di [`../spec/01`](../spec/01-DATABASE-SCHEMA.md) → **23 tabel**. |
 | **E-35** | 🆕 **Daftar agent berubah untuk KEEMPAT kalinya — dan Grooming hilang lagi.** Naskah 5 §12 mendaftar **22 agent** (12 inti + 10 domain). Dibanding registry 14 di naskah 4: **HealthAgent, GroomingAgent, ProductivityAgent, EntertainmentAgent, dan ResearchAgent hilang**; **WardrobeAgent dan TrendAgent muncul**; dan 12 agent sistem (Planner, Behavior, Context, Goal, Evaluation, **Safety**, Personalization, …) masuk daftar untuk pertama kalinya. ⚠️ **Health dan Lifestyle adalah *domain* di §3 tapi tidak punya agent di §12.** Ini membatalkan **H-8**. |
 | **E-34** | 🆕 **Model pengguna bergeser lagi di dalam naskah 5.** *HumanState* turun dari **8 field jadi 7** — **`mood` keluar**; itu kemungkinan besar benar dan disengaja (mood punya event `mood.logged` dan tabel `mood_entries` sendiri — **dilaporkan pengguna**, bukan **ditaksir sistem**), tapi belum pernah dinyatakan. *DigitalTwin* tetap 8 model tetapi **`SocialModel` diganti `LifestyleModel`**. Lihat **A-19**. |
@@ -261,12 +273,32 @@ Ini kelompok temuan paling serius, karena **seluruh produk berdiri di atas graf 
 - ✅ **Peta 14 lapisan konsisten dengan isi naskah 1–5** — tiap lapisan punya
   bahan yang sudah tertulis; tidak ada lapisan yang mengarang kebutuhan baru.
 
+**Diperiksa di naskah ketujuh:**
+
+- ✅ **Penomoran Layer 21–50 melanjutkan Layer 6–20 tanpa tabrakan.** Tujuh
+  naskah, dua sistem penomoran layer, nol nomor ganda.
+- ✅ **"Jangan lompat ke Kubernetes pada hari pertama"** konsisten dengan
+  naskah 4 §51 dan naskah 5 §1. **Tiga naskah berturut-turut** — ini pendirian
+  paling stabil pemilik di seluruh proyek.
+- ✅ **"Jangan mengoptimalkan manipulasi; optimalkan pengalaman pengguna"**
+  (Layer 34) sejalan dengan penolakan satu angka Life Score (naskah 4 §28) dan
+  prinsip penutup *"jangan menilai manusia baik atau buruk"*. Menyebut batas
+  itu di baris yang sama dengan *retention* dan *engagement* adalah pilihan
+  yang benar, bukan basa-basi.
+- ✅ **Tiga dari empat fondasi di Layer 50 sudah punya bentuk teknis di V0** —
+  Human Core (`profiles`, `goals`, `human_states`), Behavior Intelligence
+  (`events` + projector Sprint 5), Agent OS (`agents`, `agent_tools`,
+  `agent_runs`, `permissions`). Hanya fondasi ke-4 (Knowledge + Simulation)
+  yang belum ada bentuknya sama sekali — lihat **E-49**.
+
 ---
 
-## G. Lubang di naskah 3 sendiri
+## G. Lubang di dalam naskah sendiri
 
 | # | Temuan |
 |---|---|
+| **G-4** | 🆕 **Layer 44 terpotong di tengah tabel — gejala yang sama terulang.** Yang terbaca hanya `Uptime 99.9%` lalu `Latency` **tanpa angka target**, dan metrik ketiga dan seterusnya hilang. Bentuknya **persis** seperti **G-1** di naskah 3. Dua naskah panjang, dua tabel terpotong di tempat yang sama macamnya — kemungkinan besar batas salin-tempel, bukan kelalaian menulis. Disimpan apa adanya di [`110`](110-L44-46-RELIABILITY-INFRA.md). |
+| **G-5** | 🆕 **Layer 45 tidak pernah muncul, dan ada fragmen tanpa judul.** Setelah Layer 44 yang terpotong, naskah melompat ke Layer 46. Di antaranya berdiri satu kalimat tanpa judul dan tanpa nomor: *"Jangan lompat ke Kubernetes pada hari pertama."* Kemungkinan besar itu sisa Layer 45 (infrastruktur/scaling). **Persis pola G-2** di naskah 3 (Layer 15/16 hilang + Profile Engine tanpa judul). Disimpan apa adanya, tidak ditambal. |
 | **G-1** | **Layer 14 terpotong di tengah tabel.** Yang terbaca hanya `Accuracy 95%` lalu `Latency` — tanpa angka target. ⚠️ Naskah 4 §47 memberi **8 metrik evaluasi** yang jauh lebih lengkap; lubang naskah 3 tetap dicatat, tapi sudah ada penggantinya. Dicatat di [`39-L14-EVALUATION-FRAMEWORK.md`](39-L14-EVALUATION-FRAMEWORK.md). |
 | **G-2** | **Layer 15 dan Layer 16 tidak pernah muncul.** Satu lapisan tanpa nomor (*Profile Engine*) dan dua nomor tanpa lapisan. Disimpan apa adanya di [`40-TANPA-NOMOR-PROFILE-ENGINE.md`](40-TANPA-NOMOR-PROFILE-ENGINE.md). |
 | **G-3** | **Data Governance dijanjikan tapi tidak ditulis.** ⚠️ **Isinya sekarang ada** — §43 Privacy Center, §44 Personal Data Vault, §45 AI Audit Trail, dan *Governance* sebagai komponen SYSTEM di §56. Yang tersisa hanya keputusan penempatan (**A-16**). |

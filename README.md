@@ -23,10 +23,10 @@ manusia + agent + data + knowledge + simulation + automation**.
 | Tahap | **Spesifikasi engineering siap** — belum ada kode (disengaja) |
 | Berkas kode | 0 |
 | Repo git | belum diinisialisasi |
-| Dokumen | **86 berkas** di `docs/` (naskah + audit + catatan sesi) + **8 berkas** di `spec/` |
-| Naskah pemilik | **6** — terakhir: peta 14 lapisan engineering |
+| Dokumen | **99 berkas** di `docs/` (naskah + audit + catatan sesi) + **8 berkas** di `spec/` |
+| Naskah pemilik | **7** — terakhir: Phase 4 Enterprise OS (Layer 21–50) + teaser Phase 5 |
 | Keputusan tertutup | **14 butir H** — nama · MVP · struktur repo · rencana kanonik V0–V6 |
-| Keputusan terbuka | **17 pertanyaan A** · **41 ketidakcocokan E** · **3 lubang G** |
+| Keputusan terbuka | **18 pertanyaan A** · **49 ketidakcocokan E** · **5 lubang G** |
 | Tanggal dokumen | 3 September 2026 |
 
 > ⚠️ **Nol baris kode itu disengaja — dan penghambatnya terus berkurang.**
@@ -116,7 +116,7 @@ Selengkapnya: [`docs/75-URUTAN-PEMBANGUNAN-V0-V6.md`](docs/75-URUTAN-PEMBANGUNAN
 
 ---
 
-## Enam naskah
+## Tujuh naskah
 
 ```
   NASKAH 1   HumanOS — visi & 12 modul manusia          berkas 01–07
@@ -137,15 +137,22 @@ Selengkapnya: [`docs/75-URUTAN-PEMBANGUNAN-V0-V6.md`](docs/75-URUTAN-PEMBANGUNAN
      │       "berhenti menambah visi/fitur"
      │
   NASKAH 6   Peta 14 lapisan engineering               berkas 98
-             Operating Model · "jangan lompat ke fitur baru lagi"
-             └──► lapisan 04 dikerjakan → spec/
+     │       Operating Model · "jangan lompat ke fitur baru lagi"
+     │       └──► lapisan 04 dikerjakan → spec/
+     │
+  NASKAH 7   Phase 4 Enterprise Operating System       berkas 100–112
+             Layer 21–50 · standards · design system · AI Ops
+             + teaser Phase 5: 500+ spesifikasi riset
 ```
+
+> ℹ️ Penomoran berkas melewati 99. `99-CATATAN-AUDIT.md` tetap di tempatnya
+> sebagai berkas audit; naskah 7 memakai `100`–`112`.
 
 ---
 
 ## Aturan berkas dokumen
 
-1. Berkas `01`–`98` merekam **kata pemilik apa adanya**. Susunannya dirapikan,
+1. Berkas `01`–`112` merekam **kata pemilik apa adanya**. Susunannya dirapikan,
    isinya tidak ditambah-tambahi. Bagian yang hilang di naskah **ditandai
    sebagai hilang**, bukan ditambal.
 2. Setiap keraguan, koreksi, risiko, atau usulan dari pihak lain (termasuk AI)
@@ -269,6 +276,30 @@ Selengkapnya: [`docs/75-URUTAN-PEMBANGUNAN-V0-V6.md`](docs/75-URUTAN-PEMBANGUNAN
 | [`95-V0-SPESIFIKASI.md`](docs/95-V0-SPESIFIKASI.md) | 29–32 | ⭐ **12 fitur · 4 agent · 19 tabel · 7 sprint** |
 | [`96-SESUDAH-V0-DAN-TARGET-AKHIR.md`](docs/96-SESUDAH-V0-DAN-TARGET-AKHIR.md) | 33–34 | V1–V6 · target akhir dengan lapisan **HUMAN CONTROL** |
 | [`97-LANGKAH-BERIKUTNYA-ENGINEERING-SPEC.md`](docs/97-LANGKAH-BERIKUTNYA-ENGINEERING-SPEC.md) | — | Langkah berikutnya: **Engineering Specification v1.0** |
+
+---
+
+### Naskah 7 — Phase 4: Enterprise Operating System (Layer 21–50)
+
+| Berkas | Layer | Isi |
+|---|---|---|
+| [`100-PHASE-4-IKHTISAR.md`](docs/100-PHASE-4-IKHTISAR.md) | 21 | HumanVerse OS — 6 standar + peta Layer 21–50 |
+| [`101-L22-ENGINEERING-STANDARDS.md`](docs/101-L22-ENGINEERING-STANDARDS.md) | 22 | Kontrak per folder · naming convention |
+| [`102-L23-ADR.md`](docs/102-L23-ADR.md) | 23 | ADR-001…004 — **LangGraph akhirnya dikunci** |
+| [`103-L24-26-DESIGN-SYSTEM.md`](docs/103-L24-26-DESIGN-SYSTEM.md) | 24–26 | Design tokens · 10 komponen · motion |
+| [`104-L27-29-INTERAKSI.md`](docs/104-L27-29-INTERAKSI.md) | 27–29 | UX Intelligence · 4 mode · alur percakapan 9 langkah |
+| [`105-L30-32-PROMPTOPS-MODEL.md`](docs/105-L30-32-PROMPTOPS-MODEL.md) | 30–32 | PromptOps · siklus hidup model · optimasi biaya |
+| [`106-L33-35-EKSPERIMEN-EVALUASI.md`](docs/106-L33-35-EKSPERIMEN-EVALUASI.md) | 33–35 | Feature flag · eksperimen · lab evaluasi AI |
+| [`107-L36-37-PERSONA.md`](docs/107-L36-37-PERSONA.md) | 36–37 | Synthetic user · persona library |
+| [`108-L38-40-NOTIFIKASI-SEARCH-KNOWLEDGE.md`](docs/108-L38-40-NOTIFIKASI-SEARCH-KNOWLEDGE.md) | 38–40 | Notifikasi · search · ⭐ **Memory ≠ Knowledge** |
+| [`109-L41-43-DOKUMENTASI-PLAYBOOK-INSIDEN.md`](docs/109-L41-43-DOKUMENTASI-PLAYBOOK-INSIDEN.md) | 41–43 | Documentation OS · playbook · AI incident response |
+| [`110-L44-46-RELIABILITY-INFRA.md`](docs/110-L44-46-RELIABILITY-INFRA.md) | 44–46 | SRE ⚠️ **terpotong** · Layer 45 ⚠️ **hilang** · multi-region |
+| [`111-L47-50-PLATFORM-EKONOMI-VISI.md`](docs/111-L47-50-PLATFORM-EKONOMI-VISI.md) | 47–50 | Enterprise API · developer platform · ⭐ **4 fondasi** |
+| [`112-PHASE-5-RESEARCH-LAB.md`](docs/112-PHASE-5-RESEARCH-LAB.md) | — | Phase 5: 9 arah riset, **500+ spesifikasi** |
+
+> ⚠️ **Layer 44 terpotong dan Layer 45 tidak ada** — bentuknya persis seperti
+> lubang naskah 3 (Layer 14 terpotong, Layer 15/16 hilang). Tidak dikarang;
+> lihat butir **G-4** dan **G-5**.
 
 ---
 

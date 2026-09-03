@@ -4,6 +4,58 @@
 
 ---
 
+## Sesi 5 — 3 September 2026
+
+**Naskah ketujuh direkam — dan lubang naskah 3 terulang persis.**
+
+| Hal | Hasil |
+|---|---|
+| Naskah baru | **Phase 4 Enterprise OS**, Layer 21–50 + teaser Phase 5 |
+| Dokumen ditambah | **13 berkas** (`100`–`112`) |
+| Dokumen total | 86 → **99** di `docs/`, + 8 di `spec/` |
+| Berkas kode | tetap **0** |
+
+### ⚠️ Dua lubang, bentuknya sama seperti naskah 3
+
+| Naskah 3 | Naskah 7 |
+|---|---|
+| Layer 14 terpotong di tengah tabel (**G-1**) | Layer 44 terpotong di tengah tabel (**G-4**) |
+| Layer 15/16 hilang + fragmen tanpa judul (**G-2**) | Layer 45 hilang + fragmen *"jangan lompat ke Kubernetes"* (**G-5**) |
+
+Dua naskah panjang, dua tabel terpotong di tempat yang sama macamnya.
+Kemungkinan besar batas salin-tempel. **Ditandai hilang, tidak ditambal.**
+
+### Yang paling berguna dari naskah ini
+
+- **Layer 40: Memory ≠ Knowledge.** *Memory = pengalaman pengguna, Knowledge =
+  pengetahuan dunia.* Menjelaskan kekaburan lama *Semantic Memory*, dan punya
+  konsekuensi nyata: pengetahuan dunia tidak ikut terhapus saat akun dihapus.
+- **Layer 50: empat fondasi** — rumusan visi paling tajam dari tujuh naskah,
+  dan tiga dari empat sudah punya bentuk teknis di V0.
+- **Layer 34:** *"Jangan mengoptimalkan manipulasi; optimalkan pengalaman
+  pengguna"* — ditulis di baris yang sama dengan *retention* dan *engagement*.
+- **ADR-004** mengunci LangGraph; disebut sejak naskah 2, baru sekarang jadi
+  keputusan.
+
+### Delapan ketidakcocokan baru (E-43..E-50)
+
+Yang paling mendesak: **E-43** — format nama event **tiga segmen**
+(`fashion.outfit.selected`) bertabrakan dengan **dua segmen** di naskah 5 §7
+(21 event, semuanya dua segmen). **Nama event tidak boleh diganti setelah
+dipakai**, jadi harus dipilih sebelum Sprint 3.
+
+Juga: **E-48** dua daftar persona di dua lapisan berdampingan (hanya *Student*
+yang sama), dan **E-45** rantai percakapan 9 langkah yang melewatkan
+Safety/Risk.
+
+### Hitungan yang perlu diperhatikan
+
+Phase 5 menambah **500+ spesifikasi riset**. Total: 100 → 160 → 300+ →
+14 lapisan → +500 = lewat **900 dokumen**, dengan **0 baris kode**
+(butir **A-24**).
+
+---
+
 ## Sesi 4 — 3 September 2026
 
 **Naskah keenam direkam — lalu lapisan 04 dikerjakan: Engineering Spec v1.0.**
