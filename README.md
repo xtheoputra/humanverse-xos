@@ -47,23 +47,26 @@ manusia + agent + data + knowledge + simulation + automation**.
 
 ## 📌 Pekerjaan terbuka = GitHub Issues
 
-**35 issue** dalam 3 milestone — **5 sudah ditutup naskah 5**. Baca issue-nya,
-jangan analisis ulang naskahnya.
+**37 issue** dalam 3 milestone — **6 ditutup**. Baca issue-nya, jangan analisis
+ulang naskahnya.
 
 | Milestone | Isi | Issue |
 |---|---|---|
 | **M1 — Keputusan sebelum kode** | 8 terbuka, 1 ditutup | [#1](../../issues/1)–[#9](../../issues/9) |
-| **M2 — Blueprint & Engineering Spec** | 21 terbuka, 4 ditutup | [#10](../../issues/10)–[#19](../../issues/19), [#26](../../issues/26)–[#35](../../issues/35) |
+| **M2 — Blueprint & Engineering Spec** | 23 terbuka, 5 ditutup | [#10](../../issues/10)–[#19](../../issues/19), [#26](../../issues/26)–[#37](../../issues/37) |
 | **M3 — Sebelum ada pengguna nyata** | 6 terbuka | [#20](../../issues/20)–[#25](../../issues/25) |
 
-✅ **Ditutup naskah 5:** [#1](../../issues/1) rencana kanonik → V0–V6 ·
+✅ **Ditutup:** [#1](../../issues/1) rencana kanonik → V0–V6 ·
 [#8](../../issues/8) struktur repo · [#12](../../issues/12) Weather/Calendar = tool ·
-[#17](../../issues/17) empat penyimpanan · [#10](../../issues/10) blueprint ditulis pemilik.
+[#17](../../issues/17) empat penyimpanan · [#10](../../issues/10) blueprint ·
+[#31](../../issues/31) Engineering Specification.
 
-🛑 **Empat yang mengunci Engineering Spec** (#31), karena semuanya menentukan
-skema basis data: [#2](../../issues/2) lima model angka pengguna ·
-[#7](../../issues/7) model graf · [#33](../../issues/33) memory: jenis atau scope ·
-[#32](../../issues/32) tiga skala skor.
+🛑 **Penghambat V0 yang tersisa — tinggal dua, dan keduanya bukan soal skema:**
+[#3](../../issues/3) 12 fitur & 7 sprint dalam 4–6 minggu ·
+[#20](../../issues/20) cek merek.
+Yang masih menunggu jawaban tapi tidak menahan Sprint 0–4:
+[#2](../../issues/2) model angka pengguna (menahan Sprint 5) ·
+[#21](../../issues/21) eskalasi krisis Journal (menahan rilis ke orang lain).
 
 ---
 

@@ -7,9 +7,11 @@
 > Cara pakai: kalau pemilik memutuskan sebuah butir, keputusannya **naik** ke
 > berkas visi yang sesuai, lalu butirnya turun ke bagian **H**.
 
-> 📌 **Butir di berkas ini sudah jadi 35 GitHub Issue** dalam 3 milestone —
-> 30 terbuka, 5 ditutup oleh naskah kelima. Baca issue-nya, jangan analisis
-> ulang naskahnya.
+> 📌 **Butir di berkas ini sudah jadi 37 GitHub Issue** dalam 3 milestone —
+> 31 terbuka, 6 ditutup. Baca issue-nya, jangan analisis ulang naskahnya.
+>
+> 🔧 Hasil kerja engineering ada di [`../spec/`](../spec/README.md) —
+> **bukan kata pemilik**, dan sengaja di luar `docs/`.
 
 Diperbarui: 3 September 2026 · Mencakup **enam naskah**:
 **1 HumanOS** · **2 HumanVerse X** · **3 Phase 2 Enterprise Blueprint** ·
