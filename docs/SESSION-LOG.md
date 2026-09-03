@@ -4,6 +4,58 @@
 
 ---
 
+## Sesi 6 — 3 September 2026
+
+**Naskah kedelapan direkam — peta Phase 5–12, dan satu angka bertabrakan 10×.**
+
+| Hal | Hasil |
+|---|---|
+| Naskah baru | **Peta Phase 5–12** + taksiran kemajuan 45 % → berkas `113` |
+| Dokumen total | 99 → **100** di `docs/`, + 8 di `spec/` |
+| Berkas kode | tetap **0** |
+
+### Yang diperiksa dan benar
+
+- **Aritmetika delapan fase benar**: 50+40+50+30+30+40+40+100 = **380**, tepat
+  di dalam rentang "300–500 dokumen".
+- **"Tidak ingin memperpanjang hanya demi panjang"** — pertama kalinya dalam
+  delapan naskah pemilik membatasi dirinya sendiri sebelum diminta.
+- **Bias Detection** dan **Human Override** benar-benar baru. *Human Override*
+  khususnya adalah pasangan yang selama ini hilang dari janji *"Act di bawah
+  kontrol pengguna"*: yang ditulis baru **izin sebelum** aksi, belum
+  **pembatalan sesudah**.
+
+### Tiga temuan
+
+- **E-51** — Phase 5 berbeda **sepuluh kali lipat** antara dua naskah: naskah 7
+  menulis *500+ spesifikasi*, naskah 8 menulis *50+ dokumen*. Aritmetika naskah
+  8 sendiri membuktikan 50+ yang benar (total 380), tapi butuh konfirmasi.
+- **E-52** — **Multi-Agent Collective Intelligence hilang** dari Phase 5.
+  Itu justru riset di balik janji pembuka naskah 2: *"ratusan AI Agent bekerja
+  secara bersamaan"*.
+- **E-53** — Phase 8, 11, dan 12 **sebagian mengulang** yang sudah ditulis.
+  Phase 12 (*Event Schema, Agent Contracts, Sprint Backlog, CI/CD, Docker*)
+  adalah pekerjaan yang **sudah selesai untuk V0** di `spec/` — bedanya hanya
+  skala (23 tabel vs 100+, ~40 endpoint vs 500+).
+
+### 🔧 Koreksi hitungan saya sendiri
+
+Sesi lalu saya menulis "lewat **900 dokumen**". Itu **terlalu besar** — saya
+menjumlahkan lingkup yang tumpang tindih. Naskah 8 memberi angka yang lebih
+tepat: **380** untuk delapan fase tersisa, dan sebagiannya mengulang yang sudah
+ada. Butir **A-24** diperbaiki.
+
+### Dua risiko baru
+
+- **C-12** — *Company Wellness* (Phase 9) berarti **pemberi kerja** menyentuh
+  data kesehatan pekerja. Berbeda dari *Coaches* karena ada ketimpangan
+  kekuasaan: persetujuan kepada atasan tidak pernah sepenuhnya bebas.
+- **B-19** — Phase 10 (*Email Automation*, *Cross-App Actions*) adalah **ujian
+  pertama** janji kendali manusia. Itu Risk Level 3, tingkat yang sengaja tidak
+  punya satu pun tool di V0.
+
+---
+
 ## Sesi 5 — 3 September 2026
 
 **Naskah ketujuh direkam — dan lubang naskah 3 terulang persis.**

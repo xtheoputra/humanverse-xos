@@ -23,10 +23,10 @@ manusia + agent + data + knowledge + simulation + automation**.
 | Tahap | **Spesifikasi engineering siap** — belum ada kode (disengaja) |
 | Berkas kode | 0 |
 | Repo git | belum diinisialisasi |
-| Dokumen | **99 berkas** di `docs/` (naskah + audit + catatan sesi) + **8 berkas** di `spec/` |
-| Naskah pemilik | **7** — terakhir: Phase 4 Enterprise OS (Layer 21–50) + teaser Phase 5 |
+| Dokumen | **100 berkas** di `docs/` (naskah + audit + catatan sesi) + **8 berkas** di `spec/` |
+| Naskah pemilik | **8** — terakhir: peta Phase 5–12 (≈380 dokumen tersisa) |
 | Keputusan tertutup | **14 butir H** — nama · MVP · struktur repo · rencana kanonik V0–V6 |
-| Keputusan terbuka | **18 pertanyaan A** · **49 ketidakcocokan E** · **5 lubang G** |
+| Keputusan terbuka | **18 pertanyaan A** · **52 ketidakcocokan E** · **5 lubang G** |
 | Tanggal dokumen | 3 September 2026 |
 
 > ⚠️ **Nol baris kode itu disengaja — dan penghambatnya terus berkurang.**
@@ -118,7 +118,7 @@ Selengkapnya: [`docs/75-URUTAN-PEMBANGUNAN-V0-V6.md`](docs/75-URUTAN-PEMBANGUNAN
 
 ---
 
-## Tujuh naskah
+## Delapan naskah
 
 ```
   NASKAH 1   HumanOS — visi & 12 modul manusia          berkas 01–07
@@ -143,8 +143,11 @@ Selengkapnya: [`docs/75-URUTAN-PEMBANGUNAN-V0-V6.md`](docs/75-URUTAN-PEMBANGUNAN
      │       └──► lapisan 04 dikerjakan → spec/
      │
   NASKAH 7   Phase 4 Enterprise Operating System       berkas 100–112
-             Layer 21–50 · standards · design system · AI Ops
-             + teaser Phase 5: 500+ spesifikasi riset
+     │       Layer 21–50 · standards · design system · AI Ops
+     │
+  NASKAH 8   Peta Phase 5–12                            berkas 113
+             ≈380 dokumen tersisa · taksiran kemajuan 45 %
+             "tidak ingin memperpanjang hanya demi panjang"
 ```
 
 > ℹ️ Penomoran berkas melewati 99. `99-CATATAN-AUDIT.md` tetap di tempatnya
@@ -154,7 +157,7 @@ Selengkapnya: [`docs/75-URUTAN-PEMBANGUNAN-V0-V6.md`](docs/75-URUTAN-PEMBANGUNAN
 
 ## Aturan berkas dokumen
 
-1. Berkas `01`–`112` merekam **kata pemilik apa adanya**. Susunannya dirapikan,
+1. Berkas `01`–`113` merekam **kata pemilik apa adanya**. Susunannya dirapikan,
    isinya tidak ditambah-tambahi. Bagian yang hilang di naskah **ditandai
    sebagai hilang**, bukan ditambal.
 2. Setiap keraguan, koreksi, risiko, atau usulan dari pihak lain (termasuk AI)
@@ -297,11 +300,37 @@ Selengkapnya: [`docs/75-URUTAN-PEMBANGUNAN-V0-V6.md`](docs/75-URUTAN-PEMBANGUNAN
 | [`109-L41-43-DOKUMENTASI-PLAYBOOK-INSIDEN.md`](docs/109-L41-43-DOKUMENTASI-PLAYBOOK-INSIDEN.md) | 41–43 | Documentation OS · playbook · AI incident response |
 | [`110-L44-46-RELIABILITY-INFRA.md`](docs/110-L44-46-RELIABILITY-INFRA.md) | 44–46 | SRE ⚠️ **terpotong** · Layer 45 ⚠️ **hilang** · multi-region |
 | [`111-L47-50-PLATFORM-EKONOMI-VISI.md`](docs/111-L47-50-PLATFORM-EKONOMI-VISI.md) | 47–50 | Enterprise API · developer platform · ⭐ **4 fondasi** |
-| [`112-PHASE-5-RESEARCH-LAB.md`](docs/112-PHASE-5-RESEARCH-LAB.md) | — | Phase 5: 9 arah riset, **500+ spesifikasi** |
+| [`112-PHASE-5-RESEARCH-LAB.md`](docs/112-PHASE-5-RESEARCH-LAB.md) | — | Phase 5: 9 arah riset, **500+ spesifikasi** ⚠️ angkanya dibantah naskah 8 |
 
 > ⚠️ **Layer 44 terpotong dan Layer 45 tidak ada** — bentuknya persis seperti
 > lubang naskah 3 (Layer 14 terpotong, Layer 15/16 hilang). Tidak dikarang;
 > lihat butir **G-4** dan **G-5**.
+
+---
+
+### Naskah 8 — Peta Phase 5–12
+
+| Berkas | Isi |
+|---|---|
+| [`113-PETA-FASE-5-12.md`](docs/113-PETA-FASE-5-12.md) | Taksiran kemajuan 45 % + 8 fase tersisa, ≈**380 dokumen** |
+
+```
+Phase 5   Research Lab           50+    BFM · GNN · World Model · Federated
+Phase 6   Developer Platform     40+    SDK · Plugin API · Marketplace · OAuth
+Phase 7   Data & AI Infra        50+    Feature Store · Lakehouse · Model Registry
+Phase 8   AI Safety & Ethics     30+    Bias Detection · Human Override ← BARU
+Phase 9   Enterprise & Business  30+    Team · Family · Company Wellness
+Phase 10  AI Automation Engine   40+    Cross-App · Calendar · Email Automation
+Phase 11  HumanVerse Cloud       40+    Multi-region · DR · Edge
+Phase 12  Blueprint Implementation 100+ ERD 100+ tabel · API 500+ endpoint
+```
+
+> ✅ Aritmetikanya benar: **380**, tepat di dalam rentang "300–500".
+>
+> ⚠️ Tapi **Phase 5 berbeda 10× dengan naskah 7** (500+ vs 50+ dokumen), dan
+> **Phase 8/11/12 sebagian mengulang** yang sudah ditulis — Phase 12 justru
+> pekerjaan yang **sudah selesai untuk V0** di [`spec/`](spec/README.md), hanya
+> beda skala. Lihat **E-51** dan **E-53**.
 
 ---
 
