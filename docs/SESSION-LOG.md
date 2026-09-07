@@ -4,6 +4,74 @@
 
 ---
 
+## Sesi 16 — 7 September 2026
+
+**Phase 14 direkam — naskah terpanjang (69 bagian), dan aturan yang saya catat sebagai hilang di naskah 15 datang lengkap.**
+
+| Hal | Hasil |
+|---|---|
+| Naskah baru | **Phase 14: Autonomous Intelligence & Collective Agent Ecosystem**, §14.1–§14.69 |
+| Dokumen ditambah | **12 berkas** (`207`–`218`) |
+| Dokumen total | 193 → **205** di `docs/`, + 8 di `spec/` |
+| Berkas kode | tetap **0** |
+| Issue | 91 → **99** (81 terbuka, 18 ditutup); **#92**–**#99** baru, **#73 ditutup** |
+| Temuan | **H-24** · **A-30** · **B-28**–**B-30** · **C-21** · **E-117**–**E-122** · **G-14** · enam butir **F** |
+
+### ⭐⭐⭐ Aturan yang hilang di naskah 15 datang — dan lebih baik daripada usul saya
+
+Di [`181-MULTI-AGENT.md`](181-MULTI-AGENT.md) saya menulis bahwa satu aturan belum ada, dan ia satu kalimat: *"lingkup pesan tidak boleh lebih luas daripada lingkup pengirimnya"*. Tanpa itu, agent berlingkup sempit bisa meminta agent lain melakukan hal yang ia sendiri tidak boleh — **privilege escalation lewat delegasi**.
+
+§14.42 menjawabnya:
+
+> ## Delegation cannot exceed the authority of the delegator.
+
+Rumusan pemilik **lebih kuat** daripada usul saya. Usul saya adalah aturan tentang **field di dalam pesan**, jadi penegakannya bergantung pada field itu diisi benar. Rumusan pemilik adalah aturan tentang **kewenangan**, jadi ia berlaku lewat jalur apa pun — pesan, panggilan langsung, tool, atau protokol federasi §14.41. Itu juga sebabnya hilangnya `authorization.scope` dari amplop §14.7 **bukan kemunduran**: yang dibuang field, yang datang invarian.
+
+Dan naskah ini memberi **dua** penangkal, bukan satu: **aturan** (§14.42 + §14.43 *capability attenuation* + `max_depth: 2`) dan **deteksi** (graf kapabilitas §14.32/§14.33 mencari jalur `A → B → C → Sensitive Database`).
+
+### 🛑 Lubang terbesar: deteksi graf buta di batas federasi — B-28 / [#94](../../issues/94)
+
+Graf kapabilitas hanya bisa memuat agent yang kapabilitasnya **diketahui**. Untuk agent internal itu manifest yang tervalidasi registry; untuk agent **federasi** (§14.4) kapabilitas **dideklarasikan sendiri** oleh agent yang berjalan di mesin orang lain — dan §14.5 bahkan menaruh `trust_level: certified` di dalam deklarasi itu.
+
+Jalur eskalasi terdeteksi selama A, B, dan C internal. Begitu satu simpul eksternal, **jalurnya hilang dari graf** — bukan karena tidak ada, melainkan karena satu simpul tidak melaporkan apa yang benar-benar bisa ia lakukan.
+
+### 🛑 Empat rantai tanpa titik tahan manusia — E-117 / [#93](../../issues/93)
+
+§14.20 (Security Mesh kehilangan `Consent`, `Rate Limit`, `Confirmation`) · §14.37 dan §14.38 (`Human Approval` **sesudah** `Execution`) · §14.46 (Collective Cognitive Runtime **tanpa `POLICY_CHECK`**).
+
+Yang keempat paling perlu diperhatikan: **H-18** ditutup justru karena §9.29 menaruh `POLICY_CHECK` setelah `PLANNING` dan sebelum `DECISION`/`ACTION`. Empat kali dalam satu naskah bukan kelalaian penulisan — itu pola, dan rantai yang digambar lengkap akan dibangun seperti yang digambar.
+
+### 🛑 Naskah membatalkan hukumnya sendiri — B-29 / [#96](../../issues/96)
+
+§14.64 menetapkan sebagai **foundational law**: *"More agents must not automatically mean more autonomy"*, karena `collective risk > individual risk`.
+
+§14.50 **menjumlahkan** `Safety` dengan tujuh hal lain menjadi satu *Collective Intelligence Score*. Team yang cepat, murah, dan terkoordinasi baik bisa menyamai team yang aman — dan kalau skor itu dipakai memilih team (§14.48) atau menaikkan otonomi (§14.61), sistem bergerak ke arah yang salah **tanpa ada aturan yang dilanggar**. Bentuk yang benar sudah dipakai di tempat lain: **keselamatan adalah gerbang, bukan suku** (Risk Engine §8.17 menolak, tidak menjumlahkan).
+
+### 🛑 Roadmap membuka pintu enam langkah sebelum penjaganya — B-30 / [#99](../../issues/99)
+
+`A14.1 Agent Federation Foundation` pertama; `A14.7 Agent Security Mesh` ketujuh. Di antaranya dibangun komunikasi, delegasi, kolaborasi, negosiasi, dan kecerdasan kolektif — semuanya dengan peserta yang berjalan di mesin orang lain dan belum diawasi.
+
+### ⭐ Yang ditutup dan yang akhirnya diberi angka
+
+- **A-27 / [#73](../../issues/73) DITUTUP → H-24.** §14.23 memberi tujuh model pendapatan, dan §14.17–§14.18 mengembalikan Enterprise. Dua blok yang **E-86** catat hilang dari peta 15 fase kini keduanya punya rumah. ⚠️ Tarif dan bagi hasil tetap milik **A-6** / [#18](../../issues/18).
+- **Ambang `confidence` pertama setelah delapan naskah:** §14.62 menulis `escalate_when: confidence < 0.6`, dan ia berada di tempat yang tepat — di dalam kontrak yang bisa dibaca dan diubah pemiliknya, bukan di kode. Dikirim sebagai komentar ke [#34](../../issues/34).
+- **`private.journal` akhirnya disebut dengan namanya** di dalam aturan (`deny:` §14.21), memperbaiki masalah kata pengganti **G-9**.
+- **"Tidak boleh mengarang data" (§14.35)** menutup bentuk paling berbahaya dari **B-14** / [#26](../../issues/26): degradasi berakhir di **diam**, bukan di karangan.
+
+### Teknik yang berbuah sesi ini
+
+**Bandingkan rantai yang sama di dua naskah, hitung langkahnya, lalu tanyakan langkah mana yang hilang.** Tiga dari empat temuan berat sesi ini datang dari sana — E-117 (empat rantai), E-119 (`risk: level` vs `max_risk`), dan G-14 (tujuh tindakan → tiga event). Bukan membaca apa yang ditulis, melainkan **membandingkan panjang dua daftar yang seharusnya sama**.
+
+### Langkah berikutnya menurut pemilik
+
+Pemilik menutup naskah ini dengan permintaan yang **berbeda jenisnya** dari tujuh belas naskah sebelumnya:
+
+> Namun saya **tidak menyarankan kita langsung melompat ke Phase 15.** … Sebelum melanjutkan, secara engineering kita sebaiknya memecah Phase 14 menjadi arsitektur teknis tingkat implementasi: protocol specification · agent message schema · federation protocol · security model · delegation model · consensus algorithm · database schema · API contract · event schema · repository · Docker/Kubernetes topology · sprint-by-sprint implementation.
+
+Itu persis bentuk artefak yang sudah ada di [`../spec/`](../spec/README.md) untuk V0 — jadi pekerjaannya bisa dimulai tanpa keputusan baru. ⚠️ Dengan satu syarat: **empat butir harus diputuskan lebih dulu karena keempatnya soal bentuk, bukan selera** — [#93](../../issues/93) (titik tahan), [#97](../../issues/97) (`max_risk`), [#98](../../issues/98) (L5 & kontrak), [#99](../../issues/99) (urutan roadmap).
+
+---
+
 ## Sesi 15 — 7 September 2026
 
 **Phase 13 direkam — dan dua pengaman naskah 15 dilepas di dua bagian berbeda.**

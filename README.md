@@ -23,10 +23,10 @@ manusia + agent + data + knowledge + simulation + automation**.
 | Tahap | **Spesifikasi engineering siap** — belum ada kode (disengaja) |
 | Berkas kode | 0 |
 | Repo git | privat `xtheoputra/humanverse-xos`, branch `master` |
-| Dokumen | **193 berkas** di `docs/` (naskah + audit + catatan sesi) + **8 berkas** di `spec/` |
-| Naskah pemilik | **17** — terakhir: **Phase 13 HumanOS — Personal AI Operating System** |
-| Keputusan tertutup | **23 butir H** — nama · MVP · struktur repo · ambang konfirmasi · model memory · memory meluruh · gerbang policy · context package · peta 15 fase · dua tangga R/L · manifest dipulihkan · **model transisi belajar dari galat sendiri**. ⚠️ **H-13** ([#72](../../issues/72)) dan **H-11** ([#78](../../issues/78)) perlu ditinjau ulang |
-| Keputusan terbuka | **21 pertanyaan A** · **114 ketidakcocokan E** · **13 lubang G** |
+| Dokumen | **205 berkas** di `docs/` (naskah + audit + catatan sesi) + **8 berkas** di `spec/` |
+| Naskah pemilik | **18** — terakhir: **Phase 14 Autonomous Intelligence & Collective Agent Ecosystem** (69 bagian, naskah terpanjang) |
+| Keputusan tertutup | **24 butir H** — nama · MVP · struktur repo · ambang konfirmasi · model memory · memory meluruh · gerbang policy · context package · peta 15 fase · dua tangga R/L · manifest dipulihkan · **model transisi belajar dari galat sendiri** · **monetisasi punya fase (Phase 14)**. ⚠️ **H-13** ([#72](../../issues/72)) dan **H-11** ([#78](../../issues/78)) perlu ditinjau ulang |
+| Keputusan terbuka | **21 pertanyaan A** · **121 ketidakcocokan E** · **14 lubang G** |
 | Tanggal dokumen | 7 September 2026 |
 
 > ⚠️ **Nol baris kode itu disengaja — dan penghambatnya terus berkurang.**
@@ -47,14 +47,14 @@ manusia + agent + data + knowledge + simulation + automation**.
 
 ## 📌 Pekerjaan terbuka = GitHub Issues
 
-**91 issue** dalam 3 milestone — **17 ditutup**. Baca issue-nya, jangan analisis
+**99 issue** dalam 3 milestone — **18 ditutup**. Baca issue-nya, jangan analisis
 ulang naskahnya.
 
 | Milestone | Isi | Issue |
 |---|---|---|
-| **M1 — Keputusan sebelum kode** | 12 terbuka, 4 ditutup | [#1](../../issues/1)–[#9](../../issues/9), [#38](../../issues/38), [#58](../../issues/58)–[#59](../../issues/59), [#72](../../issues/72), [#80](../../issues/80), [#90](../../issues/90)–[#91](../../issues/91) |
-| **M2 — Blueprint & Platform** | 46 terbuka, 11 ditutup | [#10](../../issues/10)–[#19](../../issues/19), [#26](../../issues/26)–[#37](../../issues/37), [#39](../../issues/39), [#41](../../issues/41)–[#45](../../issues/45), [#47](../../issues/47)–[#49](../../issues/49), [#51](../../issues/51), [#54](../../issues/54)–[#56](../../issues/56), [#60](../../issues/60)–[#70](../../issues/70), [#73](../../issues/73)–[#74](../../issues/74), [#77](../../issues/77)–[#79](../../issues/79), [#82](../../issues/82)–[#84](../../issues/84), [#87](../../issues/87)–[#89](../../issues/89) |
-| **M3 — Sebelum ada pengguna nyata** | 16 terbuka, 2 ditutup | [#20](../../issues/20)–[#25](../../issues/25), [#40](../../issues/40), [#46](../../issues/46), [#50](../../issues/50), [#52](../../issues/52)–[#53](../../issues/53), [#57](../../issues/57), [#71](../../issues/71), [#75](../../issues/75)–[#76](../../issues/76), [#81](../../issues/81), [#85](../../issues/85)–[#86](../../issues/86) |
+| **M1 — Keputusan sebelum kode** | 16 terbuka, 4 ditutup | [#1](../../issues/1)–[#9](../../issues/9), [#38](../../issues/38), [#58](../../issues/58)–[#59](../../issues/59), [#72](../../issues/72), [#80](../../issues/80), [#90](../../issues/90)–[#93](../../issues/93), [#98](../../issues/98)–[#99](../../issues/99) |
+| **M2 — Blueprint & Platform** | 48 terbuka, 12 ditutup | [#10](../../issues/10)–[#19](../../issues/19), [#26](../../issues/26)–[#37](../../issues/37), [#39](../../issues/39), [#41](../../issues/41)–[#45](../../issues/45), [#47](../../issues/47)–[#49](../../issues/49), [#51](../../issues/51), [#54](../../issues/54)–[#56](../../issues/56), [#60](../../issues/60)–[#70](../../issues/70), [#73](../../issues/73)–[#74](../../issues/74), [#77](../../issues/77)–[#79](../../issues/79), [#82](../../issues/82)–[#84](../../issues/84), [#87](../../issues/87)–[#89](../../issues/89), [#94](../../issues/94), [#96](../../issues/96)–[#97](../../issues/97) |
+| **M3 — Sebelum ada pengguna nyata** | 17 terbuka, 2 ditutup | [#20](../../issues/20)–[#25](../../issues/25), [#40](../../issues/40), [#46](../../issues/46), [#50](../../issues/50), [#52](../../issues/52)–[#53](../../issues/53), [#57](../../issues/57), [#71](../../issues/71), [#75](../../issues/75)–[#76](../../issues/76), [#81](../../issues/81), [#85](../../issues/85)–[#86](../../issues/86), [#95](../../issues/95) |
 
 ⚠️ **[#55](../../issues/55) meninjau ulang keputusan yang sudah ditutup:**
 monorepo final (H-10) tergerus oleh tiga pohon repo baru dari naskah 9, 10, 11.
@@ -155,7 +155,7 @@ Selengkapnya: [`docs/75-URUTAN-PEMBANGUNAN-V0-V6.md`](docs/75-URUTAN-PEMBANGUNAN
 
 ---
 
-## Sebelas naskah
+## Delapan belas naskah
 
 ```
   NASKAH 1   HumanOS — visi & 12 modul manusia          berkas 01–07
@@ -192,18 +192,52 @@ Selengkapnya: [`docs/75-URUTAN-PEMBANGUNAN-V0-V6.md`](docs/75-URUTAN-PEMBANGUNAN
      │       25 layer · OAuth · SDK 7 bahasa · marketplace
      │
   NASKAH 11  Phase 7 — Data & AI Infrastructure        berkas 132–141
-             event platform · lakehouse · feature store
-             deletion engine · 18 deliverable (1 "Future")
+     │       event platform · lakehouse · feature store
+     │       deletion engine · 18 deliverable (1 "Future")
+     │
+  NASKAH 12  Phase 8 — AI Safety, Security & Privacy   berkas 142–153
+     │       46 bagian · identity · consent · data vault
+     │       risk policy R0–R4 · kill switch · privacy center
+     │
+  NASKAH 13  Phase 9 — Intelligence & Cognitive Arch.  berkas 154–164
+     │       41 bagian · memory 6 jenis · decay & konsolidasi
+     │       cognitive runtime · POLICY_CHECK
+     │
+  NASKAH 14  Phase 10 — Multimodal Intelligence        berkas 165–175
+     │       persepsi: vision · audio · spatial
+     │       peta 15 fase (menggantikan peta naskah 8)
+     │
+  NASKAH 15  Phase 11 — Agentic Intelligence & Agency  berkas 176–187
+     │       64 bagian · Action Gateway · dua tangga R & L
+     │       budget · multi-agent · "autonomy must be earned"
+     │
+  NASKAH 16  Phase 12 — Digital Twin & World Simulation berkas 188–197
+     │       31 bagian · assumption engine · learning loop
+     │       "Observed ≠ Certain"
+     │
+  NASKAH 17  Phase 13 — HumanOS, Personal AI OS        berkas 198–206
+     │       40 bagian · Attention OS · Approval Center
+     │       state machine · app/agent/plugin
+     │
+  NASKAH 18  Phase 14 — Autonomous Intelligence &      berkas 207–218
+             Collective Agent Ecosystem
+             69 bagian (terpanjang) · federasi · agent team
+             governance mesh · agent economy · L5 + autonomy contract
+             "More agents must not automatically mean more autonomy"
 ```
 
 > ℹ️ Penomoran berkas melewati 99. `99-CATATAN-AUDIT.md` tetap di tempatnya
 > sebagai berkas audit; naskah 7 memakai `100`–`112`.
+>
+> ℹ️ **Peta dokumen di bawah baru mencakup naskah 1–11.** Untuk naskah 12–18
+> (`142`–`218`), daftar berkas per naskah ada di
+> [`docs/SESSION-LOG.md`](docs/SESSION-LOG.md) — satu entri per sesi.
 
 ---
 
 ## Aturan berkas dokumen
 
-1. Berkas `01`–`141` merekam **kata pemilik apa adanya**. Susunannya dirapikan,
+1. Berkas `01`–`218` merekam **kata pemilik apa adanya**. Susunannya dirapikan,
    isinya tidak ditambah-tambahi. Bagian yang hilang di naskah **ditandai
    sebagai hilang**, bukan ditambal.
 2. Setiap keraguan, koreksi, risiko, atau usulan dari pihak lain (termasuk AI)
