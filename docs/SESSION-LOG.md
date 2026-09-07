@@ -72,6 +72,45 @@ Itu persis bentuk artefak yang sudah ada di [`../spec/`](../spec/README.md) untu
 
 ---
 
+## Sesi 16 — 7 September 2026
+
+**Daftar penghambat Engineering Spec ternyata salah: TIGA pertanyaan, bukan empat.**
+
+| Hal | Hasil |
+|---|---|
+| Dokumen ditambah | **1 berkas** (`GERBANG-SKEMA.md`) |
+| Dokumen total | 205 → **206** di `docs/` |
+| Berkas kode | tetap **0** |
+| Issue | **#100** baru |
+
+`README` menyebut empat butir yang mengunci Engineering Spec *"karena keempatnya menentukan skema basis data"*. Diperiksa satu per satu terhadap berkas audit, daftar itu **sudah tidak akurat**:
+
+| Butir | Kata README | Kenyataan |
+|---|---|---|
+| **E-39** | mengunci | ✅ **sudah DITUTUP** naskah 13 → H-16 (`kind`/`scope`/`tier`) |
+| **E-16** | mengunci | ✅ **praktis tertutup** — tiga lawan satu |
+| **E-17/E-18** | mengunci | 🛑 masih terbuka |
+| **A-19** | mengunci | 🛑 masih terbuka, **memburuk jadi enam model** |
+| **E-37** | mengunci | 🛑 masih terbuka, **memburuk** |
+
+Pekerjaan yang tampak terhalang empat pintu sebenarnya terhalang dua.
+
+### Ketiganya bisa dijawab tanpa naskah baru
+
+[`GERBANG-SKEMA.md`](GERBANG-SKEMA.md) menyusunnya jadi tiga pertanyaan yang bisa dijawab ya/tidak, masing-masing dengan usul yang memakai **pola yang sudah terbukti di repo ini sendiri**:
+
+1. **`HumanState` jadi satu-satunya yang disimpan?** — lima lainnya jadi tampilan turunan, tiap angka turunan wajib membawa `confidence` (B-15/B-1).
+2. **Satu tabel sisi dengan kolom `kind`?** — kausal dan struktural bukan pilihan yang saling meniadakan, melainkan dua jenis sisi; `kind` adalah pola yang **sudah dipilih sekali dan berhasil** di H-16.
+3. **Skor disimpan `0–1`?** — §12.21 sudah membuktikan bobot berjumlah 1,00; persen dan poin adalah cara *menampilkan*, bukan *menyimpan*.
+
+**A-17 sengaja dikeluarkan** dari daftar gerbang: ia keputusan **cakupan**, bukan **skema**, dan tidak menghalangi satu baris DDL pun.
+
+### Catatan
+
+Tidak ada temuan baru di sesi ini — seluruhnya menyusun ulang butir yang sudah ada. Yang bertambah cuma satu: kesadaran bahwa **daftar penghambatnya sendiri tidak pernah diperbarui saat butirnya ditutup**. Itu kelas kesalahan yang layak dijaga: sebuah daftar penghalang yang basi membuat pekerjaan tampak lebih terkunci daripada kenyataannya.
+
+---
+
 ## Sesi 15 — 7 September 2026
 
 **Phase 13 direkam — dan dua pengaman naskah 15 dilepas di dua bagian berbeda.**

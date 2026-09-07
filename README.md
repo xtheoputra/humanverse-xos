@@ -23,7 +23,7 @@ manusia + agent + data + knowledge + simulation + automation**.
 | Tahap | **Spesifikasi engineering siap** — belum ada kode (disengaja) |
 | Berkas kode | 0 |
 | Repo git | privat `xtheoputra/humanverse-xos`, branch `master` |
-| Dokumen | **205 berkas** di `docs/` (naskah + audit + catatan sesi) + **8 berkas** di `spec/` |
+| Dokumen | **206 berkas** di `docs/` (naskah + audit + catatan sesi) + **8 berkas** di `spec/` |
 | Naskah pemilik | **18** — terakhir: **Phase 14 Autonomous Intelligence & Collective Agent Ecosystem** (69 bagian, naskah terpanjang) |
 | Keputusan tertutup | **24 butir H** — nama · MVP · struktur repo · ambang konfirmasi · model memory · memory meluruh · gerbang policy · context package · peta 15 fase · dua tangga R/L · manifest dipulihkan · **model transisi belajar dari galat sendiri** · **monetisasi punya fase (Phase 14)**. ⚠️ **H-13** ([#72](../../issues/72)) dan **H-11** ([#78](../../issues/78)) perlu ditinjau ulang |
 | Keputusan terbuka | **21 pertanyaan A** · **121 ketidakcocokan E** · **14 lubang G** |
@@ -35,13 +35,19 @@ manusia + agent + data + knowledge + simulation + automation**.
 > enam** (A-10), **V0–V6 sebagai rencana kanonik** (A-18), dan **Confidence
 > Layer** untuk angka taksiran (B-15/B-1).
 >
-> Yang **masih mengunci Engineering Spec** — karena keempatnya menentukan
-> skema basis data:
-> **A-19** (kini **lima** model angka pengguna, tak satu pun berumus) ·
-> **E-16..E-18** (model graf) · **E-39** (memory: jenis atau nama scope) ·
-> **E-37** (tiga sistem skoring dengan skala berbeda).
-> Ditambah **A-17** — V0 bertambah 2 fitur jadi 12, waktunya tetap 4–6 minggu.
-> Semuanya di [`docs/99-CATATAN-AUDIT.md`](docs/99-CATATAN-AUDIT.md).
+> Yang **masih mengunci Engineering Spec** — **TIGA pertanyaan, bukan empat.**
+> Daftar lama sudah tidak akurat: **E-39 sudah DITUTUP** (naskah 13 → H-16:
+> `kind`/`scope`/`tier`) dan **E-16 praktis tertutup** (tiga lawan satu).
+> Yang tersisa, dan dua di antaranya **memburuk**:
+> **A-19** (kini **enam** model angka pengguna, tak satu pun berumus) ·
+> **E-17/E-18** (node & kosakata relasi graf) ·
+> **E-37** (skala skoring — naskah 17 menambah tiga skala energi di dalam SATU naskah).
+> Ditambah **A-17** — V0 bertambah 2 fitur jadi 12, waktunya tetap 4–6 minggu;
+> itu keputusan **cakupan**, bukan skema, jadi ia bukan gerbang yang sama.
+>
+> 🔑 **Ketiganya disusun jadi bentuk yang bisa diputuskan di
+> [`docs/GERBANG-SKEMA.md`](docs/GERBANG-SKEMA.md)** — lengkap dengan usul yang
+> memakai pola yang sudah terbukti di repo ini sendiri.
 
 ---
 
