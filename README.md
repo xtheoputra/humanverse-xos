@@ -23,8 +23,8 @@ manusia + agent + data + knowledge + simulation + automation**.
 | Tahap | **Spesifikasi engineering siap** — belum ada kode (disengaja) |
 | Berkas kode | 0 |
 | Repo git | privat `xtheoputra/humanverse-xos`, branch `master` |
-| Dokumen | **184 berkas** di `docs/` (naskah + audit + catatan sesi) + **8 berkas** di `spec/` |
-| Naskah pemilik | **16** — terakhir: **Phase 12 Digital Twin & World Simulation** |
+| Dokumen | **193 berkas** di `docs/` (naskah + audit + catatan sesi) + **8 berkas** di `spec/` |
+| Naskah pemilik | **17** — terakhir: **Phase 13 HumanOS — Personal AI Operating System** |
 | Keputusan tertutup | **23 butir H** — nama · MVP · struktur repo · ambang konfirmasi · model memory · memory meluruh · gerbang policy · context package · peta 15 fase · dua tangga R/L · manifest dipulihkan · **model transisi belajar dari galat sendiri**. ⚠️ **H-13** ([#72](../../issues/72)) dan **H-11** ([#78](../../issues/78)) perlu ditinjau ulang |
 | Keputusan terbuka | **21 pertanyaan A** · **106 ketidakcocokan E** · **13 lubang G** |
 | Tanggal dokumen | 7 September 2026 |
@@ -47,7 +47,7 @@ manusia + agent + data + knowledge + simulation + automation**.
 
 ## 📌 Pekerjaan terbuka = GitHub Issues
 
-**89 issue** dalam 3 milestone — **17 ditutup**. Baca issue-nya, jangan analisis
+**91 issue** dalam 3 milestone — **17 ditutup**. Baca issue-nya, jangan analisis
 ulang naskahnya.
 
 | Milestone | Isi | Issue |

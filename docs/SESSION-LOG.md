@@ -4,6 +4,56 @@
 
 ---
 
+## Sesi 15 — 7 September 2026
+
+**Phase 13 direkam — dan dua pengaman naskah 15 dilepas di dua bagian berbeda.**
+
+| Hal | Hasil |
+|---|---|
+| Naskah baru | **Phase 13: HumanOS — Personal AI Operating System**, §13.1–§13.40 |
+| Dokumen ditambah | **9 berkas** (`198`–`206`) |
+| Dokumen total | 184 → **193** di `docs/`, + 8 di `spec/` |
+| Berkas kode | tetap **0** |
+| Issue | 89 → **91** (74 terbuka, 17 ditutup); **#90** dan **#91** baru |
+| Temuan | **E-108**–**E-115** · delapan butir **F** |
+
+### 🛑🛑🛑 Dua pengaman dilepas, dan keduanya bersenyawa
+
+Ini temuan terpenting sesi ini, dan nilainya justru pada **gabungannya** — masing-masing sendiri tampak seperti penyesuaian kecil.
+
+**E-108 / [#90](../../issues/90) — "Ask Every Time".** §11.15 baru saja menaikkan R4 dari *"wajib konfirmasi"* menjadi **`DENY`**, dengan definisi baru **`irreversible`**, dan catatannya eksplisit: *"tingkat tertinggi tidak bisa dikonfirmasi."* §11.17 menambah `purchases: { amount_limit: 0 }` sebagai bawaan. §13.10 memberi pembelian dan kontrol perangkat **"Ask Every Time"** — tepat konstruksi yang ditolak §11.15 — dan **tanpa satu angka pun**, sehingga bawaan nol tidak punya tempat untuk dinyatakan.
+
+**E-109 / [#91](../../issues/91) — `Rollback` hilang.** **G-8** ([#65](../../issues/65)) mencatat *Human Override* tidak pernah datang di Fase 8; §11.61 mengisinya dengan enam kata kerja termasuk **`Rollback`**. §13.34 memberi enam kekuasaan juga, tapi bukan enam yang sama: tiga kekuasaan **pencegahan** ditambah, tiga kekuasaan **korektif** dibuang. Kata *rollback*, *undo*, *revert* nol kali di seluruh naskah 17.
+
+Digabung, keduanya menghasilkan keadaan yang persis ingin dicegah §11.15:
+
+> tindakan **yang tidak bisa ditarik** lewat dengan **satu ketukan**, dan **tidak ada jalan kembali**.
+
+§11.15 memasang dua kunci pada pintu itu. Naskah ini melepas keduanya, **di dua bagian yang berbeda** — dan itulah sebabnya tak satu pun terlihat sebagai keputusan besar saat dibaca sendiri-sendiri.
+
+### 🛑 Empat temuan lain
+
+- **E-110** — manifest **keenam**, dan lebih lemah daripada yang kelima. §11.5 baru memulihkan `purpose` dan memisahkan lagi `memory.read`/`.write` (menutup E-68/#61); §13.26 menjatuhkan keduanya plus `autonomy.max_level` dan `tools`. Bantahan *"app ≠ agent"* tidak menyelamatkannya: §13.27 menaruh apps, agents, dan plugins di **satu marketplace**, jadi manifest terlemah jadi jalan termudah. Diperkuat §13.35 yang **mewajibkan** kolom `Why` di audit trail — yaitu `purpose` dengan nama lain.
+- **E-111** — **dua pohon `human-os/` di naskah yang sama** (§13.2 = 17 direktori datar; §13.37 = 13 bersarang). Tiga hilang tanpa penampung: `capability/`, `agency/`, `events/` — padahal §13.9 menjadikan Capability primitif keamanan inti dan §13.12 menjadikan Event Bus arsitekturnya.
+- **E-113** — **`H13.x` adalah huruf KEENAM**, dan ia bertabrakan dengan penomoran berkas audit sendiri: `H-13` (butir keputusan) vs `H13.1` (sub-fase), beda satu tanda hubung.
+- **E-114** — **"HumanOS" kini punya arti ketiga**, dan dua di antaranya adalah tahap di dua rencana kanonik yang sedang bertabrakan: **V5 = HumanOS** (V0–V6) vs **Phase 13 = HumanOS** (peta 15 fase). Kalau V0–V6 masih berlaku, naskah ini pada dasarnya spesifikasi **V5**. 🛑 V0–V6 tetap tidak disebut, **naskah kelima berturut-turut**.
+
+### ⭐ Yang justru bertahan — delapan butir F
+
+Setelah lima naskah yang menggerus keputusan tertutup, naskah ini juga membawa kabar baik yang layak dicatat setara:
+
+- **Peta 15 fase bertahan naskah KEEMPAT** — §10.41, §11.64, §12.31 menempatkan Phase 13 = HumanOS, dan naskah ini memang itu. **H-20** aman.
+- **Tabrakan paling berbahaya tidak kambuh.** §13.33 **memanggil** tangga L dan menyebut sumbernya alih-alih mendefinisikan ulang — **E-77 / #67** tetap tertutup.
+- **`/actions/prepare` dan `/actions/execute` dipisah jadi dua endpoint.** Tangga L ditegakkan **bentuk API**, bukan kebijakan.
+- **State machine §13.36 menaruh tiga gerbang sebagai STATE**, bukan pemeriksaan di dalam kode — dan jalur kegagalan berakhir di `WAITING_CONFIRMATION`, bukan `EXECUTING`.
+- **§13.32 menutup bagian proaktif dengan *"Bukan langsung melakukan sesuatu."*** — pengaman yang ditulis pemilik sendiri.
+
+### Catatan kerja
+
+Naskah 16 (Phase 12) masih di pohon kerja saat sesi ini dimulai, ditulis sesi lain yang berjalan bersamaan. Dokumen `198`–`206` karena itu ditulis di rentang nomor yang tidak bertabrakan, dan penomoran `E-` sengaja ditunda sampai naskah 16 di-commit — supaya `E-107` sudah final sebelum `E-108` dipakai.
+
+---
+
 ## Sesi 14 — 7 September 2026
 
 **Phase 12 direkam — B-24 ditutup lewat jalan keempat, dan `intelligence/` dibongkar.**
