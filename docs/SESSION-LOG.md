@@ -4,6 +4,133 @@
 
 ---
 
+## Sesi 18 — 7 September 2026
+
+**Phase 15 direkam — dan peta 15 fase, satu-satunya sumbu penomoran yang bertahan lima naskah, patah di kalimat penutupnya.**
+
+| Hal | Hasil |
+|---|---|
+| Naskah baru | **Phase 15: Spatial Intelligence & XR Universe**, §15.1–§15.32 |
+| Dokumen ditambah | **9 berkas** (`219`–`227`) |
+| Dokumen total | 206 → **215** di `docs/`, + 8 di `spec/` |
+| Berkas kode | tetap **0** |
+| Issue | 100 → **107** (89 terbuka, 18 ditutup); **#101**–**#107** baru |
+| Temuan | **A-31** · **B-31** · **C-22**–**C-23** · **E-123**–**E-127** · **G-15** · enam butir **F** |
+
+### 🛑🛑🛑 H-20 patah — E-123 / [#101](../../issues/101)
+
+Peta kanonik §10.41 ([`175`](175-REPO-API-DB-ROADMAP-DOD.md)) menetapkan **lima belas** fase dan menamai yang terakhir **Global Intelligence Platform**. Naskah 19 memberi **Phase 15 = Spatial Intelligence & XR Universe**, lalu menutup dengan **Phase 16 — Robotics & Embodied Intelligence**.
+
+Dua hal sekaligus, keduanya di kalimat penutup: **isi fase terakhir diganti**, dan **petanya berhenti berjumlah lima belas**.
+
+Yang jadi soal bukan isinya — SpatialOS masuk akal, dan *Global Intelligence Platform* memang tidak pernah punya isi selain namanya. Yang jadi soal adalah **cara ia berubah**: bagian F mencatat **lima kali berturut-turut** bahwa peta ini bertahan, dan nilainya seluruhnya terletak pada kestabilannya — ia satu sumbu stabil di antara lima yang bertabrakan. Ini butir **H kelima** yang tergerus (H-8 · H-10 · H-11 · H-13 · H-20).
+
+### 🛑🛑 Privasi: sakelar yang mematikan sensor yang salah — C-23 / [#104](../../issues/104)
+
+Temuan terberat sesi ini, dan seluruh buktinya ada **di dalam naskah yang sama**:
+
+| Bagian | Yang dinyatakan |
+|---|---|
+| §15.23 | `bedroom: {camera:false, audio:false}` — lalu *“User tetap mengontrol”* |
+| §15.4 | AetherScan membaca **WiFi CSI** — tidak butuh kamera maupun mikrofon |
+| §15.4 | dan ia **menembus dinding**, jadi tidak perlu berada di dalam kamar |
+| §15.10 | **`Sleeping`** ada di daftar aktivitas yang dilacak |
+| §15.4 | **`breathing detection`** = laju napas, tanda vital |
+
+**Pengguna yang mematikan kamera dan mikrofon di kamar tidurnya tetap terpantau tidur dan bernapas — sambil mengira sudah mematikan pemantauan.**
+
+Ini bukan celah implementasi melainkan **bentuk policy-nya**: daftar `camera`/`audio` adalah daftar **perangkat**, sementara yang perlu dikendalikan adalah **kemampuan**. Bentuk yang benar sudah dipakai di repo ini — `deny` eksplisit §14.21 dan default deny §14.37 ⇒ **policy ruangan menyebut kemampuan yang DIIZINKAN, apa pun yang tidak disebut ditolak**, plus **ruangan yang menolak sebuah kemampuan menolaknya juga dari luar ruangan itu.**
+
+§15.30 juga **tidak menjadwalkan privasi sebagai milestone sama sekali**, sementara `S15.8 AetherScan Integration` punya miliknya sendiri ⇒ urutan bawaannya adalah **sensor dibangun sebelum sakelar yang mematikannya**.
+
+### 🛑 Tiga temuan berat lainnya
+
+- **C-22 / [#102](../../issues/102)** — `through-wall sensing` dan `breathing detection` menaikkan **C-18** dari soal persetujuan menjadi **soal hukum**: yang pertama mendeteksi orang di properti tetangga (persetujuan pengguna tidak bisa memberi izin atas ruang yang bukan miliknya); yang kedua adalah **tanda vital yang diukur tanpa perangkat apa pun di badan orangnya**.
+- **E-124 / [#106](../../issues/106)** — §15.22 adalah rantai **kelima** yang berakhir di tindakan tanpa `Risk` maupun `Confirmation`, setelah empat yang [#93](../../issues/93) catat di naskah 18. Bedanya: penutup naskah menyatakan **Phase 16 = Robotics**, jadi rantai ini akan menjadi rantai keselamatan **benda yang bergerak di ruangan yang sama dengan manusia**.
+- **B-31 / [#107](../../issues/107)** — `wifi_csi` (10–100 Hz) dan `point_clouds` di PostgreSQL. Pembandingnya sudah ada: `PersonDetected` 1 Hz = 2,6 juta baris/30 hari untuk satu kamera; CSI berjalan satu sampai dua **orde** lebih cepat. ⭐ Penawarnya juga ada di naskah yang sama, §15.29.
+
+### ⭐ Yang justru bertahan — enam butir F
+
+- **“HumanVerse tidak menebak”** sebagai kalimat pembuka: menyatakan **syarat**, bukan janji. Dan panah AR bisa **dibuktikan salah dalam sepuluh detik** — fase pertama yang keluarannya bisa dibantah seketika.
+- **§15.6 menyebut pustaka yang SUDAH ADA** (ARKit · ARCore · OpenVSLAM · ORB-SLAM3 · RTAB-Map) alih-alih merancang komponen baru — pertama kalinya dalam sembilan belas naskah, dan penghematan pekerjaan terbesar di fase ini.
+- **§15.29 = pernyataan privasi-oleh-arsitektur pertama di repo ini** (*“edge melakukan processing sensitif”*) — satu-satunya bentuk perlindungan yang tetap berlaku saat terjadi kebocoran, penyitaan, atau permintaan aparat.
+- **§15.11 Scene Graph: enam relasi geometris**, tidak satu pun kausal — graf **ketiga**, dan yang paling aman. ⚠️ Kecuali `MOVING_TO`, yang **prediksi**, bukan pengukuran.
+- **§15.12 memberi lima target akurasi berangka** yang bisa diuji dengan meteran di lantai — dan sekaligus memberi aturan yang §15.3 butuhkan (**sensor lebih presisi menang**). 🔴 Tapi itu justru memperkuat **E-112**: §15.32 di naskah yang sama kembali memberi **10 kriteria DoD tanpa satu angka pun**.
+- **§15.18 Spatial Notifications** = penerapan pertama `Attention Budget` §14.25 pada permukaan nyata, dan bentuknya benar: **notifikasi tidak mengejar orangnya, ia menunggu di tempat.**
+
+### Teknik yang berbuah sesi ini
+
+**Baca satu bagian sambil memegang bagian lain di naskah yang sama, lalu tanyakan apakah keduanya bisa benar bersamaan.** C-23 seluruhnya lahir dari itu — §15.23 (policy kamar) melawan §15.4 (sensor tembus dinding) dan §15.10 (`Sleeping`); tidak satu pun dari ketiganya mencurigakan kalau dibaca sendiri-sendiri. Sama untuk E-112 (§15.12 punya angka, §15.32 tidak) dan E-124 (§15.22 tanpa `Risk`, penutup mengumumkan robot).
+
+### Catatan kerja
+
+Sesi lain menulis `GERBANG-SKEMA.md` dan [#100](../../issues/100) selagi sesi ini berjalan, dan **menomori entrinya “Sesi 16”** — bertabrakan dengan entri naskah 18. Entri itu **dinomori ulang menjadi Sesi 17** dan dipindah ke atas sesuai aturan *“yang terbaru di atas”*; isinya tidak diubah sama sekali.
+
+---
+
+## Sesi 17 — 7 September 2026
+
+**Daftar penghambat Engineering Spec ternyata salah — dan koreksi pertama saya JUGA salah. Kenyataannya: TIDAK ADA yang mengunci.**
+
+| Hal | Hasil |
+|---|---|
+| Dokumen ditambah | **1 berkas** (`GERBANG-SKEMA.md`) |
+| Dokumen total | 205 → **206** di `docs/` |
+| Berkas kode | tetap **0** |
+| Issue | **#100** baru |
+
+`README` menyebut empat butir yang mengunci Engineering Spec *"karena keempatnya menentukan skema basis data"*. Diperiksa satu per satu terhadap berkas audit, daftar itu **sudah tidak akurat**:
+
+| Butir | Kata README | Kenyataan |
+|---|---|---|
+| **E-39** | mengunci | ✅ **sudah DITUTUP** naskah 13 → H-16 (`kind`/`scope`/`tier`) |
+| **E-16** | mengunci | ✅ **praktis tertutup** — tiga lawan satu |
+| **E-17/E-18** | mengunci | 🛑 masih terbuka |
+| **A-19** | mengunci | 🛑 masih terbuka, **memburuk jadi enam model** |
+| **E-37** | mengunci | 🛑 masih terbuka, **memburuk** |
+
+Pekerjaan yang tampak terhalang empat pintu sebenarnya terhalang dua.
+
+### Ketiganya bisa dijawab tanpa naskah baru
+
+[`GERBANG-SKEMA.md`](GERBANG-SKEMA.md) menyusunnya jadi tiga pertanyaan yang bisa dijawab ya/tidak, masing-masing dengan usul yang memakai **pola yang sudah terbukti di repo ini sendiri**:
+
+1. **`HumanState` jadi satu-satunya yang disimpan?** — lima lainnya jadi tampilan turunan, tiap angka turunan wajib membawa `confidence` (B-15/B-1).
+2. **Satu tabel sisi dengan kolom `kind`?** — kausal dan struktural bukan pilihan yang saling meniadakan, melainkan dua jenis sisi; `kind` adalah pola yang **sudah dipilih sekali dan berhasil** di H-16.
+3. **Skor disimpan `0–1`?** — §12.21 sudah membuktikan bobot berjumlah 1,00; persen dan poin adalah cara *menampilkan*, bukan *menyimpan*.
+
+**A-17 sengaja dikeluarkan** dari daftar gerbang: ia keputusan **cakupan**, bukan **skema**, dan tidak menghalangi satu baris DDL pun.
+
+### 🔴 Koreksi dalam sesi yang sama: saya mengulang kesalahan yang baru saya temukan
+
+Kesimpulan pertama — *"tiga pertanyaan tersisa"* — **terlalu tinggi**. Sebabnya bisa disebut persis: saya memeriksa `99-CATATAN-AUDIT.md` dan `README.md`, **tetapi tidak memeriksa [`spec/README.md`](../spec/README.md)** — berkas yang seluruh tugasnya justru menjawab pertanyaan itu.
+
+Berkas itu punya bagian tersendiri, *"Empat keputusan yang mengunci skema — dan cara saya menanganinya"*, dan menutupnya dengan **"Artinya V0 bisa dimulai sekarang."**
+
+Buktinya ada di DDL, bukan di prosa:
+
+| Butir | Kata saya | Kenyataan di `spec/01` |
+|---|---|---|
+| **#32** skala skor | masih terbuka, usul `0–1` | **sudah** `numeric(4,3) CHECK (score BETWEEN 0 AND 1)` + `confidence` + `scoring_version` |
+| **#2** model angka | masih terbuka, usul `HumanState` kanonik | **sengaja tidak diputuskan** — `metrics jsonb` + `model_version`; enam model hidup berdampingan tanpa migrasi |
+| **#7** model graf | masih terbuka | **tidak menyentuh V0** — Neo4j baru V2 |
+
+Dua dari tiga usul saya **sudah ada di DDL**, ditulis lebih dulu dan dengan alasan yang lebih baik — khususnya *"100-poin dan persen lossless dikonversi ke 0–1; sebaliknya tidak."*
+
+**Bentuk kesalahannya sama persis dengan yang saya temukan di `README.md`:** percaya pada daftar ringkasan alih-alih memeriksa sumbernya. Ditemukan di dokumen orang lain, lalu diulang di dokumen sendiri, dalam sesi yang sama.
+
+Aturan sesudah ini: **sebelum menyatakan sesuatu terhalang, buka berkas yang paling berkepentingan membantahnya.**
+
+### Penghambat V0 yang sebenarnya
+
+Cuma dua, dan keduanya bukan soal skema: **#3** (siapa mengerjakan 12 fitur dalam 4–6 minggu) dan **#20** (cek merek, domain, nama paket).
+
+### Catatan
+
+Tidak ada temuan baru di sesi ini — seluruhnya menyusun ulang butir yang sudah ada. Yang bertambah cuma satu: kesadaran bahwa **daftar penghambatnya sendiri tidak pernah diperbarui saat butirnya ditutup**. Itu kelas kesalahan yang layak dijaga: sebuah daftar penghalang yang basi membuat pekerjaan tampak lebih terkunci daripada kenyataannya.
+
+---
+
 ## Sesi 16 — 7 September 2026
 
 **Phase 14 direkam — naskah terpanjang (69 bagian), dan aturan yang saya catat sebagai hilang di naskah 15 datang lengkap.**
@@ -69,69 +196,6 @@ Pemilik menutup naskah ini dengan permintaan yang **berbeda jenisnya** dari tuju
 > Namun saya **tidak menyarankan kita langsung melompat ke Phase 15.** … Sebelum melanjutkan, secara engineering kita sebaiknya memecah Phase 14 menjadi arsitektur teknis tingkat implementasi: protocol specification · agent message schema · federation protocol · security model · delegation model · consensus algorithm · database schema · API contract · event schema · repository · Docker/Kubernetes topology · sprint-by-sprint implementation.
 
 Itu persis bentuk artefak yang sudah ada di [`../spec/`](../spec/README.md) untuk V0 — jadi pekerjaannya bisa dimulai tanpa keputusan baru. ⚠️ Dengan satu syarat: **empat butir harus diputuskan lebih dulu karena keempatnya soal bentuk, bukan selera** — [#93](../../issues/93) (titik tahan), [#97](../../issues/97) (`max_risk`), [#98](../../issues/98) (L5 & kontrak), [#99](../../issues/99) (urutan roadmap).
-
----
-
-## Sesi 16 — 7 September 2026
-
-**Daftar penghambat Engineering Spec ternyata salah — dan koreksi pertama saya JUGA salah. Kenyataannya: TIDAK ADA yang mengunci.**
-
-| Hal | Hasil |
-|---|---|
-| Dokumen ditambah | **1 berkas** (`GERBANG-SKEMA.md`) |
-| Dokumen total | 205 → **206** di `docs/` |
-| Berkas kode | tetap **0** |
-| Issue | **#100** baru |
-
-`README` menyebut empat butir yang mengunci Engineering Spec *"karena keempatnya menentukan skema basis data"*. Diperiksa satu per satu terhadap berkas audit, daftar itu **sudah tidak akurat**:
-
-| Butir | Kata README | Kenyataan |
-|---|---|---|
-| **E-39** | mengunci | ✅ **sudah DITUTUP** naskah 13 → H-16 (`kind`/`scope`/`tier`) |
-| **E-16** | mengunci | ✅ **praktis tertutup** — tiga lawan satu |
-| **E-17/E-18** | mengunci | 🛑 masih terbuka |
-| **A-19** | mengunci | 🛑 masih terbuka, **memburuk jadi enam model** |
-| **E-37** | mengunci | 🛑 masih terbuka, **memburuk** |
-
-Pekerjaan yang tampak terhalang empat pintu sebenarnya terhalang dua.
-
-### Ketiganya bisa dijawab tanpa naskah baru
-
-[`GERBANG-SKEMA.md`](GERBANG-SKEMA.md) menyusunnya jadi tiga pertanyaan yang bisa dijawab ya/tidak, masing-masing dengan usul yang memakai **pola yang sudah terbukti di repo ini sendiri**:
-
-1. **`HumanState` jadi satu-satunya yang disimpan?** — lima lainnya jadi tampilan turunan, tiap angka turunan wajib membawa `confidence` (B-15/B-1).
-2. **Satu tabel sisi dengan kolom `kind`?** — kausal dan struktural bukan pilihan yang saling meniadakan, melainkan dua jenis sisi; `kind` adalah pola yang **sudah dipilih sekali dan berhasil** di H-16.
-3. **Skor disimpan `0–1`?** — §12.21 sudah membuktikan bobot berjumlah 1,00; persen dan poin adalah cara *menampilkan*, bukan *menyimpan*.
-
-**A-17 sengaja dikeluarkan** dari daftar gerbang: ia keputusan **cakupan**, bukan **skema**, dan tidak menghalangi satu baris DDL pun.
-
-### 🔴 Koreksi dalam sesi yang sama: saya mengulang kesalahan yang baru saya temukan
-
-Kesimpulan pertama — *"tiga pertanyaan tersisa"* — **terlalu tinggi**. Sebabnya bisa disebut persis: saya memeriksa `99-CATATAN-AUDIT.md` dan `README.md`, **tetapi tidak memeriksa [`spec/README.md`](../spec/README.md)** — berkas yang seluruh tugasnya justru menjawab pertanyaan itu.
-
-Berkas itu punya bagian tersendiri, *"Empat keputusan yang mengunci skema — dan cara saya menanganinya"*, dan menutupnya dengan **"Artinya V0 bisa dimulai sekarang."**
-
-Buktinya ada di DDL, bukan di prosa:
-
-| Butir | Kata saya | Kenyataan di `spec/01` |
-|---|---|---|
-| **#32** skala skor | masih terbuka, usul `0–1` | **sudah** `numeric(4,3) CHECK (score BETWEEN 0 AND 1)` + `confidence` + `scoring_version` |
-| **#2** model angka | masih terbuka, usul `HumanState` kanonik | **sengaja tidak diputuskan** — `metrics jsonb` + `model_version`; enam model hidup berdampingan tanpa migrasi |
-| **#7** model graf | masih terbuka | **tidak menyentuh V0** — Neo4j baru V2 |
-
-Dua dari tiga usul saya **sudah ada di DDL**, ditulis lebih dulu dan dengan alasan yang lebih baik — khususnya *"100-poin dan persen lossless dikonversi ke 0–1; sebaliknya tidak."*
-
-**Bentuk kesalahannya sama persis dengan yang saya temukan di `README.md`:** percaya pada daftar ringkasan alih-alih memeriksa sumbernya. Ditemukan di dokumen orang lain, lalu diulang di dokumen sendiri, dalam sesi yang sama.
-
-Aturan sesudah ini: **sebelum menyatakan sesuatu terhalang, buka berkas yang paling berkepentingan membantahnya.**
-
-### Penghambat V0 yang sebenarnya
-
-Cuma dua, dan keduanya bukan soal skema: **#3** (siapa mengerjakan 12 fitur dalam 4–6 minggu) dan **#20** (cek merek, domain, nama paket).
-
-### Catatan
-
-Tidak ada temuan baru di sesi ini — seluruhnya menyusun ulang butir yang sudah ada. Yang bertambah cuma satu: kesadaran bahwa **daftar penghambatnya sendiri tidak pernah diperbarui saat butirnya ditutup**. Itu kelas kesalahan yang layak dijaga: sebuah daftar penghalang yang basi membuat pekerjaan tampak lebih terkunci daripada kenyataannya.
 
 ---
 
