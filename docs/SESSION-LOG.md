@@ -4,6 +4,66 @@
 
 ---
 
+## Sesi 19 — 7 September 2026
+
+**Phase 16 direkam — fase yang paling mungkin melukai orang, dan kata “risk” tidak muncul satu kali pun di dalamnya.**
+
+| Hal | Hasil |
+|---|---|
+| Naskah baru | **Phase 16: Robotics & Embodied Intelligence**, §16.1–§16.35 |
+| Dokumen ditambah | **8 berkas** (`228`–`235`) |
+| Dokumen total | 215 → **223** di `docs/`, + 8 di `spec/` |
+| Berkas kode | tetap **0** |
+| Issue | 107 → **114** (94 terbuka, 20 ditutup); **#108**–**#114** baru |
+| Temuan | **A-32** · **B-32** · **C-24** · **E-128**–**E-132** · **G-16** · enam butir **F** |
+
+### 🛑🛑🛑 Ramalan E-124 terbukti — dan rantainya kehilangan satu gerbang lagi
+
+Butir **E-124** ([#106](../../issues/106)) ditutup satu naskah lalu dengan kalimat: *“rantai keselamatan tanpa `Risk` yang diwarisi benda bergerak adalah kesalahan yang mahal diperbaiki setelah ada perangkat kerasnya.”* Naskah 20 memberi rantainya:
+
+| Rantai | Gerbang |
+|---|---|
+| §11.14 Action Gateway | **9**, termasuk `Risk`, `Consent`, `Rate Limit`, **`Confirmation`** |
+| §14.20 Agent Security Mesh | **11**, kehilangan tiga (**E-117**) |
+| §15.22 Spatial Safety | **5**, punya `Permission`, tanpa `Risk`/`Confirmation` |
+| **§16.18 Robot Safety Kernel** | **5**, punya `Emergency Rules`, **tanpa `Risk`, `Confirmation`, MAUPUN `Permission`** |
+| **§16.13 Smart Home** | **3**, dan `pintu` sederet dengan `lampu` |
+
+**Kata “risk” tidak muncul satu kali pun di seluruh naskah 20.** Dan §16.34 menjadwalkan **`R16.10 Safety Kernel` di urutan TERAKHIR** — sesudah humanoid, drone, manipulasi, dan armada — padahal §16.18 sendiri menyebutnya *“komponen paling kritis”*. Itu **B-30** ([#99](../../issues/99)) yang lebih berat: di naskah 18 yang dibuka lebih dulu adalah pintu; di sini **mesin yang bergerak di dekat orang**.
+
+⭐ Yang **ditambahkan** naskah ini nyata: `Emergency Rules` + mesin keadaan §16.20 adalah **pengaman REAKTIF pertama** dalam 20 naskah — sesuatu yang menghentikan tindakan **yang sedang berlangsung**. Tapi reaktif bukan pengganti preventif.
+
+### 🛑 Tiga temuan berat lainnya
+
+- **A-32 / [#112](../../issues/112)** — **Phase 16 tanpa satu pun angka.** Lima besaran yang menentukan apakah seseorang terluka tidak ditulis di mana pun: **jarak henti · latensi reaksi · batas gaya · personal space · kecepatan per zona**. §16.8 menyebut `force` tanpa batas atas; §16.20 hanya mendeteksi gaya **tak terduga**, bukan gaya yang **direncanakan** terlalu besar — dan §16.23 menutup lingkarannya: robot menaikkan gayanya sendiri (`Future: Adjust force`), sehingga gaya baru itu kini “terduga” dan pengaman tidak berbunyi. Diperberat §16.27: empat variasi latihan sintetis semuanya soal **penampilan**, nol soal **perilaku** ⇒ `Safety Test` hanya bisa menguji apa yang disimulasikan.
+- **B-32 / [#110](../../issues/110)** — diagram `HumanVerse → ROS Adapter → ROS2 → Robot` menempatkan **ROS2 lebih dekat ke robot daripada HumanVerse** ⇒ siapa pun yang bisa bicara ke ROS2 menggerakkan robot **tanpa melewati** Safety Kernel, Safe Zones, maupun Emergency Controller. Bentuk fisik dari *“agent tidak boleh bypass gateway”* §11.14.
+- **C-24 / [#114](../../issues/114)** — **robot membawa sensornya sendiri MASUK ke ruangan**, sehingga policy yang terpasang pada ruangan tidak mengikatnya: §16.12 menuntut kamera ke wajah orang; §16.5 memberi humanoid kemampuan **membuka pintu** ⇒ `child_room: restricted:true` berhenti jadi batas fisik; §16.15 memberi drone `monitoring` di luar batas properti — dan naskah **tidak menyebut aturan penerbangan satu kali pun**.
+
+### ⭐ Yang justru bertahan — enam butir F
+
+- **§16.26 `Code → Simulation → Safety Test → Hardware`** — keputusan keselamatan terpenting naskah ini, dan **batas keras keempat yang perlu CI**; satu-satunya yang mencegah cedera fisik.
+- **§16.21 menaruh `emergency` di EDGE** — konsisten dengan pemicunya sendiri (`communication loss`): pengaman darurat di cloud akan mati justru pada pemicunya. Digabung §15.29 ⇒ **apa pun yang harus tetap bekerja ketika segalanya gagal, berjalan paling dekat dengan dunia.**
+- **§16.10 *“prioritas keselamatan tertinggi diberikan pada manusia”*** — memperbaiki lubang terbesar Phase 15 (`Person` di pohon objek yang sama dengan `Sofa`), dan memperbaikinya dengan **peringkat**, bukan penjelasan.
+- **§16.11 `Robot slows → Wait`** — ketika sistem tidak yakin, jawabannya **melambat dan berhenti**. Satu-satunya tempat di naskah ini di mana prediksi yang salah tidak berbahaya. Sejalan: **`Wait` sebagai skill yang setara dengan `Pick`** (§16.24).
+- **§16.12 *“ekspresi robot harus transparan, bukan berpura-pura punya emosi manusia”*** — pengaman pemilik yang **keenam berturut-turut**, dan ia mengenai godaan terbesar robotika sosial.
+- **Naskah KEDUA berturut-turut memakai yang SUDAH ADA** — §16.7 (MoveIt/OMPL/RRT*/CHOMP/TrajOpt) · §16.14 (MQTT/Matter/Zigbee/Thread/BLE) · §16.22 (*“HumanVerse tidak menggantikan ROS”*) · §16.26 (Isaac Sim/Gazebo/Webots/MuJoCo).
+
+### 🛑 Phase 17 diumumkan — petanya terbuka-ujung
+
+Naskah 19 mengumumkan Phase 16; naskah 20 mengumumkan **Phase 17 — Human Health & Bio Intelligence**. Dua naskah berturut-turut menambah satu fase di kalimat penutupnya, tanpa satu pun menyebut §10.41. Pertanyaan ketiga [#101](../../issues/101) (*berapa fase lagi*) terjawab dengan perbuatan: **tidak ada ujungnya yang ditulis.**
+
+⇒ **Berhenti mencatat “peta bertahan” sebagai butir F**, dan **beri versi pada peta fase** (`v1` 15 fase §10.41, `v2` terbuka-ujung). ⚠️ Phase 17 juga fase paling sensitif dari semuanya — *Health Digital Twin* menggabungkan wearable, biometrik, gaya hidup, dan perilaku, keempatnya Level 3–4. ⭐ Tiga butir sudah menunggu **sebelum naskahnya ditulis**: **C-20** ([#85](../../issues/85)) · **C-22** ([#102](../../issues/102)) · larangan §8.10.
+
+### Teknik yang berbuah sesi ini
+
+**Ambil butir yang saya tulis sebagai RAMALAN di naskah sebelumnya, lalu periksa apakah ia terjadi.** E-124 memperkirakan tiga hal untuk Phase 16; naskah 20 memperbaiki satu (`Person` ≠ `Sofa`, §16.10) dan mewarisi dua. Itu cara termurah menilai apakah sebuah naskah membaik — dan lebih jujur daripada membaca ulang dari nol, karena ramalannya ditulis sebelum jawabannya ada.
+
+### Catatan kerja
+
+Sesi lain menutup [#100](../../issues/100) dan [#14](../../issues/14) selagi sesi ini berjalan (tidak ada commit baru). Hitungan issue di berkas audit dan README karena itu diambil ulang dari `gh` sesudah pekerjaan selesai, bukan dari angka yang dibawa dari awal sesi.
+
+---
+
 ## Sesi 18 — 7 September 2026
 
 **Phase 15 direkam — dan peta 15 fase, satu-satunya sumbu penomoran yang bertahan lima naskah, patah di kalimat penutupnya.**
