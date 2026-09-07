@@ -4,6 +4,124 @@
 
 ---
 
+## Sesi 13 — 7 September 2026
+
+**Phase 11 direkam — dua tabrakan terberat ditutup, dan keputusan keempat tergerus.**
+
+| Hal | Hasil |
+|---|---|
+| Naskah baru | **Phase 11: Agentic Intelligence & Agency**, §11.1–§11.64 — **naskah terpanjang dari lima belas** |
+| Dokumen ditambah | **12 berkas** (`176`–`187`) |
+| Dokumen total | 162 → **174** di `docs/`, + 8 di `spec/` |
+| Berkas kode | tetap **0** |
+| Issue | 77 → **83** (67 terbuka, 16 ditutup); **#67** dan **#61** ditutup |
+
+### ⭐⭐⭐ H-21 — tabrakan paling berbahaya dari lima belas naskah, ditutup
+
+Sesi lalu saya catat **E-77** sebagai yang paling berbahaya: naskah 12 memberi
+`R4 = Critical, wajib konfirmasi`; naskah 13 memberi `Level 4 = Bounded
+autonomy, bertindak sendiri`. *"Agent ini Level 4"* berarti dua hal berlawanan.
+
+§11.15 membuka dengan *"kita sudah memiliki R0–R4"* lalu §11.16 memberi tangga
+otonomi **terpisah** — dan §11.5 menaruh keduanya di satu berkas:
+
+```yaml
+risk_level: R1          # risiko AKSI
+autonomy:
+  max_level: L2         # kewenangan AGENT
+```
+
+⭐ Kelima tingkat L **identik dengan §9.26** — daftar yang diulang tanpa
+bergeser. ⭐⭐ Dan §11.15 **memperketat**: R4 kini `DENY` sebagai bawaan, dengan
+definisi baru **"irreversible"** — bukan "berdampak besar".
+
+### ⭐⭐ H-22 — manifest keenam memulihkan dua field yang saya keluhkan
+
+`purpose` kembali (hilang sejak naskah 10) dan `memory.read`/`memory.write`
+kembali jadi **dua field** (diruntuhkan naskah 12 jadi `memory_scope` tunggal).
+Itu membuat dua batas paling halus di `spec/05` bisa dinyatakan lagi:
+`coach-agent` hanya menulis `coaching_notes`; `memory-agent` membaca semua
+**kecuali** `journal_raw`.
+
+⭐ Ditambah §11.37 yang memberi `require_confirmation` bentuk policy konkret,
+dengan tiga kata yang menutup satu kelas kesalahan: **"Bukan LLM."**
+
+### 🛑 E-94 — H-11 tergerus, keputusan KEEMPAT yang tergerus
+
+**H-11** ditutup dengan tegas: *"Weather & Calendar = TOOL, bukan agent."*
+Butir **E-28** mencatat kenapa butir itu pernah terbuka: naskah 4 §13 memakai
+`WeatherAgent` sebagai contoh komunikasi antar-agent, **lengkap dengan pesan
+`"to": "WeatherAgent"`**.
+
+§11.20 sekarang: `{"from": "travel-agent", "to": "weather-agent"}` —
+**konstruksi yang sama persis, di peran yang sama persis.** Dan §11.4
+menempatkan *Calendar Agent* di Action Agents, sementara calendar adalah
+**tool** di tiga tempat lain di naskah yang sama.
+
+H yang tergerus berurutan: **H-8** (Grooming) · **H-10** (monorepo) ·
+**H-13** (rencana kanonik) · **H-11**. Polanya cukup jelas untuk dijadikan
+kebiasaan: **tinjau ulang butir H setiap beberapa naskah.**
+
+### 🛑 E-95 — daftar agent versi kelima, tujuh agent di contoh tanpa terdaftar
+
+25 agent berhierarki. ⭐ **Health kembali** dan **Lifestyle mendapat agent
+untuk pertama kalinya** — separuh jawaban A-20/#4. ⭐ **Action Agents** sebagai
+kategori tersendiri memberi B-19 batas per kategori.
+
+🛑 Tapi tujuh agent hidup di contoh tanpa ada di hierarki: *Productivity*
+(§11.59), *Weather · Transportation · Hotel · Budget* (§11.19), *Location ·
+Preference* (§11.21) — pola **E-38** pada skala tujuh kali lipat. Dan
+**Mental Wellness masih tanpa agent setelah lima belas naskah**, dijaga lewat
+kata pengganti dua kali (*"private documents"*, *"private conversations"*)
+tanpa pernah dinamai.
+
+### Temuan lain
+
+- **A-28 / #80** — §11.41 (tugas Senin–Minggu) dan §11.42 (proaktif) adalah
+  komponen **pertama yang bekerja sendiri tanpa diminta**. Tiga hal yang
+  dibutuhkan belum ada: izin lokasi (tidak pernah didaftarkan), push
+  notification, dan preferensi gangguan. ⭐ Pengamannya sudah dirancang:
+  anggaran `notification: 10/day`, Interruption Manager, dan **"Do Nothing
+  adalah kemampuan penting bagi agent."**
+- **C-19 / #81** — Communication Agent dan Booking Agent bertindak **kepada
+  orang ketiga**, dan penerima **tidak bisa tahu** apakah yang menulis manusia
+  atau agent. B-19 selalu dari sisi pengguna; ini sisi penerima, dan belum
+  pernah dibahas di lima belas naskah.
+- **B-26 / #83** — tugas seminggu membuat **B-14 struktural**: sinyal mati hari
+  Rabu menghasilkan `Review` hari Minggu dari dua hari data, tanpa apa pun yang
+  mewajibkan agent menyadarinya.
+- **E-96/E-99 / #82** — Fase 8 dan Fase 11 mendefinisikan hal yang sama dua
+  kali: **dua Control Plane** berbagi empat komponen, dan **dua tabel**
+  (`agent_capabilities`, `agent_trust_scores`) didefinisikan dua fase.
+  Duplikasi pertama di tingkat **skema**, bukan folder.
+- **E-97** — pohon tingkat-atas **kedelapan** (`agents/`, 28 folder) dengan
+  **dua belas duplikasi**, terbanyak dari semua pohon. ⭐ Tapi naskah ini
+  sendiri memberi aturannya: **`security/` memiliki mesinnya, `agents/` hanya
+  memanggil** — dengan itu enam folder tidak perlu ada.
+- **E-98** — 22 event agent PascalCase, naskah **ketiga** berturut-turut
+  melanggar #38; dua di antaranya menduplikasi event keamanan §8.26.
+- **G-12** — `requires_confirmation` kini di **tiga tempat** tanpa satu pun
+  menyatakan mana yang otoritatif.
+
+### ⭐ Yang paling berharga secara konseptual
+
+**Lima kata sifat di prinsip pembuka** — *earned, bounded, observable,
+**reversible**, revocable* — dan tiga di antaranya belum pernah ada.
+§11.27 **Reversibility Engine** yang paling menjelaskan: empat belas naskah
+mengukur risiko dari **akibat** aksi; ini menambahkan **seberapa sulit
+dibatalkan**. Itu sebabnya R4 = `DENY`.
+
+Dan **§11.61 memberi enam kata kerja kendali** — Pause · Resume · Cancel ·
+Revoke · Kill · **Rollback** — yang adalah *Human Override* yang **G-8**/#65
+catat tidak datang di Fase 8. Bias Detection masih nol.
+
+### Langkah berikutnya menurut pemilik
+
+**Phase 12 — Digital Twin & World Simulation Engine.** ⭐ Peta 15 fase
+**bertahan untuk naskah kedua** (§11.64 = §10.41) — H-20 aman.
+
+---
+
 ## Sesi 12 — 7 September 2026
 
 **Phase 10 direkam — peta fase diganti, dan V0 kehilangan tempatnya.**
