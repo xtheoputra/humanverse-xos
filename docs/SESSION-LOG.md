@@ -4,6 +4,124 @@
 
 ---
 
+## Sesi 11 — 7 September 2026
+
+**Phase 9 direkam — empat butir lama ditutup sekaligus, dan satu tabrakan
+penomoran yang membalik arah keselamatan.**
+
+| Hal | Hasil |
+|---|---|
+| Naskah baru | **Phase 9: Human Intelligence & Cognitive Architecture**, §9.1–§9.41 |
+| Dokumen ditambah | **11 berkas** (`154`–`164`) |
+| Dokumen total | 140 → **151** di `docs/`, + 8 di `spec/` |
+| Berkas kode | tetap **0** |
+| Issue | 65 → **71** (58 terbuka, 13 ditutup); **#33, #42, #50, #62** ditutup |
+
+### ⭐ Empat butir ditutup — terbanyak dari naskah mana pun
+
+| Issue | Ditutup oleh | Kenapa akhirnya bisa |
+|---|---|---|
+| **#33** memory: jenis atau scope | §9.7 | Enam jenisnya **identik dengan naskah 5 §17** — daftar memory pertama yang diulang tanpa bergeser setelah lima hitungan berbeda. Jawabannya **tiga sumbu tegak lurus**: `kind` · `scope` · `tier` |
+| **#50** Identity Memory permanen | §9.9 + §9.4 | *"Memory lama tidak boleh menjadi dogma"* + `Preference(user, item, context, time)` — sesuatu yang punya argumen waktu tidak bisa permanen **secara bentuk**, bukan secara kebijakan |
+| **#42** alur percakapan tanpa keselamatan | §9.29 | `POLICY_CHECK` berdiri **tepat setelah PLANNING**, persis di tempat yang saya usulkan, plus keadaan `REQUIRES_CONFIRMATION` |
+| **#62** akses tabel vs vault | §9.31 | *"Daripada setiap agent mengambil data sendiri-sendiri…"* — **agent tidak mengambil data sama sekali**; Context Engine menyerahkan paket |
+
+**#62 layak dicatat khusus: jawabannya lebih baik daripada kedua pilihan yang
+saya ajukan.** Saya mengusulkan dua model dilapis. Yang benar adalah keduanya
+bukan cara agent *mengambil* data, melainkan dua sisi dari cara Context Engine
+*menyiapkan* data. Izin jadi diperiksa **satu kali di satu tempat**, dan
+katalog pertanyaan yang saya khawatirkan tidak lagi dibutuhkan.
+
+### 🛑🛑 Tabrakan paling berbahaya dari tiga belas naskah
+
+| Nomor | Naskah 12 §8.16 — **risiko** | Naskah 13 §9.26 — **otonomi** |
+|---|---|---|
+| 3 | High impact → **wajib konfirmasi** | **Ask confirmation** |
+| **4** | Critical → **wajib konfirmasi** | **Bounded autonomy** — bertindak sendiri |
+
+*"Agent ini Level 4"* berarti **"selalu minta izin"** dengan naskah 12, dan
+**"boleh jalan sendiri"** dengan naskah 13. Dua tangga 0–4, sumbu berbeda,
+**terbalik di ujung atas**. Kalau masuk ke kode, ia melewati konfirmasi tepat
+di tempat yang paling membutuhkannya. Usul: otonomi `A0`–`A4`, risiko tetap
+`R0`–`R4`, plus satu baris pengikat. Lihat **E-77** / #67.
+
+### 🛑 Peta fase naskah 8 mati untuk Phase 9 ke atas
+
+Phase 9 seharusnya *Enterprise & Business Platform*, Phase 10 *AI Automation
+Engine*. Yang datang: Phase 9 = **Cognitive**, Phase 10 diumumkan =
+**Multimodal**. **Dua fase berturut-turut tergeser tanpa rumah baru** — dan dua
+issue terbuka menyebut nomor lamanya (#46 Company Wellness, #47 Email
+Automation). ⭐ Urutan barunya lebih masuk akal (mata dipasang pada otak yang
+sudah ada); yang perlu hanya menuliskannya. **A-26** / #66.
+
+### 🛑 `model-router/` hilang justru ketika naskah memperkuat kebutuhannya
+
+Pohon `intelligence/` §9.38 membuang empat folder monorepo naskah 5:
+`behavior-model/` · `preference-model/` · `personalization/` ·
+**`model-router/`**. Dua yang pertama adalah **L2 dari tumpukan §9.3 naskah ini
+sendiri** — tumpukan dua belas lapisan punya dua lapisan tanpa rumah.
+
+`model-router/` paling berat: §9.2 berkata LLM hanya salah satu komponen, §9.20
+memberi tiga jalur (*Fast · Cognitive · High-stakes*) yang harus ada yang
+memilih. Perutean dijelaskan **lebih rinci dari sebelumnya, lalu foldernya
+dihapus**. **E-79** / #69.
+
+### ⭐⭐⭐ `Prediction Calibration` menjawab B-10 — butir yang menggantung sejak naskah 4
+
+B-10 bertanya *"akurat terhadap apa"*, dan memperingatkan *Automatic Rollback*
+yang skornya sekadar model menilai model.
+
+Kalibrasi **tidak butuh kebenaran acuan tentang jawaban yang benar** — hanya
+hasil teramati: dari semua yang disebut berpeluang 70 %, apakah ~70 % terjadi?
+Untuk `habit completion tomorrow = 0.68`, jawabannya datang **besok** dari
+`habit_completions` yang sudah ada. Kebenaran acuan yang dihasilkan sistem
+sendiri, tanpa penilai manusia, **dan bisa dijalankan sejak V0**.
+
+### Temuan lain
+
+- **G-10** — tumpukan 12 lapisan §9.3 **meleset satu dari judul bagiannya
+  sendiri** (§9.4 ditulis "Layer 1" tapi gambar menaruhnya di L2, karena
+  *Data Foundation* mengambil L1). Layer 7–11 cocok; 1–6 meleset. Dan tidak ada
+  bagian "Layer 12". Ketahuan hanya dari **menghitung kotaknya**.
+- **E-78** — L9–L12 bertabrakan dengan Layer 9–12 naskah 3, di rentang yang
+  sama persis: *Decision Engine* naskah 3 adalah **L12**, *Decision* naskah 13
+  adalah **L10**.
+- **E-80** — HumanState versi ketiga: 8 → 7 → **10**, dan `mood` kembali
+  setelah E-34 mencatat penghapusannya kemungkinan disengaja. ⭐ Tapi bentuk
+  `{value, confidence}` per field adalah jawaban penyimpanan yang dicari A-19.
+- **E-81** — `influences` kembali ke graf setelah naskah 9 membuangnya (E-55
+  mencatat itu sebagai kabar baik), sementara §9.17 di naskah yang sama menuntut
+  bukti kausal.
+- **B-24** — Counterfactual Engine menjanjikan jawaban yang §9.17 melarang;
+  sumber data `Transition` tidak ada. Dan counterfactual **mundur** adalah
+  penyesalan yang dihitung.
+- **C-16** — Personal Utility Model menyimpulkan **apa yang seseorang hargai**,
+  lebih dalam dari Identity Memory: *"Anda menghargai Income 0,25"* tidak bisa
+  dibantah dengan data apa pun. ⭐ Naskah menyelamatkannya: *"user harus dapat
+  mengubahnya"* — `Edit` yang hilang, kini dituntut dua bagian naskah.
+
+### 🔧 Koreksi saya sendiri
+
+Di komentar #7 saya menulis *"penutupan issue ini tetap berlaku"* — **#7 tidak
+pernah ditutup**. Yang tetap berlaku adalah temuannya (graf tidak menyentuh
+V0), bukan penutupan. Sudah dikoreksi di issue-nya.
+
+### ⭐ Yang berbeda dari Fase 8 — dan mengubah jawaban #58
+
+Fase 8 menambah pekerjaan **di atas** V0 (20 tabel, 8 sprint). Fase 9 sebagian
+besar **bukan pekerjaan tambahan melainkan arsitektur dari pekerjaan yang sudah
+dijadwalkan**: C2 Context, C3 Memory, dan C9 Decision semuanya sudah ada di
+dalam 12 fitur V0. Membacanya sebagai "fase kesembilan yang menunggu giliran"
+keliru.
+
+### Langkah berikutnya menurut pemilik
+
+**Fase 10 — HumanVerse Multimodal Intelligence & Perception Layer** (mata,
+telinga, suara, vision, sensor, wearable, camera, document understanding,
+spatial intelligence, multimodal fusion).
+
+---
+
 ## Sesi 10 — 7 September 2026
 
 **Phase 8 direkam — satu keputusan besar ditutup, dua pengaman lama hilang.**

@@ -23,10 +23,10 @@ manusia + agent + data + knowledge + simulation + automation**.
 | Tahap | **Spesifikasi engineering siap** — belum ada kode (disengaja) |
 | Berkas kode | 0 |
 | Repo git | privat `xtheoputra/humanverse-xos`, branch `master` |
-| Dokumen | **140 berkas** di `docs/` (naskah + audit + catatan sesi) + **8 berkas** di `spec/` |
-| Naskah pemilik | **12** — terakhir: **Phase 8 AI Safety, Security & Privacy** |
-| Keputusan tertutup | **15 butir H** — nama · MVP · struktur repo · rencana kanonik V0–V6 · ambang konfirmasi manusia |
-| Keputusan terbuka | **18 pertanyaan A** · **75 ketidakcocokan E** · **9 lubang G** |
+| Dokumen | **151 berkas** di `docs/` (naskah + audit + catatan sesi) + **8 berkas** di `spec/` |
+| Naskah pemilik | **13** — terakhir: **Phase 9 Human Intelligence & Cognitive Architecture** |
+| Keputusan tertutup | **19 butir H** — nama · MVP · struktur repo · rencana kanonik V0–V6 · ambang konfirmasi · **model memory** · **memory meluruh** · **gerbang policy di runtime** · **context package** |
+| Keputusan terbuka | **19 pertanyaan A** · **84 ketidakcocokan E** · **10 lubang G** |
 | Tanggal dokumen | 7 September 2026 |
 
 > ⚠️ **Nol baris kode itu disengaja — dan penghambatnya terus berkurang.**
@@ -47,14 +47,14 @@ manusia + agent + data + knowledge + simulation + automation**.
 
 ## 📌 Pekerjaan terbuka = GitHub Issues
 
-**65 issue** dalam 3 milestone — **9 ditutup**. Baca issue-nya, jangan analisis
+**71 issue** dalam 3 milestone — **13 ditutup**. Baca issue-nya, jangan analisis
 ulang naskahnya.
 
 | Milestone | Isi | Issue |
 |---|---|---|
 | **M1 — Keputusan sebelum kode** | 8 terbuka, 4 ditutup | [#1](../../issues/1)–[#9](../../issues/9), [#38](../../issues/38), [#58](../../issues/58)–[#59](../../issues/59) |
-| **M2 — Blueprint & Platform** | 37 terbuka, 4 ditutup | [#10](../../issues/10)–[#19](../../issues/19), [#26](../../issues/26)–[#37](../../issues/37), [#39](../../issues/39), [#41](../../issues/41)–[#45](../../issues/45), [#47](../../issues/47)–[#49](../../issues/49), [#51](../../issues/51), [#54](../../issues/54)–[#56](../../issues/56), [#60](../../issues/60)–[#65](../../issues/65) |
-| **M3 — Sebelum ada pengguna nyata** | 11 terbuka, 1 ditutup | [#20](../../issues/20)–[#25](../../issues/25), [#40](../../issues/40), [#46](../../issues/46), [#50](../../issues/50), [#52](../../issues/52)–[#53](../../issues/53), [#57](../../issues/57) |
+| **M2 — Blueprint & Platform** | 39 terbuka, 7 ditutup | [#10](../../issues/10)–[#19](../../issues/19), [#26](../../issues/26)–[#37](../../issues/37), [#39](../../issues/39), [#41](../../issues/41)–[#45](../../issues/45), [#47](../../issues/47)–[#49](../../issues/49), [#51](../../issues/51), [#54](../../issues/54)–[#56](../../issues/56), [#60](../../issues/60)–[#70](../../issues/70) |
+| **M3 — Sebelum ada pengguna nyata** | 11 terbuka, 2 ditutup | [#20](../../issues/20)–[#25](../../issues/25), [#40](../../issues/40), [#46](../../issues/46), [#50](../../issues/50), [#52](../../issues/52)–[#53](../../issues/53), [#57](../../issues/57), [#71](../../issues/71) |
 
 ⚠️ **[#55](../../issues/55) meninjau ulang keputusan yang sudah ditutup:**
 monorepo final (H-10) tergerus oleh tiga pohon repo baru dari naskah 9, 10, 11.
@@ -65,7 +65,11 @@ Sprint 0 tugas 0.1 menunggu jawabannya.
 [#17](../../issues/17) empat penyimpanan · [#10](../../issues/10) blueprint ·
 [#31](../../issues/31) Engineering Specification · [#38](../../issues/38) nama event dua segmen ·
 [#5](../../issues/5) ambang konfirmasi → **otomatis sampai R2, konfirmasi mulai R3** ·
-[#52](../../issues/52) `risk_level` kembali & konfirmasi pindah ke Policy Engine.
+[#52](../../issues/52) `risk_level` kembali & konfirmasi pindah ke Policy Engine ·
+[#33](../../issues/33) memory = **tiga sumbu** `kind`/`scope`/`tier` ·
+[#50](../../issues/50) Identity Memory **meluruh**, tidak permanen ·
+[#42](../../issues/42) `POLICY_CHECK` masuk rantai percakapan ·
+[#62](../../issues/62) agent tidak mengambil data — **context package**.
 
 🛑 **Penghambat V0 yang tersisa — tiga:**
 [#3](../../issues/3) 12 fitur & 7 sprint dalam 4–6 minggu ·
@@ -80,8 +84,12 @@ Yang masih menunggu jawaban tapi tidak menahan Sprint 0–4:
 [#2](../../issues/2) model angka pengguna (menahan Sprint 5) ·
 [#21](../../issues/21) eskalasi krisis Journal (menahan rilis ke orang lain — dan naskah 12
 lewat tanpa menyebut jurnal sekali pun) ·
-[#58](../../issues/58) berapa banyak Fase 8 masuk V0 (punya default aman: pakai 23 tabel yang
-sudah ada).
+[#58](../../issues/58) berapa banyak Fase 8 & 9 masuk V0 (punya default aman: pakai 23 tabel yang
+sudah ada) ·
+🆕 [#67](../../issues/67) **dua tangga 0–4 yang terbalik di ujung atas** — otonomi “Level 4”
+(bertindak sendiri) vs risiko “R4” (wajib konfirmasi); belum mengikat V0 karena tidak ada tool
+di atas level 2, tapi harus diselesaikan sebelum tangga mana pun masuk basis data ·
+🆕 [#66](../../issues/66) peta fase naskah 8 sudah tidak berlaku untuk Phase 9 ke atas.
 
 ---
 
