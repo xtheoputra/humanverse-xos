@@ -4,6 +4,127 @@
 
 ---
 
+## Sesi 10 — 7 September 2026
+
+**Phase 8 direkam — satu keputusan besar ditutup, dua pengaman lama hilang.**
+
+| Hal | Hasil |
+|---|---|
+| Naskah baru | **Phase 8: AI Safety, Security & Privacy**, §8.1–§8.46 |
+| Dokumen ditambah | **12 berkas** (`142`–`153`) |
+| Dokumen total | 128 → **140** di `docs/`, + 8 di `spec/` |
+| Berkas kode | tetap **0** |
+| Issue | 57 → **65** (56 terbuka, 9 ditutup); **#5** dan **#52** ditutup |
+
+### ⭐ Dua bagian terkuat
+
+**§8.10 Purpose Limitation.** Data yang diberikan untuk rekomendasi tidur tidak
+otomatis boleh dipakai untuk *advertising*, *insurance scoring*, atau
+*employment scoring*. Digabung dengan §7.24 (`purpose` menempel pada data) dan
+§8.9 (`purpose` menempel pada persetujuan), penegakannya jadi **satu operasi
+himpunan**: `data.purpose ⊆ consent.purpose`. Tidak ada naskah yang menuliskan
+perbandingan itu, tetapi itulah mekanismenya — dan ia menutup **C-11** serta
+separuh **C-12** (*employment scoring* dilarang dengan kata pemilik sendiri).
+
+**§8.17 Human Confirmation → H-15.** *"AI tidak boleh langsung membeli hanya
+karena sebelumnya user berkata: kalau murah, belikan."* Ini memisahkan dua hal
+yang selama ini tercampur:
+
+```
+Consent      → mengizinkan AKSES ke data,      berjangka waktu (§8.9)
+Confirmation → mengizinkan satu AKSI tertentu, sekali pakai   (§8.17)
+```
+
+Menutup **A-22** / #5: otomatis sampai R2, konfirmasi wajib mulai R3.
+
+### 🛑 Dua butir yang dijanjikan Phase 8 tidak datang — dan justru dua yang baru
+
+Naskah 8 memetakan Phase 8 sebagai *AI Safety & **Ethics*** dengan enam butir.
+Butir **E-53** menyimpulkan empat di antaranya sudah ditulis di tempat lain,
+sehingga **hanya *Bias Detection* dan *Human Override* yang benar-benar baru**.
+
+Keduanya **tidak muncul satu kali pun** di 46 bagian. Judulnya sendiri berubah
+jadi *AI Safety, **Security** & Privacy* — separuh etika ditukar keamanan.
+*Human Override* punya kerabat tapi bukan penggantinya: §8.17 terjadi
+**sebelum** aksi, §8.35 menghentikan **semuanya**; tidak ada yang membalik
+**satu** keputusan yang sudah berjalan. Lihat **G-8**.
+
+### 🛑 Jurnal: nol kali disebut di naskah keselamatan
+
+§8.23 menjaga *Health* dan *Finance*. Tidak ada Mental Wellness, tidak ada
+krisis, dan **jurnal tidak disebut sekali pun**. Padahal Journal masuk V0,
+ada di Level 3 klasifikasi data, satu-satunya tempat yang bisa memuat isyarat
+krisis (**C-3**), dan ditawarkan ke developer pihak ketiga (**E-61**). Daftar
+DENY §8.6 pun tidak memuatnya, padahal naskah 5 §15 menempatkannya di DENY
+bahkan untuk agent internal. Lihat **G-9**.
+
+### 🛑 Tangga risiko turun satu takik — buktinya contoh yang identik
+
+*Rekomendasi outfit* adalah contoh yang **sama persis** di dua naskah, dan ia
+pindah dari **Level 1** (naskah 4 §16) ke **R0** (§8.16). Menulis ke data
+pengguna turun dari Level 2 jadi **R1**; pembelian naik dari Level 3 jadi
+**R4**. Ujung bawah turun, ujung atas naik.
+
+Akibatnya nyata: `habit.complete` dan `memory.write` di `spec/05` adalah
+**risk 2** dengan default `ask`. Kalau *mengubah habit* adalah R1 dan
+konfirmasi baru mulai R3, **setiap tulisan ke data pengguna di V0 berjalan
+tanpa satu pun konfirmasi**. Lihat **E-67**.
+
+### 🛑 Dua pengaman lama hilang — dan keduanya dasar penutupan butir H
+
+| Hilang | Dari | Yang tergerus |
+|---|---|---|
+| **`Edit`** di Privacy Center | naskah 4 §43 punya *View · Edit · Export · Delete · Revoke*; §8.36 punya delapan kata kerja tanpa satu pun cara **memperbaiki** | **H-4** ditutup atas dasar lima kata kerja itu. Dan `Edit` justru yang diminta **C-13** (*Identity Memory* harus bisa dibantah) dan **B-17** (koreksi manual Wardrobe) |
+| **Alasan ringkas** di Audit Trail | naskah 4 §45 menyimpan *"audit metadata **dan alasan ringkas yang dapat diverifikasi**"*; 12 field §8.25 tidak memuat satu pun alasan | **H-7** ditutup persis karena §45 menyimpan alasan. Tanpanya, jejak audit tahu *apa* yang diputuskan tapi tidak pernah tahu **kenapa** |
+
+Ini pola yang sudah tiga kali terjadi (**H-8** dulu dibatalkan cara yang sama):
+**satu naskah memulihkan sesuatu bukan berarti sudah tetap — dan naskah baru
+bisa menghapus pengaman tanpa menyebutnya.**
+
+### Temuan lain
+
+- **E-71** — naskah bertabrakan dengan dirinya sendiri: §8.6 memberi akses
+  **tingkat tabel**, §8.11 berkata agent tidak pernah menerima baris. §8.15,
+  §8.25, dan §8.37 semuanya memakai model §8.6 — jadi Personal Data Vault
+  berdiri **sendirian melawan tiga bagian lain di naskahnya sendiri**.
+- **E-69** — `SecurityEvent` bukan amplop keempat melainkan **model event
+  kedua** (`action`+`resource`, bukan `event_type`+`payload`), dan §8.26
+  memasukkannya ke bus yang sama. `user_id` hilang — padahal pemisahan
+  *siapa yang bertindak* dari *data siapa yang disentuh* persis yang
+  dibutuhkan **C-10**/**C-12**. `ip` mentah, sementara `spec/01` sengaja
+  menyimpan `ip_hash`.
+- **E-73** — pohon tingkat-atas **kelima** (`security/`, 30 folder). Empat
+  naskah berturut-turut menambah pohon sendiri; **H-10** tergerus lagi (#55).
+- **A-25** — Fase 8 meminta **8 sprint** dan **20 tabel baru** di atas 23 tabel
+  V0, sementara seluruh V0 adalah 7 sprint dalam 4–6 minggu.
+- ⭐ **S8.1–S8.8** adalah penomoran pertama yang membawa fasenya sendiri —
+  usul yang sama sebaiknya berlaku surut untuk `R1–R8` dan dua `D1–D8`.
+
+### 🔧 Koreksi saya sendiri
+
+Butir **E-60** saya tulis sebagai kehilangan murni: DP-L8 membuang
+`requires_confirmation`, dan `spec/05` aturan 3 mempertahankannya di manifest.
+§8.18 menunjukkan tempat yang lebih benar — **Policy Engine**, bukan manifest.
+Selama field itu ada di manifest, **penulis agent** yang menentukan kapan
+penggunanya dimintai izin, dan agent pihak ketiga tinggal menuliskan daftar
+kosong. Jadi yang perlu diperbaiki bukan naskahnya, melainkan **aturan 3 di
+spesifikasi saya sendiri**: ia memeriksa manifest, seharusnya memeriksa ada
+tidaknya baris policy.
+
+### ✅ Yang terbukti benar
+
+`backup` yang saya tambahkan sendiri di sesi 9 — di luar tujuh tempat naskah 11
+— muncul di §8.38 sebagai langkah nyata, bersama **Identity Verification** dan
+**Deletion Verification** yang juga belum pernah ada.
+
+### Langkah berikutnya menurut pemilik
+
+**Fase 9 — HumanVerse Intelligence & Cognitive Architecture.** ⚠️ Ini **bukan**
+Phase 9 di peta naskah 8, yang berisi *Enterprise & Business Platform*. Perlu
+dinyatakan: fase berikutnya menyela urutan peta, atau petanya yang berubah.
+
+---
+
 ## Sesi 9 — 3 September 2026
 
 **Phase 7 Data & AI Infrastructure direkam — dan satu keputusan lama tergerus.**

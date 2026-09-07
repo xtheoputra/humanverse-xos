@@ -22,12 +22,12 @@ manusia + agent + data + knowledge + simulation + automation**.
 |---|---|
 | Tahap | **Spesifikasi engineering siap** — belum ada kode (disengaja) |
 | Berkas kode | 0 |
-| Repo git | belum diinisialisasi |
-| Dokumen | **128 berkas** di `docs/` (naskah + audit + catatan sesi) + **8 berkas** di `spec/` |
-| Naskah pemilik | **11** — terakhir: **Phase 7 Data & AI Infrastructure** |
-| Keputusan tertutup | **14 butir H** — nama · MVP · struktur repo · rencana kanonik V0–V6 |
-| Keputusan terbuka | **18 pertanyaan A** · **65 ketidakcocokan E** · **6 lubang G** |
-| Tanggal dokumen | 3 September 2026 |
+| Repo git | privat `xtheoputra/humanverse-xos`, branch `master` |
+| Dokumen | **140 berkas** di `docs/` (naskah + audit + catatan sesi) + **8 berkas** di `spec/` |
+| Naskah pemilik | **12** — terakhir: **Phase 8 AI Safety, Security & Privacy** |
+| Keputusan tertutup | **15 butir H** — nama · MVP · struktur repo · rencana kanonik V0–V6 · ambang konfirmasi manusia |
+| Keputusan terbuka | **18 pertanyaan A** · **75 ketidakcocokan E** · **9 lubang G** |
+| Tanggal dokumen | 7 September 2026 |
 
 > ⚠️ **Nol baris kode itu disengaja — dan penghambatnya terus berkurang.**
 > Lima naskah sudah menjawab: **nama** (A-7), **MVP** (A-2), **struktur repo**
@@ -47,14 +47,14 @@ manusia + agent + data + knowledge + simulation + automation**.
 
 ## 📌 Pekerjaan terbuka = GitHub Issues
 
-**57 issue** dalam 3 milestone — **7 ditutup**. Baca issue-nya, jangan analisis
+**65 issue** dalam 3 milestone — **9 ditutup**. Baca issue-nya, jangan analisis
 ulang naskahnya.
 
 | Milestone | Isi | Issue |
 |---|---|---|
-| **M1 — Keputusan sebelum kode** | 8 terbuka, 2 ditutup | [#1](../../issues/1)–[#9](../../issues/9), [#38](../../issues/38) |
-| **M2 — Blueprint & Platform** | 36 terbuka, 5 ditutup | [#10](../../issues/10)–[#19](../../issues/19), [#26](../../issues/26)–[#37](../../issues/37), [#39](../../issues/39), [#41](../../issues/41)–[#45](../../issues/45), [#47](../../issues/47)–[#49](../../issues/49), [#51](../../issues/51), [#54](../../issues/54)–[#56](../../issues/56) |
-| **M3 — Sebelum ada pengguna nyata** | 12 terbuka | [#20](../../issues/20)–[#25](../../issues/25), [#40](../../issues/40), [#46](../../issues/46), [#50](../../issues/50), [#52](../../issues/52)–[#53](../../issues/53), [#57](../../issues/57) |
+| **M1 — Keputusan sebelum kode** | 8 terbuka, 4 ditutup | [#1](../../issues/1)–[#9](../../issues/9), [#38](../../issues/38), [#58](../../issues/58)–[#59](../../issues/59) |
+| **M2 — Blueprint & Platform** | 37 terbuka, 4 ditutup | [#10](../../issues/10)–[#19](../../issues/19), [#26](../../issues/26)–[#37](../../issues/37), [#39](../../issues/39), [#41](../../issues/41)–[#45](../../issues/45), [#47](../../issues/47)–[#49](../../issues/49), [#51](../../issues/51), [#54](../../issues/54)–[#56](../../issues/56), [#60](../../issues/60)–[#65](../../issues/65) |
+| **M3 — Sebelum ada pengguna nyata** | 11 terbuka, 1 ditutup | [#20](../../issues/20)–[#25](../../issues/25), [#40](../../issues/40), [#46](../../issues/46), [#50](../../issues/50), [#52](../../issues/52)–[#53](../../issues/53), [#57](../../issues/57) |
 
 ⚠️ **[#55](../../issues/55) meninjau ulang keputusan yang sudah ditutup:**
 monorepo final (H-10) tergerus oleh tiga pohon repo baru dari naskah 9, 10, 11.
@@ -63,15 +63,25 @@ Sprint 0 tugas 0.1 menunggu jawabannya.
 ✅ **Ditutup:** [#1](../../issues/1) rencana kanonik → V0–V6 ·
 [#8](../../issues/8) struktur repo · [#12](../../issues/12) Weather/Calendar = tool ·
 [#17](../../issues/17) empat penyimpanan · [#10](../../issues/10) blueprint ·
-[#31](../../issues/31) Engineering Specification.
+[#31](../../issues/31) Engineering Specification · [#38](../../issues/38) nama event dua segmen ·
+[#5](../../issues/5) ambang konfirmasi → **otomatis sampai R2, konfirmasi mulai R3** ·
+[#52](../../issues/52) `risk_level` kembali & konfirmasi pindah ke Policy Engine.
 
-🛑 **Penghambat V0 yang tersisa — tinggal dua, keduanya bukan soal teknis:**
+🛑 **Penghambat V0 yang tersisa — tiga:**
 [#3](../../issues/3) 12 fitur & 7 sprint dalam 4–6 minggu ·
-[#20](../../issues/20) cek merek.
-*(#38 format nama event ✅ ditutup naskah 10 — dua segmen.)*
+[#20](../../issues/20) cek merek ·
+🆕 [#59](../../issues/59) **`consents.purpose` + `model_training` harus ada sebelum baris data
+pertama** — §8.10 melarang memakai data di luar tujuan pemberiannya, jadi data V0 yang tidak
+pernah menanyakannya **tidak bisa melatih model apa pun di Phase 5**. Biayanya nol sekarang,
+hampir mustahil nanti.
+*(#38 format nama event ✅ ditutup naskah 10 — dua segmen. #5 ambang konfirmasi ✅ ditutup
+naskah 12 — R3 ke atas.)*
 Yang masih menunggu jawaban tapi tidak menahan Sprint 0–4:
 [#2](../../issues/2) model angka pengguna (menahan Sprint 5) ·
-[#21](../../issues/21) eskalasi krisis Journal (menahan rilis ke orang lain).
+[#21](../../issues/21) eskalasi krisis Journal (menahan rilis ke orang lain — dan naskah 12
+lewat tanpa menyebut jurnal sekali pun) ·
+[#58](../../issues/58) berapa banyak Fase 8 masuk V0 (punya default aman: pakai 23 tabel yang
+sudah ada).
 
 ---
 
