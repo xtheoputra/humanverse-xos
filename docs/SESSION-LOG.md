@@ -4,6 +4,142 @@
 
 ---
 
+## Sesi 14 — 7 September 2026
+
+**Phase 12 direkam — B-24 ditutup lewat jalan keempat, dan `intelligence/` dibongkar.**
+
+| Hal | Hasil |
+|---|---|
+| Naskah baru | **Phase 12: Digital Twin & World Simulation**, §12.1–§12.31 |
+| Dokumen ditambah | **10 berkas** (`188`–`197`) |
+| Dokumen total | 174 → **184** di `docs/`, + 8 di `spec/` |
+| Berkas kode | tetap **0** |
+| Issue | 83 → **89** (72 terbuka, 17 ditutup); **#70** ditutup |
+
+### ⭐⭐⭐ H-23 — B-24 ditutup, dan jawabannya jalan **keempat**
+
+Saya menawarkan tiga jalan keluar untuk model transisi yang tidak punya sumber:
+eksperimen pengguna · pengetahuan umum · perbandingan relatif. §12.20 memilih
+yang keempat:
+
+```
+Simulation → Prediction → Real World → Actual Outcome
+→ Prediction Error → Evaluation → Model Update
+```
+
+Kekuatan panah kausal **dipelajari dari galat prediksinya sendiri**. Prinsip
+yang sama dengan `Prediction Calibration` §9.34 yang menutup B-10: **kebenaran
+acuan dihasilkan sistem sendiri** dari hasil teramati — tanpa penilai manusia,
+tanpa model menilai model. `Expected 75 → Actual 61` datang gratis.
+
+⭐⭐ Ditambah **§12.14 Assumption Engine** (*"simulation without assumptions is
+misleading"*) yang membuat yang dipinjam jadi **terlihat dan bisa dibantah**,
+dan §12.7 yang membandingkan **delapan dimensi antar-skenario** — termasuk
+**`Sustainability`**, kata yang belum pernah ada dan yang menangkap kegagalan
+paling umum dari rencana buatan mesin.
+
+### 🛑 E-101 — tujuh pohon sekaligus, dan LIMA ditarik keluar dari `intelligence/`
+
+Sebelum ini tiap naskah menambah **satu** pohon. §12.26 menambah tujuh — dan
+lima di antaranya adalah folder yang **dipindahkan keluar** dari pohon yang
+baru didefinisikan tiga naskah lalu: `world-model/` · `simulation/` ·
+`decision/` · `prediction/` · `reasoning/causal/`.
+
+**E-79** mencatat naskah 13 membuang empat folder dari `intelligence/`; naskah
+16 mengeluarkan lima lagi. Dari lima belas kelompok §9.38, **tersisa sembilan**.
+Total pohon tingkat-atas: **lima belas**, dan delapan naskah berturut-turut
+menyentuh struktur repo.
+
+⭐ Tapi ketujuhnya **muat sebagai submodul `intelligence/`** — usulan saya jadi
+lebih sederhana, bukan lebih rumit.
+
+### 🛑 C-20 — proyeksi masa depan adalah kelas data baru
+
+§12.13 menyimpan `future_projections`; §12.10 memproyeksikan **wealth
+trajectory**, karier, dan kesehatan sampai **lima tahun**. §8.10 melarang
+memakai data untuk *insurance/employment scoring* — dan **proyeksi adalah
+persis bentuk turunan yang paling berguna bagi mereka**. Larangan tujuan
+menahan pemakaiannya; ia tidak menahan **keberadaannya**.
+
+🔴 Ditambah **§12.22 Life Optimization Engine** yang menaikkan taruhan C-16:
+model utilitas yang bobotnya **disimpulkan** kini dipakai bukan untuk
+**membandingkan** (§9.24) melainkan untuk **memaksimalkan** — dan §12.23
+menyerahkan hasilnya ke agent. **Perbandingan menyerahkan penilaian kepada
+orangnya; optimasi mengambilnya.**
+
+### 🛑 A-29 — horizon 3 dan 5 tahun tidak pernah masuk loop belajar
+
+Proyeksi 30 hari bisa diperiksa dalam 30 hari dan dipakai memperbaiki model.
+Proyeksi **5 tahun** tidak bisa diperiksa siapa pun sampai lima tahun lewat —
+satu-satunya keluaran sistem yang **tidak bisa dikalibrasi**, sementara ia yang
+paling memengaruhi keputusan besar. Dan §12.10 memproyeksikan kekayaan (**C-4**)
+dan kesehatan (**C-2**).
+
+⭐ Penyelamatnya ada di naskah yang sama: **`confidence interval`** — pertama
+kalinya di enam belas naskah sebuah angka datang dengan **rentang**.
+
+### Temuan lain
+
+- **E-102** — Human State versi **keempat**: 8 → 7 → 10 → **8**, `mood` keluar
+  untuk kedua kalinya, `financial pressure` juga hilang. ⭐ Keduanya
+  kemungkinan **benar** dibuang; masalahnya tidak dinyatakan.
+- **E-103** — Digital Twin versi keempat: 8 → 8 → 9 → **18**, dan
+  **`Perception` hilang** setelah satu naskah (pola H-8). ⭐⭐ Tapi
+  **`constraints`** dan **`resources`** akhirnya punya rumah — `constraints`
+  adalah satu-satunya field context package §9.31 yang belum pernah punya
+  sumber di tiga belas naskah.
+- ⭐⭐ **`volatility`** per atribut menjawab pertanyaan terbuka di #49: ia
+  **laju peluruhan per atribut**. Empat besaran akhirnya berpasangan rapi:
+  `value` · `confidence` · `quality` · `volatility`.
+- **E-104** — Personal Utility Model: rumus **8 suku**, contoh **5 bobot**,
+  nama tidak cocok, dan §9.25 punya daftar ketiga. Pola **E-37** persis. ⚠️
+  `w6 Risk` berbobot **positif** = kesalahan arah.
+- **E-105** — "sandbox" kini **empat** makna (uji · runtime · sertifikasi ·
+  simulasi). ⭐ Yang keempat batas keras: *"simulation tidak boleh mengubah
+  data dunia nyata"*.
+- **E-106** — 26 tabel baru ⇒ **99 tabel**. Nol dari 26 dibutuhkan V0.
+- **G-13 / #89** — 12 agent baru, total **> 40**. ⭐⭐⭐ Dan naskahnya sendiri
+  memperingatkan **untuk pertama kalinya di enam belas naskah**: *"jangan
+  membuat semuanya sebagai autonomous agent — sebagian lebih baik sebagai
+  deterministic/model services."* ⚠️ Tapi kriterianya tidak diberikan; saya
+  tulis empat baris, dan dengan itu **sepuluh dari dua belas** kemungkinan
+  service.
+- **B-27 / #88** — loop belajar §12.20 butuh **titik mulai**; sebelum ada galat
+  pertama tidak ada yang bisa dikalibrasi.
+
+### ⭐⭐⭐ Prinsip penutup — kontribusi konseptual terbesar naskah ini
+
+```
+Observed  ≠  Predicted  ≠  Simulated  ≠  Certain
+```
+
+Ia memperluas tangga §10.5 (*Perception → Interpretation → Inference*) ke sumbu
+**waktu**. Yang paling menentukan: **`Predicted ≠ Simulated`** — prediksi
+mengatakan *apa yang mungkin terjadi*; simulasi mengatakan *apa yang mungkin
+terjadi **jika** asumsinya berlaku*. Dan `Certain` di ujung **tanpa padanan**
+adalah pengakuan bahwa tidak ada keluaran sistem ini yang pernah masuk kategori
+itu.
+
+Lima naskah berturut-turut menutup dengan kalimat yang searah — n4 *"jangan
+menilai baik atau buruk"* · §8.46 · §9.41 · §11.63 · dan ini.
+
+### ✅ Yang diperiksa dan ternyata benar
+
+Rantai kausal §12.5 identik dengan naskah 4 §36 dan §9.17 (**tiga naskah**), dan
+bahasanya **melunak di tempat yang tepat** (*"repeated controlled experiments"*
+→ *"hubungan konsisten"*) · `Sleep → Energy → Focus` §12.6 membuat **E-16 jadi
+tiga lawan satu** · bobot utility berjumlah tepat 1,00 · tujuh horizon §12.13
+menyelesaikan **E-29/E-7** · peta 15 fase bertahan **naskah ketiga**.
+
+🛑 Tapi **V0–V6 tetap tidak disebut — naskah KEEMPAT berturut-turut** (#72).
+Empat naskah cukup lama untuk berhenti menyebutnya kelalaian.
+
+### Langkah berikutnya menurut pemilik
+
+**Phase 13 — HumanVerse Personal AI Operating System / HumanOS.**
+
+---
+
 ## Sesi 13 — 7 September 2026
 
 **Phase 11 direkam — dua tabrakan terberat ditutup, dan keputusan keempat tergerus.**

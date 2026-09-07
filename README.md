@@ -23,10 +23,10 @@ manusia + agent + data + knowledge + simulation + automation**.
 | Tahap | **Spesifikasi engineering siap** — belum ada kode (disengaja) |
 | Berkas kode | 0 |
 | Repo git | privat `xtheoputra/humanverse-xos`, branch `master` |
-| Dokumen | **174 berkas** di `docs/` (naskah + audit + catatan sesi) + **8 berkas** di `spec/` |
-| Naskah pemilik | **15** — terakhir: **Phase 11 Agentic Intelligence & Agency** |
-| Keputusan tertutup | **22 butir H** — nama · MVP · struktur repo · ambang konfirmasi · model memory · memory meluruh · gerbang policy · context package · peta 15 fase · **dua tangga R/L dipisahkan** · **manifest dipulihkan**. ⚠️ **H-13** ([#72](../../issues/72)) dan **H-11** ([#78](../../issues/78)) perlu ditinjau ulang |
-| Keputusan terbuka | **20 pertanyaan A** · **99 ketidakcocokan E** · **12 lubang G** |
+| Dokumen | **184 berkas** di `docs/` (naskah + audit + catatan sesi) + **8 berkas** di `spec/` |
+| Naskah pemilik | **16** — terakhir: **Phase 12 Digital Twin & World Simulation** |
+| Keputusan tertutup | **23 butir H** — nama · MVP · struktur repo · ambang konfirmasi · model memory · memory meluruh · gerbang policy · context package · peta 15 fase · dua tangga R/L · manifest dipulihkan · **model transisi belajar dari galat sendiri**. ⚠️ **H-13** ([#72](../../issues/72)) dan **H-11** ([#78](../../issues/78)) perlu ditinjau ulang |
+| Keputusan terbuka | **21 pertanyaan A** · **106 ketidakcocokan E** · **13 lubang G** |
 | Tanggal dokumen | 7 September 2026 |
 
 > ⚠️ **Nol baris kode itu disengaja — dan penghambatnya terus berkurang.**
@@ -47,14 +47,14 @@ manusia + agent + data + knowledge + simulation + automation**.
 
 ## 📌 Pekerjaan terbuka = GitHub Issues
 
-**83 issue** dalam 3 milestone — **16 ditutup**. Baca issue-nya, jangan analisis
+**89 issue** dalam 3 milestone — **17 ditutup**. Baca issue-nya, jangan analisis
 ulang naskahnya.
 
 | Milestone | Isi | Issue |
 |---|---|---|
 | **M1 — Keputusan sebelum kode** | 10 terbuka, 4 ditutup | [#1](../../issues/1)–[#9](../../issues/9), [#38](../../issues/38), [#58](../../issues/58)–[#59](../../issues/59), [#72](../../issues/72), [#80](../../issues/80) |
-| **M2 — Blueprint & Platform** | 43 terbuka, 10 ditutup | [#10](../../issues/10)–[#19](../../issues/19), [#26](../../issues/26)–[#37](../../issues/37), [#39](../../issues/39), [#41](../../issues/41)–[#45](../../issues/45), [#47](../../issues/47)–[#49](../../issues/49), [#51](../../issues/51), [#54](../../issues/54)–[#56](../../issues/56), [#60](../../issues/60)–[#70](../../issues/70), [#73](../../issues/73)–[#74](../../issues/74), [#77](../../issues/77)–[#79](../../issues/79), [#82](../../issues/82)–[#83](../../issues/83) |
-| **M3 — Sebelum ada pengguna nyata** | 14 terbuka, 2 ditutup | [#20](../../issues/20)–[#25](../../issues/25), [#40](../../issues/40), [#46](../../issues/46), [#50](../../issues/50), [#52](../../issues/52)–[#53](../../issues/53), [#57](../../issues/57), [#71](../../issues/71), [#75](../../issues/75)–[#76](../../issues/76), [#81](../../issues/81) |
+| **M2 — Blueprint & Platform** | 46 terbuka, 11 ditutup | [#10](../../issues/10)–[#19](../../issues/19), [#26](../../issues/26)–[#37](../../issues/37), [#39](../../issues/39), [#41](../../issues/41)–[#45](../../issues/45), [#47](../../issues/47)–[#49](../../issues/49), [#51](../../issues/51), [#54](../../issues/54)–[#56](../../issues/56), [#60](../../issues/60)–[#70](../../issues/70), [#73](../../issues/73)–[#74](../../issues/74), [#77](../../issues/77)–[#79](../../issues/79), [#82](../../issues/82)–[#84](../../issues/84), [#87](../../issues/87)–[#89](../../issues/89) |
+| **M3 — Sebelum ada pengguna nyata** | 16 terbuka, 2 ditutup | [#20](../../issues/20)–[#25](../../issues/25), [#40](../../issues/40), [#46](../../issues/46), [#50](../../issues/50), [#52](../../issues/52)–[#53](../../issues/53), [#57](../../issues/57), [#71](../../issues/71), [#75](../../issues/75)–[#76](../../issues/76), [#81](../../issues/81), [#85](../../issues/85)–[#86](../../issues/86) |
 
 ⚠️ **[#55](../../issues/55) meninjau ulang keputusan yang sudah ditutup:**
 monorepo final (H-10) tergerus oleh tiga pohon repo baru dari naskah 9, 10, 11.
@@ -73,7 +73,8 @@ Sprint 0 tugas 0.1 menunggu jawabannya.
 [#66](../../issues/66) peta fase **diganti**: 12 → **15 fase**, Agency→P11, Digital Twin→P12,
 Marketplace→P14 ·
 [#67](../../issues/67) **dua tangga dipisahkan** — `risk_level: R1` + `autonomy.max_level: L2` ·
-[#61](../../issues/61) manifest memulihkan `purpose` + `memory.read`/`write`.
+[#61](../../issues/61) manifest memulihkan `purpose` + `memory.read`/`write` ·
+[#70](../../issues/70) model transisi punya sumber — **galat prediksinya sendiri**.
 
 🛑 **Penghambat V0 yang tersisa — tiga:**
 [#3](../../issues/3) 12 fitur & 7 sprint dalam 4–6 minggu ·
@@ -98,9 +99,13 @@ menyebut tangga V sama sekali, dan **V0 tidak punya tempat di daftar 15 fase** �
 satu-satunya lingkup tertutup yang pernah ditetapkan. Ini H ketiga yang tergerus ·
 [#75](../../issues/75) pemantauan berkelanjutan di dalam rumah — izin `Always`; belum mengikat V0
 (tidak ada kamera), tapi on-device (§10.28) harus mendahului Vision ·
-🆕 [#80](../../issues/80) **V0 reaktif atau proaktif?** §11.41–§11.42 memberi komponen pertama
-yang bekerja sendiri tanpa diminta — dan izin lokasi, push notification, serta ambang confidence
-semuanya belum ada. Jawaban aman: **V0 reaktif**.
+[#80](../../issues/80) V0 reaktif atau proaktif? — jawaban aman: **V0 reaktif** ·
+🆕 [#86](../../issues/86) **sampai horizon berapa proyeksi boleh ditampilkan?** §12.13 memberi
+sampai **5 tahun**, dan horizon 3–5 tahun **tidak pernah masuk loop belajar** — satu-satunya
+keluaran yang tidak bisa dikalibrasi ·
+🆕 [#85](../../issues/85) **proyeksi masa depan = kelas data baru** yang paling diinginkan pihak
+ketiga; dan §12.22 memakai bobot utilitas yang **disimpulkan** untuk **memaksimalkan**, bukan
+lagi membandingkan.
 
 ---
 
