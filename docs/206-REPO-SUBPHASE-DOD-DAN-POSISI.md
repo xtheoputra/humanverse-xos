@@ -244,17 +244,12 @@ HumanVerse.
 
 ---
 
-## Catatan penomoran temuan
+## Catatan penomoran
 
-Temuan di seluruh berkas `198`–`206` **sengaja belum diberi nomor `E-`**. Saat
-naskah ini direkam, naskah keenam belas (Phase 12) masih di pohon kerja dan
-belum di-commit; nomor `E-` terakhirnya (`E-107`) belum final.
-
-Yang harus dikerjakan sesudah naskah 16 mendarat:
-
-1. Lipat temuan ini ke [`99-CATATAN-AUDIT.md`](99-CATATAN-AUDIT.md) dengan nomor
-   `E-` berikutnya.
-2. Perbarui `README.md` — jumlah dokumen, jumlah naskah, dan daftar naskah.
-3. Buat GitHub Issue untuk dua temuan terberat: **"Ask Every Time" vs R4=DENY**
-   (§13.10) dan **`Rollback` hilang** (§13.39) — keduanya menyentuh keselamatan
-   dan saling menguatkan.
+Temuan di seluruh berkas `198`–`206` **sudah dilipat** ke
+[`99-CATATAN-AUDIT.md`](99-CATATAN-AUDIT.md) sebagai `E-108`–`E-115`, dan
+`README.md` sudah diperbarui — dikerjakan setelah naskah keenam belas mendarat
+di `41f553b`. Dua yang terberat sudah jadi GitHub Issue:
+[#90](../../issues/90) (**E-108** — *Ask Every Time* membatalkan `R4 = DENY`
+dan `amount_limit: 0`) dan [#91](../../issues/91) (**E-109** — `Rollback`
+hilang dari Safety Kernel).

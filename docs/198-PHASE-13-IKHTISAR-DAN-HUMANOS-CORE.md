@@ -1,8 +1,8 @@
 # 198 — Phase 13: Ikhtisar & HumanOS Core (naskah ketujuhbelas)
 
-> Naskah ketujuh belas dari pemilik. Merekam **§13.1–§13.2**.
-> Berkas ini merekam kata pemilik apa adanya; catatan audit ditandai blockquote
-> ber-⭐/⚠️/🛑 dan **belum bernomor** — lihat catatan di kaki berkas.
+> Berkas ini merekam kata pemilik apa adanya (naskah ketujuhbelas, 7 Sep 2026).
+> Merekam **§13.1–§13.2**.
+> Koreksi dan keraguan ada di [`99-CATATAN-AUDIT.md`](99-CATATAN-AUDIT.md).
 
 ---
 
@@ -156,7 +156,7 @@ human-os/
 
 > 🛑 **Naskah ini memuat DUA pohon repositori `human-os/` yang BERBEDA, dan
 > keduanya ditulis sebagai satu-satunya.** §13.2 (di atas) memberi **17
-> direktori datar**; [§13.37](208-REPO-SUBPHASE-DOD-DAN-POSISI.md) memberi
+> direktori datar**; [§13.37](206-REPO-SUBPHASE-DOD-DAN-POSISI.md) memberi
 > **13 direktori bersarang**. Perbandingan lengkapnya ada di berkas itu.
 >
 > Yang paling berkonsekuensi: **`capability/`, `agency/`, dan `events/` ada di
@@ -176,13 +176,9 @@ human-os/
 
 ---
 
-## Catatan penomoran temuan
+## Catatan penomoran
 
-Temuan di berkas ini **sengaja belum diberi nomor `E-`**. Saat naskah ini
-direkam, naskah keenam belas (Phase 12) masih berada di pohon kerja dan belum
-di-commit — nomor `E-` terakhirnya (`E-107`) belum final. Memberi nomor sekarang
-berisiko bertabrakan.
-
-Yang harus dikerjakan sesudah naskah 16 mendarat: lipat temuan-temuan ini ke
-[`99-CATATAN-AUDIT.md`](99-CATATAN-AUDIT.md) dengan nomor `E-` berikutnya, dan
-perbarui `README.md`.
+Temuan di berkas `198`–`206` **sudah diberi nomor** `E-108`–`E-115` di
+[`99-CATATAN-AUDIT.md`](99-CATATAN-AUDIT.md) setelah naskah keenam belas
+(Phase 12) mendarat di `41f553b`. Dua temuan terberat sudah jadi GitHub Issue:
+[#90](../../issues/90) (**E-108**) dan [#91](../../issues/91) (**E-109**).
