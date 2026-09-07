@@ -1,139 +1,115 @@
-# Gerbang Skema — apa yang sebenarnya masih mengunci Engineering Spec
+# Gerbang Skema — tidak ada yang mengunci Engineering Spec
 
-> ⚠️ **Bukan kata pemilik.** Berkas ini menyusun ulang butir yang sudah ada di
-> [`99-CATATAN-AUDIT.md`](99-CATATAN-AUDIT.md) menjadi bentuk yang bisa
-> **diputuskan**, bukan menambah temuan baru.
+> ⚠️ **Bukan kata pemilik.** Berkas ini merekonsiliasi dua dokumen di repo ini
+> yang **saling bertentangan** tentang apakah pekerjaan terhalang.
 >
-> Disusun 7 September 2026, sesudah naskah 18.
+> 🔴 **Versi pertama berkas ini (7 Sep 2026, commit `58d026c`) SALAH** dan sudah
+> diganti seluruhnya. Lihat [bagian terakhir](#koreksi-atas-versi-pertama-berkas-ini).
 
 ---
 
-## Kenapa berkas ini ada
+## Dua dokumen, dua jawaban yang berlawanan
 
-`README.md` menyebut **empat butir** yang mengunci Engineering Spec *"karena
-keempatnya menentukan skema basis data"*. Daftar itu **sudah tidak akurat** —
-satu di antaranya sudah ditutup, dan satu lagi praktis tertutup, sementara dua
-sisanya justru **memburuk**.
-
-Selisih itu penting: pekerjaan yang tampak terhalang empat pintu sebenarnya
-terhalang dua.
-
-| Butir | Kata `README` | Keadaan sebenarnya di berkas audit |
-|---|---|---|
-| **E-39** memory: jenis atau nama scope | mengunci | ✅ **SUDAH DITUTUP** naskah 13 → **H-16**. Jawabannya **tiga sumbu tegak lurus**: `kind` · `scope` · `tier` |
-| **E-16** arah sebab-akibat | mengunci | ✅ **Praktis tertutup** — `Sleep → Energy → Focus` §12.6 cocok dengan naskah 3 dan naskah 9; kini **tiga lawan satu** |
-| **E-17 / E-18** node & relasi graf | mengunci | 🛑 **masih terbuka** |
-| **A-19** model angka pengguna | mengunci | 🛑 **masih terbuka, dan MEMBURUK** — kini **enam**, bukan lima |
-| **E-37** skala skoring | mengunci | 🛑 **masih terbuka, dan MEMBURUK** — Phase 13 menambah tabrakan skala **di dalam satu naskah** |
-
----
-
-## Gerbang 1 — A-19: enam model angka pengguna, nol rumus
-
-**Pertanyaannya satu kalimat:** angka mana yang kanonik untuk menggambarkan
-keadaan seorang pengguna, dan bagaimana ia dihitung?
-
-Yang sudah ada, tak satu pun saling merujuk dan tak satu pun berumus:
-
-| # | Model | Bentuk |
-|---|---|---|
-| 1 | *Human Genome of Behavior* | 6 skor |
-| 2 | *Profile Engine* | 5 atribut |
-| 3 | **`HumanState`** | 7 field (naskah 5 membuang `mood`) |
-| 4 | *Human Dashboard* | 7 batang |
-| 5 | `DigitalTwin` | 8 model |
-| 6 | **Energy Budget** §13.15 | anggaran harian 100, biaya per aktivitas |
-
-Yang keenam datang dari naskah 17 dan **lebih berbahaya daripada lima
-sebelumnya**, karena ia satu-satunya yang **menolak pekerjaan**: kalau angkanya
-salah, penjadwal akan menolak sesuatu yang sebenarnya sanggup dikerjakan, dan
-penggunanya mematikan fiturnya.
-
-**Usul:** jadikan **`HumanState`** satu-satunya yang disimpan — ia satu-satunya
-yang sudah punya bentuk tetap dan sudah dipakai lintas naskah — dan perlakukan
-lima lainnya sebagai **tampilan turunan**, bukan tabel. Setiap angka turunan
-wajib membawa `confidence`, sesuai **B-15/B-1** yang sudah ditutup.
-
-**Yang harus ditulis bersamaan:** satu rumus untuk `HumanState`, sekalipun
-sederhana. Angka tanpa produsen adalah utang yang bunganya dibayar saat
-pengguna pertama bertanya *"kenapa angkanya segitu?"*.
-
----
-
-## Gerbang 2 — E-17 / E-18: node dan relasi graf
-
-**Pertanyaannya dua kalimat:** simpul apa saja yang ada di graf, dan kosakata
-relasi mana yang berlaku?
-
-**E-17 — daftar node.** Naskah 2 menetapkan **10 node**. Rantai Layer 8 memakai
-`Energy`, `Productivity`, `Career` yang tidak ada di daftar itu. Naskah 4
-menambah `Goal`, `Milestone`, `Project`, `Skill`, `Wardrobe item`. Naskah 17
-menambah **Life Graph** dengan `HEALTH`/`CAREER`/`FINANCE` → `GOALS` →
-`PROJECTS` → `TASKS` → `ACTIONS` → `OUTCOMES`.
-
-**E-18 — kosakata relasi, tiga set yang terputus:**
-
-| Set | Contoh | Sifat |
-|---|---|---|
-| Naskah 2 | `improves` · `causes` · `influences` · `blocks` · `predicts` | **kausal** |
-| Naskah 3 (ontology) | `hasHabit` · `prefersStyle` | **struktural** |
-| Naskah 4 §9 | set ketiga | — |
-
-**Usul:** keduanya bukan pilihan yang saling meniadakan — mereka **dua jenis
-sisi di graf yang sama**. Relasi struktural (`hasHabit`) menjawab *"apa yang
-dimiliki pengguna"*; relasi kausal (`improves`) menjawab *"apa memengaruhi
-apa"*. Simpan sebagai **satu tabel sisi dengan kolom `kind`**, persis pola yang
-sudah dipakai dan diterima untuk memory di **H-16** (`kind`/`scope`/`tier`).
-
-Kalau pola itu sudah dipilih sekali dan berhasil, memakainya lagi lebih murah
-daripada memilih salah satu set dan membuang yang lain.
-
----
-
-## Gerbang 3 — E-37: skala skoring yang tidak sepadan
-
-**Pertanyaannya satu kalimat:** skor disimpan dalam skala apa?
-
-| Sumber | Skala |
+| Dokumen | Klaimnya |
 |---|---|
-| Naskah 2 | bobot persen, berjumlah **100 %** |
-| Naskah 3 | *Outfit Score* berjumlah **100 poin** |
-| Naskah 5 §11 | *Recommendation Score* **rata-rata 0–1** |
+| **`README.md`** (akar) | *"Yang **masih mengunci Engineering Spec** — karena keempatnya menentukan skema basis data: A-19 · E-16..E-18 · E-39 · E-37."* |
+| **`spec/README.md`** | *"**Artinya V0 bisa dimulai sekarang.** Yang tersisa sebagai penghambat nyata hanyalah **#3** dan **#20** — keduanya bukan soal skema."* |
 
-Naskah 17 memburukkannya dengan cara baru: **energi ditulis tiga skala di dalam
-satu naskah** — `Energy > 0.7` (§13.11), `Daily Energy = 100` (§13.15), dan
-`Energy 72%` di layar utama (§13.29). Itu **E-115**.
+Yang benar adalah **`spec/README.md`**. Ia bahkan punya bagian tersendiri —
+*"Empat keputusan yang mengunci skema — dan cara saya menanganinya"* — yang
+menyelesaikan keempatnya satu per satu, dan alasannya bisa diperiksa langsung di
+DDL.
 
-**Usul:** **`0–1`**, dan alasannya bukan selera:
-
-1. §12.21 sudah membuktikan bobot **berjumlah tepat 1,00** (0,30+0,25+0,20+0,15+0,10) dan §9.25 sepakat — jadi skala itu sudah dipakai benar di dua tempat.
-2. Persen dan poin adalah **cara menampilkan**, bukan cara menyimpan. `0,72` bisa ditampilkan sebagai `72 %`; `72 poin` tidak bisa dikembalikan jadi rasio tanpa tahu pembaginya.
-3. Ia satu-satunya skala yang bisa bersanding dengan `confidence` tanpa membingungkan — keduanya `0–1`.
-
-⚠️ Catatan yang tidak boleh hilang: rumus §11 menyebut **7 komponen** sementara
-contohnya memakai **5** (*Occasion Fit* dan *Availability* tidak muncul), dan
-belum ada bobot. Memilih skala **tidak** menyelesaikan itu.
+Yang dibaca orang lebih dulu adalah yang salah.
 
 ---
 
-## Yang TIDAK ada di berkas ini
+## Bukti di DDL, bukan di prosa
 
-**A-17** — V0 bertambah 2 fitur jadi 12 sementara waktunya tetap 4–6 minggu.
-Itu keputusan **cakupan**, bukan keputusan **skema**; ia tidak menghalangi satu
-baris DDL pun. Ia tetap terbuka dan tetap penting, tapi ia bukan gerbang yang
-sama.
+### #32 / E-37 — skala skoring: **sudah dipilih**
+
+`spec/01-DATABASE-SCHEMA.md`:
+
+```sql
+score            numeric(4,3) CHECK (score BETWEEN 0 AND 1),
+score_breakdown  jsonb NOT NULL DEFAULT '{}'::jsonb,
+confidence       numeric(4,3) CHECK (confidence BETWEEN 0 AND 1),
+scoring_version  text NOT NULL DEFAULT 'v1',
+```
+
+**`0–1`, ditegakkan `CHECK`, dengan `confidence` bersanding dan `scoring_version`
+supaya rumusnya boleh berubah tanpa migrasi.** Alasan yang ditulis
+`spec/README.md` tepat: skala 100-poin dan persen **lossless** dikonversi ke
+0–1; sebaliknya tidak.
+
+Yang **masih** terbuka dari E-37 bukan soal penyimpanan, melainkan **rumusnya**:
+§11 menyebut 7 komponen sementara contohnya memakai 5, dan belum ada bobot. Itu
+tidak menghalangi satu baris DDL pun — `score_breakdown jsonb` menampung bentuk
+apa pun.
+
+### #2 / A-19 — model angka pengguna: **sengaja tidak diputuskan**
+
+```sql
+CREATE TABLE human_states (
+  ...
+  metrics       jsonb NOT NULL DEFAULT '{}'::jsonb,
+  model_version text NOT NULL,
+  UNIQUE (user_id, for_date, model_version)
+);
+```
+
+Bukan tujuh kolom tetap. Tiap metrik menyimpan
+`{value, confidence, evidence_count, model_version}` sesuai Confidence Layer.
+`UNIQUE` yang menyertakan `model_version` berarti **enam model boleh hidup
+berdampingan** — termasuk *Energy Budget* §13.15 yang baru datang di naskah 17.
+
+Model mana pun yang akhirnya dipilih **tidak butuh migrasi**. Itu bukan
+penundaan; itu keputusan bahwa pertanyaannya belum matang dan skemanya tidak
+boleh menyandera jawabannya.
+
+### #7 / E-16..E-18 — model graf: **tidak menyentuh V0**
+
+`spec/01` punya **nol tabel graf** — dan itu disengaja. V0 adalah *modular
+monolith* PostgreSQL + Redis; **Neo4j baru masuk V2**.
+
+Butir ini memblokir **V2**, bukan spesifikasi ini.
+
+### #33 / E-39 — memory: **ditutup**
+
+Issue **#33 sudah CLOSED**, dan jawabannya dua kolom karena keduanya menjawab
+hal berbeda: `kind` = *bagaimana* memori disimpan & diambil; `scope` = *siapa*
+boleh membacanya. Naskah 13 §9.7 menambahkan sumbu ketiga `tier` → **H-16**.
 
 ---
 
-## Ringkasnya
+## Penghambat V0 yang sebenarnya
 
-Dua gerbang tertutup atau praktis tertutup. **Tiga pertanyaan tersisa**, dan
-ketiganya bisa dijawab tanpa naskah baru:
+Keduanya **bukan soal skema**, dan keduanya butuh tangan pemilik:
 
-1. **`HumanState` jadi satu-satunya yang disimpan?** (A-19)
-2. **Satu tabel sisi dengan kolom `kind`?** (E-17/E-18)
-3. **Skor disimpan `0–1`?** (E-37)
+| Issue | Isi | Kenapa hanya pemilik |
+|---|---|---|
+| **[#3](../../issues/3)** — A-17 | Siapa yang mengerjakan V0 dalam 4–6 minggu, sesudah cakupannya naik jadi 12 fitur | Soal waktu dan orang, bukan teknis |
+| **[#20](../../issues/20)** — C-5 | Cek ketersediaan merek, domain, dan nama paket `HumanVerse XOS` | Butuh pencarian merek dan pembelian |
 
-Ketiganya sudah punya pola yang terbukti di repo ini sendiri — `kind`/`scope`/`tier`
-dari H-16, dan bobot berjumlah 1,00 dari §12.21. Tidak ada yang perlu ditemukan;
-yang perlu hanya diputuskan.
+---
+
+## Koreksi atas versi pertama berkas ini
+
+Versi pertama menyimpulkan **"TIGA pertanyaan tersisa, bukan empat"** dan
+menyusun usul untuk ketiganya. Kesimpulan itu **terlalu tinggi**, dan usulnya
+menjawab pertanyaan yang **sudah dijawab**.
+
+Sebabnya bisa disebut persis: saya memeriksa `99-CATATAN-AUDIT.md` dan
+`README.md`, **tetapi tidak memeriksa `spec/README.md`** — berkas yang seluruh
+tugasnya justru menjawab pertanyaan itu. Dua dari tiga usul saya
+(`0–1` untuk skor, dan menampung banyak model tanpa migrasi) ternyata **sudah
+ada di DDL**, ditulis lebih dulu dan dengan alasan yang lebih baik.
+
+Ini kesalahan yang bentuknya sama persis dengan yang saya temukan di
+`README.md`: **percaya pada daftar ringkasan alih-alih memeriksa sumbernya.**
+Saya menemukannya di dokumen orang lain lalu mengulanginya di dokumen sendiri,
+dalam sesi yang sama.
+
+Aturan yang layak dipegang sesudah ini: **sebelum menyatakan sesuatu terhalang,
+buka berkas yang paling berkepentingan membantahnya.** Di repo ini, untuk
+apa pun yang menyangkut skema, berkas itu adalah `spec/`.

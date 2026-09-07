@@ -74,7 +74,7 @@ Itu persis bentuk artefak yang sudah ada di [`../spec/`](../spec/README.md) untu
 
 ## Sesi 16 — 7 September 2026
 
-**Daftar penghambat Engineering Spec ternyata salah: TIGA pertanyaan, bukan empat.**
+**Daftar penghambat Engineering Spec ternyata salah — dan koreksi pertama saya JUGA salah. Kenyataannya: TIDAK ADA yang mengunci.**
 
 | Hal | Hasil |
 |---|---|
@@ -104,6 +104,30 @@ Pekerjaan yang tampak terhalang empat pintu sebenarnya terhalang dua.
 3. **Skor disimpan `0–1`?** — §12.21 sudah membuktikan bobot berjumlah 1,00; persen dan poin adalah cara *menampilkan*, bukan *menyimpan*.
 
 **A-17 sengaja dikeluarkan** dari daftar gerbang: ia keputusan **cakupan**, bukan **skema**, dan tidak menghalangi satu baris DDL pun.
+
+### 🔴 Koreksi dalam sesi yang sama: saya mengulang kesalahan yang baru saya temukan
+
+Kesimpulan pertama — *"tiga pertanyaan tersisa"* — **terlalu tinggi**. Sebabnya bisa disebut persis: saya memeriksa `99-CATATAN-AUDIT.md` dan `README.md`, **tetapi tidak memeriksa [`spec/README.md`](../spec/README.md)** — berkas yang seluruh tugasnya justru menjawab pertanyaan itu.
+
+Berkas itu punya bagian tersendiri, *"Empat keputusan yang mengunci skema — dan cara saya menanganinya"*, dan menutupnya dengan **"Artinya V0 bisa dimulai sekarang."**
+
+Buktinya ada di DDL, bukan di prosa:
+
+| Butir | Kata saya | Kenyataan di `spec/01` |
+|---|---|---|
+| **#32** skala skor | masih terbuka, usul `0–1` | **sudah** `numeric(4,3) CHECK (score BETWEEN 0 AND 1)` + `confidence` + `scoring_version` |
+| **#2** model angka | masih terbuka, usul `HumanState` kanonik | **sengaja tidak diputuskan** — `metrics jsonb` + `model_version`; enam model hidup berdampingan tanpa migrasi |
+| **#7** model graf | masih terbuka | **tidak menyentuh V0** — Neo4j baru V2 |
+
+Dua dari tiga usul saya **sudah ada di DDL**, ditulis lebih dulu dan dengan alasan yang lebih baik — khususnya *"100-poin dan persen lossless dikonversi ke 0–1; sebaliknya tidak."*
+
+**Bentuk kesalahannya sama persis dengan yang saya temukan di `README.md`:** percaya pada daftar ringkasan alih-alih memeriksa sumbernya. Ditemukan di dokumen orang lain, lalu diulang di dokumen sendiri, dalam sesi yang sama.
+
+Aturan sesudah ini: **sebelum menyatakan sesuatu terhalang, buka berkas yang paling berkepentingan membantahnya.**
+
+### Penghambat V0 yang sebenarnya
+
+Cuma dua, dan keduanya bukan soal skema: **#3** (siapa mengerjakan 12 fitur dalam 4–6 minggu) dan **#20** (cek merek, domain, nama paket).
 
 ### Catatan
 

@@ -35,19 +35,21 @@ manusia + agent + data + knowledge + simulation + automation**.
 > enam** (A-10), **V0–V6 sebagai rencana kanonik** (A-18), dan **Confidence
 > Layer** untuk angka taksiran (B-15/B-1).
 >
-> Yang **masih mengunci Engineering Spec** — **TIGA pertanyaan, bukan empat.**
-> Daftar lama sudah tidak akurat: **E-39 sudah DITUTUP** (naskah 13 → H-16:
-> `kind`/`scope`/`tier`) dan **E-16 praktis tertutup** (tiga lawan satu).
-> Yang tersisa, dan dua di antaranya **memburuk**:
-> **A-19** (kini **enam** model angka pengguna, tak satu pun berumus) ·
-> **E-17/E-18** (node & kosakata relasi graf) ·
-> **E-37** (skala skoring — naskah 17 menambah tiga skala energi di dalam SATU naskah).
-> Ditambah **A-17** — V0 bertambah 2 fitur jadi 12, waktunya tetap 4–6 minggu;
-> itu keputusan **cakupan**, bukan skema, jadi ia bukan gerbang yang sama.
+> ✅ **TIDAK ADA yang mengunci Engineering Spec.** Daftar "empat penghambat" di
+> versi lama README ini **salah**, dan [`spec/README.md`](spec/README.md) sudah
+> membantahnya sejak awal — lengkap dengan cara tiap butir ditangani di DDL:
+> **#32** skala skor → `numeric(4,3) CHECK BETWEEN 0 AND 1` + `scoring_version` ·
+> **#2** model angka → `metrics jsonb` + `model_version` (enam model boleh
+> hidup berdampingan, tanpa migrasi) · **#7** model graf → **tidak menyentuh V0**,
+> Neo4j baru di V2 · **#33** memory → **sudah ditutup** (`kind` + `scope`, plus
+> `tier` dari H-16).
 >
-> 🔑 **Ketiganya disusun jadi bentuk yang bisa diputuskan di
-> [`docs/GERBANG-SKEMA.md`](docs/GERBANG-SKEMA.md)** — lengkap dengan usul yang
-> memakai pola yang sudah terbukti di repo ini sendiri.
+> 🛑 **Penghambat V0 yang sebenarnya cuma dua, dan keduanya bukan soal skema:**
+> **[#3](../../issues/3)** (siapa mengerjakan 12 fitur dalam 4–6 minggu) dan
+> **[#20](../../issues/20)** (cek merek, domain, nama paket).
+>
+> 🔑 Rekonsiliasi lengkap kedua dokumen ada di
+> [`docs/GERBANG-SKEMA.md`](docs/GERBANG-SKEMA.md).
 
 ---
 
