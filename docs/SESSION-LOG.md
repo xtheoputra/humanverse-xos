@@ -4,6 +4,133 @@
 
 ---
 
+## Sesi 12 — 7 September 2026
+
+**Phase 10 direkam — peta fase diganti, dan V0 kehilangan tempatnya.**
+
+| Hal | Hasil |
+|---|---|
+| Naskah baru | **Phase 10: Multimodal Intelligence & Perception**, §10.1–§10.41 |
+| Dokumen ditambah | **11 berkas** (`165`–`175`) |
+| Dokumen total | 151 → **162** di `docs/`, + 8 di `spec/` |
+| Berkas kode | tetap **0** |
+| Issue | 71 → **77** (63 terbuka, 14 ditutup); **#66** ditutup |
+
+### ✅ A-26 ditutup → H-20: petanya **diganti**, bukan digeser
+
+Dua belas fase menjadi **lima belas**. Tiga blok akhirnya punya rumah:
+**Agency → Phase 11** (menjawab kapan **B-19**/#47 diuji) · **Digital Twin →
+Phase 12** · **Marketplace → Phase 14** (rumah untuk A-15/C-7).
+
+### 🛑🛑 Tapi jawabannya menggerus H-13 — dan ini H **ketiga** yang tergerus
+
+**A-18** ditutup sebagai **H-13** karena naskah 5 memakai tangga V dari awal
+sampai akhir dan **tidak menyebut Phase 1/2/3 satu kali pun**. Naskah 13 dan 14
+sekarang tidak menyebut **V0–V6** sama sekali, dan §10.41 memberi lima belas
+fase sebagai urutan besar pekerjaan.
+
+🔴 **V0 tidak punya tempat di dalamnya** — padahal V0 adalah satu-satunya
+lingkup tertutup yang pernah ditetapkan (12 fitur, 23 tabel, 51 tugas).
+*"Phase 1–4 Foundation"* tidak memetakan ke sana. Setelah **H-8** (dibatalkan)
+dan **H-10** (monorepo), polanya jelas: **keputusan yang ditutup perlu ditinjau
+ulang tiap beberapa naskah.** → **E-87** / #72.
+
+### 🛑 Empat blok peta lama tanpa rumah baru — termasuk seluruh lapisan bisnis
+
+*Subscription* dan *Revenue Platform* tidak muncul di satu pun dari lima belas
+fase, bersama *Team Workspace*, *Enterprise Admin*, *Family Mode*, dan **Company
+Wellness**. Sementara **H-6** mengakui biaya inferensi berlipat, **A-6** masih
+terbuka, dan **E-41** mencatat `Billing` muncul entah dari mana.
+
+**Model biaya yang diakui, nol fase pendapatan.** → **A-27** / #73.
+
+### 🛑 Empat belas event persepsi tidak muat di tabel `events`
+
+Tiga alasan, semuanya bisa diperiksa terhadap `spec/01`:
+
+1. **`source` tidak punya nilainya** — `CHECK (... 'app','agent','integration',
+   'backfill')`, tidak ada `sensor`. Setiap event persepsi ditolak constraint.
+2. **Volumenya 3–4 orde lebih besar** — `PersonDetected` pada 1 Hz = **86.400
+   per hari**; §10.22 menuntut 30 hari ⇒ **≈2,6 juta baris** untuk satu
+   pengguna, satu kamera, satu jenis event.
+3. **`idempotency_key` kehilangan artinya** — untuk aliran bingkai satu-satunya
+   pembeda adalah waktunya.
+
+⭐ **Jawabannya ada di naskah itu sendiri, hanya tidak disambungkan:** §10.10
+mengubah lima bingkai jadi **satu** event, §10.11 mengubah 5.400 pembacaan jadi
+**satu** kalimat. → **E-89** / #74.
+
+### 🛑 Pemantauan berkelanjutan — dan izin `Always` yang ditambahkan karena fiturnya membutuhkannya
+
+§10.11 mengukur **90 menit**, §10.25 mengukur **118 menit**, §10.22 menuntut
+**30 hari**. Tak satu pun bisa dicapai dengan izin *while using*; ketiganya
+**hanya berjalan pada `Always`** — opsi yang tidak pernah ada di naskah 4 §15
+maupun §8.37.
+
+Jadi opsi paling invasif bukan pilihan tambahan melainkan **prasyarat**.
+Bedanya dengan **C-1** bukan derajat melainkan jenis: C-1 tentang kategori data
+khusus di dalam sebuah gambar; ini tentang **kehadiran dan perilaku seseorang di
+rumahnya sendiri yang terus dicatat**. → **C-17** / #75.
+
+⭐ Jawabannya sudah ada — §10.28 (`Privacy Filtering` **di perangkat**) — tapi
+§10.37 menempatkan Vision di M10.2 dan on-device di **tidak satu pun milestone**.
+
+### 🛑 AetherScan: keputusan batasnya benar, konsekuensi izinnya belum ditulis
+
+§10.40 memposisikan proyek pemilik yang lain sebagai **penyedia sensor**, bukan
+sistem yang digabung — ⭐ keputusan yang benar dan penting diambil sekarang.
+Catatan pertama tentang AetherScan di seluruh repo.
+
+Tapi RF/Wi-Fi sensing berbeda jenis dari kamera: **tanpa indikator aktif, tidak
+bisa ditutup, bekerja dalam gelap, menembus dinding**. Ia menangkap **siapa pun
+di jangkauan** — tamu, anak, tetangga di balik dinding — tanpa satu pun bisa
+menyadarinya. **C-10** berhenti jadi masalah masa depan. → **C-18** / #76.
+
+### Temuan lain
+
+- **B-25** — pengulangan menyaring kesalahan **acak** dan **memperkuat**
+  kesalahan **sistematis**. §10.22 membuat **B-17** berlaku untuk setiap aliran
+  persepsi, dan di sini kesalahannya tidak sekadar mengendap — ia naik pangkat
+  jadi pola. ⭐ Bentuk jawabannya sudah ada: kalibrasi sensor terhadap laporan
+  pengguna, prinsip yang sama dengan `Prediction Calibration` §9.34.
+- **G-11** — tiga belas tool persepsi tanpa `risk_level`, dan itu memperlihatkan
+  lubang di tangganya sendiri: **tangga risiko mengukur akibat aksi, bukan
+  sensitivitas data yang disentuh**. `habit.complete` (menulis satu baris) =
+  risk 2; `vision.analyze_scene()` (membaca isi kamar tidur) = tanpa angka.
+- **E-88** — nama event PascalCase, konvensi **ketiga** setelah #38 ditutup.
+  ⭐ Tapi yang ini mudah diperbaiki: `ImageCaptured` → `image.captured`.
+- **E-90** — pohon tingkat-atas **ketujuh** (`multimodal/`), lima foldernya
+  menduplikasi pohon lain. Enam naskah berturut-turut menyentuh struktur repo.
+- **E-91** — `M10.1`–`M10.10` bertabrakan dengan milestone GitHub repo ini
+  sendiri (M1/M2/M3). ⭐ Tapi awalannya membawa fase — praktik 2 dari 3.
+- ⭐ **Model Router KEMBALI** (§10.29 + §10.34) — separuh **E-79**/#69 terjawab.
+  ⚠️ Tapi sekarang ada dua perutean dan hanya satu punya rumah: *modality* vs
+  *effort* (§9.20 Fast/Cognitive/High-stakes).
+- ⭐ **§10.25 Provenance mengembalikan alasan yang tersimpan** — separuh
+  **E-75**/#64 terjawab, dan bentuknya lebih baik dari kalimat bebas karena
+  berantai sampai ke sumbernya.
+- ⭐ **§10.5 Perception / Interpretation / Inference** — sumbangan konseptual
+  terbesar naskah ini: **jarak sebuah klaim dari datanya** sebagai sifat yang
+  berdiri sendiri. Ia menjelaskan **B-15** (`"energy": 0.62` terlihat sama
+  presisinya dengan `"steps": 8420`), dan menuntut ambang confidence yang
+  **berbeda per tingkat**.
+
+### ✅ Yang diperiksa dan ternyata benar
+
+Delapan komponen Digital Twin §10.32 **identik dengan naskah 4 §25** (diperiksa
+satu per satu) · enam jenis memory H-16 **tidak bertambah** — delapan baris
+§10.23 adalah `modality`, sumbu **keempat** yang tegak lurus, bukan taksonomi
+keenam · bentuk `{value, confidence}` dipertahankan utuh · batas *"bukan
+mind-reading, bukan clone manusia"* dipegang di naskah kelima berturut-turut.
+
+### Langkah berikutnya menurut pemilik
+
+**Phase 11 — Autonomous Agent & Agency Layer**: merencanakan, memakai tools,
+menjalankan workflow, berkolaborasi antar-agent, meminta izin, mengambil
+tindakan terbatas, mengamati hasilnya, belajar dari outcome.
+
+---
+
 ## Sesi 11 — 7 September 2026
 
 **Phase 9 direkam — empat butir lama ditutup sekaligus, dan satu tabrakan

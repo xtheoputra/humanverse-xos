@@ -23,10 +23,10 @@ manusia + agent + data + knowledge + simulation + automation**.
 | Tahap | **Spesifikasi engineering siap** — belum ada kode (disengaja) |
 | Berkas kode | 0 |
 | Repo git | privat `xtheoputra/humanverse-xos`, branch `master` |
-| Dokumen | **151 berkas** di `docs/` (naskah + audit + catatan sesi) + **8 berkas** di `spec/` |
-| Naskah pemilik | **13** — terakhir: **Phase 9 Human Intelligence & Cognitive Architecture** |
-| Keputusan tertutup | **19 butir H** — nama · MVP · struktur repo · rencana kanonik V0–V6 · ambang konfirmasi · **model memory** · **memory meluruh** · **gerbang policy di runtime** · **context package** |
-| Keputusan terbuka | **19 pertanyaan A** · **84 ketidakcocokan E** · **10 lubang G** |
+| Dokumen | **162 berkas** di `docs/` (naskah + audit + catatan sesi) + **8 berkas** di `spec/` |
+| Naskah pemilik | **14** — terakhir: **Phase 10 Multimodal Intelligence & Perception** |
+| Keputusan tertutup | **20 butir H** — nama · MVP · struktur repo · ambang konfirmasi · model memory · memory meluruh · gerbang policy · context package · **peta 15 fase**. ⚠️ **H-13 (rencana kanonik V0–V6) perlu ditinjau ulang** — lihat [#72](../../issues/72) |
+| Keputusan terbuka | **19 pertanyaan A** · **92 ketidakcocokan E** · **11 lubang G** |
 | Tanggal dokumen | 7 September 2026 |
 
 > ⚠️ **Nol baris kode itu disengaja — dan penghambatnya terus berkurang.**
@@ -47,14 +47,14 @@ manusia + agent + data + knowledge + simulation + automation**.
 
 ## 📌 Pekerjaan terbuka = GitHub Issues
 
-**71 issue** dalam 3 milestone — **13 ditutup**. Baca issue-nya, jangan analisis
+**77 issue** dalam 3 milestone — **14 ditutup**. Baca issue-nya, jangan analisis
 ulang naskahnya.
 
 | Milestone | Isi | Issue |
 |---|---|---|
-| **M1 — Keputusan sebelum kode** | 8 terbuka, 4 ditutup | [#1](../../issues/1)–[#9](../../issues/9), [#38](../../issues/38), [#58](../../issues/58)–[#59](../../issues/59) |
-| **M2 — Blueprint & Platform** | 39 terbuka, 7 ditutup | [#10](../../issues/10)–[#19](../../issues/19), [#26](../../issues/26)–[#37](../../issues/37), [#39](../../issues/39), [#41](../../issues/41)–[#45](../../issues/45), [#47](../../issues/47)–[#49](../../issues/49), [#51](../../issues/51), [#54](../../issues/54)–[#56](../../issues/56), [#60](../../issues/60)–[#70](../../issues/70) |
-| **M3 — Sebelum ada pengguna nyata** | 11 terbuka, 2 ditutup | [#20](../../issues/20)–[#25](../../issues/25), [#40](../../issues/40), [#46](../../issues/46), [#50](../../issues/50), [#52](../../issues/52)–[#53](../../issues/53), [#57](../../issues/57), [#71](../../issues/71) |
+| **M1 — Keputusan sebelum kode** | 9 terbuka, 4 ditutup | [#1](../../issues/1)–[#9](../../issues/9), [#38](../../issues/38), [#58](../../issues/58)–[#59](../../issues/59), [#72](../../issues/72) |
+| **M2 — Blueprint & Platform** | 41 terbuka, 8 ditutup | [#10](../../issues/10)–[#19](../../issues/19), [#26](../../issues/26)–[#37](../../issues/37), [#39](../../issues/39), [#41](../../issues/41)–[#45](../../issues/45), [#47](../../issues/47)–[#49](../../issues/49), [#51](../../issues/51), [#54](../../issues/54)–[#56](../../issues/56), [#60](../../issues/60)–[#70](../../issues/70), [#73](../../issues/73)–[#74](../../issues/74), [#77](../../issues/77) |
+| **M3 — Sebelum ada pengguna nyata** | 13 terbuka, 2 ditutup | [#20](../../issues/20)–[#25](../../issues/25), [#40](../../issues/40), [#46](../../issues/46), [#50](../../issues/50), [#52](../../issues/52)–[#53](../../issues/53), [#57](../../issues/57), [#71](../../issues/71), [#75](../../issues/75)–[#76](../../issues/76) |
 
 ⚠️ **[#55](../../issues/55) meninjau ulang keputusan yang sudah ditutup:**
 monorepo final (H-10) tergerus oleh tiga pohon repo baru dari naskah 9, 10, 11.
@@ -69,7 +69,9 @@ Sprint 0 tugas 0.1 menunggu jawabannya.
 [#33](../../issues/33) memory = **tiga sumbu** `kind`/`scope`/`tier` ·
 [#50](../../issues/50) Identity Memory **meluruh**, tidak permanen ·
 [#42](../../issues/42) `POLICY_CHECK` masuk rantai percakapan ·
-[#62](../../issues/62) agent tidak mengambil data — **context package**.
+[#62](../../issues/62) agent tidak mengambil data — **context package** ·
+[#66](../../issues/66) peta fase **diganti**: 12 → **15 fase**, Agency→P11, Digital Twin→P12,
+Marketplace→P14.
 
 🛑 **Penghambat V0 yang tersisa — tiga:**
 [#3](../../issues/3) 12 fitur & 7 sprint dalam 4–6 minggu ·
@@ -89,7 +91,12 @@ sudah ada) ·
 🆕 [#67](../../issues/67) **dua tangga 0–4 yang terbalik di ujung atas** — otonomi “Level 4”
 (bertindak sendiri) vs risiko “R4” (wajib konfirmasi); belum mengikat V0 karena tidak ada tool
 di atas level 2, tapi harus diselesaikan sebelum tangga mana pun masuk basis data ·
-🆕 [#66](../../issues/66) peta fase naskah 8 sudah tidak berlaku untuk Phase 9 ke atas.
+🆕 [#72](../../issues/72) **rencana kanonik: V0–V6 atau Phase 1–15?** Naskah 13 & 14 tidak
+menyebut tangga V sama sekali, dan **V0 tidak punya tempat di daftar 15 fase** — padahal V0
+satu-satunya lingkup tertutup yang pernah ditetapkan. Ini H ketiga yang tergerus ·
+🆕 [#75](../../issues/75) **pemantauan berkelanjutan di dalam rumah** — izin `Always` yang
+ditambahkan karena fiturnya membutuhkannya; belum mengikat V0 (tidak ada kamera), tapi
+on-device (§10.28) harus mendahului Vision, bukan menyusul.
 
 ---
 
