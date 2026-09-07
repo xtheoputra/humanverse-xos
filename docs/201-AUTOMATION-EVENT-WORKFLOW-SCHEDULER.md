@@ -76,6 +76,40 @@ RecommendationAccepted
 RecommendationRejected
 ```
 
+> 🛑🛑 **E-116 — 15 event PascalCase: naskah KEEMPAT berturut-turut melanggar
+> [#38](../../issues/38), dan DELAPAN di antaranya SUDAH ADA di `spec/03`.**
+>
+> Setelah prosa naskah 12 (**E-70**), PascalCase naskah 14 (**E-88**), dan
+> PascalCase naskah 15 (**E-98**). Yang membuat yang keempat berbeda kelas:
+> sebelumnya tabrakannya antar-dokumen visi; kali ini ia menabrak **kontrak
+> yang sudah ditulis**.
+>
+> **Lima identik, hanya beda huruf:** `goal.created` ↔ `GoalCreated` ·
+> `habit.completed` ↔ `HabitCompleted` · `workout.completed` ↔
+> `WorkoutCompleted` · `sleep.started` ↔ `SleepStarted` · `meeting.started` ↔
+> `MeetingStarted`.
+>
+> **Tiga BUKAN sekadar beda huruf — kata kerjanya berbeda untuk kejadian yang
+> sama:**
+>
+> | `spec/03` | naskah 17 | Selisihnya |
+> |---|---|---|
+> | `sleep.completed` | **`SleepEnded`** | `completed` vs `Ended` |
+> | `meeting.completed` | **`MeetingEnded`** | `completed` vs `Ended` |
+> | `mood.logged` | **`MoodChanged`** | `logged` vs `Changed` |
+>
+> Ini **kosakata kedua**, bukan gaya penulisan kedua. Kalau keduanya
+> dikodekan, satu kejadian punya dua event.
+>
+> ⚠️ **Separuh kedua #38 juga diambil ke sisi non-spec:** §13.24 menulis
+> `/v1/intents`, sedangkan [`spec/04`](../spec/04-API-CONTRACTS.md) menyatakan
+> basisnya `/api/v1`. Naskah 17 karena itu berlawanan dengan spesifikasi pada
+> **kedua** separuh butir itu.
+>
+> 🛑 Dengan kata #38 sendiri: *“nama event **tidak boleh diganti setelah
+> dipakai**. Begitu event pertama tersimpan di tabel `events`, mengganti
+> namanya berarti migrasi data historis atau kehilangan riwayat perilaku.”*
+
 > ⭐⭐ **`RecommendationAccepted` / `RecommendationRejected` adalah dua event
 > paling berharga di daftar ini.** Keduanya menutup gelang umpan balik: tanpa
 > mereka, sistem tidak pernah tahu sarannya berguna atau tidak. **B-19**

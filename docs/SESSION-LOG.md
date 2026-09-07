@@ -15,7 +15,7 @@
 | Dokumen total | 184 → **193** di `docs/`, + 8 di `spec/` |
 | Berkas kode | tetap **0** |
 | Issue | 89 → **91** (74 terbuka, 17 ditutup); **#90** dan **#91** baru |
-| Temuan | **E-108**–**E-115** · delapan butir **F** |
+| Temuan | **E-108**–**E-116** · delapan butir **F** |
 
 ### 🛑🛑🛑 Dua pengaman dilepas, dan keduanya bersenyawa
 
@@ -37,6 +37,18 @@ Digabung, keduanya menghasilkan keadaan yang persis ingin dicegah §11.15:
 - **E-111** — **dua pohon `human-os/` di naskah yang sama** (§13.2 = 17 direktori datar; §13.37 = 13 bersarang). Tiga hilang tanpa penampung: `capability/`, `agency/`, `events/` — padahal §13.9 menjadikan Capability primitif keamanan inti dan §13.12 menjadikan Event Bus arsitekturnya.
 - **E-113** — **`H13.x` adalah huruf KEENAM**, dan ia bertabrakan dengan penomoran berkas audit sendiri: `H-13` (butir keputusan) vs `H13.1` (sub-fase), beda satu tanda hubung.
 - **E-114** — **"HumanOS" kini punya arti ketiga**, dan dua di antaranya adalah tahap di dua rencana kanonik yang sedang bertabrakan: **V5 = HumanOS** (V0–V6) vs **Phase 13 = HumanOS** (peta 15 fase). Kalau V0–V6 masih berlaku, naskah ini pada dasarnya spesifikasi **V5**. 🛑 V0–V6 tetap tidak disebut, **naskah kelima berturut-turut**.
+
+### 🛑 Sapuan kedua menemukan E-116 — dan ini yang pertama menabrak spesifikasi
+
+Sapuan pertama memakai tiga dari empat teknik yang paling berbuah di repo ini. Sapuan kedua memakai yang keempat — **cari daftar yang IDENTIK di dua naskah, jangan banding labelnya** — dan langsung berbuah.
+
+§13.12 memberi **15 event, semuanya PascalCase**: pelanggaran [#38](../../issues/38) yang **keempat berturut-turut** (sesudah E-70, E-88, E-98). Tapi yang membuatnya berbeda kelas: **delapan di antaranya sudah ada di `spec/03`** — kontrak yang sudah ditulis, bukan dokumen visi.
+
+Lima identik modulo huruf. **Tiga bukan sekadar beda huruf:** `sleep.completed` ↔ **`SleepEnded`**, `meeting.completed` ↔ **`MeetingEnded`**, `mood.logged` ↔ **`MoodChanged`**. Itu kosakata kedua — kalau keduanya dikodekan, satu kejadian punya dua event.
+
+Separuh kedua #38 juga diambil ke sisi non-spec: §13.24 memakai `/v1/…`, `spec/04` menyatakan `/api/v1`.
+
+Bukti lengkapnya dikirim sebagai komentar di [#38](../../issues/38), karena butir itu memang keputusan yang menunggu — dan #38 sendiri memperingatkan bahwa nama event **tidak boleh diganti setelah dipakai**.
 
 ### ⭐ Yang justru bertahan — delapan butir F
 
