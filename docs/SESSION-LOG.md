@@ -4,6 +4,130 @@
 
 ---
 
+## Sesi 22 — 8 September 2026
+
+**Phase 19 direkam — dan naskahnya merujuk peta fase yang tidak pernah ada, sambil memperbaiki cara peta itu diubah.**
+
+| Hal | Hasil |
+|---|---|
+| Naskah baru | **Phase 19: Scientific Discovery Engine**, §19.1–§19.34 |
+| Dokumen ditambah | **10 berkas** (`256`–`265`) |
+| Dokumen total | 243 → **253** di `docs/`, + 8 di `spec/` |
+| Berkas kode | tetap **0** |
+| Issue | 130 → **138** (118 terbuka, 20 ditutup); **#131**–**#138** baru |
+| Temuan | **A-34** · **B-37** · **C-29** · **E-144**–**E-147** · **G-18** · dua belas butir **F** |
+
+### 🛑🛑🛑 Temuan terbesar: peta yang dirujuk tidak punya berkas
+
+Naskah 23 membuka dengan *“roadmap **20 fase** yang sudah kita tetapkan
+sebelumnya”*, lalu mengubah isi **Phase 19** (Civilization Intelligence →
+Scientific Discovery Engine) dan memindahkan Civilization ke **Phase 20**.
+
+```
+grep -rioE "dua puluh fase|20 fase|phase 20" docs/ spec/ README.md
+→ 0
+```
+
+Nomor fase tertinggi yang pernah disebut adalah **Phase 19** — dengan isi
+**berbeda**, dari naskah 22. Yang pernah ditulis cuma **v1** (15 fase, §10.41)
+dan **v2** (terbuka-ujung).
+
+⇒ Ini **akibat yang E-128/[#108](../../issues/108) ramalkan**, bukan kekeliruan
+mengingat: peta terbuka-ujung tanpa versi melahirkan rujukan balik ke rencana
+yang tidak bisa dibuka. **Ketika tidak ada dokumen untuk memeriksa *“apa yang
+sudah kita tetapkan”*, yang tersisa cuma ingatan — dan ingatan tidak bisa
+di-`grep`.** → **E-144** / [#132](../../issues/132), **A-34** /
+[#133](../../issues/133).
+
+### ⭐⭐⭐⭐ Tapi ini juga perubahan peta PERTAMA yang diumumkan dengan alasannya
+
+Pemilik menyatakan ia mengubah sesuatu, memberi alasannya (*agar Phase 19 tidak
+tumpang tindih dengan Phase 18* — benar secara teknis: §18.4 sudah menelan
+`scientific publications`), menunjukkan susunan barunya, dan menyebut **Phase 20
+sebagai fase TERAKHIR**. Empat hal yang tak satu pun ada pada
+§10.41→SpatialOS (**E-123**, yang mematahkan **H-20**) maupun tiga perpanjangan
+sesudahnya. Ini persis yang [#101](../../issues/101) minta — dan **ujung pertama
+yang dinyatakan sejak §10.41**. Yang perlu tinggal: **tuliskan kedua puluh
+fasenya sebagai daftar di satu berkas.**
+
+### 🛑🛑🛑 Keselamatan terakhir untuk naskah KEEMPAT — dan kali ini menggerakkan materi fisik
+
+§19.22 menyebut Ethics Governance ***“komponen wajib”***; §19.33 menaruhnya di
+`S19.10`, terakhir dari sepuluh.
+
+| Naskah | Milestone | Posisi |
+|---|---|---|
+| 20 | `R16.10` | terakhir dari 10 — [#111](../../issues/111) |
+| 21 | `H17.12` | di luar MVP — [#116](../../issues/116) |
+| 22 | — | tidak ada — [#121](../../issues/121) |
+| **23** | **`S19.10`** | **terakhir dari 10** |
+
+🔴 Yang menjadikannya kelas tersendiri: **§19.15 Digital Laboratory**
+(`robotic pipette` · `liquid handler` · `experiment scheduler`) — *“HumanVerse
+**mengirimkan protocol** ke lab automation”*. **Satu-satunya tempat di 23 naskah
+di mana HumanVerse menggerakkan materi fisik atas dasar kesimpulannya sendiri**,
+dan tiga pengaman absen: `ACTION GATEWAY`/`GOVERNANCE MESH` (naskah **kelima**
+berturut tanpanya), `Confirmation` (**H-15**), dan §19.22 sendiri — yang tidak
+berdiri di rantai mana pun. → **C-29** / [#131](../../issues/131).
+
+⭐⭐⭐⭐ **Jawabannya ditulis pemilik sendiri dua bagian sebelumnya**, §19.23:
+***“Semakin tinggi risiko, semakin ketat governance”*** — kalimat yang sama
+dengan penutup §17.56. **Naskah ini memuat aturannya dan pelanggarannya
+sekaligus**, dan karena prinsip itu kini muncul di **dua naskah terpisah**, ia
+berhenti menjadi tafsir dan menjadi posisi pemiliknya.
+
+### ⭐⭐⭐⭐⭐ §19.17 menutup separuh #121 — usul satu naskah lalu, dipakai
+
+**G-17** mengusulkan: *“konsensus hanya menyatukan hal yang sumbernya sepakat;
+ketidaksepakatan naik ke pengguna sebagai ketidaksepakatan.”* §19.17 memberi
+`Debate → **Consensus** → **Remaining Disagreement**` — bukan memilih di antara
+keduanya, melainkan **mengeluarkan keduanya**. Lebih baik daripada usulnya.
+⚠️ Sisa: G18.8 sendiri belum diperbaiki.
+
+Bersamanya, sebelas butir **F** lain — di antaranya **§19.20 *“sitasi harus
+nyata, tidak boleh mengarang referensi”*** (larangan pada KELUARAN, jenis yang
+bisa diuji) · **§19.10** menuliskan kekeliruan menegaskan konsekuen dengan BENAR
+lalu menolaknya · **§19.25 mengembalikan registri model** yang naskah 22
+hilangkan ([#127](../../issues/127)), lebih lengkap dari aslinya (`bias`,
+`limitations`) · **§19.14 `Distribution`** memperbaiki `31+46+23=100` §18.10 ·
+**§19.19 `seed tercatat`** · **§19.3 *“Berbeda dengan World Knowledge Graph”*** —
+pertama kalinya sebuah naskah MENDAHULUI tabrakan penamaan.
+
+### 🔴 AetherScan naik pangkat lagi — satu naskah sesudah diturunkan
+
+§18.13 menurunkannya menjadi *“salah satu spatial sensing provider, bukan bagian
+inti”*, dan saya mencatatnya sebagai butir **F berbintang empat** karena ia
+keputusan pemilik yang **mengurangi cakupan**. Satu naskah kemudian §19.30
+memberi **`scientific-discovery/labs/aetherscan/`**.
+
+⇒ **Ini H-8 dalam bentuk terbaliknya**, dan pelajarannya baru: **keputusan yang
+MEMPERKECIL cakupan juga perlu diperiksa ulang di naskah berikutnya — ia tidak
+lebih tahan daripada keputusan yang memperbesar.** Dicatat sekaligus sebagai
+koreksi atas penilaian saya sendiri. → **E-147** / [#136](../../issues/136).
+
+### ⚠️ Sisanya
+
+**§19.1 *“Posisi dalam Arsitektur HumanVerse”* KOSONG** — ketiga kalinya, dan
+ketiganya jenis yang sama (§15.1 → #103, §16.33 → #113); justru di fase yang
+paling banyak bertumpang tindih. Plus **empat butir DoD tanpa milestone**,
+termasuk `provenance` — kemunduran dari `G18.1` naskah 22 yang menaruhnya
+**pertama**. → **G-18** / [#137](../../issues/137).
+
+**§19.27 membalik DUA urutan yang naskahnya sendiri tetapkan**: hipotesis
+sebelum literatur (§19.2 memberi kebalikannya) dan eksperimen sebelum simulasi
+(§19.13 membuka dengan *“Simulation sebelum eksperimen”*). → [#136](../../issues/136).
+
+**Rantai provenance kedua kehilangan `Transformation` dan `Policy`** — tepat dua
+mata yang menjadikan §18.21 berbintang empat; `Evidence Ranking` kini di **tiga**
+tempat; kosakata risiko jadi **empat**. → **E-146** / [#135](../../issues/135).
+
+**`scientific-discovery/` = H-10 kesembilan**, pohon keamanan jadi **sepuluh**,
+dan `governance/` naskah 22 **tidak diwarisi** — pembuktian langsung atas
+keberatan [#129](../../issues/129), satu naskah kemudian.
+→ **E-145** / [#138](../../issues/138).
+
+---
+
 ## Sesi 21 — 8 September 2026
 
 **Phase 18 direkam — dan Safety Kernel yang naskahnya sendiri sebut “sangat penting” tidak punya milestone sama sekali.**
