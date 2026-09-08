@@ -4,6 +4,160 @@
 
 ---
 
+## Sesi 21 — 8 September 2026
+
+**Phase 18 direkam — dan Safety Kernel yang naskahnya sendiri sebut “sangat penting” tidak punya milestone sama sekali.**
+
+| Hal | Hasil |
+|---|---|
+| Naskah baru | **Phase 18: Global Intelligence Network**, §18.1–§18.34 |
+| Dokumen ditambah | **10 berkas** (`246`–`255`) |
+| Dokumen total | 233 → **243** di `docs/`, + 8 di `spec/` |
+| Berkas kode | tetap **0** |
+| Issue | 114 → **130** (110 terbuka, 20 ditutup); **#115**–**#120** menutup utang Sesi 20, **#121**–**#130** baru |
+| Temuan | **A-33** · **B-35**–**B-36** · **C-27**–**C-28** · **E-138**–**E-143** · **G-17** · tujuh butir **F** |
+
+### 🛑 Utang Sesi 20 dibayar lebih dulu — dan urutannya tidak bisa dibalik
+
+Sesi 20 menulis sepuluh dokumen dan 107 baris audit, lalu **berhenti sebelum
+membuat issue-nya, menulis catatan sesi, dan commit**. Akibatnya **14 tautan
+menggantung di 7 berkas**: dokumen sudah menulis `#115`–`#120`, sementara GitHub
+masih berhenti di 114.
+
+Nomor issue GitHub diberikan **berurutan dan tidak bisa dipilih**. Kalau naskah
+22 diproses lebih dulu dan membuat issue apa pun, keenam nomor itu terpakai dan
+ke-14 tautan **patah permanen**. Jadi #115–#120 dibuat lebih dulu, satu per satu,
+sesuai pemetaan yang sudah saling-rujuk konsisten di dalam dokumennya sendiri
+(C-25 menunjuk B-33 sebagai #116, B-33 menunjuk C-25 sebagai #115).
+
+→ Verifikasi akhir: **109 nomor issue dirujuk seluruh `docs/`, nol menggantung**,
+dan **seluruh 16 issue baru dirujuk dokumen**.
+
+### 🛑🛑🛑 Keselamatan turun untuk naskah KETIGA — dan lintasannya tetap
+
+| Naskah | Milestone keselamatan | Posisi |
+|---|---|---|
+| 20 (Phase 16) | `R16.10` | terakhir dari 10 — #111 |
+| 21 (Phase 17) | `H17.12` | di luar MVP — #116 |
+| **22 (Phase 18)** | **—** | **tidak ada sama sekali** |
+
+§18.22 Global Intelligence Safety Kernel tidak muncul di sepuluh milestone
+§18.32 maupun di 21 butir DoD §18.33. `G18.5 Information Integrity` mencakup
+**§18.23**, bukan §18.22 — keduanya menjawab pertanyaan yang berbeda:
+*“apakah informasi ini benar”* lawan *“apakah masukan ini menyerang saya”*.
+
+Ditambah **empat butir DoD tanpa milestone**: `privacy boundaries` ·
+`governance` · `agent trust/reputation` · dan Safety Kernel yang bahkan tak masuk
+DoD. Pengulangan persis **B-33** (#116) — naskah kedua berturut-turut.
+→ **G-17** / #121.
+
+### 🛑🛑🛑 `productivity` atas `People` adalah larangan §8.10 yang datang sebagai fitur
+
+§8.10 menyebut tiga tujuan terlarang secara harfiah: `advertising` ·
+`insurance scoring` · **`employment scoring`**. §18.12 menaruh `productivity`
+paling depan di delapan analisis, dan `People` paling depan di sembilan komponen
+organisasi.
+
+Lebih berat dari **C-12** (#46): Phase 17 sudah menambahkan `recovery_score`,
+`training_load`, `stress`, dan `sleep` ke sistem yang sama.
+
+🔴 Dan **seluruh model persetujuan dua puluh dua naskah terbalik di bagian ini
+tanpa disebut**: di semua fase sebelumnya yang membayar dan yang datanya dipakai
+adalah orang yang sama — itu yang membuat `consent`, `purpose`, dan Privacy
+Center masuk akal. Organization Intelligence memperkenalkan pihak ketiga:
+**organisasi pelanggannya, karyawan subjek datanya**. → **C-27** / #122.
+
+### 🛑🛑 Tangga kausal KEDUA — lima tingkat, satu naskah sesudah empat tingkat
+
+§17.9 memberi empat tingkat dan menutup **E-81** (#7), butir tertua di repo ini,
+dengan aturan: **hanya `Causal evidence` yang boleh menjadi dasar rekomendasi.**
+§18.9 menambahkan **`Causal Conclusion`** di atasnya ⇒ aturan itu berhenti bisa
+dibaca.
+
+Pola **ketiga** pada sumbu berbeda (**E-77**/H-21 · **E-133**/#117 · di sini) —
+dan yang ini **paling tajam sebab jaraknya SATU naskah**. → **E-138** / #124.
+
+### ⭐ Yang paling berharga: gerbangnya ADA, cuma tidak dipasang
+
+§18.30 Query Engine (sepuluh langkah) dan §18.10 Simulation keduanya berakhir di
+pengguna **tanpa `Safety`, `Policy`, maupun `Risk`** — rantai kelima yang
+begitu. Tetapi berbeda dari **E-117**/**E-124**/**E-130**, di sini gerbangnya
+**ada di naskah yang sama** (§18.22), dua belas bagian sebelumnya.
+
+⇒ Ini **masalah perkabelan, bukan rancangan**, dan karenanya jauh lebih murah.
+→ **E-143** / #125.
+
+### ⭐⭐⭐⭐⭐ `UNRESOLVED` sebagai keluaran yang sah — belum pernah ada
+
+§18.23 mengizinkan sistem **berhenti tanpa jawaban**: *“Conflict detected ·
+confidence 0.61 · Status: UNRESOLVED”*. Setiap mekanisme keyakinan sebelumnya
+berakhir dengan **memilih**. Ini yang paling berlawanan dengan tekanan produk,
+dan yang paling menaikkan kelayakan dipercaya.
+
+Bersamanya: **§18.24 memisahkan `Probability` dari `Confidence`** dan menambah
+`Horizon` (klaimnya bisa diperiksa ketika 90 hari lewat) · **§18.32 urutan
+roadmap terbaik dalam lima naskah** (`provenance` di milestone pertama,
+Information Integrity mendahului semua yang menalar) · **§18.31 contoh terbaik
+di 22 naskah** (memisahkan sebab dunia dari sebab perilaku) · **§18.15 rantai
+keamanan terlengkap di sembilan naskah** · **§18.13 menurunkan pangkat
+AetherScan** — keputusan pemilik yang **mengurangi** cakupan, jenis paling
+jarang di repo ini.
+
+### ⚠️ Peta fase diperpanjang KEEMPAT kali — Phase 19 Civilization Intelligence
+
+naskah 19 → Phase 16 · naskah 20 → Phase 17 · naskah 21 → Phase 18 ·
+**naskah 22 → Phase 19**. Usul **E-128** (#108) — beri versi pada peta fase —
+berhenti menjadi kerapian dan menjadi syarat agar sebuah dokumen bisa menyebut
+rencana mana yang dipakainya. → **E-142**.
+
+Dan `global-intelligence/` menggerus **H-10 untuk kedelapan kalinya** (pohon
+keamanan jadi **sembilan**; `protocols/` dan `provenance/` muncul **dua kali di
+dalam pohon yang sama**). ⭐ Tapi **`governance/` akhirnya muncul** — pertama
+kali sejak diminta di naskah 18 — sayangnya **di dalam pohon fase**, sehingga ia
+tidak bisa mengatur `robotics/`, `health-bio/`, maupun `agents/`.
+→ **E-139** / #129.
+
+---
+
+## Sesi 20 — 7 September 2026
+
+**Phase 17 direkam — fase paling sensitif dari semuanya, dan naskah yang paling banyak menjawab butir lama.**
+
+> ⚠️ **Sesi ini berhenti sebelum menutup diri.** Sepuluh dokumen dan 107 baris
+> audit ditulis, tetapi **issue-nya tidak dibuat, catatan sesi tidak ditulis, dan
+> tidak ada commit** — sehingga 14 tautan ke `#115`–`#120` menggantung sampai
+> Sesi 21 membayarnya. Baris di bawah ini direkonstruksi dari berkasnya.
+
+| Hal | Hasil |
+|---|---|
+| Naskah baru | **Phase 17: Human Health & Bio Intelligence**, §17.1–§17.56 |
+| Dokumen ditambah | **10 berkas** (`236`–`245`) |
+| Dokumen total | 223 → **233** di `docs/`, + 8 di `spec/` |
+| Berkas kode | tetap **0** |
+| Issue | direncanakan **#115**–**#120** — baru benar-benar dibuat di Sesi 21 |
+| Temuan | **B-33**–**B-34** · **C-25**–**C-26** · **E-133**–**E-137** · empat butir **F** berbintang empat |
+
+### ⭐⭐⭐⭐ Naskah yang paling banyak menutup butir lama
+
+**§17.9 menutup E-81** — butir tertua di repo ini — dengan **empat tingkat
+bukti**, dan menutupnya lebih baik daripada usul saya. **§17.38 mengembalikan
+`Risk Engine` ke rantai** untuk pertama kalinya sejak §11.14, sesudah tujuh
+rantai berturut-turut kehilangannya, ditambah `Evidence Check` yang belum pernah
+ada di mana pun. **§17.36–§17.37 memberi metrik evaluasi model PERTAMA di
+seluruh repo** (sepuluh metrik, *“accuracy saja tidak cukup”*), dengan
+`data availability` sebagai sumbu bias yang paling tajam dan paling jarang
+dipikirkan.
+
+### 🛑 Tetapi keselamatan dikeluarkan dari MVP
+
+`H17.12 Health Safety & Governance` tidak ada di jalur MVP §17.53, sementara
+§17.54 **menuntut** `escalation`, `emergency`, dan `audit` sebagai kriteria
+selesai. → **B-33** / #116. Dan **Mental Health Safety Layer §17.17** — yang
+batasnya benar — kehilangan ketiga hal yang menentukan apakah ia bekerja.
+→ **C-25** / #115.
+
+---
+
 ## Sesi 19 — 7 September 2026
 
 **Phase 16 direkam — fase yang paling mungkin melukai orang, dan kata “risk” tidak muncul satu kali pun di dalamnya.**

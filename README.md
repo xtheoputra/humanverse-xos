@@ -23,11 +23,11 @@ manusia + agent + data + knowledge + simulation + automation**.
 | Tahap | **Spesifikasi engineering siap** — belum ada kode (disengaja) |
 | Berkas kode | 0 |
 | Repo git | privat `xtheoputra/humanverse-xos`, branch `master` |
-| Dokumen | **223 berkas** di `docs/` (naskah + audit + catatan sesi) + **8 berkas** di `spec/` |
-| Naskah pemilik | **20** — terakhir: **Phase 16 Robotics & Embodied Intelligence** (35 bagian) |
-| Keputusan tertutup | **24 butir H** — nama · MVP · struktur repo · ambang konfirmasi · model memory · memory meluruh · gerbang policy · context package · peta 15 fase · dua tangga R/L · manifest dipulihkan · **model transisi belajar dari galat sendiri** · **monetisasi punya fase (Phase 14)**. 🛑 **H-20 PATAH, dan petanya kini TERBUKA-UJUNG** — naskah 19 mengumumkan **Phase 16**, naskah 20 mengumumkan **Phase 17** ([#101](../../issues/101), [#108](../../issues/108)). ⚠️ **H-13** ([#72](../../issues/72)) dan **H-11** ([#78](../../issues/78)) juga perlu ditinjau ulang |
-| Keputusan terbuka | **23 pertanyaan A** · **131 ketidakcocokan E** · **16 lubang G** |
-| Tanggal dokumen | 7 September 2026 |
+| Dokumen | **243 berkas** di `docs/` (naskah + audit + catatan sesi) + **8 berkas** di `spec/` |
+| Naskah pemilik | **22** — terakhir: **Phase 18 Global Intelligence Network** (34 bagian) |
+| Keputusan tertutup | **24 butir H** — nama · MVP · struktur repo · ambang konfirmasi · model memory · memory meluruh · gerbang policy · context package · peta 15 fase · dua tangga R/L · manifest dipulihkan · **model transisi belajar dari galat sendiri** · **monetisasi punya fase (Phase 14)**. 🛑 **H-20 PATAH, dan petanya TERBUKA-UJUNG** — **empat naskah berturut-turut masing-masing menambah satu fase** di kalimat penutupnya: naskah 19 → **Phase 16**, naskah 20 → **Phase 17**, naskah 21 → **Phase 18**, naskah 22 → **Phase 19 Civilization Intelligence** ([#101](../../issues/101), [#108](../../issues/108)). ⚠️ **H-13** ([#72](../../issues/72)) dan **H-11** ([#78](../../issues/78)) juga perlu ditinjau ulang |
+| Keputusan terbuka | **24 pertanyaan A** · **142 ketidakcocokan E** · **17 lubang G** |
+| Tanggal dokumen | 8 September 2026 |
 
 > ⚠️ **Nol baris kode itu disengaja — dan penghambatnya terus berkurang.**
 > Lima naskah sudah menjawab: **nama** (A-7), **MVP** (A-2), **struktur repo**
@@ -55,21 +55,27 @@ manusia + agent + data + knowledge + simulation + automation**.
 
 ## 📌 Pekerjaan terbuka = GitHub Issues
 
-**114 issue** dalam 3 milestone — **20 ditutup**. Baca issue-nya, jangan analisis
+**130 issue** dalam 3 milestone — **20 ditutup**. Baca issue-nya, jangan analisis
 ulang naskahnya.
 
 | Milestone | Isi | Issue |
 |---|---|---|
-| **M1 — Keputusan sebelum kode** | 23 terbuka, 5 ditutup | [#1](../../issues/1)–[#9](../../issues/9), [#38](../../issues/38), [#58](../../issues/58)–[#59](../../issues/59), [#72](../../issues/72), [#80](../../issues/80), [#90](../../issues/90)–[#93](../../issues/93), [#98](../../issues/98)–[#101](../../issues/101), [#103](../../issues/103), [#105](../../issues/105), [#108](../../issues/108), [#111](../../issues/111)–[#113](../../issues/113) |
-| **M2 — Blueprint & Platform** | 51 terbuka, 13 ditutup | [#10](../../issues/10)–[#19](../../issues/19), [#26](../../issues/26)–[#37](../../issues/37), [#39](../../issues/39), [#41](../../issues/41)–[#45](../../issues/45), [#47](../../issues/47)–[#49](../../issues/49), [#51](../../issues/51), [#54](../../issues/54)–[#56](../../issues/56), [#60](../../issues/60)–[#70](../../issues/70), [#73](../../issues/73)–[#74](../../issues/74), [#77](../../issues/77)–[#79](../../issues/79), [#82](../../issues/82)–[#84](../../issues/84), [#87](../../issues/87)–[#89](../../issues/89), [#94](../../issues/94), [#96](../../issues/96)–[#97](../../issues/97), [#106](../../issues/106)–[#107](../../issues/107), [#109](../../issues/109)–[#110](../../issues/110) |
-| **M3 — Sebelum ada pengguna nyata** | 20 terbuka, 2 ditutup | [#20](../../issues/20)–[#25](../../issues/25), [#40](../../issues/40), [#46](../../issues/46), [#50](../../issues/50), [#52](../../issues/52)–[#53](../../issues/53), [#57](../../issues/57), [#71](../../issues/71), [#75](../../issues/75)–[#76](../../issues/76), [#81](../../issues/81), [#85](../../issues/85)–[#86](../../issues/86), [#95](../../issues/95), [#102](../../issues/102), [#104](../../issues/104), [#114](../../issues/114) |
+| **M1 — Keputusan sebelum kode** | 27 terbuka, 5 ditutup | [#1](../../issues/1)–[#9](../../issues/9), [#38](../../issues/38), [#58](../../issues/58)–[#59](../../issues/59), [#72](../../issues/72), [#80](../../issues/80), [#90](../../issues/90)–[#93](../../issues/93), [#98](../../issues/98)–[#101](../../issues/101), [#103](../../issues/103), [#105](../../issues/105), [#108](../../issues/108), [#111](../../issues/111)–[#113](../../issues/113) |
+| **M2 — Blueprint & Platform** | 58 terbuka, 13 ditutup | [#10](../../issues/10)–[#19](../../issues/19), [#26](../../issues/26)–[#37](../../issues/37), [#39](../../issues/39), [#41](../../issues/41)–[#45](../../issues/45), [#47](../../issues/47)–[#49](../../issues/49), [#51](../../issues/51), [#54](../../issues/54)–[#56](../../issues/56), [#60](../../issues/60)–[#70](../../issues/70), [#73](../../issues/73)–[#74](../../issues/74), [#77](../../issues/77)–[#79](../../issues/79), [#82](../../issues/82)–[#84](../../issues/84), [#87](../../issues/87)–[#89](../../issues/89), [#94](../../issues/94), [#96](../../issues/96)–[#97](../../issues/97), [#106](../../issues/106)–[#107](../../issues/107), [#109](../../issues/109)–[#110](../../issues/110) |
+| **M3 — Sebelum ada pengguna nyata** | 25 terbuka, 2 ditutup | [#20](../../issues/20)–[#25](../../issues/25), [#40](../../issues/40), [#46](../../issues/46), [#50](../../issues/50), [#52](../../issues/52)–[#53](../../issues/53), [#57](../../issues/57), [#71](../../issues/71), [#75](../../issues/75)–[#76](../../issues/76), [#81](../../issues/81), [#85](../../issues/85)–[#86](../../issues/86), [#95](../../issues/95), [#102](../../issues/102), [#104](../../issues/104), [#114](../../issues/114) |
 
 ⚠️ **[#55](../../issues/55) meninjau ulang keputusan yang sudah ditutup:**
-monorepo final (H-10) kini tergerus **enam kali** — tiga pohon dari naskah 9/10/11,
-**enam** dari naskah 18, **`spatial-os/`** dari naskah 19, dan **`robotics/`** dari
-naskah 20 — sehingga pohon keamanan menjadi **lima** (`security/` ·
-`agent-security/` · `spatial-os/safety/` · `spatial-os/privacy/` ·
-`robotics/safety/`) dan aturan impor §8.42 tidak lagi bisa dinyatakan.
+monorepo final (H-10) kini tergerus **delapan kali** — tiga pohon dari naskah
+9/10/11, **enam** dari naskah 18, **`spatial-os/`** (naskah 19), **`robotics/`**
+(naskah 20), **`health-bio/`** (naskah 21, [#120](../../issues/120)), dan
+**`global-intelligence/`** (naskah 22, [#129](../../issues/129)) — sehingga pohon
+keamanan menjadi **sembilan** (`security/` · `agent-security/` ·
+`spatial-os/safety/` · `spatial-os/privacy/` · `robotics/safety/` ·
+`health-bio/safety/` · `health-bio/privacy/` · `global-intelligence/security/` ·
+`global-intelligence/privacy/`) dan aturan impor §8.42 tidak lagi bisa dinyatakan.
+**Sepuluh naskah berturut-turut menyentuh struktur repo.** ⭐ `governance/`
+akhirnya muncul di naskah 22 — tetapi **di dalam pohon fase**, sehingga ia tidak
+bisa mengatur `robotics/`, `health-bio/`, maupun `agents/`.
 🛑 Naskah 20 bahkan memberi struktur repo **dua kali di dalam satu naskah**
 ([#109](../../issues/109)).
 Sprint 0 tugas 0.1 menunggu jawabannya.
@@ -253,6 +259,28 @@ Selengkapnya: [`docs/75-URUTAN-PEMBANGUNAN-V0-V6.md`](docs/75-URUTAN-PEMBANGUNAN
              safety kernel · safe zones · simulation-first
              "Intelligence becomes embodied." — satu AI, banyak tubuh
              ⚠️ mengumumkan Phase 17 → peta terbuka-ujung (#108)
+     │
+  NASKAH 21  Phase 17 — Human Health & Bio             berkas 236–245
+             Intelligence
+             56 bagian · Health Digital Twin · Health Vault
+             tidur/recovery · nutrisi · stress · anomali & forecast
+             rekam medis · federasi · model registry · bias engine
+             ⭐ Health Safety Kernel — rantai pertama dengan Risk
+                DAN Evidence Check; metrik evaluasi model PERTAMA
+             "HumanVerse tidak boleh menjadi AI dokter yang serba tahu."
+             🛑 Safety & Governance di LUAR MVP ([#116](../../issues/116))
+     │
+  NASKAH 22  Phase 18 — Global Intelligence Network    berkas 246–255
+             34 bagian · World Model · World Knowledge Graph
+             HINP · federasi knowledge/agent · collective intelligence
+             trust vector · provenance · global risk · early warning
+             organization & city intelligence · marketplace
+             ⭐⭐ `UNRESOLVED` sebagai KELUARAN yang sah (§18.23) —
+                pertama kalinya sistem boleh berhenti tanpa jawaban
+             "HumanVerse tidak mengontrol dunia."
+             🛑 Safety Kernel §18.22 TANPA milestone ([#121](../../issues/121))
+             🛑 `productivity` atas `People` = larangan §8.10 ([#122](../../issues/122))
+             ⚠️ mengumumkan Phase 19 → perpanjangan KEEMPAT (#101)
 ```
 
 > ℹ️ Penomoran berkas melewati 99. `99-CATATAN-AUDIT.md` tetap di tempatnya
