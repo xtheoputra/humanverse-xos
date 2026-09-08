@@ -23,7 +23,7 @@ manusia + agent + data + knowledge + simulation + automation**.
 | Tahap | **Spesifikasi engineering siap** — belum ada kode (disengaja) |
 | Berkas kode | 0 |
 | Repo git | privat `xtheoputra/humanverse-xos`, branch `master` |
-| Dokumen | **263 berkas** di `docs/` (naskah + audit + catatan sesi) + **8 berkas** di `spec/` |
+| Dokumen | **264 berkas** di `docs/` (naskah + audit + catatan sesi) + **8 berkas** di `spec/` |
 | Naskah pemilik | **24** — terakhir: **Phase 20 Civilization Platform** (39 bagian) — **fase TERAKHIR** |
 | Keputusan tertutup | **24 butir H** — nama · MVP · struktur repo · ambang konfirmasi · model memory · memory meluruh · gerbang policy · context package · peta 15 fase · dua tangga R/L · manifest dipulihkan · **model transisi belajar dari galat sendiri** · **monetisasi punya fase (Phase 14)**. 🛑 **H-20 PATAH, dan petanya TERBUKA-UJUNG** — **empat naskah berturut-turut masing-masing menambah satu fase** di kalimat penutupnya: naskah 19 → **Phase 16**, naskah 20 → **Phase 17**, naskah 21 → **Phase 18**, naskah 22 → **Phase 19 Civilization Intelligence**. ⭐ **Naskah 23 MEMBALIKKAN polanya sebagian** — ia mengubah Phase 19 menjadi *Scientific Discovery Engine*, memindahkan Civilization ke **Phase 20**, dan **mengumumkan perubahan itu beserta alasannya**: pertama kalinya dalam lima naskah, dan ia menyebut **Phase 20 sebagai fase TERAKHIR**. 🛑 Tapi ia menyandarkannya pada *“roadmap 20 fase yang sudah kita tetapkan sebelumnya”* — yang **tidak pernah ada** ([#132](../../issues/132), [#133](../../issues/133), [#101](../../issues/101), [#108](../../issues/108)). ⚠️ **H-13** ([#72](../../issues/72)) dan **H-11** ([#78](../../issues/78)) juga perlu ditinjau ulang |
 | Keputusan terbuka | **26 pertanyaan A** · **150 ketidakcocokan E** · **19 lubang G** |
@@ -179,7 +179,7 @@ Selengkapnya: [`docs/75-URUTAN-PEMBANGUNAN-V0-V6.md`](docs/75-URUTAN-PEMBANGUNAN
 
 ---
 
-## Dua puluh naskah
+## Dua puluh empat naskah
 
 ```
   NASKAH 1   HumanOS — visi & 12 modul manusia          berkas 01–07
@@ -331,269 +331,49 @@ Selengkapnya: [`docs/75-URUTAN-PEMBANGUNAN-V0-V6.md`](docs/75-URUTAN-PEMBANGUNAN
 
 ## Aturan berkas dokumen
 
-1. Berkas `01`–`235` merekam **kata pemilik apa adanya**. Susunannya dirapikan,
+1. Berkas `01`–`275` merekam **kata pemilik apa adanya**. Susunannya dirapikan,
    isinya tidak ditambah-tambahi. Bagian yang hilang di naskah **ditandai
    sebagai hilang**, bukan ditambal.
 2. Setiap keraguan, koreksi, risiko, atau usulan dari pihak lain (termasuk AI)
    masuk ke `99-CATATAN-AUDIT.md` — **tidak pernah disisipkan** ke berkas visi.
 3. Kalau pemilik memutuskan sesuatu, keputusan itu **naik** ke berkas visi yang
    sesuai, lalu butirnya turun ke bagian **H** di berkas audit.
+4. Empat berkas **bukan** rekaman naskah:
+   [`00-DAFTAR-ISI.md`](docs/00-DAFTAR-ISI.md) (dibangun dari isi direktori),
+   [`99-CATATAN-AUDIT.md`](docs/99-CATATAN-AUDIT.md),
+   [`GERBANG-SKEMA.md`](docs/GERBANG-SKEMA.md), dan
+   [`SESSION-LOG.md`](docs/SESSION-LOG.md).
 
 ---
 
 ## Peta dokumen
 
-### Naskah 1 — Visi (*HumanOS*)
+> 📚 **Daftar lengkap ada di [`docs/00-DAFTAR-ISI.md`](docs/00-DAFTAR-ISI.md)** —
+> **263 berkas**, berurutan, dikelompokkan per naskah, masing-masing dengan
+> keterangan isi dan jumlah barisnya.
 
-| Berkas | Isi |
+Bagian ini dulu memuat daftar berkas, tetapi berhenti dipelihara di berkas
+`141` (naskah 11) — ia hanya mencakup **126 dari 263** berkas. Daftar induk
+menggantikannya, dan dibangun ulang dari isi direktori sehingga tidak bisa
+tertinggal lagi.
+
+| Yang dijamin daftar induk | |
 |---|---|
-| [`01-VISI.md`](docs/01-VISI.md) | Big Vision, Moonshot Vision, pembeda utama |
-| [`02-HUMAN-INTELLIGENCE-GRAPH.md`](docs/02-HUMAN-INTELLIGENCE-GRAPH.md) | Gagasan inti: semua data terhubung |
-| [`03-MODUL.md`](docs/03-MODUL.md) | 12 Complete Human Modules |
-| [`04-SISTEM-LANJUTAN.md`](docs/04-SISTEM-LANJUTAN.md) | Avatar, Digital Twin, Trend, Feed, Behavior Genome |
-| [`05-ARSITEKTUR.md`](docs/05-ARSITEKTUR.md) | Enterprise-Grade Technology Architecture |
-| [`06-MONETISASI.md`](docs/06-MONETISASI.md) | Enam paket, Free sampai Enterprise |
-| [`07-PRINSIP.md`](docs/07-PRINSIP.md) | Privasi, transparansi, kendali, batas AI |
+| Tiap berkas `docs/` muncul **tepat satu kali** | ✅ 263 = 263 |
+| Nomor ganda | ✅ nihil |
+| Berkas terdaftar tapi tidak ada | ✅ nihil |
+| Berkas ada tapi tidak terdaftar | ✅ nihil |
+| Nomor tak terpakai (`8–9`, `23–29`, `47–49`, `78–79`) | ✅ semuanya di batas antar-naskah, dijelaskan di Lampiran A |
 
-### Naskah 2 — Arsitektur eksekusi (*HumanVerse X*)
+### Aturan penomoran
 
-| Berkas | Isi |
-|---|---|
-| [`10-IDENTITAS.md`](docs/10-IDENTITAS.md) | Nama, AI Agent Factory, **keputusan nama resmi** |
-| [`11-STRUKTUR-REPO.md`](docs/11-STRUKTUR-REPO.md) | Pohon monorepo lengkap |
-| [`12-HIERARKI-AGEN.md`](docs/12-HIERARKI-AGEN.md) | Layer 1 Orchestrator, Layer 2 Core, Layer 3 Specialist |
-| [`13-KNOWLEDGE-GRAPH.md`](docs/13-KNOWLEDGE-GRAPH.md) | Skema graf: 10 node, 5 relasi kausal |
-| [`14-DIGITAL-TWIN-ENGINE.md`](docs/14-DIGITAL-TWIN-ENGINE.md) | Lima profil + simulasi |
-| [`15-MEMORY.md`](docs/15-MEMORY.md) | Lima jenis memori |
-| [`16-EVENT-DRIVEN.md`](docs/16-EVENT-DRIVEN.md) | Event, Kafka, Redis Streams |
-| [`17-AI-WORKFLOW.md`](docs/17-AI-WORKFLOW.md) | LangGraph, MCP, Tool Calling |
-| [`18-DATABASE-DAN-PIPELINE.md`](docs/18-DATABASE-DAN-PIPELINE.md) | 6 basis data, 8 tahap, bobot rekomendasi |
-| [`19-DEVOPS-DAN-KEAMANAN.md`](docs/19-DEVOPS-DAN-KEAMANAN.md) | DevOps, Observability, Security |
-| [`20-EVALUASI-AI.md`](docs/20-EVALUASI-AI.md) | Evaluator per agen |
-| [`21-ROADMAP.md`](docs/21-ROADMAP.md) | V0 → V5 ⚠️ **digantikan sebagian oleh naskah 4** |
-| [`22-PAKET-DOKUMENTASI.md`](docs/22-PAKET-DOKUMENTASI.md) | Rencana ~100 dokumen |
-
-### Naskah 3 — Phase 2 Enterprise Blueprint
-
-| Berkas | Layer | Isi |
-|---|---|---|
-| [`30-PHASE-2-IKHTISAR.md`](docs/30-PHASE-2-IKHTISAR.md) | — | Ikhtisar + peta 15 lapisan |
-| [`31-L06-AGENT-OS.md`](docs/31-L06-AGENT-OS.md) | 6 | **AgentOS** — sistem operasi untuk AI Agent |
-| [`32-L07-HUMAN-ONTOLOGY.md`](docs/32-L07-HUMAN-ONTOLOGY.md) | 7 | **Human Ontology** — 10 domain, 7 relasi struktural |
-| [`33-L08-KNOWLEDGE-GRAPH-ENGINE.md`](docs/33-L08-KNOWLEDGE-GRAPH-ENGINE.md) | 8 | Knowledge Graph Engine (Neo4j) |
-| [`34-L09-MEMORY-HIERARCHY.md`](docs/34-L09-MEMORY-HIERARCHY.md) | 9 | Memory Hierarchy — 7 jenis |
-| [`35-L10-MCP-TOOL-ECOSYSTEM.md`](docs/35-L10-MCP-TOOL-ECOSYSTEM.md) | 10 | MCP Tool Ecosystem — 9 tool |
-| [`36-L11-WORKFLOW-ENGINE.md`](docs/36-L11-WORKFLOW-ENGINE.md) | 11 | Workflow Engine (LangGraph) |
-| [`37-L12-DECISION-ENGINE.md`](docs/37-L12-DECISION-ENGINE.md) | 12 | Decision Engine — Outfit Score |
-| [`38-L13-PROMPTOPS.md`](docs/38-L13-PROMPTOPS.md) | 13 | PromptOps — prompt versioned |
-| [`39-L14-EVALUATION-FRAMEWORK.md`](docs/39-L14-EVALUATION-FRAMEWORK.md) | 14 | AI Evaluation Framework ⚠️ **terpotong** |
-| [`40-TANPA-NOMOR-PROFILE-ENGINE.md`](docs/40-TANPA-NOMOR-PROFILE-ENGINE.md) | ⚠️ ? | Profile Engine — **judul & nomor hilang di naskah** |
-| [`41-L17-TREND-PLATFORM.md`](docs/41-L17-TREND-PLATFORM.md) | 17 | Trend Intelligence Platform — 12 kategori |
-| [`42-L18-AI-MARKETPLACE.md`](docs/42-L18-AI-MARKETPLACE.md) | 18 | AI Marketplace — agen pihak ketiga |
-| [`43-L19-HUMANVERSE-SDK.md`](docs/43-L19-HUMANVERSE-SDK.md) | 19 | HumanVerse SDK — 5 bahasa |
-| [`44-L20-SIMULATION-ENGINE.md`](docs/44-L20-SIMULATION-ENGINE.md) | 20 | AI Simulation Engine |
-| [`45-MASTER-DOCUMENTATION.md`](docs/45-MASTER-DOCUMENTATION.md) | — | 160 dokumen engineering |
-| [`46-PHASE-3.md`](docs/46-PHASE-3.md) | — | Ringkasan Phase 3 → **dirinci naskah 4** |
-
-> ⚠️ **Layer 15 dan Layer 16 tidak ada di naskah**, dan Layer 14 terpotong di
-> tengah tabel. Tidak saya karang — lihat butir **G-1** dan **G-2**.
-
----
-
-### Naskah 4 — Phase 3: AI-Native Human Ecosystem
-
-| Berkas | § | Isi |
-|---|---|---|
-| [`50-NASKAH-4-IKHTISAR.md`](docs/50-NASKAH-4-IKHTISAR.md) | — | Core Philosophy + peta 58 bagian |
-| [`51-HUMANVERSE-CORE.md`](docs/51-HUMANVERSE-CORE.md) | 1 | **HumanVerse Core** — semua agent bicara lewat sini |
-| [`52-CONTEXT-ENGINE.md`](docs/52-CONTEXT-ENGINE.md) | 2–3 | Human Context Engine · Context Vector |
-| [`53-HUMAN-STATE-ENGINE.md`](docs/53-HUMAN-STATE-ENGINE.md) | 4 | Human State — 8 field |
-| [`54-BEHAVIOR-ENGINE.md`](docs/54-BEHAVIOR-ENGINE.md) | 5–7 | Behavior Engine · Pattern Mining · **Causality** |
-| [`55-GOAL-INTELLIGENCE.md`](docs/55-GOAL-INTELLIGENCE.md) | 8–9 | Goal Intelligence · Goal Graph |
-| [`56-AGENT-FACTORY.md`](docs/56-AGENT-FACTORY.md) | 10–12 | Agent Factory · **Manifest** · Registry 14 agent |
-| [`57-AGENT-PROTOKOL-DAN-MEMORY-POLICY.md`](docs/57-AGENT-PROTOKOL-DAN-MEMORY-POLICY.md) | 13–14 | Protokol antar-agent · Memory Policy |
-| [`58-PERMISSION-RISK-SAFETY.md`](docs/58-PERMISSION-RISK-SAFETY.md) | 15–17 | Permission · **Risk Level 0–4** · Safety Layer |
-| [`59-MULTIMODAL-INTERFACE.md`](docs/59-MULTIMODAL-INTERFACE.md) | 18–20 | Multimodal · Voice HumanOS · AI Vision |
-| [`60-WARDROBE-DAN-TREND-ENGINE.md`](docs/60-WARDROBE-DAN-TREND-ENGINE.md) | 21–22 | Wardrobe Intelligence · Trend Score |
-| [`61-PERSONALIZATION-DAN-FEEDBACK-LOOP.md`](docs/61-PERSONALIZATION-DAN-FEEDBACK-LOOP.md) | 23–24 | Personalization · Feedback Loop |
-| [`62-DIGITAL-TWIN-V2-DAN-SIMULASI.md`](docs/62-DIGITAL-TWIN-V2-DAN-SIMULASI.md) | 25–27 | Digital Twin V2 · World Model · **Decision Lab** |
-| [`63-LIFE-SCORE-XAI-INSIGHT.md`](docs/63-LIFE-SCORE-XAI-INSIGHT.md) | 28–30 | **Tolak satu angka** · Explainable AI · Insight |
-| [`64-REVIEW-MINGGUAN-DAN-BULANAN.md`](docs/64-REVIEW-MINGGUAN-DAN-BULANAN.md) | 31–32 | Weekly Review · Monthly Life Review |
-| [`65-ROUTINE-DAN-HABIT-ADAPTIF.md`](docs/65-ROUTINE-DAN-HABIT-ADAPTIF.md) | 33–34 | Autonomous Routines · *Consistency > Perfection* |
-| [`66-EXPERIMENT-DAN-PERSONAL-SCIENCE.md`](docs/66-EXPERIMENT-DAN-PERSONAL-SCIENCE.md) | 35–36 | Experiment Engine · Personal Science Lab |
-| [`67-EVENT-DATA-PLATFORM-FLYWHEEL.md`](docs/67-EVENT-DATA-PLATFORM-FLYWHEEL.md) | 37–39 | Event · Data Lakehouse · Data Flywheel |
-| [`68-PERSONAL-AI-MODEL-DAN-PRIVASI-ML.md`](docs/68-PERSONAL-AI-MODEL-DAN-PRIVASI-ML.md) | 40–42 | Personal AI Model · On-device · Federated |
-| [`69-PRIVACY-CENTER-VAULT-AUDIT.md`](docs/69-PRIVACY-CENTER-VAULT-AUDIT.md) | 43–45 | **Privacy Center** · Data Vault · Audit Trail |
-| [`70-OBSERVABILITY-DAN-EVALUASI-AGEN.md`](docs/70-OBSERVABILITY-DAN-EVALUASI-AGEN.md) | 46–47 | Agent Observability · Evaluation + rollback |
-| [`71-COST-ENGINE-DAN-MODEL-ROUTER.md`](docs/71-COST-ENGINE-DAN-MODEL-ROUTER.md) | 48–49 | AI Cost Engine · Model Router |
-| [`72-INFRASTRUKTUR-DAN-KUBERNETES.md`](docs/72-INFRASTRUKTUR-DAN-KUBERNETES.md) | 50–51 | HumanVerse Cloud · **jangan langsung K8s** |
-| [`73-DEVELOPMENT-OS.md`](docs/73-DEVELOPMENT-OS.md) | 52–55 | Development OS · AI coding agent governance |
-| [`74-EKOSISTEM-AKHIR-DAN-LOOP.md`](docs/74-EKOSISTEM-AKHIR-DAN-LOOP.md) | 56–57 | Final Agent Ecosystem · The HumanVerse Loop |
-| [`75-URUTAN-PEMBANGUNAN-V0-V6.md`](docs/75-URUTAN-PEMBANGUNAN-V0-V6.md) | 58 | ⭐ **V0 → V6 — jangan langsung 50 agent** |
-| [`76-HUMANVERSE-ECONOMY.md`](docs/76-HUMANVERSE-ECONOMY.md) | — | HumanVerse Economy · bentuk akhir · prinsip penutup |
-| [`77-LANGKAH-BERIKUTNYA-BLUEPRINT-V1.md`](docs/77-LANGKAH-BERIKUTNYA-BLUEPRINT-V1.md) | — | Langkah berikutnya: **Blueprint Engineering v1.0** |
-
-### Naskah 5 — Blueprint Engineering v1.0
-
-| Berkas | § | Isi |
-|---|---|---|
-| [`80-BLUEPRINT-IKHTISAR.md`](docs/80-BLUEPRINT-IKHTISAR.md) | 1 | **Modular Monolith → Distributed Services → Agent Platform** |
-| [`81-SYSTEM-CONTEXT.md`](docs/81-SYSTEM-CONTEXT.md) | 2 | System Context — apps → gateway → 3 blok → event bus → 3 penyimpanan |
-| [`82-DOMAIN-ARCHITECTURE.md`](docs/82-DOMAIN-ARCHITECTURE.md) | 3 | 10 bounded context + 8 domain platform |
-| [`83-STRUKTUR-REPO-FINAL.md`](docs/83-STRUKTUR-REPO-FINAL.md) | 4 | ⭐ **Monorepo final** — menutup E-27 |
-| [`84-DATABASE-ARCHITECTURE.md`](docs/84-DATABASE-ARCHITECTURE.md) | 5–6 | PostgreSQL · Qdrant · Neo4j · Redis — **Kafka & ClickHouse dibuang** |
-| [`85-BEHAVIOR-DAN-EVENT.md`](docs/85-BEHAVIOR-DAN-EVENT.md) | 7–8 | **21 event** + arsitektur event bus |
-| [`86-HUMAN-STATE-DAN-CONTEXT.md`](docs/86-HUMAN-STATE-DAN-CONTEXT.md) | 9–10 | HumanState 7 field (`mood` keluar) · Context Engine |
-| [`87-RECOMMENDATION-ENGINE.md`](docs/87-RECOMMENDATION-ENGINE.md) | 11 | Recommendation Score — 7 komponen |
-| [`88-ARSITEKTUR-AGEN.md`](docs/88-ARSITEKTUR-AGEN.md) | 12–16 | **22 agent** · Orchestrator · Manifest · Permission · Risk 0–4 |
-| [`89-MEMORY-ARCHITECTURE.md`](docs/89-MEMORY-ARCHITECTURE.md) | 17 | Memory 6 jenis, dengan contoh |
-| [`90-DIGITAL-TWIN-DAN-CONFIDENCE.md`](docs/90-DIGITAL-TWIN-DAN-CONFIDENCE.md) | 18–19 | ⭐ **Confidence Layer** — low confidence → tanya pengguna |
-| [`91-PERSONALIZATION-DAN-TREND.md`](docs/91-PERSONALIZATION-DAN-TREND.md) | 20–21 | Flywheel · *Popular ≠ suitable for the user* |
-| [`92-MODEL-ROUTER-EVALUASI-AUDIT.md`](docs/92-MODEL-ROUTER-EVALUASI-AUDIT.md) | 22–24 | Model Router · Evaluation + rollback · Audit metadata |
-| [`93-SECURITY-DAN-PRIVACY.md`](docs/93-SECURITY-DAN-PRIVACY.md) | 25–26 | Rantai keamanan · Privacy Center + izin per agent |
-| [`94-DEVELOPMENT-LIFECYCLE.md`](docs/94-DEVELOPMENT-LIFECYCLE.md) | 27–28 | *Governance tetap manusia* · 10 agent pengembangan |
-| [`95-V0-SPESIFIKASI.md`](docs/95-V0-SPESIFIKASI.md) | 29–32 | ⭐ **12 fitur · 4 agent · 19 tabel · 7 sprint** |
-| [`96-SESUDAH-V0-DAN-TARGET-AKHIR.md`](docs/96-SESUDAH-V0-DAN-TARGET-AKHIR.md) | 33–34 | V1–V6 · target akhir dengan lapisan **HUMAN CONTROL** |
-| [`97-LANGKAH-BERIKUTNYA-ENGINEERING-SPEC.md`](docs/97-LANGKAH-BERIKUTNYA-ENGINEERING-SPEC.md) | — | Langkah berikutnya: **Engineering Specification v1.0** |
-
----
-
-### Naskah 7 — Phase 4: Enterprise Operating System (Layer 21–50)
-
-| Berkas | Layer | Isi |
-|---|---|---|
-| [`100-PHASE-4-IKHTISAR.md`](docs/100-PHASE-4-IKHTISAR.md) | 21 | HumanVerse OS — 6 standar + peta Layer 21–50 |
-| [`101-L22-ENGINEERING-STANDARDS.md`](docs/101-L22-ENGINEERING-STANDARDS.md) | 22 | Kontrak per folder · naming convention |
-| [`102-L23-ADR.md`](docs/102-L23-ADR.md) | 23 | ADR-001…004 — **LangGraph akhirnya dikunci** |
-| [`103-L24-26-DESIGN-SYSTEM.md`](docs/103-L24-26-DESIGN-SYSTEM.md) | 24–26 | Design tokens · 10 komponen · motion |
-| [`104-L27-29-INTERAKSI.md`](docs/104-L27-29-INTERAKSI.md) | 27–29 | UX Intelligence · 4 mode · alur percakapan 9 langkah |
-| [`105-L30-32-PROMPTOPS-MODEL.md`](docs/105-L30-32-PROMPTOPS-MODEL.md) | 30–32 | PromptOps · siklus hidup model · optimasi biaya |
-| [`106-L33-35-EKSPERIMEN-EVALUASI.md`](docs/106-L33-35-EKSPERIMEN-EVALUASI.md) | 33–35 | Feature flag · eksperimen · lab evaluasi AI |
-| [`107-L36-37-PERSONA.md`](docs/107-L36-37-PERSONA.md) | 36–37 | Synthetic user · persona library |
-| [`108-L38-40-NOTIFIKASI-SEARCH-KNOWLEDGE.md`](docs/108-L38-40-NOTIFIKASI-SEARCH-KNOWLEDGE.md) | 38–40 | Notifikasi · search · ⭐ **Memory ≠ Knowledge** |
-| [`109-L41-43-DOKUMENTASI-PLAYBOOK-INSIDEN.md`](docs/109-L41-43-DOKUMENTASI-PLAYBOOK-INSIDEN.md) | 41–43 | Documentation OS · playbook · AI incident response |
-| [`110-L44-46-RELIABILITY-INFRA.md`](docs/110-L44-46-RELIABILITY-INFRA.md) | 44–46 | SRE ⚠️ **terpotong** · Layer 45 ⚠️ **hilang** · multi-region |
-| [`111-L47-50-PLATFORM-EKONOMI-VISI.md`](docs/111-L47-50-PLATFORM-EKONOMI-VISI.md) | 47–50 | Enterprise API · developer platform · ⭐ **4 fondasi** |
-| [`112-PHASE-5-RESEARCH-LAB.md`](docs/112-PHASE-5-RESEARCH-LAB.md) | — | Phase 5: 9 arah riset, **500+ spesifikasi** ⚠️ angkanya dibantah naskah 8 |
-
-> ⚠️ **Layer 44 terpotong dan Layer 45 tidak ada** — bentuknya persis seperti
-> lubang naskah 3 (Layer 14 terpotong, Layer 15/16 hilang). Tidak dikarang;
-> lihat butir **G-4** dan **G-5**.
-
----
-
-### Naskah 8 — Peta Phase 5–12
-
-| Berkas | Isi |
-|---|---|
-| [`113-PETA-FASE-5-12.md`](docs/113-PETA-FASE-5-12.md) | Taksiran kemajuan 45 % + 8 fase tersisa, ≈**380 dokumen** |
-
-```
-Phase 5   Research Lab           50+    BFM · GNN · World Model · Federated
-Phase 6   Developer Platform     40+    SDK · Plugin API · Marketplace · OAuth
-Phase 7   Data & AI Infra        50+    Feature Store · Lakehouse · Model Registry
-Phase 8   AI Safety & Ethics     30+    Bias Detection · Human Override ← BARU
-Phase 9   Enterprise & Business  30+    Team · Family · Company Wellness
-Phase 10  AI Automation Engine   40+    Cross-App · Calendar · Email Automation
-Phase 11  HumanVerse Cloud       40+    Multi-region · DR · Edge
-Phase 12  Blueprint Implementation 100+ ERD 100+ tabel · API 500+ endpoint
-```
-
-> ✅ Aritmetikanya benar: **380**, tepat di dalam rentang "300–500".
->
-> ⚠️ Tapi **Phase 5 berbeda 10× dengan naskah 7** (500+ vs 50+ dokumen), dan
-> **Phase 8/11/12 sebagian mengulang** yang sudah ditulis — Phase 12 justru
-> pekerjaan yang **sudah selesai untuk V0** di [`spec/`](spec/README.md), hanya
-> beda skala. Lihat **E-51** dan **E-53**.
-
----
-
-### Naskah 9 — Phase 5: HumanVerse Research Lab
-
-| Berkas | Pillar | Isi |
-|---|---|---|
-| [`114-PHASE-5-IKHTISAR.md`](docs/114-PHASE-5-IKHTISAR.md) | — | 4 prinsip riset · repo `research/` · peta 15 pilar |
-| [`115-R1-BEHAVIOR-FOUNDATION-MODEL.md`](docs/115-R1-BEHAVIOR-FOUNDATION-MODEL.md) | 1 | **BFM** — struktur model, dataset, evaluasi (**Calibration**) |
-| [`116-R2-R3-PREFERENCE-DAN-GRAPH.md`](docs/116-R2-R3-PREFERENCE-DAN-GRAPH.md) | 2–3 | Preference Learning · Graph Intelligence |
-| [`117-R4-MEMORY-COMPRESSION.md`](docs/117-R4-MEMORY-COMPRESSION.md) | 4 | Raw → Episode → Summary → Chapter → **Identity** |
-| [`118-R5-R7-WORLD-MODEL-SIMULASI.md`](docs/118-R5-R7-WORLD-MODEL-SIMULASI.md) | 5–7 | World Model · Counterfactual · Simulation |
-| [`119-R8-R9-EMBEDDING-REPRESENTASI.md`](docs/119-R8-R9-EMBEDDING-REPRESENTASI.md) | 8–9 | Embedding · ⭐ **Personal Representation Layer** |
-| [`120-R10-R12-INTERVENSI-XAI-EKSPERIMEN.md`](docs/120-R10-R12-INTERVENSI-XAI-EKSPERIMEN.md) | 10–12 | Adaptive Intervention (**annoyance**) · XAI · eksperimen |
-| [`121-R13-R15-BENCHMARK-REGISTRY-GOVERNANCE.md`](docs/121-R13-R15-BENCHMARK-REGISTRY-GOVERNANCE.md) | 13–15 | Benchmark · Experiment Registry · **Research Governance** |
-| [`122-PHASE-5-ROADMAP-DAN-DELIVERABLE.md`](docs/122-PHASE-5-ROADMAP-DAN-DELIVERABLE.md) | — | Repo final · roadmap R1–R8 · 10 deliverable |
-
-> ⭐ **Pillar 9 hampir menutup issue [#2](../../issues/2)** — *Personal
-> Representation Layer* punya **6 dari 7 dimensi identik** dengan Human
-> Dashboard naskah 4, plus `confidence`/`trend`/`evidence` per dimensi.
->
-> 🛑 **Tapi Research Lab tidak bisa dimulai sebelum V0 mengumpulkan datanya.**
-> Seluruh dataset BFM baru ada setelah V0 dipakai berbulan-bulan, dan
-> `sleep_events` + `calendar_events` tidak ada di V0 sama sekali (**B-21**).
-
----
-
-### Naskah 10 — Phase 6: Developer Platform
-
-| Berkas | Layer | Isi |
-|---|---|---|
-| [`123-PHASE-6-IKHTISAR.md`](docs/123-PHASE-6-IKHTISAR.md) | — | 3 tipe pengguna · 5 prinsip · ⚠️ **tabrakan penomoran Layer** |
-| [`124-DP-L1-L3-PORTAL-API-GATEWAY.md`](docs/124-DP-L1-L3-PORTAL-API-GATEWAY.md) | 1–3 | Developer Portal · REST API · API Gateway |
-| [`125-DP-L4-L5-AUTH-DAN-KEY.md`](docs/125-DP-L4-L5-AUTH-DAN-KEY.md) | 4–5 | OAuth 2.1 + PKCE · 🛑 scope `journal.read` · API key |
-| [`126-DP-L6-L9-SDK-AGENT-PLUGIN.md`](docs/126-DP-L6-L9-SDK-AGENT-PLUGIN.md) | 6–9 | SDK 7 bahasa · Agent SDK · 🛑 **manifest tanpa `risk_level`** |
-| [`127-DP-L10-L11-MCP-TOOL-REGISTRY.md`](docs/127-DP-L10-L11-MCP-TOOL-REGISTRY.md) | 10–11 | MCP · Tool Registry · Capability Discovery |
-| [`128-DP-L12-L16-WEBHOOK-SANDBOX-CLI.md`](docs/128-DP-L12-L16-WEBHOOK-SANDBOX-CLI.md) | 12–16 | ⭐ **Webhook menutup #38** · Sandbox · CLI · `.hvap` |
-| [`129-DP-L17-L20-MARKETPLACE-REVIEW-REVENUE.md`](docs/129-DP-L17-L20-MARKETPLACE-REVIEW-REVENUE.md) | 17–20 | Marketplace · **Review System** · revenue · analytics |
-| [`130-DP-L21-L25-DOKUMENTASI-KOMUNITAS-ENTERPRISE.md`](docs/130-DP-L21-L25-DOKUMENTASI-KOMUNITAS-ENTERPRISE.md) | 21–25 | Dokumentasi · contoh · sertifikasi · komunitas · enterprise |
-| [`131-PHASE-6-ROADMAP-DAN-DELIVERABLE.md`](docs/131-PHASE-6-ROADMAP-DAN-DELIVERABLE.md) | — | Repo · roadmap D1–D8 · 13 deliverable |
-
-> ⭐ **Menutup [#38](../../issues/38):** DP-L12 memakai `outfit.selected` untuk
-> event yang naskah 7 tulis `fashion.outfit.selected` — dua naskah dua segmen
-> melawan satu naskah tiga segmen.
->
-> ⭐ **Sandbox + Review System** adalah jawaban terbesar untuk beban hukum
-> marketplace ([#24](../../issues/24)) setelah enam naskah hanya berupa
-> kekhawatiran.
->
-> 🛑 Tapi dua pengaman hilang justru di tempat paling dibutuhkan: manifest
-> marketplace **membuang `risk_level` dan `requires_confirmation`**, dan
-> **`journal.read` ditawarkan sebagai scope pihak ketiga**.
-
----
-
-### Naskah 11 — Phase 7: Data & AI Infrastructure
-
-| Berkas | § | Isi |
-|---|---|---|
-| [`132-PHASE-7-IKHTISAR.md`](docs/132-PHASE-7-IKHTISAR.md) | 7.0–7.1 | Tangga evolusi V0–V5 · data backbone |
-| [`133-DATA-CLASSIFICATION.md`](docs/133-DATA-CLASSIFICATION.md) | 7.2 | 4 tingkat sensitivitas ⚠️ **Level 4 kosong** |
-| [`134-EVENT-PLATFORM.md`](docs/134-EVENT-PLATFORM.md) | 7.3–7.5 | Streaming · **canonical envelope** · schema registry |
-| [`135-LAKEHOUSE-WAREHOUSE-FEATURE.md`](docs/135-LAKEHOUSE-WAREHOUSE-FEATURE.md) | 7.6–7.9 | Lakehouse · warehouse · **feature store offline/online** |
-| [`136-VECTOR-RETRIEVAL-GRAPH.md`](docs/136-VECTOR-RETRIEVAL-GRAPH.md) | 7.10–7.13 | Vector · **hybrid retrieval** · knowledge graph |
-| [`137-PIPELINE-QUALITY-LINEAGE.md`](docs/137-PIPELINE-QUALITY-LINEAGE.md) | 7.14–7.16 | Processing · 6 metrik kualitas · lineage |
-| [`138-ML-PLATFORM-DAN-INFERENCE.md`](docs/138-ML-PLATFORM-DAN-INFERENCE.md) | 7.17–7.23 | Training · registry · serving · batch · flywheel |
-| [`139-PRIVACY-DELETION-RETENTION.md`](docs/139-PRIVACY-DELETION-RETENTION.md) | 7.24–7.26 | ⭐ **Privacy metadata · cascade deletion 7 tempat** |
-| [`140-SKALA-OBSERVABILITY-RESEARCH.md`](docs/140-SKALA-OBSERVABILITY-RESEARCH.md) | 7.27–7.32 | Multi-region · DR · **Production ≠ Research** |
-| [`141-PHASE-7-REPO-ROADMAP-DELIVERABLE.md`](docs/141-PHASE-7-REPO-ROADMAP-DELIVERABLE.md) | 7.33–7.35 | Repo 21 folder · roadmap D1–D8 · teaser Phase 8 |
-
-> ⭐ **Bagian terkuat:** metadata privasi yang menempel pada datanya
-> (`purpose`, `retention`, `consent_required`) — pembatasan tujuan yang bisa
-> ditegakkan mesin — dan **cascade deletion ke 7 tempat**, yang memperluas
-> prosedur hapus akun di [`spec/`](spec/README.md) dengan empat tempat yang
-> belum tercakup.
->
-> 🛑 **Dua tabrakan penomoran baru:** tangga V0–V5 memberi makna **ketiga**
-> untuk nomor versi, dan **`D1`–`D8` dipakai dua kali** (Developer Platform
-> naskah 10 vs Data Platform naskah 11).
-
----
-
-### Catatan
-
-| Berkas | Isi |
-|---|---|
-| [`99-CATATAN-AUDIT.md`](docs/99-CATATAN-AUDIT.md) | **Catatan, risiko & pertanyaan terbuka — bukan kata pemilik** |
-
----
+- `01`–`99` dua digit, `100`–`275` tiga digit. Urutan abjad sebuah `ls`
+  **tidak** sama dengan urutan nomor (`10`, `100`, `101`, `11`, `99`) — pakai
+  daftar induk untuk urutan yang benar.
+- Nama berkas **sengaja tidak dinomori ulang**: 34 GitHub Issue yang sudah
+  terbit menaut berkas dua digit, dan penomoran ulang akan mematahkan tautan
+  di isi issue tersebut.
+- Tiap blok naskah menempati rentangnya sendiri, dengan celah di antaranya.
 
 ## Arsitektur sekilas
 

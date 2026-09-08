@@ -4,6 +4,75 @@
 
 ---
 
+## Sesi 24 — 8 September 2026
+
+**Tidak ada naskah baru. Seluruh dokumen disusun berurutan dan kelengkapannya dibuktikan.**
+
+| Hal | Hasil |
+|---|---|
+| Naskah baru | **tidak ada** — pemilik menghentikan perekaman di Phase 20 |
+| Dokumen ditambah | **1 berkas** ([`00-DAFTAR-ISI.md`](00-DAFTAR-ISI.md)) |
+| Dokumen total | 263 → **264** di `docs/`, + 8 di `spec/` |
+| Berkas kode | tetap **0** |
+| Issue | tetap **145** (125 terbuka, 20 ditutup) |
+| README | 735 → **481 baris** (−254): bagian *Peta dokumen* yang tak lengkap diganti penunjuk |
+
+### ✅ Kelengkapan DIBUKTIKAN, bukan diklaim
+
+Diperiksa dengan skrip, dan diperiksa ulang dengan **pemeriksa kedua yang
+terpisah** dari pembangunnya:
+
+| Pemeriksaan | Hasil |
+|---|---|
+| Berkas `docs/` terdaftar di daftar induk | **263 = 263** |
+| Berkas terdaftar >1 kali di tabel pendaftaran | **NIHIL** |
+| Berkas ada tapi tidak terdaftar | **NIHIL** |
+| Berkas terdaftar tapi tidak ada | **NIHIL** |
+| Nomor ganda | **NIHIL** |
+| Berkas tanpa `H1`, atau `H1` yang nomornya tak cocok nama berkas | **NIHIL** |
+| Berkas yang tak bisa ditelusuri ke commit penambahnya | **NIHIL** |
+| Tautan `.md` rusak di seluruh 264 berkas | **NIHIL** |
+| Jangkar `#naskah-N` mati | **NIHIL** |
+
+### 🔍 Empat belas nomor yang tampak hilang ternyata bukan dokumen hilang
+
+`8–9` · `23–29` · `47–49` · `78–79` tidak ada di `docs/`. Dua pemeriksaan
+menutup pertanyaannya:
+
+1. `git log --all --diff-filter=D` — **tidak pernah** ada berkas dengan nomor
+   itu yang dihapus;
+2. pencarian tautan di seluruh `docs/` — **nol** rujukan kepadanya.
+
+⇒ Keempat celah jatuh **persis di batas antar blok naskah** (naskah 1→2,
+2→3, 3→4, 4→5): ruang yang sengaja disisakan. **Nol dokumen hilang.**
+
+### 🛑 Yang benar-benar kurang: peta dokumen di README
+
+Bagian *Peta dokumen* README memuat **126 dari 263** berkas — ia berhenti
+dipelihara di berkas `141` (naskah 11), dan 137 dokumen dari naskah 12–24
+tidak pernah masuk. Keterangannya ditulis tangan dan lebih kaya daripada judul
+`H1`, jadi ia **tidak dibuang**: 126 keterangan itu diekstrak dan digabungkan ke
+daftar induk, dengan judul `H1` sebagai isian untuk 137 sisanya. Kolom *Isi*
+kini terisi untuk **semua** baris.
+
+### ⚠️ Nama berkas SENGAJA tidak dinomori ulang
+
+Penomoran campur dua/tiga digit membuat urutan abjad `ls` salah
+(`10` · `100` · `101` · `11` · `99`). Penomoran ulang menjadi tiga digit
+seragam akan memperbaikinya — tetapi **34 GitHub Issue yang sudah terbit menaut
+berkas dua digit**, dan isinya tidak bisa diperbaiki dari sisi repo. Biaya itu
+lebih besar daripada manfaatnya, jadi urutan yang benar diberikan lewat daftar
+induk, dan alasannya dicatat di Lampiran C.
+
+### Yang menunggu keputusan pemilik
+
+Tidak berubah dari sesi lalu, dan kini menjadi satu-satunya pekerjaan di depan:
+**[#139](../../issues/139) — Master Architecture v2.0 dimulai sekarang atau
+tidak.** Pemilik sendiri yang mengusulkannya di penutup naskah 24
+(*“jangan langsung membuat Phase 21”*).
+
+---
+
 ## Sesi 23 — 8 September 2026
 
 **Phase 20 direkam — fase terakhir, dan naskahnya menutup lebih banyak butir daripada yang dibukanya.**
