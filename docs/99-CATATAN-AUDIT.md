@@ -46,7 +46,10 @@ Diperbarui: 8 September 2026 · Mencakup **dua puluh empat naskah**:
 > **K-5** tiga uji agent lawan service ([#89](../../issues/89)) ·
 > **K-6** tujuh kata kerja Phase 2–8 ([#142](../../issues/142), sebagian) ·
 > **K-7** §15.15 dapat `Permission` ([#153](../../issues/153), sebagian) ·
-> **K-8** awalan `/v1` ([#38](../../issues/38)).
+> **K-8** awalan `/v1` ([#38](../../issues/38)) ·
+> **K-9** **satu monorepo + uji naik-turun**; keluarga keamanan (**19 pohon**)
+> jadi **satu** `security/`, `governance/` berdiri sendiri ([#55](../../issues/55) —
+> **membuka blokir Sprint 0 tugas 0.1**).
 >
 > 🛑 **Nol butir C saya putuskan**, dan §16.5/§16.7 (humanoid) sengaja
 > ditinggalkan: kalau salahnya ditanggung orang lain, keputusannya bukan milik

@@ -15,7 +15,7 @@
 | Dokumen total | 264 → **272** di `docs/`, + 8 di `spec/` |
 | Berkas kode | tetap **0** — skrip pengukur sengaja **tidak** disimpan di repo |
 | `spec/` diubah | **4 berkas** — `01` presedensi tabel · `03` tabel padanan 127 nama · `04` awalan `/v1` · `05` aturan 7 + kriteria agent |
-| Issue | 145 → **153** (128 terbuka, **25 ditutup** — lima ditutup oleh keputusan K); **#146**–**#153** baru, plus komentar bukti di **#1**, **#38**, **#139**, **#142** |
+| Issue | 145 → **153** (127 terbuka, **26 ditutup** — enam ditutup oleh keputusan K); **#146**–**#153** baru, plus komentar bukti di **#1**, **#38**, **#139**, **#142** |
 | Temuan | **E-151**–**E-157** · **G-20** · **B-39** · 5 cacat indeks diperbaiki · **2 koreksi atas pekerjaan saya sendiri** (klaim #142; awalan `spec/04`) |
 
 ### 🔴🔴 Temuan terbesar: hitungan BERURUTAN meleset ke bawah secara sistematis
@@ -400,7 +400,7 @@ diperiksa satu per satu terhadap `spec/`:
 menyatakan sesuatu terhalang, buka berkas yang paling berkepentingan
 membantahnya.**
 
-### 🔧 DELAPAN keputusan diambil sendiri — atas permintaan pemilik
+### 🔧 SEMBILAN keputusan diambil sendiri — atas permintaan pemilik
 
 Pemilik mendelegasikan: *“beri keputusan sendiri sesuai aturan”*. Batas yang
 saya pegang: **yang engineering saya putuskan; yang salahnya ditanggung orang
@@ -418,9 +418,24 @@ lain tetap milik pemilik.** Semuanya di
 | **K-6** | tujuh **kata kerja** Phase 2–8 | — | [#142](../../issues/142) sebagian |
 | **K-7** | §15.15 dapat `Permission` | — | [#153](../../issues/153) sebagian |
 | **K-8** | awalan API `/v1` | `spec/04` | [#38](../../issues/38) |
+| **K-9** | **satu monorepo** + **uji naik-turun**; keamanan **19 pohon → satu** | — | [#55](../../issues/55) ✅ |
 
-⚠️ **Nol dari delapan mengubah V0** — `spec/01` tetap 23 tabel, `spec/03` tetap
+⚠️ **Nol dari sembilan mengubah V0** — `spec/01` tetap 23 tabel, `spec/03` tetap
 22 event V0, keempat agent V0 lulus ketiga uji K-5. Diperiksa sesudahnya.
+
+⭐⭐ **K-9 membuka blokir Sprint 0 tugas 0.1.** [#55](../../issues/55) menanyakan
+satu hal: pohon fase baru itu **folder di dalam monorepo** atau **repo
+terpisah**? Jawabannya **satu monorepo**, dan yang membuatnya bisa ditegakkan
+adalah **uji naik-turun dengan TIGA hasil**: naik (hal yang sama) · tinggal
+(khas fase) · **diganti nama** (kata yang sama untuk hal berbeda).
+🔑 **Hasil ketiga itu yang menyelamatkan aturannya dari menjadi “gabungkan
+semuanya”** — `simulation/` di 15 pohon ternyata **tiga mesin berbeda dengan
+satu kata** (fisika · perilaku · fisiologi), jadi ia diganti nama, bukan
+digabung.
+🛑 Dan alasan terkuatnya bukan kerapian: keluarga keamanan tersebar di
+**19 pohon**, dan selama itu benar **aturan impor §8.42 (*kode agent tidak boleh
+mengimpor `security/`*) tidak bisa DINYATAKAN** — tidak ada satu `security/`
+untuk dirujuk.
 
 🛑 **Yang sengaja TIDAK saya putuskan**, dan alasannya satu: **kalau salahnya
 ditanggung orang lain, keputusannya bukan milik saya.**

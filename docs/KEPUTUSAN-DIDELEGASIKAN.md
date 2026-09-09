@@ -159,6 +159,90 @@ baris.
 
 ---
 
+## K-9 · Aturan komposisi pohon repositori — **satu monorepo, dan uji naik-turun**
+
+**Menutup:** [#55](../../issues/55) (**E-66**) · menyelesaikan deret H-10 yang
+tergerus sepuluh kali ([#109](../../issues/109) · [#120](../../issues/120) ·
+[#129](../../issues/129) · [#138](../../issues/138) · [#143](../../issues/143) ·
+[#84](../../issues/84) · [#51](../../issues/51))
+
+[#55](../../issues/55) menanyakan satu hal yang memblokir **Sprint 0 tugas
+0.1**: pohon fase baru itu **folder di dalam monorepo** atau **repo terpisah**?
+
+### Keputusan 1 — satu monorepo, nol repo terpisah
+
+Tiap pohon fase menjadi **folder tingkat-atas** di `humanverse-x/`.
+
+| | |
+|---|---|
+| **Bukti** | Sensus menemukan **38 pohon** di 24 naskah ([`SENSUS-MODUL.md`](SENSUS-MODUL.md)). Repo terpisah berarti **38 daur rilis** dan pembuatan kontrak antar-repo — masalah baru yang lebih besar daripada yang dipecahkannya. |
+| **Bacaan yang DITOLAK** | *“Pisahkan yang jelas berbeda — `robotics/` tidak ada urusan dengan `health-bio/`.”* **Ditolak** karena janji *Backward-compatible* (naskah 10) berlaku **ke dalam**, bukan hanya kepada developer luar; begitu ada dua repo, tiap perubahan kontrak menuntut versi, jadwal, dan matriks kompatibilitas — sebelum satu baris kode pun ditulis. |
+| **Cara membalikkan** | Pisahkan satu folder menjadi repo sendiri. Selama aturan 2 dipatuhi, batasnya sudah bersih dan pemisahan itu murah. |
+
+### Keputusan 2 — **uji naik-turun**, dan ia punya tiga hasil, bukan dua
+
+Ini aturan yang membuat keputusan 1 bisa ditegakkan, dan yang selama ini tidak
+ada (*“empat pohon repo tanpa aturan komposisi”*):
+
+| Kalau… | Maka |
+|---|---|
+| dua fase memakai nama itu untuk **hal yang SAMA** | **naik** ke tingkat atas, dipakai bersama — **tidak disalin** |
+| hanya satu fase membutuhkannya | **tinggal** di dalam fase |
+| dua fase memakai nama yang sama untuk **hal yang BERBEDA** | **salah satunya diganti namanya** — tidak digabung, tidak dibiarkan |
+
+⭐ **Hasil ketiga itu yang menyelamatkan aturan ini dari menjadi “gabungkan
+semuanya”.** Contohnya `simulation/`, nama yang paling banyak berulang
+(**15 pohon**): `robotics/simulation/` adalah simulasi **fisika**,
+`intelligence/simulation/` simulasi **perilaku**, `health-bio/simulation/`
+simulasi **fisiologi**. Tiga mesin berbeda dengan satu kata. Menggabungkannya
+akan menghasilkan modul yang tak seorang pun bisa memiliki.
+⇒ **Diganti nama**, bukan digabung.
+
+### Keputusan 3 — keluarga keamanan naik **seluruhnya**, menjadi **satu** pohon
+
+Dua belas nama tersebar di **19 pohon**: `security` (6) · `safety` (6) ·
+`privacy` (6) · `audit` (5) · `permissions` (5) · `consent` (3) ·
+`policies` (3) · `trust` (3) · `governance` (3) · `policy` · `compliance` ·
+`ethics`.
+
+🛑 **Selama itu benar, aturan impor §8.42 — *“kode agent tidak boleh mengimpor
+`security/`”* — tidak bisa dinyatakan**, sebab tidak ada satu `security/` untuk
+dirujuk. Itu bukan soal kerapian: aturan itu satu-satunya yang memisahkan
+Control Plane dari kode agent.
+
+⇒ Satu `security/` tingkat-atas menyerap `safety` · `privacy` · `consent` ·
+`audit` · `permissions` · `policies` · `trust` · `compliance` · `ethics`
+sebagai submodul.
+
+**Kecuali `governance/`** — ia **naik** tetapi **berdiri sendiri**, bukan di
+dalam `security/`. Alasannya bukan selera: *security menjawab **apa yang
+boleh**, governance menjawab **siapa yang memutuskan***. Dan catatan audit sudah
+membuktikan **tiga kali** bahwa `governance/` yang hidup di dalam pohon fase
+**tidak diwarisi** fase berikutnya ([#138](../../issues/138)).
+
+### Yang langsung terselesaikan
+
+| Nama | Sebelum | Sesudah |
+|---|---|---|
+| `sdk/` | **14 pohon** | **satu**, submodul per domain (`sdk/spatial/`, `sdk/robotics/`) |
+| `agents/` · `memory/` · `runtime/` · `evaluation/` | 10 · 8 · 7 · 7 | **satu** masing-masing |
+| keluarga keamanan | **19 pohon** | **satu** `security/` + `governance/` |
+| `simulation/` | 15 pohon | **diganti nama per fase** — bukan digabung |
+| `robotics/locomotion/` · `spatial-os/slam/` · `health-bio/biometrics/` | — | **tetap** di dalam fasenya |
+
+⚠️ **Sisa ~40 nama di ≥3 pohon** ([`SENSUS-MODUL.md`](SENSUS-MODUL.md) Tabel B)
+diselesaikan **mekanis oleh uji yang sama** ketika pohonnya benar-benar
+dibangun. Yang diputuskan di sini **aturannya**, bukan tiap nama satu per satu —
+sebab memutuskan 128 nama tanpa kode yang memakainya berarti menebak.
+
+### Yang TIDAK berubah
+
+**Nol untuk V0.** [`../spec/06`](../spec/06-MODULE-BOUNDARIES.md) tetap
+mengatur modular monolith V0 apa adanya; aturan ini berlaku bagi pohon **lintas
+fase**, yang belum satu pun ditulis sebagai kode.
+
+---
+
 ## Yang sengaja **tidak** saya putuskan
 
 | Butir | Kenapa |

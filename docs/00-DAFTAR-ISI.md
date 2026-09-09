@@ -22,7 +22,7 @@
 | — berlaku lintas-naskah (termasuk `99`) | 11 |
 | Berkas di [`../spec/`](../spec/README.md) | 8 |
 | Naskah pemilik yang direkam | **24** (Phase 20 = fase terakhir) |
-| Baris dokumen `docs/` | 42.703 |
+| Baris dokumen `docs/` | 42.805 |
 | Berkas kode | **0** — disengaja |
 
 ---
@@ -77,7 +77,7 @@ berlaku untuk seluruh repo.
 | Berkas | Isi | Baris |
 |---|---|---|
 | [**Catatan Audit & Keputusan Terbuka**](99-CATATAN-AUDIT.md) | Butir **A** (pertanyaan pemilik) · **B** (risiko teknis) · **C** (hukum & kepatuhan) · **D** (celah) · **E** (ketidakcocokan antar-naskah) · **F** (sudah diperiksa, benar) · **G** (lubang di dalam naskah) · **H** (sudah diputuskan). **Bukan kata pemilik.** | 1.307 |
-| [**Keputusan yang Didelegasikan**](KEPUTUSAN-DIDELEGASIKAN.md) | Delapan keputusan engineering yang **saya ambil sendiri** atas permintaan pemilik, tiap butir dengan **bacaan yang ditolak** dan **cara membalikkannya**. **Bukan kata pemilik.** | 177 |
+| [**Keputusan yang Didelegasikan**](KEPUTUSAN-DIDELEGASIKAN.md) | Sembilan keputusan engineering yang **saya ambil sendiri** atas permintaan pemilik, tiap butir dengan **bacaan yang ditolak** dan **cara membalikkannya**. **Bukan kata pemilik.** | 261 |
 | [**Gerbang Skema**](GERBANG-SKEMA.md) | Apa yang mengunci — dan apa yang **tidak** mengunci — Engineering Spec. | 146 |
 | [**Peta Fase**](PETA-FASE.md) | Tiga peta fase dibandingkan dengan yang benar-benar terjadi; nama Phase 1–20 beserta buktinya; deret permintaan pemilik yang berulang. **Bukan kata pemilik.** | 187 |
 | [**Sensus Rantai Keputusan**](SENSUS-RANTAI.md) | **20 dari 36** rantai tindakan sudah punya gerbang — denominator yang belum pernah ada; tiga yang belum menggerakkan benda fisik. **Bukan kata pemilik.** | 119 |
