@@ -6,16 +6,16 @@
 
 ## Sesi 25 — 9 September 2026
 
-**Tidak ada naskah baru. Dua hal diukur untuk pertama kalinya — overlap antar-modul dan peta fase — dan keduanya membalik angka yang selama ini dipakai.**
+**Tidak ada naskah baru. TIGA hal diukur untuk pertama kalinya — overlap antar-modul, peta fase, dan nama event — dan ketiganya membalik angka yang selama ini dipakai. Polanya satu: menghitung satu per satu MELESET; menghitung KEJADIAN bukan AKIBAT.**
 
 | Hal | Hasil |
 |---|---|
 | Naskah baru | **tidak ada** |
-| Dokumen ditambah | **2 berkas** — [`SENSUS-MODUL.md`](SENSUS-MODUL.md) (321 baris) + [`PETA-FASE.md`](PETA-FASE.md) (187 baris) |
-| Dokumen total | 264 → **266** di `docs/`, + 8 di `spec/` |
+| Dokumen ditambah | **3 berkas** — [`SENSUS-MODUL.md`](SENSUS-MODUL.md) 321 · [`PETA-FASE.md`](PETA-FASE.md) 187 · [`SENSUS-EVENT.md`](SENSUS-EVENT.md) 164 |
+| Dokumen total | 264 → **267** di `docs/`, + 8 di `spec/` |
 | Berkas kode | tetap **0** — skrip pengukur sengaja **tidak** disimpan di repo |
-| Issue | 145 → **148** (128 terbuka, 20 ditutup); **#146**–**#148** baru, plus komentar bukti di **#139** dan **#142** |
-| Temuan | **E-151** · **E-152** · **G-20** · 5 cacat indeks diperbaiki · 1 koreksi atas audit sendiri |
+| Issue | 145 → **149** (129 terbuka, 20 ditutup); **#146**–**#149** baru, plus komentar bukti di **#139** dan **#142** |
+| Temuan | **E-151** · **E-152** · **E-153** · **G-20** · 5 cacat indeks diperbaiki · 1 koreksi atas audit sendiri |
 
 ### 🔴🔴 Temuan terbesar: hitungan BERURUTAN meleset ke bawah secara sistematis
 
@@ -150,6 +150,53 @@ pemilik”* ([`218`](218-REPO-DATA-EVENT-ROADMAP-DOD.md) L682) — enam naskah
 kemudian ia belum dimulai. Bukti ini dipasang sebagai komentar di
 [#139](../../issues/139), bukan issue baru, supaya ia berada di tempat
 keputusannya diambil.
+
+### 🔴🔴 Sensus KETIGA: nama event — "kesepuluh" ternyata **128 nama**
+
+[#38](../../issues/38) sudah **ditutup** (`domain.verb`, huruf kecil, dua
+segmen). Pelanggarannya dicatat sampai *“kesepuluh”* — tetapi yang dihitung
+selama ini **kejadian** (satu naskah = satu pelanggaran), bukan **nama**.
+
+| Populasi | sesuai | PascalCase |
+|---|---|---|
+| **kata pemilik di naskah** | **21** | **133** |
+| catatan audit saya | 31 | 59 |
+
+Lima PascalCase hanya di [`16`](16-EVENT-DRIVEN.md) (naskah 1–2, **sebelum**
+keputusan) ⇒ **128 nama ditulis dalam format yang ditolak sesudah keputusan.**
+
+⭐ **Yang lebih menentukan: ke-21 nama yang sesuai SEMUANYA (21 dari 21)
+berasal dari [`85`](85-BEHAVIOR-DAN-EVENT.md) — naskah 5 §7.** Naskah sesudahnya
+hanya mengutip ulang. 🛑 **Sejak naskah 5 pemilik menamai 128 event baru, dan
+nol memakai format yang dipilih.** Formatnya bukan diperdebatkan — ia tidak
+pernah dipakai lagi.
+
+⚠️ Phase 12 dan Phase 19 tidak muncul di sebaran **bukan karena terlewat**:
+keduanya tidak mendefinisikan model event sama sekali (diperiksa langsung).
+⇒ **sembilan dari sembilan** naskah yang punya model event memakai PascalCase.
+
+💰 Biaya masih nol (belum ada kode) — **kecuali tiga tabrakan KOSAKATA** yang
+tidak selesai dengan mengubah bentuk: `sleep.completed`↔`SleepEnded` ·
+`meeting.completed`↔`MeetingEnded` · `mood.logged`↔`MoodChanged`.
+→ **E-153** / [#149](../../issues/149).
+
+### ⚠️ Dua kekeliruan alat ukur saya sendiri, keduanya condong ke arah yang sama
+
+Sensus event butuh **tiga** percobaan, dan dua yang pertama membuat format yang
+dipilih tampak **lebih banyak dipakai daripada kenyataannya**:
+
+| Percobaan | Kekeliruan | Akibat |
+|---|---|---|
+| 1 | tak memisahkan kata pemilik dari catatan audit saya | `spatial_map.updated` terhitung “sesuai” padahal itu **usul saya** |
+| 2 | menganggap semua baris `>` = catatan saya | **salah** — naskah juga mengutip pemilik dengan `>`; §18.5 kehilangan **13 nama** |
+| 3 | blok `>` diklasifikasi dari **baris pertamanya** (catatan audit selalu dibuka penanda vonis) | ✅ dipakai — dan divalidasi silang |
+
+✅ **Validasi silang** menyelamatkannya: hasil sensus dicocokkan dengan
+pemeriksaan manual yang sudah ada di naskah — §13.12 *“lima belas event”* → 15 ·
+§16.31 *“13 event”* → 13 · §18.5 → 14. **Ketiganya cocok.**
+
+💡 **Pembeda populasi harus DIUJI, bukan diasumsikan.** Percobaan 2 terdengar
+masuk akal dan gagal diam-diam.
 
 ### Yang menunggu keputusan pemilik
 

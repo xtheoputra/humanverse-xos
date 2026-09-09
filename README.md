@@ -23,10 +23,10 @@ manusia + agent + data + knowledge + simulation + automation**.
 | Tahap | **Spesifikasi engineering siap** — belum ada kode (disengaja) |
 | Berkas kode | 0 |
 | Repo git | privat `xtheoputra/humanverse-xos`, branch `master` |
-| Dokumen | **266 berkas** di `docs/` (naskah + audit + sensus + peta fase + catatan sesi) + **8 berkas** di `spec/` |
+| Dokumen | **267 berkas** di `docs/` (naskah + audit + 2 sensus + peta fase + catatan sesi) + **8 berkas** di `spec/` |
 | Naskah pemilik | **24** — terakhir: **Phase 20 Civilization Platform** (39 bagian) — **fase TERAKHIR** |
 | Keputusan tertutup | **24 butir H** — nama · MVP · struktur repo · ambang konfirmasi · model memory · memory meluruh · gerbang policy · context package · peta 15 fase · dua tangga R/L · manifest dipulihkan · **model transisi belajar dari galat sendiri** · **monetisasi punya fase (Phase 14)**. 🛑 **H-20 PATAH, dan petanya TERBUKA-UJUNG** — **empat naskah berturut-turut masing-masing menambah satu fase** di kalimat penutupnya: naskah 19 → **Phase 16**, naskah 20 → **Phase 17**, naskah 21 → **Phase 18**, naskah 22 → **Phase 19 Civilization Intelligence**. ⭐ **Naskah 23 MEMBALIKKAN polanya sebagian** — ia mengubah Phase 19 menjadi *Scientific Discovery Engine*, memindahkan Civilization ke **Phase 20**, dan **mengumumkan perubahan itu beserta alasannya**: pertama kalinya dalam lima naskah, dan ia menyebut **Phase 20 sebagai fase TERAKHIR**. 🛑 Tapi ia menyandarkannya pada *“roadmap 20 fase yang sudah kita tetapkan sebelumnya”* — yang **tidak pernah ada** ([#132](../../issues/132), [#133](../../issues/133), [#101](../../issues/101), [#108](../../issues/108)). ⚠️ **H-13** ([#72](../../issues/72)) dan **H-11** ([#78](../../issues/78)) juga perlu ditinjau ulang |
-| Keputusan terbuka | **26 pertanyaan A** · **152 ketidakcocokan E** · **20 lubang G** |
+| Keputusan terbuka | **26 pertanyaan A** · **153 ketidakcocokan E** · **20 lubang G** |
 | Tanggal dokumen | 8 September 2026 |
 
 > ⚠️ **Nol baris kode itu disengaja — dan penghambatnya terus berkurang.**
@@ -55,13 +55,13 @@ manusia + agent + data + knowledge + simulation + automation**.
 
 ## 📌 Pekerjaan terbuka = GitHub Issues
 
-**148 issue** dalam 3 milestone — **20 ditutup**. Baca issue-nya, jangan analisis
+**149 issue** dalam 3 milestone — **20 ditutup**. Baca issue-nya, jangan analisis
 ulang naskahnya.
 
 | Milestone | Isi | Issue |
 |---|---|---|
 | **M1 — Keputusan sebelum kode** | 33 terbuka, 5 ditutup | [#1](../../issues/1)–[#9](../../issues/9), [#38](../../issues/38), [#58](../../issues/58)–[#59](../../issues/59), [#72](../../issues/72), [#80](../../issues/80), [#90](../../issues/90)–[#93](../../issues/93), [#98](../../issues/98)–[#101](../../issues/101), [#103](../../issues/103), [#105](../../issues/105), [#108](../../issues/108), [#111](../../issues/111)–[#113](../../issues/113) |
-| **M2 — Blueprint & Platform** | 69 terbuka, 13 ditutup | [#10](../../issues/10)–[#19](../../issues/19), [#26](../../issues/26)–[#37](../../issues/37), [#39](../../issues/39), [#41](../../issues/41)–[#45](../../issues/45), [#47](../../issues/47)–[#49](../../issues/49), [#51](../../issues/51), [#54](../../issues/54)–[#56](../../issues/56), [#60](../../issues/60)–[#70](../../issues/70), [#73](../../issues/73)–[#74](../../issues/74), [#77](../../issues/77)–[#79](../../issues/79), [#82](../../issues/82)–[#84](../../issues/84), [#87](../../issues/87)–[#89](../../issues/89), [#94](../../issues/94), [#96](../../issues/96)–[#97](../../issues/97), [#106](../../issues/106)–[#107](../../issues/107), [#109](../../issues/109)–[#110](../../issues/110) |
+| **M2 — Blueprint & Platform** | 70 terbuka, 13 ditutup | [#10](../../issues/10)–[#19](../../issues/19), [#26](../../issues/26)–[#37](../../issues/37), [#39](../../issues/39), [#41](../../issues/41)–[#45](../../issues/45), [#47](../../issues/47)–[#49](../../issues/49), [#51](../../issues/51), [#54](../../issues/54)–[#56](../../issues/56), [#60](../../issues/60)–[#70](../../issues/70), [#73](../../issues/73)–[#74](../../issues/74), [#77](../../issues/77)–[#79](../../issues/79), [#82](../../issues/82)–[#84](../../issues/84), [#87](../../issues/87)–[#89](../../issues/89), [#94](../../issues/94), [#96](../../issues/96)–[#97](../../issues/97), [#106](../../issues/106)–[#107](../../issues/107), [#109](../../issues/109)–[#110](../../issues/110) |
 | **M3 — Sebelum ada pengguna nyata** | 26 terbuka, 2 ditutup | [#20](../../issues/20)–[#25](../../issues/25), [#40](../../issues/40), [#46](../../issues/46), [#50](../../issues/50), [#52](../../issues/52)–[#53](../../issues/53), [#57](../../issues/57), [#71](../../issues/71), [#75](../../issues/75)–[#76](../../issues/76), [#81](../../issues/81), [#85](../../issues/85)–[#86](../../issues/86), [#95](../../issues/95), [#102](../../issues/102), [#104](../../issues/104), [#114](../../issues/114) |
 
 ⚠️ **[#55](../../issues/55) meninjau ulang keputusan yang sudah ditutup:**
@@ -109,6 +109,18 @@ sudah terkumpul di [`99-CATATAN-AUDIT.md`](docs/99-CATATAN-AUDIT.md) baris
 17–20. Sisanya **satu nama (Phase 1) + tujuh kata kerja**, bukan delapan baris
 kosong. 💡 *`grep` yang mengembalikan nol membuktikan “tidak ada yang berbentuk
 ini”, bukan “tidak ada”.*
+
+🔴🔴 **Nama event juga dihitung** — [`docs/SENSUS-EVENT.md`](docs/SENSUS-EVENT.md)
+([#149](../../issues/149)). [#38](../../issues/38) sudah ditutup dengan format
+`domain.verb`, dan pelanggarannya dicatat sampai *“kesepuluh”* — tetapi yang
+dihitung selama ini **kejadian**, bukan **nama**. Sensus: **21 nama sesuai
+lawan 128 nama PascalCase yang ditulis sesudah keputusan**. ⭐ Dan yang paling
+menentukan: **ke-21 nama yang sesuai semuanya berasal dari naskah 5** — sejak
+itu pemilik menamai 128 event baru dan **nol** memakai format yang dipilih.
+Formatnya bukan diperdebatkan, ia tidak pernah dipakai lagi. 💰 Biayanya masih
+nol karena belum ada kode — kecuali **tiga tabrakan kosakata**
+(`sleep.completed`↔`SleepEnded` dan dua lainnya) yang tidak selesai hanya
+dengan mengubah bentuk.
 
 ✅ **Ditutup:** [#1](../../issues/1) rencana kanonik → V0–V6 ·
 [#8](../../issues/8) struktur repo · [#12](../../issues/12) Weather/Calendar = tool ·
@@ -364,12 +376,13 @@ Selengkapnya: [`docs/75-URUTAN-PEMBANGUNAN-V0-V6.md`](docs/75-URUTAN-PEMBANGUNAN
    masuk ke `99-CATATAN-AUDIT.md` — **tidak pernah disisipkan** ke berkas visi.
 3. Kalau pemilik memutuskan sesuatu, keputusan itu **naik** ke berkas visi yang
    sesuai, lalu butirnya turun ke bagian **H** di berkas audit.
-4. Enam berkas **bukan** rekaman naskah:
+4. Tujuh berkas **bukan** rekaman naskah:
    [`00-DAFTAR-ISI.md`](docs/00-DAFTAR-ISI.md) (dibangun dari isi direktori),
    [`99-CATATAN-AUDIT.md`](docs/99-CATATAN-AUDIT.md),
    [`GERBANG-SKEMA.md`](docs/GERBANG-SKEMA.md),
-   [`SENSUS-MODUL.md`](docs/SENSUS-MODUL.md) dan
-   [`PETA-FASE.md`](docs/PETA-FASE.md) (keduanya pengukuran — tidak memutuskan
+   [`SENSUS-MODUL.md`](docs/SENSUS-MODUL.md),
+   [`SENSUS-EVENT.md`](docs/SENSUS-EVENT.md) dan
+   [`PETA-FASE.md`](docs/PETA-FASE.md) (ketiganya pengukuran — tidak memutuskan
    apa pun), dan [`SESSION-LOG.md`](docs/SESSION-LOG.md).
 
 ---
