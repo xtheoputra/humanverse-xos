@@ -6,16 +6,16 @@
 
 ## Sesi 25 — 9 September 2026
 
-**Tidak ada naskah baru. TIGA hal diukur untuk pertama kalinya — overlap antar-modul, peta fase, dan nama event — dan ketiganya membalik angka yang selama ini dipakai. Polanya satu: menghitung satu per satu MELESET; menghitung KEJADIAN bukan AKIBAT.**
+**Tidak ada naskah baru. EMPAT hal diukur untuk pertama kalinya — overlap antar-modul, peta fase, nama event, dan daftar agent — dan keempatnya membalik angka yang selama ini dipakai. Polanya satu: hitungan BERURUTAN meleset ke bawah, hitungan KEJADIAN bukan AKIBAT, dan PENJUMLAHAN bukan HIMPUNAN.**
 
 | Hal | Hasil |
 |---|---|
 | Naskah baru | **tidak ada** |
-| Dokumen ditambah | **3 berkas** — [`SENSUS-MODUL.md`](SENSUS-MODUL.md) 321 · [`PETA-FASE.md`](PETA-FASE.md) 187 · [`SENSUS-EVENT.md`](SENSUS-EVENT.md) 164 |
-| Dokumen total | 264 → **267** di `docs/`, + 8 di `spec/` |
+| Dokumen ditambah | **4 berkas** — [`SENSUS-MODUL.md`](SENSUS-MODUL.md) 321 · [`PETA-FASE.md`](PETA-FASE.md) 187 · [`SENSUS-EVENT.md`](SENSUS-EVENT.md) 164 · [`SENSUS-AGENT.md`](SENSUS-AGENT.md) 122 |
+| Dokumen total | 264 → **268** di `docs/`, + 8 di `spec/` |
 | Berkas kode | tetap **0** — skrip pengukur sengaja **tidak** disimpan di repo |
-| Issue | 145 → **149** (129 terbuka, 20 ditutup); **#146**–**#149** baru, plus komentar bukti di **#139** dan **#142** |
-| Temuan | **E-151** · **E-152** · **E-153** · **G-20** · 5 cacat indeks diperbaiki · 1 koreksi atas audit sendiri |
+| Issue | 145 → **150** (130 terbuka, 20 ditutup); **#146**–**#150** baru, plus komentar bukti di **#139** dan **#142** |
+| Temuan | **E-151** · **E-152** · **E-153** · **E-154** · **G-20** · 5 cacat indeks diperbaiki · 1 koreksi atas audit sendiri |
 
 ### 🔴🔴 Temuan terbesar: hitungan BERURUTAN meleset ke bawah secara sistematis
 
@@ -197,6 +197,36 @@ pemeriksaan manual yang sudah ada di naskah — §13.12 *“lima belas event”*
 
 💡 **Pembeda populasi harus DIUJI, bukan diasumsikan.** Percobaan 2 terdengar
 masuk akal dan gagal diam-diam.
+
+### 🔴🔴 Sensus KEEMPAT: daftar agent — "> 40" ternyata **59**, dan irisannya **enam**
+
+Jumlah agent ditaksir dengan **penjumlahan** (25 §11.4 + 7 tak terdaftar + 12
+§12.29 = *“> 40”*), yang mengabaikan dua daftar lebih tua **dan** menganggap tak
+ada nama berulang.
+
+Lima daftar, nama dinormalkan (`FashionAgent` = `Fashion`):
+
+| | |
+|---|---|
+| baris mentah | **80** |
+| **nama unik** | **59** |
+| muncul di 4–5 daftar | **NIHIL** |
+| muncul di 3 daftar | **6** |
+| hanya sekali | **44 — 75 %** |
+
+⭐ **Irisan ketiga registry umum — yang berisi 14, 22, dan 25 agent — tepat
+ENAM:** `Career · Fashion · Habit · Learning · Social · Travel` — dan
+**keenamnya agent DOMAIN**. Tak satu pun agent inti/sistem bertahan di
+ketiganya.
+
+⚠️ Tiga pasang nyaris-kembar (`Orchestrator`↔`Supreme Orchestrator` ·
+`Planner`↔`Planning` · `Finance`↔`Finance Behavior`) akan menaikkannya jadi
+tujuh — **sengaja tidak dipakai**: menyamakannya KEPUTUSAN, bukan pengukuran.
+
+⇒ Untuk [#89](../../issues/89) (*mana agent, mana service*): **44 dari 59 nama
+cuma pernah disebut sekali** — kandidat terkuat untuk *bukan agent*.
+💡 **Menjumlahkan daftar bukan menghitung himpunan.**
+→ **E-154** / [#150](../../issues/150).
 
 ### Yang menunggu keputusan pemilik
 
