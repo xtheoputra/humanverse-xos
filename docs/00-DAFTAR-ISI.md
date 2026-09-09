@@ -16,13 +16,13 @@
 
 | Hal | Jumlah |
 |---|---|
-| Berkas di `docs/` | **270** — 269 dokumen + daftar ini |
+| Berkas di `docs/` | **271** — 270 dokumen + daftar ini |
 | — bernomor `01`–`275` | 261 |
-| — tanpa nomor (`GERBANG-SKEMA`, `PETA-FASE`, `SENSUS-AGENT`, `SENSUS-EVENT`, `SENSUS-MODUL`, `SENSUS-TABEL`, `SENSUS-TANGGA`, `SESSION-LOG`) | 8 |
-| — berlaku lintas-naskah (termasuk `99`) | 9 |
+| — tanpa nomor (`GERBANG-SKEMA`, `PETA-FASE`, `SENSUS-AGENT`, `SENSUS-EVENT`, `SENSUS-MODUL`, `SENSUS-RANTAI`, `SENSUS-TABEL`, `SENSUS-TANGGA`, `SESSION-LOG`) | 9 |
+| — berlaku lintas-naskah (termasuk `99`) | 10 |
 | Berkas di [`../spec/`](../spec/README.md) | 8 |
 | Naskah pemilik yang direkam | **24** (Phase 20 = fase terakhir) |
-| Baris dokumen `docs/` | 42.252 |
+| Baris dokumen `docs/` | 42.418 |
 | Berkas kode | **0** — disengaja |
 
 ---
@@ -33,7 +33,7 @@ Diperiksa dengan skrip, bukan dengan penglihatan:
 
 | Pemeriksaan | Hasil |
 |---|---|
-| Dokumen yang harus terdaftar | **269** (di luar daftar ini) |
+| Dokumen yang harus terdaftar | **270** (di luar daftar ini) |
 | Nomor ganda | **NIHIL** |
 | Berkas tanpa judul `H1` | **NIHIL** |
 | Judul `H1` yang nomornya tidak cocok nama berkas | **NIHIL** |
@@ -57,6 +57,7 @@ Repo ini terlalu besar untuk dibaca dari `01`. Empat jalur masuk:
 | **tahu apa yang belum diputuskan** | [`99-CATATAN-AUDIT.md`](99-CATATAN-AUDIT.md) → GitHub Issues |
 | **mulai menulis kode** | [`../spec/`](../spec/README.md) → [`GERBANG-SKEMA.md`](GERBANG-SKEMA.md) → [`75`](75-URUTAN-PEMBANGUNAN-V0-V6.md) |
 | **memahami arsitektur akhir** | [`275`](275-ROADMAP-ARSITEKTUR-FINAL-PETA-20-FASE-DAN-MASTER-ARCHITECTURE.md) → mundur ke fase yang menarik |
+| **memeriksa jalur tindakan** | [`SENSUS-RANTAI.md`](SENSUS-RANTAI.md) → [#111](../../issues/111) → [#153](../../issues/153) |
 | **menetapkan ambang risiko** | [`SENSUS-TANGGA.md`](SENSUS-TANGGA.md) → [#60](../../issues/60) → [#152](../../issues/152) |
 | **merancang skema data** | [`SENSUS-TABEL.md`](SENSUS-TABEL.md) → [`../spec/01`](../spec/01-DATABASE-SCHEMA.md) → [#151](../../issues/151) |
 | **menetapkan daftar agent** | [`SENSUS-AGENT.md`](SENSUS-AGENT.md) → [#35](../../issues/35) → [#89](../../issues/89) |
@@ -69,7 +70,7 @@ Repo ini terlalu besar untuk dibaca dari `01`. Empat jalur masuk:
 
 ## Berkas lintas-naskah
 
-Sembilan berkas ini **tidak** merekam satu naskah tertentu; kesembilannya
+Sepuluh berkas ini **tidak** merekam satu naskah tertentu; kesepuluhnya
 berlaku untuk seluruh repo.
 
 | Berkas | Isi | Baris |
@@ -77,6 +78,7 @@ berlaku untuk seluruh repo.
 | [**Catatan Audit & Keputusan Terbuka**](99-CATATAN-AUDIT.md) | Butir **A** (pertanyaan pemilik) · **B** (risiko teknis) · **C** (hukum & kepatuhan) · **D** (celah) · **E** (ketidakcocokan antar-naskah) · **F** (sudah diperiksa, benar) · **G** (lubang di dalam naskah) · **H** (sudah diputuskan). **Bukan kata pemilik.** | 1.307 |
 | [**Gerbang Skema**](GERBANG-SKEMA.md) | Apa yang mengunci — dan apa yang **tidak** mengunci — Engineering Spec. | 116 |
 | [**Peta Fase**](PETA-FASE.md) | Tiga peta fase dibandingkan dengan yang benar-benar terjadi; nama Phase 1–20 beserta buktinya; deret permintaan pemilik yang berulang. **Bukan kata pemilik.** | 187 |
+| [**Sensus Rantai Keputusan**](SENSUS-RANTAI.md) | **20 dari 36** rantai tindakan sudah punya gerbang — denominator yang belum pernah ada; tiga yang belum menggerakkan benda fisik. **Bukan kata pemilik.** | 119 |
 | [**Sensus Tangga Risiko & Otonomi**](SENSUS-TANGGA.md) | Empat tangga risiko berdampingan; satu tindakan yang sama berpindah **melewati ambang konfirmasi**. **Bukan kata pemilik.** | 116 |
 | [**Sensus Nama Tabel**](SENSUS-TABEL.md) | Hitungan tabel berhenti dipelihara di Phase 12: himpunannya **247**, bukan 99; dua tabel didefinisikan **empat kali**. **Bukan kata pemilik.** | 139 |
 | [**Sensus Daftar Agent**](SENSUS-AGENT.md) | Lima daftar agent dibandingkan: **59 nama unik** (bukan “> 40”), nol muncul di semua daftar, inti stabil **enam**. **Bukan kata pemilik.** | 122 |

@@ -6,17 +6,17 @@
 
 ## Sesi 25 — 9 September 2026
 
-**Tidak ada naskah baru. ENAM hal diukur untuk pertama kalinya — overlap antar-modul, peta fase, nama event, daftar agent, nama tabel, dan tangga risiko — dan semuanya membalik angka yang dipakai. Polanya: hitungan BERURUTAN meleset ke bawah · KEJADIAN bukan AKIBAT · PENJUMLAHAN bukan HIMPUNAN · hitungan yang BERHENTI DIPELIHARA · dan tuduhan yang ARAHNYA TERBALIK. Yang terakhir, tangga risiko, menemukan satu tindakan yang berpindah MELEWATI ambang konfirmasi.**
+**Tidak ada naskah baru. TUJUH hal diukur untuk pertama kalinya — overlap antar-modul, peta fase, nama event, daftar agent, nama tabel, dan tangga risiko — dan semuanya membalik angka yang dipakai. Polanya: hitungan BERURUTAN meleset ke bawah · KEJADIAN bukan AKIBAT · PENJUMLAHAN bukan HIMPUNAN · hitungan yang BERHENTI DIPELIHARA · dan tuduhan yang ARAHNYA TERBALIK. Yang terakhir, tangga risiko, menemukan satu tindakan yang berpindah MELEWATI ambang konfirmasi.**
 
 | Hal | Hasil |
 |---|---|
 | Naskah baru | **tidak ada** |
-| Dokumen ditambah | **6 berkas** — [`SENSUS-MODUL.md`](SENSUS-MODUL.md) 321 · [`PETA-FASE.md`](PETA-FASE.md) 187 · [`SENSUS-EVENT.md`](SENSUS-EVENT.md) 164 · [`SENSUS-AGENT.md`](SENSUS-AGENT.md) 122 · [`SENSUS-TABEL.md`](SENSUS-TABEL.md) 139 · [`SENSUS-TANGGA.md`](SENSUS-TANGGA.md) 116 |
-| Dokumen total | 264 → **270** di `docs/`, + 8 di `spec/` |
+| Dokumen ditambah | **7 berkas** — [`SENSUS-MODUL.md`](SENSUS-MODUL.md) 321 · [`PETA-FASE.md`](PETA-FASE.md) 187 · [`SENSUS-EVENT.md`](SENSUS-EVENT.md) 164 · [`SENSUS-AGENT.md`](SENSUS-AGENT.md) 122 · [`SENSUS-TABEL.md`](SENSUS-TABEL.md) 139 · [`SENSUS-TANGGA.md`](SENSUS-TANGGA.md) 116 · [`SENSUS-RANTAI.md`](SENSUS-RANTAI.md) 119 |
+| Dokumen total | 264 → **271** di `docs/`, + 8 di `spec/` |
 | Berkas kode | tetap **0** — skrip pengukur sengaja **tidak** disimpan di repo |
 | `spec/` diubah | **1 baris** — [`04`](../spec/04-API-CONTRACTS.md) `/api/v1` → `/v1`, menuntaskan janji di [#38](../../issues/38) |
-| Issue | 145 → **152** (132 terbuka, 20 ditutup); **#146**–**#152** baru, plus komentar bukti di **#1**, **#38**, **#139**, **#142** |
-| Temuan | **E-151**–**E-156** · **G-20** · **B-39** · 5 cacat indeks diperbaiki · **2 koreksi atas pekerjaan saya sendiri** (klaim #142; awalan `spec/04`) |
+| Issue | 145 → **153** (133 terbuka, 20 ditutup); **#146**–**#153** baru, plus komentar bukti di **#1**, **#38**, **#139**, **#142** |
+| Temuan | **E-151**–**E-157** · **G-20** · **B-39** · 5 cacat indeks diperbaiki · **2 koreksi atas pekerjaan saya sendiri** (klaim #142; awalan `spec/04`) |
 
 ### 🔴🔴 Temuan terbesar: hitungan BERURUTAN meleset ke bawah secara sistematis
 
@@ -332,6 +332,50 @@ baris R2 di tabel yang sama.** → **B-39** / [#152](../../issues/152).
 tiap versi tangga, lalu bandingkan dengan AMBANG yang sudah ditutup.**
 Membandingkan tangganya saja hanya memperlihatkan "turun satu takik";
 melacak satu tindakan memperlihatkan **yang mana yang menyeberang**.
+
+### ⭐ Sensus KETUJUH: rantai keputusan — dan yang ini membawa kabar BAIK
+
+Tujuh catatan melaporkan *“rantai tanpa gerbang”* (*kelima · keenam · ketujuh*)
+**tanpa pernah menyebut penyebutnya**. *“Rantai ketujuh”* tidak bisa dibaca
+tanpa tahu **dari berapa**.
+
+| | |
+|---|---|
+| rantai ber-panah di naskah | **387** |
+| berakhir di tindakan | **36** (31 berkas) |
+| **punya gerbang** | **20** |
+| tidak | 16 |
+
+⭐ **Dua puluh dari tiga puluh enam SUDAH dijaga** — angka itu belum pernah
+ditulis. Catatan sebelumnya hanya melaporkan yang gagal.
+
+🔍 **Dari 16 yang ditandai, 10 BUKAN cacat**: dekomposisi tujuan yang berakhir
+di tindakan **penggunanya sendiri**, gelung observasi, rantai **provenans**
+(arahnya mundur), pipeline CI/CD, **kill-switch**, dan rantai **lapisan
+keselamatan** itu sendiri. Dua lagi sudah tertangani (§16.26 di hulu; #140).
+
+🛑 **Tiga benar-benar baru, dan ketiganya menggerakkan benda fisik** — di luar
+cakupan [#106](../../issues/106) (§15.22) dan [#111](../../issues/111)
+(§16.18·§16.13·§16.34):
+
+- **§15.15** `Hand Tracking → Gesture Recognition → Intent → Action` —
+  **lambaian tangan menjadi tindakan tanpa satu simpul pun di antaranya**,
+  sementara §15.22 di naskah yang sama punya `Permission`;
+- **§16.5** `Human Goal → World Model → Motion Planner → Joint Controller →
+  Execution` — pipa utama humanoid, **dari tujuan manusia langsung ke kendali
+  sendi**, dan kemampuannya termasuk *“membuka pintu”*;
+- **§16.7** `… → Collision Check → Optimization → Execution` — ⭐ punya
+  `Collision Check`, 🛑 tapi itu menjawab *“aman secara fisik”*, bukan
+  *“boleh dilakukan”*.
+
+⚠️ **Dua kekeliruan alat ukur, keduanya membuat hasil tampak lebih aman:**
+(a) hanya membaca rantai MENDATAR — rantai VERTIKAL (`↓` 507, `▼` 311)
+terlewat, padahal itu bentuk yang dipakai naskah 5 untuk jalur konfirmasi;
+(b) kata `HUMAN` diperlakukan gerbang sehingga **`Human Detection` terhitung
+sebagai persetujuan manusia**.
+💡 **Kata yang sama bisa menandai pengaman ATAU sensor yang MEMICU tindakan —
+`Human Detection` di rantai robot adalah pemicu, bukan rem.**
+→ **E-157** / [#153](../../issues/153).
 
 ### Yang menunggu keputusan pemilik
 
