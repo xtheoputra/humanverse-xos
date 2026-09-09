@@ -15,7 +15,7 @@
 | Dokumen total | 264 → **272** di `docs/`, + 8 di `spec/` |
 | Berkas kode | tetap **0** — skrip pengukur sengaja **tidak** disimpan di repo |
 | `spec/` diubah | **4 berkas** — `01` presedensi tabel · `03` tabel padanan 127 nama · `04` awalan `/v1` · `05` aturan 7 + kriteria agent |
-| Issue | 145 → **153** (124 terbuka, **29 ditutup** — sembilan ditutup oleh keputusan K); **#146**–**#153** baru, plus komentar bukti di **#1**, **#38**, **#139**, **#142** |
+| Issue | 145 → **153** (120 terbuka, **33 ditutup** — **13 ditutup sesi ini**: sembilan oleh keputusan K, empat karena **jawabannya sudah ada di `spec/` tapi issue-nya tak pernah ditutup**); **#146**–**#153** baru, plus komentar bukti di **#1**, **#38**, **#139**, **#142** |
 | Temuan | **E-151**–**E-157** · **G-20** · **B-39** · 5 cacat indeks diperbaiki · **2 koreksi atas pekerjaan saya sendiri** (klaim #142; awalan `spec/04`) |
 
 ### 🔴🔴 Temuan terbesar: hitungan BERURUTAN meleset ke bawah secara sistematis

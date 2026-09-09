@@ -22,7 +22,7 @@
 | — berlaku lintas-naskah (termasuk `99`) | 11 |
 | Berkas di [`../spec/`](../spec/README.md) | 8 |
 | Naskah pemilik yang direkam | **24** (Phase 20 = fase terakhir) |
-| Baris dokumen `docs/` | 42.867 |
+| Baris dokumen `docs/` | 42.875 |
 | Berkas kode | **0** — disengaja |
 
 ---
