@@ -6,17 +6,17 @@
 
 ## Sesi 25 — 9 September 2026
 
-**Tidak ada naskah baru. LIMA hal diukur untuk pertama kalinya — overlap antar-modul, peta fase, nama event, daftar agent, dan nama tabel — dan kelimanya membalik angka yang selama ini dipakai. Polanya satu: hitungan BERURUTAN meleset ke bawah · KEJADIAN bukan AKIBAT · PENJUMLAHAN bukan HIMPUNAN · dan hitungan yang BERHENTI DIPELIHARA.**
+**Tidak ada naskah baru. ENAM hal diukur untuk pertama kalinya — overlap antar-modul, peta fase, nama event, daftar agent, nama tabel, dan tangga risiko — dan semuanya membalik angka yang dipakai. Polanya: hitungan BERURUTAN meleset ke bawah · KEJADIAN bukan AKIBAT · PENJUMLAHAN bukan HIMPUNAN · hitungan yang BERHENTI DIPELIHARA · dan tuduhan yang ARAHNYA TERBALIK. Yang terakhir, tangga risiko, menemukan satu tindakan yang berpindah MELEWATI ambang konfirmasi.**
 
 | Hal | Hasil |
 |---|---|
 | Naskah baru | **tidak ada** |
-| Dokumen ditambah | **5 berkas** — [`SENSUS-MODUL.md`](SENSUS-MODUL.md) 321 · [`PETA-FASE.md`](PETA-FASE.md) 187 · [`SENSUS-EVENT.md`](SENSUS-EVENT.md) 164 · [`SENSUS-AGENT.md`](SENSUS-AGENT.md) 122 · [`SENSUS-TABEL.md`](SENSUS-TABEL.md) 139 |
-| Dokumen total | 264 → **269** di `docs/`, + 8 di `spec/` |
+| Dokumen ditambah | **6 berkas** — [`SENSUS-MODUL.md`](SENSUS-MODUL.md) 321 · [`PETA-FASE.md`](PETA-FASE.md) 187 · [`SENSUS-EVENT.md`](SENSUS-EVENT.md) 164 · [`SENSUS-AGENT.md`](SENSUS-AGENT.md) 122 · [`SENSUS-TABEL.md`](SENSUS-TABEL.md) 139 · [`SENSUS-TANGGA.md`](SENSUS-TANGGA.md) 116 |
+| Dokumen total | 264 → **270** di `docs/`, + 8 di `spec/` |
 | Berkas kode | tetap **0** — skrip pengukur sengaja **tidak** disimpan di repo |
 | `spec/` diubah | **1 baris** — [`04`](../spec/04-API-CONTRACTS.md) `/api/v1` → `/v1`, menuntaskan janji di [#38](../../issues/38) |
-| Issue | 145 → **151** (131 terbuka, 20 ditutup); **#146**–**#151** baru, plus komentar bukti di **#1**, **#38**, **#139**, **#142** |
-| Temuan | **E-151**–**E-156** · **G-20** · 5 cacat indeks diperbaiki · **2 koreksi atas pekerjaan saya sendiri** (klaim #142; awalan `spec/04`) |
+| Issue | 145 → **152** (132 terbuka, 20 ditutup); **#146**–**#152** baru, plus komentar bukti di **#1**, **#38**, **#139**, **#142** |
+| Temuan | **E-151**–**E-156** · **G-20** · **B-39** · 5 cacat indeks diperbaiki · **2 koreksi atas pekerjaan saya sendiri** (klaim #142; awalan `spec/04`) |
 
 ### 🔴🔴 Temuan terbesar: hitungan BERURUTAN meleset ke bawah secara sistematis
 
@@ -290,6 +290,48 @@ tepat tiga nama `spec/01` yang tak ada di naskah mana pun.
 memanen fence (`254` §18.28 memakai **backtick** dan hilang seluruhnya).
 💡 **Satu format penulisan yang tak diantisipasi bisa menghapus SATU FASE PENUH
 dari hasil pengukuran.** → **E-156** / [#151](../../issues/151).
+
+### 🛑🛑 Sensus KEENAM: tangga risiko — dan satu tindakan berpindah MELEWATI ambang konfirmasi
+
+Tangga risiko ditulis **empat kali**, dan jumlah anak tangganya **stabil** —
+lima, empat kali berturut-turut (kestabilan yang jarang di repo ini). Yang
+bergeser **isinya**: di naskah 4/5 anak tangga 1 adalah *Rekomendasi*; sejak
+Phase 8 ia *tindakan berdampak rendah*, dan setiap tindakan turun satu takik
+(**E-67**).
+
+Melacak **satu tindakan yang sama** melintasi keempatnya:
+
+| Naskah | “kirim pesan kepada orang lain” |
+|---|---|
+| naskah 4 §16 | 3 |
+| naskah 5 §16 | **3** |
+| Phase 8 §8.16 | **R3** — audit di berkas itu mencatat *“Level 3 ǀ R3 ✅ sama”* |
+| **Phase 11 §11.15** | 🛑 **R2** — *“send low-risk message”* |
+
+**H-15 ([#5](../../issues/5)) sudah menutup ambangnya: otomatis sampai R2,
+konfirmasi wajib mulai R3.** ⇒ **pemindahan itu melewati ambangnya.**
+
+🛑 §11.15 bahkan menaruh pesan di **DUA tingkat dalam satu tabel** — R2
+*low-risk message* lawan R3 *important communication* — dipisahkan hanya oleh
+kata sifat. Pencarian seluruh `docs/`: **`low-risk` tak pernah didefinisikan.**
+
+⭐ **Tetangganya di baris yang sama DISELAMATKAN, pesan tidak.**
+`purchase low-value item` punya cacat identik dan sudah ditandai audit, tetapi
+§11.17 memberinya `amount_limit: 0`. §11.17 memberi bawaan untuk kalender,
+notifikasi (kepada penggunanya sendiri), dan pembelian — **tak ada entri untuk
+pesan kepada pihak ketiga**; §11.18 mendaftar `Messages` tanpa pernah memberinya
+nilai.
+
+🔴 **Dari tiga kategori di baris R2, yang tidak mendapat definisi maupun angka
+bawaan justru satu-satunya yang punya ORANG LAIN di ujung penerimanya.**
+**C-19** ([#81](../../issues/81)) mengandalkan R3⇒konfirmasi untuk melindungi
+penerima dan mencatat *“important communication di R3”* — **ia tidak melihat
+baris R2 di tabel yang sama.** → **B-39** / [#152](../../issues/152).
+
+💡 **Teknik yang menemukannya: ambil SATU tindakan konkret, lacak nilainya di
+tiap versi tangga, lalu bandingkan dengan AMBANG yang sudah ditutup.**
+Membandingkan tangganya saja hanya memperlihatkan "turun satu takik";
+melacak satu tindakan memperlihatkan **yang mana yang menyeberang**.
 
 ### Yang menunggu keputusan pemilik
 
