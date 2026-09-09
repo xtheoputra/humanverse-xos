@@ -49,7 +49,10 @@ Diperbarui: 8 September 2026 · Mencakup **dua puluh empat naskah**:
 > **K-8** awalan `/v1` ([#38](../../issues/38)) ·
 > **K-9** **satu monorepo + uji naik-turun**; keluarga keamanan (**19 pohon**)
 > jadi **satu** `security/`, `governance/` berdiri sendiri ([#55](../../issues/55) —
-> **membuka blokir Sprint 0 tugas 0.1**).
+> **membuka blokir Sprint 0 tugas 0.1**) ·
+> **K-10** satu amplop event, `security.*` jadi domain ([#63](../../issues/63)) ·
+> **K-11** tiap tangga bernomor membawa awalan ([#54](../../issues/54), [#56](../../issues/56)) ·
+> **K-12** `risk_level` wajib + larangan scope diperluas ([#77](../../issues/77), sebagian).
 >
 > 🛑 **Nol butir C saya putuskan**, dan §16.5/§16.7 (humanoid) sengaja
 > ditinggalkan: kalau salahnya ditanggung orang lain, keputusannya bukan milik

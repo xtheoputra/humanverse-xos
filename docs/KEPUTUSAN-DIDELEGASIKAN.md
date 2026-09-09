@@ -243,6 +243,53 @@ fase**, yang belum satu pun ditulis sebagai kode.
 
 ---
 
+## K-10 · Satu amplop event; `SecurityEvent` menjadi domain `security.*`
+
+**Menutup:** [#63](../../issues/63) (**E-69/E-70**)
+
+| | |
+|---|---|
+| **Keputusan** | Ada **satu** amplop event, yaitu milik [`../spec/03`](../spec/03-EVENT-CONTRACTS.md). Security event memakainya juga, dengan `event_type: security.*` (mis. `security.permission_denied`, `security.injection_detected`). Medan `action` dan `resource` §8.41 turun menjadi isi `payload`, bukan bentuk amplop tersendiri. |
+| **Bukti** | §8.26 memasukkan security event ke **bus yang sama** tetapi dengan bentuk lain sama sekali. Dua bentuk di satu bus berarti **setiap consumer harus tahu lebih dulu jenis event mana yang sedang dibacanya** — persis yang dihindari dengan memakai amplop bersama. |
+| **Bacaan yang DITOLAK** | *“Security event itu khusus, wajar punya bentuk sendiri.”* 🛑 **Ditolak dengan alasan yang membalik arahnya:** empat medan yang hilang dari `SecurityEvent` — `schema_version`, `idempotency_key`, `user_id`, dan pemisahan `occurred_at`/`recorded_at` — justru **medan yang membuat sebuah event bisa diaudit**. Dan security event adalah jenis yang **paling mungkin diaudit**. Bentuk khusus itu menghapus tepat kemampuan yang paling dibutuhkannya. |
+| **Cara membalikkan** | Nyatakan amplop kedua secara eksplisit, lengkap dengan registry dan aturan versinya sendiri — bukan dibiarkan berbeda diam-diam. |
+
+---
+
+## K-11 · Setiap tangga bernomor membawa **awalan yang menyebut sumbunya**
+
+**Menutup:** [#54](../../issues/54) (**E-59**) · [#56](../../issues/56) (**E-63/E-64**)
+
+Tiga tabrakan penomoran punya satu bentuk yang sama: **satu nomor, banyak arti.**
+
+| Tabrakan | Sekarang | Keputusan |
+|---|---|---|
+| `Layer 6·11·14·20·22·25` berarti dua hal (naskah 3 lawan naskah 10) | nomor global | **awalan per fase**: `P2-L6` · `P4-L22` · `DP-L6` |
+| `V1–V5` berarti **tiga** hal (lingkup produk · kematangan arsitektur · kematangan data) | satu tangga `V` | `V0–V6` **tetap lingkup produk** (H-13, sudah ditutup); arsitektur → **`ARCH1–ARCH4`**; infrastruktur data → **`INFRA1–INFRA5`** |
+| `D1–D8` dipakai dua kali (naskah 10 & 11) | tanpa awalan | **`D6.1–D6.8`** dan **`D7.1–D7.8`** — awalan = nomor fasenya |
+
+| | |
+|---|---|
+| **Bukti** | Naskah 7 Layer 41 menyatakan tujuan dokumentasinya *“dibaca AI coding agent tanpa kehilangan konteks”*. Nomor yang berarti dua hal **menghapus tepat kemampuan itu** — pembaca tanpa konteks tidak punya cara memilih. |
+| **Bacaan yang DITOLAK** | *“Pakai nomor global yang terus naik saja.”* **Ditolak** — dengan 20 fase nomornya sampai ratusan, dan angka besar itu **tidak memberi tahu apa pun tentang fasenya**. Awalan membawa informasi; nomor urut global tidak. |
+| **Cara membalikkan** | Ganti awalannya. Tidak ada kode yang bergantung pada nomor ini. |
+
+---
+
+## K-12 · `risk_level` wajib pada setiap tool, dan larangan scope diperluas
+
+**Menutup sebagian:** [#77](../../issues/77) (bagian **G-11**)
+
+| | |
+|---|---|
+| **Keputusan** | Dua aturan validasi baru di [`../spec/05`](../spec/05-AGENT-CONTRACTS.md): **(8)** tool tanpa `risk_level` **ditolak** saat registrasi — tidak ada bawaan diam-diam; **(9)** larangan scope untuk `kind: third_party` (aturan 6) diperluas dengan **`spatial`, `location`, `people`, `csi`**. |
+| **Bukti** | **G-11** mencatat 13 tool persepsi §10.26 tanpa satu pun `risk_level`, dan §15.24 mengulanginya untuk lima panggilan SDK spasial yang mengembalikan **denah rumah** dan **posisi pengguna**. Skema `spec/05` memang punya medan itu — tetapi **medan yang ada di skema bukan medan yang ditegakkan**; itu pelajaran repo ini sendiri, berkali-kali. |
+| **Bacaan yang DITOLAK** | *“Beri bawaan `risk_level: 0` supaya tool lama tetap sah.”* 🛑 **Ditolak** — bawaan nol berarti tool yang lupa diberi tingkat risiko otomatis menjadi **yang paling tidak dijaga**. Kalau harus ada bawaan, ia mesti ke sisi yang lebih aman; lebih baik lagi **tidak ada bawaan sama sekali**, sehingga kelalaian berhenti di validator, bukan di produksi. |
+| **Yang TIDAK saya putuskan** | Bagian **B-25** issue itu — *pengulangan memperkuat kesalahan sistematis* (sudut pasang kamera membuat berdiri terbaca duduk, lalu **naik pangkat menjadi pola**). Itu menuntut rancangan deteksi bias yang salahnya **ditanggung pengguna**, dan bukan keputusan penamaan. [#77](../../issues/77) tetap terbuka untuknya. |
+| **Cara membalikkan** | Hapus aturan 8 atau 9. |
+
+---
+
 ## Yang sengaja **tidak** saya putuskan
 
 | Butir | Kenapa |

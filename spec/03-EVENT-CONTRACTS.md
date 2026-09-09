@@ -271,3 +271,37 @@ di bagian atas berkas ini; sisanya milik Phase 10–20.
 | `WorkoutCompleted` | **`workout.completed`** | `16` · `201` · `244` |
 | `WorkoutStarted` | **`workout.started`** | `244` |
 | `WorldStateChanged` | **`world.state_changed`** | `273` |
+
+---
+
+## 🔧 Security event memakai amplop yang sama (K-10)
+
+> Ditambahkan 9 September 2026 — **keputusan didelegasikan K-10**, menutup
+> **E-69/E-70** / [#63](../../issues/63).
+
+§8.26 memasukkan security event ke **bus yang sama**, tetapi §8.41 memberinya
+bentuk yang berbeda sama sekali (`action` + `resource` + `timestamp`, tanpa
+`schema_version`, `idempotency_key`, maupun `user_id`).
+
+**Keputusan: ada satu amplop, yaitu amplop di berkas ini.** Security event
+memakainya dengan `event_type: security.*`:
+
+```
+security.permission_denied · security.consent_revoked · security.auth_failed
+security.injection_detected · security.policy_violated · security.tool_abused
+security.data_accessed · security.agent_flagged
+```
+
+Medan `action` dan `resource` turun menjadi isi **`payload`**, bukan bentuk
+amplop tersendiri.
+
+> 🛑 **Alasannya membalik arah keberatan yang biasa.** Empat medan yang hilang
+> dari `SecurityEvent` — `schema_version`, `idempotency_key`, `user_id`, dan
+> pemisahan `occurred_at`/`recorded_at` — justru **medan yang membuat sebuah
+> event bisa diaudit**. Dan security event adalah jenis yang **paling mungkin
+> diaudit**. Bentuk khusus itu menghapus tepat kemampuan yang paling
+> dibutuhkannya.
+
+⚠️ Kedelapan nama di atas **tidak** menambah event V0 — V0 tetap **22 event**;
+security event lahir di Phase 8.
+

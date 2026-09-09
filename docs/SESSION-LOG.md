@@ -15,7 +15,7 @@
 | Dokumen total | 264 → **272** di `docs/`, + 8 di `spec/` |
 | Berkas kode | tetap **0** — skrip pengukur sengaja **tidak** disimpan di repo |
 | `spec/` diubah | **4 berkas** — `01` presedensi tabel · `03` tabel padanan 127 nama · `04` awalan `/v1` · `05` aturan 7 + kriteria agent |
-| Issue | 145 → **153** (127 terbuka, **26 ditutup** — enam ditutup oleh keputusan K); **#146**–**#153** baru, plus komentar bukti di **#1**, **#38**, **#139**, **#142** |
+| Issue | 145 → **153** (124 terbuka, **29 ditutup** — sembilan ditutup oleh keputusan K); **#146**–**#153** baru, plus komentar bukti di **#1**, **#38**, **#139**, **#142** |
 | Temuan | **E-151**–**E-157** · **G-20** · **B-39** · 5 cacat indeks diperbaiki · **2 koreksi atas pekerjaan saya sendiri** (klaim #142; awalan `spec/04`) |
 
 ### 🔴🔴 Temuan terbesar: hitungan BERURUTAN meleset ke bawah secara sistematis
@@ -400,7 +400,7 @@ diperiksa satu per satu terhadap `spec/`:
 menyatakan sesuatu terhalang, buka berkas yang paling berkepentingan
 membantahnya.**
 
-### 🔧 SEMBILAN keputusan diambil sendiri — atas permintaan pemilik
+### 🔧 DUA BELAS keputusan diambil sendiri — atas permintaan pemilik
 
 Pemilik mendelegasikan: *“beri keputusan sendiri sesuai aturan”*. Batas yang
 saya pegang: **yang engineering saya putuskan; yang salahnya ditanggung orang
@@ -419,8 +419,11 @@ lain tetap milik pemilik.** Semuanya di
 | **K-7** | §15.15 dapat `Permission` | — | [#153](../../issues/153) sebagian |
 | **K-8** | awalan API `/v1` | `spec/04` | [#38](../../issues/38) |
 | **K-9** | **satu monorepo** + **uji naik-turun**; keamanan **19 pohon → satu** | — | [#55](../../issues/55) ✅ |
+| **K-10** | **satu amplop event**; `SecurityEvent` → `security.*` | `spec/03` | [#63](../../issues/63) ✅ |
+| **K-11** | tiap tangga bernomor membawa **awalan** | — | [#54](../../issues/54) ✅ [#56](../../issues/56) ✅ |
+| **K-12** | `risk_level` **wajib**; larangan scope diperluas | `spec/05` aturan 8 & 9 | [#77](../../issues/77) sebagian |
 
-⚠️ **Nol dari sembilan mengubah V0** — `spec/01` tetap 23 tabel, `spec/03` tetap
+⚠️ **Nol dari dua belas mengubah V0** — `spec/01` tetap 23 tabel, `spec/03` tetap
 22 event V0, keempat agent V0 lulus ketiga uji K-5. Diperiksa sesudahnya.
 
 ⭐⭐ **K-9 membuka blokir Sprint 0 tugas 0.1.** [#55](../../issues/55) menanyakan
@@ -437,12 +440,21 @@ digabung.
 mengimpor `security/`*) tidak bisa DINYATAKAN** — tidak ada satu `security/`
 untuk dirujuk.
 
+⭐⭐ **Dua keputusan menolak bawaan yang “masuk akal”, dan alasannya sama:**
+K-12 menolak `risk_level: 0` sebagai bawaan — **tool yang LUPA diberi tingkat
+risiko akan otomatis menjadi yang paling tidak dijaga**; K-10 menolak amplop
+khusus untuk security event — **empat medan yang hilang darinya justru yang
+membuat event bisa DIAUDIT**, dan security event yang paling mungkin diaudit.
+💡 **Tanyakan pada tiap bawaan: kalau seseorang LUPA mengisinya, ke sisi mana
+ia jatuh?**
+
 🛑 **Yang sengaja TIDAK saya putuskan**, dan alasannya satu: **kalau salahnya
 ditanggung orang lain, keputusannya bukan milik saya.**
 [#139](../../issues/139) (waktu pemilik) · [#3](../../issues/3) (orang) ·
 [#20](../../issues/20) (merek) · **seluruh butir C** · **§16.5 & §16.7**
 (humanoid — benda yang bisa melukai orang) · [#34](../../issues/34) (menebak
-ambang lebih buruk daripada membiarkannya terbuka).
+ambang lebih buruk daripada membiarkannya terbuka) · **B-25** di
+[#77](../../issues/77) (deteksi bias sistematis — salahnya ditanggung pengguna).
 
 ⭐ **Yang paling menentukan dari delapan: K-1 dan K-5 ditegakkan VALIDATOR,
 bukan prosa.** Pelajaran repo ini sendiri — *“aturan yang dinyatakan tetapi

@@ -60,6 +60,8 @@ Aturan validasi yang ditegakkan saat registrasi:
 | 5 | Satu `name` hanya boleh punya **satu** baris `status: active`. |
 | 6 | `kind: third_party` **tidak boleh** meminta scope `journal`, `finance`, atau `health`. |
 | 7 🔧 | Tool yang akibatnya sampai kepada **orang selain pemegang akun** (`reaches_third_party: true`) **wajib** `risk_level >= 3`. Manifest yang menurunkannya **ditolak**. |
+| 8 🔧 | Tool **tanpa** `risk_level` **ditolak** saat registrasi. **Tidak ada bawaan** — kelalaian berhenti di validator, bukan di produksi. |
+| 9 🔧 | Perluasan aturan 6: `kind: third_party` juga **tidak boleh** meminta scope `spatial`, `location`, `people`, atau `csi`. |
 
 > Aturan 6 adalah penegakan **C-7/A-15** di lapisan yang paling murah:
 > selama marketplace belum punya proses review, sandbox, dan perjanjian
@@ -83,6 +85,18 @@ Aturan validasi yang ditegakkan saat registrasi:
 > tool level 3 atau 4. Ia berlaku begitu Phase 11 mulai dikodekan.
 > Cara membalikkannya ada di
 > [`../docs/KEPUTUSAN-DIDELEGASIKAN.md`](../docs/KEPUTUSAN-DIDELEGASIKAN.md) K-1.
+
+> 🔧 **Aturan 8 dan 9 (K-12).** **G-11** mencatat 13 tool persepsi §10.26 tanpa
+> satu pun `risk_level`, dan §15.24 mengulanginya untuk lima panggilan SDK
+> spasial yang mengembalikan **denah rumah** dan **posisi pengguna**. Medan
+> `risk_level` memang sudah ada di skema — tetapi **medan yang ada di skema
+> bukan medan yang ditegakkan**.
+>
+> Bawaan `risk_level: 0` sengaja **tidak** dipakai: bawaan nol berarti tool yang
+> lupa diberi tingkat risiko otomatis menjadi **yang paling tidak dijaga**.
+>
+> Aturan 9 memperluas larangan scope aturan 6 ke data spasial, sesuai usul yang
+> sudah dicatat di [`../docs/226`](../docs/226-SDK-REPO-API-DATA-EVENT-DEPLOYMENT.md).
 
 ---
 
