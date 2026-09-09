@@ -59,11 +59,57 @@ Aturan validasi yang ditegakkan saat registrasi:
 | 4 | `evaluation.gates.safety` **wajib** ada dan `>= 0.95`. |
 | 5 | Satu `name` hanya boleh punya **satu** baris `status: active`. |
 | 6 | `kind: third_party` **tidak boleh** meminta scope `journal`, `finance`, atau `health`. |
+| 7 🔧 | Tool yang akibatnya sampai kepada **orang selain pemegang akun** (`reaches_third_party: true`) **wajib** `risk_level >= 3`. Manifest yang menurunkannya **ditolak**. |
 
 > Aturan 6 adalah penegakan **C-7/A-15** di lapisan yang paling murah:
 > selama marketplace belum punya proses review, sandbox, dan perjanjian
 > pemroses data, agent pihak ketiga tidak bisa meminta data paling sensitif —
 > ditolak oleh validator, bukan oleh kebijakan tertulis.
+
+> 🔧 **Aturan 7 (ditambahkan 9 Sep 2026, keputusan didelegasikan K-1).**
+> §11.15 menaruh `send low-risk message` di **R2** — di bawah ambang
+> konfirmasi yang **H-15** ([#5](../../issues/5)) tetapkan di R3 — sementara
+> tiga tangga risiko sebelumnya menaruh pengiriman pesan di **3/R3**, dan kata
+> *“low-risk”* tidak pernah didefinisikan di mana pun. Tetangganya di baris yang
+> sama, `purchase low-value item`, punya penyelamat berupa angka
+> (`amount_limit: 0`); pesan tidak punya padanannya.
+>
+> **Yang menanggung risikonya adalah penerima**, yang tidak pernah menyetujui
+> apa pun (**C-19**). Karena penilai dan penanggung risiko bukan pihak yang
+> sama, bawaannya diambil ke sisi yang lebih aman sampai ada definisi yang bisa
+> diuji mesin.
+>
+> ⚠️ **Untuk V0 aturan ini tidak mengubah apa pun** — V0 tidak punya satu pun
+> tool level 3 atau 4. Ia berlaku begitu Phase 11 mulai dikodekan.
+> Cara membalikkannya ada di
+> [`../docs/KEPUTUSAN-DIDELEGASIKAN.md`](../docs/KEPUTUSAN-DIDELEGASIKAN.md) K-1.
+
+---
+
+## 🔧 Kapan sesuatu adalah agent, dan kapan ia service (K-5)
+
+> Ditambahkan 9 September 2026 — **keputusan didelegasikan K-5**, menutup
+> **G-13** / [#89](../../issues/89).
+
+Sebuah komponen masuk registry agent **hanya bila ketiganya benar**:
+
+| # | Uji | Kalau tidak |
+|---|---|---|
+| a | merencanakan **lebih dari satu langkah** | urutan tetap ⇒ service |
+| b | **memilih** di antara beberapa tool saat berjalan | pemanggilan tetap ⇒ service |
+| c | bisa **dihentikan di tengah** dan meninggalkan jejak yang bisa dilanjutkan (`agent_runs`) | sekali jalan ⇒ service |
+
+⭐ **Ketiganya juga persis yang membuat risk gate bermakna**: sesuatu yang tidak
+memilih tool tidak butuh gerbang tool. Uji (b) sendirian meloloskan pipeline
+bercabang; uji (c) sendirian meloloskan job antrean biasa.
+
+Dasarnya kata pemilik sendiri, §12.29: *“jangan membuat semuanya sebagai
+autonomous agent sejak awal — sebagian lebih baik sebagai deterministic/model
+services.”* Itu satu-satunya peringatan semacam itu dalam 24 naskah, dan
+sensus menemukan **44 dari 59 nama agent hanya pernah disebut sekali**
+([`../docs/SENSUS-AGENT.md`](../docs/SENSUS-AGENT.md)).
+
+⚠️ Keempat agent V0 lulus ketiga uji. Kriteria ini **tidak** mengubah V0.
 
 ---
 
@@ -85,8 +131,16 @@ output:
   longest:            integer
   completion_rate:    number
 side_effects: none                 # none | writes_user_data | external_call
+reaches_third_party: false         # 🔧 K-1: true bila akibatnya sampai ke orang
+                                   #     selain pemegang akun. true ⇒ risk_level >= 3
 rate_limit:   60/min/user
 ```
+
+> 🔧 **`reaches_third_party` (K-1).** Medan ini yang ditegakkan aturan 7. Ia
+> sengaja **bukan** turunan dari `side_effects`: `external_call` bisa berarti
+> memanggil API cuaca (tak menyentuh siapa pun) **atau** mengirim pesan kepada
+> orang lain — dua hal yang risikonya berbeda jauh, dan satu medan tidak bisa
+> memisahkannya. Seluruh tool V0 bernilai `false`.
 
 Tool V0:
 

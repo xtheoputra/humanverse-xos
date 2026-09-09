@@ -116,3 +116,158 @@ menyusul — supaya nama dan bentuknya tidak berubah nanti.
 > Consumer yang "boleh gagal" wajib **idempoten**, karena akan diulang.
 > Di V0 antreannya Redis Streams dengan consumer group; Kafka baru bila
 > skalanya menuntut (naskah 5 §5).
+
+---
+
+## 🔧 Padanan nama event naskah → `domain.verb` (K-3)
+
+> Ditambahkan 9 September 2026 — **keputusan didelegasikan K-3**, lihat
+> [`../docs/KEPUTUSAN-DIDELEGASIKAN.md`](../docs/KEPUTUSAN-DIDELEGASIKAN.md).
+
+[#38](../../issues/38) memilih **dua segmen huruf kecil**. Sejak naskah 5,
+naskah menamai **127 event baru** dengan `PascalCase` dan **nol** memakai
+format yang dipilih ([`../docs/SENSUS-EVENT.md`](../docs/SENSUS-EVENT.md)).
+
+**Berkas naskah tidak diubah** — aturan repo menyatakan naskah merekam kata
+pemilik apa adanya. Tabel ini yang menjadi jembatannya, dan **berkas ini
+adalah satu-satunya sumber nama yang sampai ke kode**.
+
+Padanannya mekanis dan bisa diperiksa: **kata pertama → domain, sisanya →
+verb `snake_case`**.
+
+⚠️ **Tiga baris bertanda ⚠️ bukan sekadar beda bentuk — kata kerjanya berbeda
+untuk kejadian yang sama**, dan diselesaikan ke arah berkas ini sebab nama itu
+sudah ada di DDL.
+
+⚠️ Tabel ini **tidak** menambahkan satu pun event ke V0. V0 tetap **22 event**
+di bagian atas berkas ini; sisanya milik Phase 10–20.
+
+| PascalCase di naskah | `domain.verb` | Naskah |
+|---|---|---|
+| `ActivityDetected` | **`activity.detected`** | `174` |
+| `AgentActionApproved` | **`agent.action_approved`** | `187` |
+| `AgentActionExecuted` | **`agent.action_executed`** | `187` |
+| `AgentActionFailed` | **`agent.action_failed`** | `187` |
+| `AgentActionRejected` | **`agent.action_rejected`** | `187` |
+| `AgentActionRequested` | **`agent.action_requested`** | `187` |
+| `AgentActionVerified` | **`agent.action_verified`** | `187` |
+| `AgentAuthenticated` | **`agent.authenticated`** | `218` |
+| `AgentBillingCreated` | **`agent.billing_created`** | `218` |
+| `AgentBudgetExceeded` | **`agent.budget_exceeded`** | `187` |
+| `AgentCertified` | **`agent.certified`** | `218` |
+| `AgentConflictDetected` | **`agent.conflict_detected`** | `218` |
+| `AgentConsensusFailed` | **`agent.consensus_failed`** | `218` |
+| `AgentConsensusReached` | **`agent.consensus_reached`** | `218` |
+| `AgentCreated` | **`agent.created`** | `187` |
+| `AgentDelegated` | **`agent.delegated`** | `218` |
+| `AgentDelegationRejected` | **`agent.delegation_rejected`** | `218` |
+| `AgentDiscovered` | **`agent.discovered`** | `218` |
+| `AgentKilled` | **`agent.killed`** | `187` · `218` |
+| `AgentPermissionGranted` | **`agent.permission_granted`** | `187` |
+| `AgentPermissionRequested` | **`agent.permission_requested`** | `187` |
+| `AgentPermissionRevoked` | **`agent.permission_revoked`** | `187` |
+| `AgentPlanApproved` | **`agent.plan_approved`** | `187` |
+| `AgentPlanGenerated` | **`agent.plan_generated`** | `187` |
+| `AgentPolicyViolation` | **`agent.policy_violation`** | `187` |
+| `AgentProposalCreated` | **`agent.proposal_created`** | `218` |
+| `AgentQuarantined` | **`agent.quarantined`** | `218` |
+| `AgentResumed` | **`agent.resumed`** | `187` |
+| `AgentRevoked` | **`agent.revoked`** | `218` |
+| `AgentSecurityViolation` | **`agent.security_violation`** | `218` |
+| `AgentStarted` | **`agent.started`** | `187` |
+| `AgentStopped` | **`agent.stopped`** | `187` |
+| `AgentSuspended` | **`agent.suspended`** | `187` |
+| `AgentTaskCompleted` | **`agent.task_completed`** | `187` |
+| `AgentTaskCreated` | **`agent.task_created`** | `187` |
+| `AgentTaskFailed` | **`agent.task_failed`** | `187` |
+| `AgentTrustUpdated` | **`agent.trust_updated`** | `218` |
+| `AgentUsageRecorded` | **`agent.usage_recorded`** | `218` |
+| `AnchorCreated` | **`anchor.created`** | `226` |
+| `AudioCaptured` | **`audio.captured`** | `174` |
+| `BatteryLow` | **`battery.low`** | `235` |
+| `CivilizationEventDetected` | **`civilization.event_detected`** | `273` |
+| `CivilizationRiskChanged` | **`civilization.risk_changed`** | `273` |
+| `ClimateSignalDetected` | **`climate.signal_detected`** | `273` |
+| `CompanyAcquired` | **`company.acquired`** | `247` |
+| `DeadlineApproaching` | **`deadline.approaching`** | `201` |
+| `DiseaseOutbreakReported` | **`disease.outbreak_reported`** | `247` |
+| `DocumentUploaded` | **`document.uploaded`** | `174` |
+| `EarthquakeDetected` | **`earthquake.detected`** | `247` |
+| `EconomicStateChanged` | **`economic.state_changed`** | `273` |
+| `EmergencyStop` | **`emergency.stop`** | `235` |
+| `EnergyChanged` | **`energy.changed`** | `201` |
+| `FlightCancelled` | **`flight.cancelled`** | `247` |
+| `GestureDetected` | **`gesture.detected`** | `174` |
+| `GestureRecognized` | **`gesture.recognized`** | `226` |
+| `GoalChanged` | **`goal.changed`** | `201` |
+| `GoalCreated` | **`goal.created`** | `201` |
+| `HabitCompleted` | **`habit.completed`** | `201` |
+| `HealthAnomalyDetected` | **`health.anomaly_detected`** | `244` |
+| `HealthConsentGranted` | **`health.consent_granted`** | `244` |
+| `HealthConsentRevoked` | **`health.consent_revoked`** | `244` |
+| `HealthInsightGenerated` | **`health.insight_generated`** | `244` |
+| `HealthRecommendationCreated` | **`health.recommendation_created`** | `244` |
+| `HeartRateRecorded` | **`heart.rate_recorded`** | `244` |
+| `HumanDetected` | **`human.detected`** | `235` |
+| `ImageCaptured` | **`image.captured`** | `174` |
+| `ImpactAssessmentCompleted` | **`impact.assessment_completed`** | `273` |
+| `InfrastructureFailureDetected` | **`infrastructure.failure_detected`** | `273` |
+| `InterestRateChanged` | **`interest.rate_changed`** | `247` |
+| `LargeScaleScenarioCreated` | **`large.scale_scenario_created`** | `273` |
+| `LocationChanged` | **`location.changed`** | `174` · `201` |
+| `MapUpdated` | **`map.updated`** | `226` |
+| `MarketMoved` | **`market.moved`** | `247` |
+| `MealDetected` | **`meal.detected`** | `244` |
+| `MeetingEnded` | **`meeting.completed`** ⚠️ | `201` |
+| `MeetingStarted` | **`meeting.started`** | `201` |
+| `MissionCompleted` | **`mission.completed`** | `235` |
+| `MissionFailed` | **`mission.failed`** | `235` |
+| `MoodChanged` | **`mood.logged`** ⚠️ | `201` |
+| `NavigationFinished` | **`navigation.finished`** | `226` |
+| `NavigationStarted` | **`navigation.started`** | `226` |
+| `NutritionLogged` | **`nutrition.logged`** | `244` |
+| `ObjectDetected` | **`object.detected`** | `174` · `226` |
+| `ObjectGrasped` | **`object.grasped`** | `235` |
+| `ObjectLost` | **`object.lost`** | `226` |
+| `ObjectMoved` | **`object.moved`** | `226` |
+| `ObjectReleased` | **`object.released`** | `235` |
+| `ObstacleDetected` | **`obstacle.detected`** | `235` |
+| `OccupancyChanged` | **`occupancy.changed`** | `226` |
+| `OilPriceChanged` | **`oil.price_changed`** | `247` |
+| `PersonDetected` | **`person.detected`** | `174` |
+| `PersonEntered` | **`person.entered`** | `226` |
+| `PersonExited` | **`person.exited`** | `226` |
+| `PolicyChanged` | **`policy.changed`** | `247` · `273` |
+| `ProductLaunched` | **`product.launched`** | `247` |
+| `RecommendationAccepted` | **`recommendation.accepted`** | `201` |
+| `RecommendationRejected` | **`recommendation.rejected`** | `201` |
+| `RecoveryChanged` | **`recovery.changed`** | `244` |
+| `RecoveryStarted` | **`recovery.started`** | `235` |
+| `ResearchPublished` | **`research.published`** | `247` |
+| `RobotArrived` | **`robot.arrived`** | `235` |
+| `RobotMoved` | **`robot.moved`** | `235` |
+| `RobotStarted` | **`robot.started`** | `235` |
+| `RobotStopped` | **`robot.stopped`** | `235` |
+| `RoomScanned` | **`room.scanned`** | `226` |
+| `SceneChanged` | **`scene.changed`** | `174` |
+| `ScientificDiscoveryPublished` | **`scientific.discovery_published`** | `273` |
+| `SensorReadingReceived` | **`sensor.reading_received`** | `174` |
+| `SleepEnded` | **`sleep.completed`** ⚠️ | `201` · `244` |
+| `SleepQualityChanged` | **`sleep.quality_changed`** | `244` |
+| `SleepStarted` | **`sleep.started`** | `16` · `201` · `244` |
+| `SpatialMapUpdated` | **`spatial.map_updated`** | `174` |
+| `SpeechDetected` | **`speech.detected`** | `174` |
+| `StormFormed` | **`storm.formed`** | `247` |
+| `StressIndicatorChanged` | **`stress.indicator_changed`** | `244` |
+| `SupplyChainDisrupted` | **`supply.chain_disrupted`** | `247` |
+| `SupplyChainDisruption` | **`supply.chain_disruption`** | `273` |
+| `TaskCompleted` | **`task.completed`** | `201` |
+| `TechnologyBreakthroughDetected` | **`technology.breakthrough_detected`** | `273` |
+| `TechnologyReleased` | **`technology.released`** | `247` |
+| `TrafficChanged` | **`traffic.changed`** | `247` |
+| `VideoCaptured` | **`video.captured`** | `174` |
+| `WearableReadingReceived` | **`wearable.reading_received`** | `174` |
+| `WiFiMotionDetected` | **`wifi.motion_detected`** | `226` |
+| `WorkoutCompleted` | **`workout.completed`** | `16` · `201` · `244` |
+| `WorkoutStarted` | **`workout.started`** | `244` |
+| `WorldStateChanged` | **`world.state_changed`** | `273` |

@@ -11,11 +11,11 @@
 | Hal | Hasil |
 |---|---|
 | Naskah baru | **tidak ada** |
-| Dokumen ditambah | **7 berkas** (+ [`GERBANG-SKEMA.md`](GERBANG-SKEMA.md) diperiksa ulang) — [`SENSUS-MODUL.md`](SENSUS-MODUL.md) 321 · [`PETA-FASE.md`](PETA-FASE.md) 187 · [`SENSUS-EVENT.md`](SENSUS-EVENT.md) 164 · [`SENSUS-AGENT.md`](SENSUS-AGENT.md) 122 · [`SENSUS-TABEL.md`](SENSUS-TABEL.md) 139 · [`SENSUS-TANGGA.md`](SENSUS-TANGGA.md) 116 · [`SENSUS-RANTAI.md`](SENSUS-RANTAI.md) 119 |
-| Dokumen total | 264 → **271** di `docs/`, + 8 di `spec/` |
+| Dokumen ditambah | **8 berkas** (+ [`GERBANG-SKEMA.md`](GERBANG-SKEMA.md) diperiksa ulang) — [`KEPUTUSAN-DIDELEGASIKAN.md`](KEPUTUSAN-DIDELEGASIKAN.md) 177 · [`SENSUS-MODUL.md`](SENSUS-MODUL.md) 321 · [`PETA-FASE.md`](PETA-FASE.md) 187 · [`SENSUS-EVENT.md`](SENSUS-EVENT.md) 164 · [`SENSUS-AGENT.md`](SENSUS-AGENT.md) 122 · [`SENSUS-TABEL.md`](SENSUS-TABEL.md) 139 · [`SENSUS-TANGGA.md`](SENSUS-TANGGA.md) 116 · [`SENSUS-RANTAI.md`](SENSUS-RANTAI.md) 119 |
+| Dokumen total | 264 → **272** di `docs/`, + 8 di `spec/` |
 | Berkas kode | tetap **0** — skrip pengukur sengaja **tidak** disimpan di repo |
-| `spec/` diubah | **1 baris** — [`04`](../spec/04-API-CONTRACTS.md) `/api/v1` → `/v1`, menuntaskan janji di [#38](../../issues/38) |
-| Issue | 145 → **153** (133 terbuka, 20 ditutup); **#146**–**#153** baru, plus komentar bukti di **#1**, **#38**, **#139**, **#142** |
+| `spec/` diubah | **4 berkas** — `01` presedensi tabel · `03` tabel padanan 127 nama · `04` awalan `/v1` · `05` aturan 7 + kriteria agent |
+| Issue | 145 → **153** (128 terbuka, **25 ditutup** — lima ditutup oleh keputusan K); **#146**–**#153** baru, plus komentar bukti di **#1**, **#38**, **#139**, **#142** |
 | Temuan | **E-151**–**E-157** · **G-20** · **B-39** · 5 cacat indeks diperbaiki · **2 koreksi atas pekerjaan saya sendiri** (klaim #142; awalan `spec/04`) |
 
 ### 🔴🔴 Temuan terbesar: hitungan BERURUTAN meleset ke bawah secara sistematis
@@ -399,6 +399,40 @@ diperiksa satu per satu terhadap `spec/`:
 💡 Ini menerapkan aturan berkas itu sendiri kepada diri sendiri: **sebelum
 menyatakan sesuatu terhalang, buka berkas yang paling berkepentingan
 membantahnya.**
+
+### 🔧 DELAPAN keputusan diambil sendiri — atas permintaan pemilik
+
+Pemilik mendelegasikan: *“beri keputusan sendiri sesuai aturan”*. Batas yang
+saya pegang: **yang engineering saya putuskan; yang salahnya ditanggung orang
+lain tetap milik pemilik.** Semuanya di
+[`KEPUTUSAN-DIDELEGASIKAN.md`](KEPUTUSAN-DIDELEGASIKAN.md), tiap butir dengan
+**bacaan yang DITOLAK** dan **cara MEMBALIKKANNYA**.
+
+| | Keputusan | Ditegakkan di | Issue |
+|---|---|---|---|
+| **K-1** | kapabilitas menyentuh **pihak ketiga** = min **R3** | `spec/05` aturan 7 + medan `reaches_third_party` | [#152](../../issues/152) ✅ |
+| **K-2** | `world-model/` **menyimpan**, `simulation/` **menjalankan** | — | [#147](../../issues/147) ✅ |
+| **K-3** | **127 nama event** dipadankan; naskah **tak diubah** | `spec/03` tabel padanan | [#149](../../issues/149) ✅ |
+| **K-4** | tabel ganda: `spec/01` menang, lalu fase terawal | `spec/01` | [#151](../../issues/151) ✅ |
+| **K-5** | **tiga uji** agent lawan service | `spec/05` | [#89](../../issues/89) ✅ |
+| **K-6** | tujuh **kata kerja** Phase 2–8 | — | [#142](../../issues/142) sebagian |
+| **K-7** | §15.15 dapat `Permission` | — | [#153](../../issues/153) sebagian |
+| **K-8** | awalan API `/v1` | `spec/04` | [#38](../../issues/38) |
+
+⚠️ **Nol dari delapan mengubah V0** — `spec/01` tetap 23 tabel, `spec/03` tetap
+22 event V0, keempat agent V0 lulus ketiga uji K-5. Diperiksa sesudahnya.
+
+🛑 **Yang sengaja TIDAK saya putuskan**, dan alasannya satu: **kalau salahnya
+ditanggung orang lain, keputusannya bukan milik saya.**
+[#139](../../issues/139) (waktu pemilik) · [#3](../../issues/3) (orang) ·
+[#20](../../issues/20) (merek) · **seluruh butir C** · **§16.5 & §16.7**
+(humanoid — benda yang bisa melukai orang) · [#34](../../issues/34) (menebak
+ambang lebih buruk daripada membiarkannya terbuka).
+
+⭐ **Yang paling menentukan dari delapan: K-1 dan K-5 ditegakkan VALIDATOR,
+bukan prosa.** Pelajaran repo ini sendiri — *“aturan yang dinyatakan tetapi
+tidak dijaga”* — sudah muncul berkali-kali; keputusan yang cuma ditulis akan
+bernasib sama.
 
 ### Yang menunggu keputusan pemilik
 

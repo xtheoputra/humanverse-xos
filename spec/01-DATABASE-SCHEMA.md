@@ -9,6 +9,27 @@ Target: **PostgreSQL 16**. Ekstensi: `pgcrypto` (untuk `gen_random_uuid()`),
 
 ---
 
+## 🔧 Presedensi ketika sebuah tabel didefinisikan lebih dari sekali (K-4)
+
+> Ditambahkan 9 September 2026 — **keputusan didelegasikan K-4**, menutup
+> **E-156** / [#151](../../issues/151).
+
+Sensus menemukan **19 nama tabel yang didefinisikan lebih dari sekali** lintas
+fase — `agent_capabilities` dan `agent_trust_scores` masing-masing **empat
+kali** ([`../docs/SENSUS-TABEL.md`](../docs/SENSUS-TABEL.md)). Aturannya:
+
+1. **Kalau namanya ada di berkas ini, definisi berkas ini yang berlaku.**
+2. Kalau tidak, **definisi fase paling awal** yang kanonik.
+3. Fase berikutnya boleh **menambah kolom**; tidak boleh **mendefinisikan
+   ulang** bentuk yang sudah ada.
+
+⚠️ Ini **tidak menambah atau mengubah satu tabel pun di V0** — jumlahnya tetap
+**23**. Ia hanya menetapkan siapa yang menang kalau nama yang sama muncul lagi
+di fase berikutnya.
+
+---
+
+
 ## Konvensi
 
 | Hal | Aturan |

@@ -34,6 +34,25 @@ Diperbarui: 8 September 2026 · Mencakup **dua puluh empat naskah**:
 
 ## H. Sudah diputuskan / ditutup
 
+> 🔧 **Delapan butir K (9 Sep 2026) diputuskan oleh SAYA, bukan pemilik** —
+> atas permintaan pemilik sendiri (*“beri keputusan sendiri sesuai aturan”*).
+> Semuanya bertanda **usulan** dan tiap butir menyebut **bacaan yang ditolak**
+> serta **cara membalikkannya**: lihat
+> [`KEPUTUSAN-DIDELEGASIKAN.md`](KEPUTUSAN-DIDELEGASIKAN.md).
+> **K-1** pihak ketiga = min R3 ([#152](../../issues/152)) ·
+> **K-2** `world-model` menyimpan / `simulation` menjalankan ([#147](../../issues/147)) ·
+> **K-3** 127 nama event dipadankan, naskah tak diubah ([#149](../../issues/149)) ·
+> **K-4** presedensi tabel ganda ([#151](../../issues/151)) ·
+> **K-5** tiga uji agent lawan service ([#89](../../issues/89)) ·
+> **K-6** tujuh kata kerja Phase 2–8 ([#142](../../issues/142), sebagian) ·
+> **K-7** §15.15 dapat `Permission` ([#153](../../issues/153), sebagian) ·
+> **K-8** awalan `/v1` ([#38](../../issues/38)).
+>
+> 🛑 **Nol butir C saya putuskan**, dan §16.5/§16.7 (humanoid) sengaja
+> ditinggalkan: kalau salahnya ditanggung orang lain, keputusannya bukan milik
+> saya.
+
+
 Naskah keempat, naskah kelima, dan keputusan pemilik 3 September 2026 menutup
 butir-butir ini. ⚠️ **H-8 dibatalkan** — lihat barisnya.
 

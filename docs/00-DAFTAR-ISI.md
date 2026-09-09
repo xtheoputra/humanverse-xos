@@ -16,13 +16,13 @@
 
 | Hal | Jumlah |
 |---|---|
-| Berkas di `docs/` | **271** — 270 dokumen + daftar ini |
+| Berkas di `docs/` | **272** — 271 dokumen + daftar ini |
 | — bernomor `01`–`275` | 261 |
-| — tanpa nomor (`GERBANG-SKEMA`, `PETA-FASE`, `SENSUS-AGENT`, `SENSUS-EVENT`, `SENSUS-MODUL`, `SENSUS-RANTAI`, `SENSUS-TABEL`, `SENSUS-TANGGA`, `SESSION-LOG`) | 9 |
-| — berlaku lintas-naskah (termasuk `99`) | 10 |
+| — tanpa nomor (`GERBANG-SKEMA`, `PETA-FASE`, `SENSUS-AGENT`, `SENSUS-EVENT`, `SENSUS-MODUL`, `KEPUTUSAN-DIDELEGASIKAN`, `SENSUS-RANTAI`, `SENSUS-TABEL`, `SENSUS-TANGGA`, `SESSION-LOG`) | 10 |
+| — berlaku lintas-naskah (termasuk `99`) | 11 |
 | Berkas di [`../spec/`](../spec/README.md) | 8 |
 | Naskah pemilik yang direkam | **24** (Phase 20 = fase terakhir) |
-| Baris dokumen `docs/` | 42.448 |
+| Baris dokumen `docs/` | 42.703 |
 | Berkas kode | **0** — disengaja |
 
 ---
@@ -33,7 +33,7 @@ Diperiksa dengan skrip, bukan dengan penglihatan:
 
 | Pemeriksaan | Hasil |
 |---|---|
-| Dokumen yang harus terdaftar | **270** (di luar daftar ini) |
+| Dokumen yang harus terdaftar | **271** (di luar daftar ini) |
 | Nomor ganda | **NIHIL** |
 | Berkas tanpa judul `H1` | **NIHIL** |
 | Judul `H1` yang nomornya tidak cocok nama berkas | **NIHIL** |
@@ -55,6 +55,7 @@ Repo ini terlalu besar untuk dibaca dari `01`. Empat jalur masuk:
 | Kalau Anda ingin… | Baca ini |
 |---|---|
 | **tahu apa yang belum diputuskan** | [`99-CATATAN-AUDIT.md`](99-CATATAN-AUDIT.md) → GitHub Issues |
+| **tahu apa yang sudah saya putuskan sendiri** | [`KEPUTUSAN-DIDELEGASIKAN.md`](KEPUTUSAN-DIDELEGASIKAN.md) |
 | **mulai menulis kode** | [`../spec/`](../spec/README.md) → [`GERBANG-SKEMA.md`](GERBANG-SKEMA.md) → [`75`](75-URUTAN-PEMBANGUNAN-V0-V6.md) |
 | **memahami arsitektur akhir** | [`275`](275-ROADMAP-ARSITEKTUR-FINAL-PETA-20-FASE-DAN-MASTER-ARCHITECTURE.md) → mundur ke fase yang menarik |
 | **memeriksa jalur tindakan** | [`SENSUS-RANTAI.md`](SENSUS-RANTAI.md) → [#111](../../issues/111) → [#153](../../issues/153) |
@@ -70,12 +71,13 @@ Repo ini terlalu besar untuk dibaca dari `01`. Empat jalur masuk:
 
 ## Berkas lintas-naskah
 
-Sepuluh berkas ini **tidak** merekam satu naskah tertentu; kesepuluhnya
+Sebelas berkas ini **tidak** merekam satu naskah tertentu; kesebelasnya
 berlaku untuk seluruh repo.
 
 | Berkas | Isi | Baris |
 |---|---|---|
 | [**Catatan Audit & Keputusan Terbuka**](99-CATATAN-AUDIT.md) | Butir **A** (pertanyaan pemilik) · **B** (risiko teknis) · **C** (hukum & kepatuhan) · **D** (celah) · **E** (ketidakcocokan antar-naskah) · **F** (sudah diperiksa, benar) · **G** (lubang di dalam naskah) · **H** (sudah diputuskan). **Bukan kata pemilik.** | 1.307 |
+| [**Keputusan yang Didelegasikan**](KEPUTUSAN-DIDELEGASIKAN.md) | Delapan keputusan engineering yang **saya ambil sendiri** atas permintaan pemilik, tiap butir dengan **bacaan yang ditolak** dan **cara membalikkannya**. **Bukan kata pemilik.** | 177 |
 | [**Gerbang Skema**](GERBANG-SKEMA.md) | Apa yang mengunci — dan apa yang **tidak** mengunci — Engineering Spec. | 146 |
 | [**Peta Fase**](PETA-FASE.md) | Tiga peta fase dibandingkan dengan yang benar-benar terjadi; nama Phase 1–20 beserta buktinya; deret permintaan pemilik yang berulang. **Bukan kata pemilik.** | 187 |
 | [**Sensus Rantai Keputusan**](SENSUS-RANTAI.md) | **20 dari 36** rantai tindakan sudah punya gerbang — denominator yang belum pernah ada; tiga yang belum menggerakkan benda fisik. **Bukan kata pemilik.** | 119 |
