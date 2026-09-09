@@ -11,7 +11,7 @@
 | Hal | Hasil |
 |---|---|
 | Naskah baru | **tidak ada** |
-| Dokumen ditambah | **7 berkas** — [`SENSUS-MODUL.md`](SENSUS-MODUL.md) 321 · [`PETA-FASE.md`](PETA-FASE.md) 187 · [`SENSUS-EVENT.md`](SENSUS-EVENT.md) 164 · [`SENSUS-AGENT.md`](SENSUS-AGENT.md) 122 · [`SENSUS-TABEL.md`](SENSUS-TABEL.md) 139 · [`SENSUS-TANGGA.md`](SENSUS-TANGGA.md) 116 · [`SENSUS-RANTAI.md`](SENSUS-RANTAI.md) 119 |
+| Dokumen ditambah | **7 berkas** (+ [`GERBANG-SKEMA.md`](GERBANG-SKEMA.md) diperiksa ulang) — [`SENSUS-MODUL.md`](SENSUS-MODUL.md) 321 · [`PETA-FASE.md`](PETA-FASE.md) 187 · [`SENSUS-EVENT.md`](SENSUS-EVENT.md) 164 · [`SENSUS-AGENT.md`](SENSUS-AGENT.md) 122 · [`SENSUS-TABEL.md`](SENSUS-TABEL.md) 139 · [`SENSUS-TANGGA.md`](SENSUS-TANGGA.md) 116 · [`SENSUS-RANTAI.md`](SENSUS-RANTAI.md) 119 |
 | Dokumen total | 264 → **271** di `docs/`, + 8 di `spec/` |
 | Berkas kode | tetap **0** — skrip pengukur sengaja **tidak** disimpan di repo |
 | `spec/` diubah | **1 baris** — [`04`](../spec/04-API-CONTRACTS.md) `/api/v1` → `/v1`, menuntaskan janji di [#38](../../issues/38) |
@@ -376,6 +376,29 @@ sebagai persetujuan manusia**.
 💡 **Kata yang sama bisa menandai pengaman ATAU sensor yang MEMICU tindakan —
 `Human Detection` di rantai robot adalah pemicu, bukan rem.**
 → **E-157** / [#153](../../issues/153).
+
+### ✅ Pemeriksaan penutup: delapan sensus, **nol penghambat skema baru**
+
+[`GERBANG-SKEMA.md`](GERBANG-SKEMA.md) seluruh tugasnya menjawab *“apakah ada
+yang terhalang”*. Delapan pengukuran dengan angka besar (247 tabel · 128 event ·
+59 agent) **mudah terbaca sebagai delapan penghambat baru**, jadi tiap temuan
+diperiksa satu per satu terhadap `spec/`:
+
+| Temuan | Menyentuh V0? |
+|---|---|
+| 247 nama tabel | ❌ `spec/01` tetap **23**; 139 nama baru milik Phase 14–20 |
+| 128 nama event | ❌ `spec/03` tetap **22** dua segmen |
+| 59 nama agent | ❌ V0 memakai **4**; 44 dari 59 cuma disebut sekali |
+| **B-39** pesan di R2 | ❌ untuk V0 — `spec/05`: **V0 tidak punya tool level 3/4**. ⚠️ mendesak untuk Phase 11+ |
+| 3 rantai tanpa gerbang | ❌ Phase 15 & 16 |
+| awalan API | ✅ **diperbaiki**, satu baris |
+
+⇒ **Penghambat V0 tetap dua dan tetap bukan soal skema:
+[#3](../../issues/3) dan [#20](../../issues/20).**
+
+💡 Ini menerapkan aturan berkas itu sendiri kepada diri sendiri: **sebelum
+menyatakan sesuatu terhalang, buka berkas yang paling berkepentingan
+membantahnya.**
 
 ### Yang menunggu keputusan pemilik
 

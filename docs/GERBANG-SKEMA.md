@@ -93,6 +93,36 @@ Keduanya **bukan soal skema**, dan keduanya butuh tangan pemilik:
 
 ---
 
+## Diperiksa ulang 9 September 2026: delapan sensus baru, **nol penghambat skema baru**
+
+Sesi 25 menerbitkan delapan pengukuran lintas naskah
+([`SENSUS-MODUL`](SENSUS-MODUL.md) · [`PETA-FASE`](PETA-FASE.md) ·
+[`SENSUS-EVENT`](SENSUS-EVENT.md) · [`SENSUS-AGENT`](SENSUS-AGENT.md) ·
+[`SENSUS-TABEL`](SENSUS-TABEL.md) · [`SENSUS-TANGGA`](SENSUS-TANGGA.md) ·
+[`SENSUS-RANTAI`](SENSUS-RANTAI.md)), dengan angka-angka besar: 247 nama tabel,
+128 nama event, 59 agent. **Tak satu pun menambah penghambat bagi V0**, dan
+itu perlu dinyatakan supaya tidak terbaca sebaliknya.
+
+| Temuan | Menyentuh V0? |
+|---|---|
+| **247 nama tabel** ([#151](../../issues/151)) | ❌ `spec/01` tetap **23 tabel**. 139 nama baru lahir di Phase 14–20; **nol dibutuhkan V0**. ⭐ Sensus itu justru **memverifikasi ulang provenans `spec/01`** — tepat 19 nama dari naskah 5, dan tepat tiga (`events`·`agent_tools`·`human_states`) yang memang bukan dari naskah |
+| **128 nama event PascalCase** ([#149](../../issues/149)) | ❌ `spec/03` tetap 22 event dua segmen. Yang 128 itu milik Phase 10–20 |
+| **59 nama agent** ([#150](../../issues/150)) | ❌ V0 memakai 4 agent; 44 dari 59 nama hanya pernah disebut sekali |
+| **B-39 pesan di R2** ([#152](../../issues/152)) | ❌ untuk V0 — [`../spec/05`](../spec/05-AGENT-CONTRACTS.md) menyatakan **V0 tidak punya satu pun tool level 3 atau 4**, jadi tidak ada pengiriman pesan ke pihak ketiga. ⚠️ **Mendesak untuk Phase 11 ke atas**, dan berdiri sendiri dari [#139](../../issues/139) |
+| **Tiga rantai tanpa gerbang** ([#153](../../issues/153)) | ❌ §15.15 · §16.5 · §16.7 — Phase 15 dan 16 |
+| **Awalan API** ([#38](../../issues/38)) | ✅ **diperbaiki** — [`../spec/04`](../spec/04-API-CONTRACTS.md) kini `/v1`, sejalan standar pemilik dan 111 rute naskah. Endpoint ditulis tanpa awalan, jadi perubahannya satu baris |
+
+⇒ **Penghambat V0 tetap dua, dan tetap bukan soal skema:
+[#3](../../issues/3) dan [#20](../../issues/20).**
+
+> 💡 Ini penerapan aturan di bagian bawah berkas ini kepada diri sendiri:
+> **sebelum menyatakan sesuatu terhalang, buka berkas yang paling berkepentingan
+> membantahnya.** Delapan pengukuran dengan angka besar mudah terbaca sebagai
+> delapan penghambat baru; diperiksa satu per satu terhadap `spec/`, tak satu
+> pun menyentuh V0.
+
+---
+
 ## Koreksi atas versi pertama berkas ini
 
 Versi pertama menyimpulkan **"TIGA pertanyaan tersisa, bukan empat"** dan
