@@ -6,17 +6,17 @@
 
 ## Sesi 25 — 9 September 2026
 
-**Tidak ada naskah baru. EMPAT hal diukur untuk pertama kalinya — overlap antar-modul, peta fase, nama event, dan daftar agent — dan keempatnya membalik angka yang selama ini dipakai. Polanya satu: hitungan BERURUTAN meleset ke bawah, hitungan KEJADIAN bukan AKIBAT, dan PENJUMLAHAN bukan HIMPUNAN.**
+**Tidak ada naskah baru. LIMA hal diukur untuk pertama kalinya — overlap antar-modul, peta fase, nama event, daftar agent, dan nama tabel — dan kelimanya membalik angka yang selama ini dipakai. Polanya satu: hitungan BERURUTAN meleset ke bawah · KEJADIAN bukan AKIBAT · PENJUMLAHAN bukan HIMPUNAN · dan hitungan yang BERHENTI DIPELIHARA.**
 
 | Hal | Hasil |
 |---|---|
 | Naskah baru | **tidak ada** |
-| Dokumen ditambah | **4 berkas** — [`SENSUS-MODUL.md`](SENSUS-MODUL.md) 321 · [`PETA-FASE.md`](PETA-FASE.md) 187 · [`SENSUS-EVENT.md`](SENSUS-EVENT.md) 164 · [`SENSUS-AGENT.md`](SENSUS-AGENT.md) 122 |
-| Dokumen total | 264 → **268** di `docs/`, + 8 di `spec/` |
+| Dokumen ditambah | **5 berkas** — [`SENSUS-MODUL.md`](SENSUS-MODUL.md) 321 · [`PETA-FASE.md`](PETA-FASE.md) 187 · [`SENSUS-EVENT.md`](SENSUS-EVENT.md) 164 · [`SENSUS-AGENT.md`](SENSUS-AGENT.md) 122 · [`SENSUS-TABEL.md`](SENSUS-TABEL.md) 139 |
+| Dokumen total | 264 → **269** di `docs/`, + 8 di `spec/` |
 | Berkas kode | tetap **0** — skrip pengukur sengaja **tidak** disimpan di repo |
 | `spec/` diubah | **1 baris** — [`04`](../spec/04-API-CONTRACTS.md) `/api/v1` → `/v1`, menuntaskan janji di [#38](../../issues/38) |
-| Issue | 145 → **150** (130 terbuka, 20 ditutup); **#146**–**#150** baru, plus komentar bukti di **#139** dan **#142** |
-| Temuan | **E-151**–**E-155** · **G-20** · 5 cacat indeks diperbaiki · **2 koreksi atas pekerjaan saya sendiri** (klaim #142; awalan `spec/04`) |
+| Issue | 145 → **151** (131 terbuka, 20 ditutup); **#146**–**#151** baru, plus komentar bukti di **#1**, **#38**, **#139**, **#142** |
+| Temuan | **E-151**–**E-156** · **G-20** · 5 cacat indeks diperbaiki · **2 koreksi atas pekerjaan saya sendiri** (klaim #142; awalan `spec/04`) |
 
 ### 🔴🔴 Temuan terbesar: hitungan BERURUTAN meleset ke bawah secara sistematis
 
@@ -257,6 +257,39 @@ tidak punya penjaga.** Issue tertutup berhenti dibaca; catatan berikutnya
 mengulang gejalanya tanpa memeriksa apakah pihak yang berjanji sudah bergerak.
 **Tanyakan: “ada janji tercatat di sini — siapa yang memeriksanya?”**
 → **E-155**, komentar di [#38](../../issues/38).
+
+### 🔴🔴 Sensus KELIMA: nama tabel — "99" berhenti dipelihara di Phase 12
+
+**E-106** menjumlahkan `23 (V0) + 20 (Fase 8) + 16 (Fase 10) + 14 (Fase 11) +
+26 (§12.28) = 99`. ⭐ **Metodenya BENAR** — tiap suku neto, sudah dikurangi yang
+sudah ada (§11.48 memberi 18 entitas, empat sudah ada ⇒ 14).
+
+🛑 **Yang salah bukan aritmetikanya, melainkan bahwa ia berhenti di Phase 12.**
+
+| | |
+|---|---|
+| **nama tabel unik** | **247** di 14 dokumen |
+| union sampai Phase 12 | 108 (taksiran neto: 99) |
+| **baru sesudah Phase 12** | **139 — belum pernah dihitung** |
+
+Tujuh fase terakhir menyumbang **155 sebutan** — lebih banyak daripada seluruh
+hitungan yang pernah diterbitkan.
+
+🛑 **`agent_capabilities` dan `agent_trust_scores` didefinisikan EMPAT kali**
+(Phase 8·11·14·18). Audit sudah menandai dua; sensus menemukan dua lagi. Untuk
+tabel yang memegang **kapabilitas** dan **kepercayaan** agent, empat definisi =
+empat kemungkinan bentuk kolom. Total **19 nama** berdefinisi ganda.
+
+✅ **Divalidasi ENAM kali**, dan yang terkuat mengejutkan: sensus mereproduksi
+sendiri pernyataan provenans [`../spec/01`](../spec/01-DATABASE-SCHEMA.md)
+(*19 naskah 5 + 3 naskah 6 + 1 usulan*) — tepat 19 ditemukan di naskah 5, dan
+tepat tiga nama `spec/01` yang tak ada di naskah mana pun.
+
+⚠️ **Dua kekeliruan alat ukur dilewati dulu:** menuntut garis bawah (membuang
+`robots`·`joints`·`missions`; `235` terhitung 11 padahal 17), lalu hanya
+memanen fence (`254` §18.28 memakai **backtick** dan hilang seluruhnya).
+💡 **Satu format penulisan yang tak diantisipasi bisa menghapus SATU FASE PENUH
+dari hasil pengukuran.** → **E-156** / [#151](../../issues/151).
 
 ### Yang menunggu keputusan pemilik
 
