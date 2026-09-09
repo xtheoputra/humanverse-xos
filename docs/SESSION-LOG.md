@@ -6,17 +6,20 @@
 
 ## Sesi 25 — 9 September 2026
 
-**Tidak ada naskah baru. TUJUH hal diukur untuk pertama kalinya — overlap antar-modul, peta fase, nama event, daftar agent, nama tabel, dan tangga risiko — dan semuanya membalik angka yang dipakai. Polanya: hitungan BERURUTAN meleset ke bawah · KEJADIAN bukan AKIBAT · PENJUMLAHAN bukan HIMPUNAN · hitungan yang BERHENTI DIPELIHARA · dan tuduhan yang ARAHNYA TERBALIK. Yang terakhir, tangga risiko, menemukan satu tindakan yang berpindah MELEWATI ambang konfirmasi.**
+**Tidak ada naskah baru. DELAPAN hal diukur untuk pertama kalinya — overlap antar-modul · peta fase · nama event · rute API · daftar agent · nama tabel · tangga risiko · rantai keputusan — dan semuanya membalik angka yang dipakai. Polanya: hitungan BERURUTAN meleset ke bawah · KEJADIAN bukan AKIBAT · PENJUMLAHAN bukan HIMPUNAN · hitungan yang BERHENTI DIPELIHARA · tuduhan yang ARAHNYA TERBALIK · dan kegagalan yang dilaporkan TANPA DENOMINATOR.**
+
+**Lalu pemilik mendelegasikan keputusan, dan DUA BELAS butir K diambil — sebelas issue ditutup karenanya, dan empat butir ditegakkan sebagai aturan validasi di `spec/`.**
 
 | Hal | Hasil |
 |---|---|
 | Naskah baru | **tidak ada** |
-| Dokumen ditambah | **8 berkas** (+ [`GERBANG-SKEMA.md`](GERBANG-SKEMA.md) diperiksa ulang) — [`KEPUTUSAN-DIDELEGASIKAN.md`](KEPUTUSAN-DIDELEGASIKAN.md) 177 · [`SENSUS-MODUL.md`](SENSUS-MODUL.md) 321 · [`PETA-FASE.md`](PETA-FASE.md) 187 · [`SENSUS-EVENT.md`](SENSUS-EVENT.md) 164 · [`SENSUS-AGENT.md`](SENSUS-AGENT.md) 122 · [`SENSUS-TABEL.md`](SENSUS-TABEL.md) 139 · [`SENSUS-TANGGA.md`](SENSUS-TANGGA.md) 116 · [`SENSUS-RANTAI.md`](SENSUS-RANTAI.md) 119 |
+| Dokumen ditambah | **8 berkas** (+ [`GERBANG-SKEMA.md`](GERBANG-SKEMA.md) diperiksa ulang) — [`KEPUTUSAN-DIDELEGASIKAN.md`](KEPUTUSAN-DIDELEGASIKAN.md) 308 · [`SENSUS-MODUL.md`](SENSUS-MODUL.md) 321 · [`PETA-FASE.md`](PETA-FASE.md) 187 · [`SENSUS-EVENT.md`](SENSUS-EVENT.md) 164 · [`SENSUS-AGENT.md`](SENSUS-AGENT.md) 122 · [`SENSUS-TABEL.md`](SENSUS-TABEL.md) 139 · [`SENSUS-TANGGA.md`](SENSUS-TANGGA.md) 116 · [`SENSUS-RANTAI.md`](SENSUS-RANTAI.md) 119 |
 | Dokumen total | 264 → **272** di `docs/`, + 8 di `spec/` |
 | Berkas kode | tetap **0** — skrip pengukur sengaja **tidak** disimpan di repo |
-| `spec/` diubah | **4 berkas** — `01` presedensi tabel · `03` tabel padanan 127 nama · `04` awalan `/v1` · `05` aturan 7 + kriteria agent |
-| Issue | 145 → **153** (120 terbuka, **33 ditutup** — **13 ditutup sesi ini**: sembilan oleh keputusan K, empat karena **jawabannya sudah ada di `spec/` tapi issue-nya tak pernah ditutup**); **#146**–**#153** baru, plus komentar bukti di **#1**, **#38**, **#139**, **#142** |
+| `spec/` diubah | **4 berkas** — `01` presedensi tabel (K-4) · `03` tabel padanan 127 nama (K-3) + amplop `security.*` (K-10) · `04` awalan `/v1` (K-8) · `05` **aturan 7·8·9** (K-1, K-12) + medan `reaches_third_party` + kriteria agent (K-5) |
+| Issue | 145 → **153** (120 terbuka, **33 ditutup** — **13 ditutup sesi ini**: **sebelas** oleh keputusan K, **dua** karena **jawabannya sudah ada di `spec/` tapi issue-nya tak pernah ditutup**); **#146**–**#153** baru, plus komentar bukti di **#1**, **#38**, **#139**, **#142** |
 | Temuan | **E-151**–**E-157** · **G-20** · **B-39** · 5 cacat indeks diperbaiki · **2 koreksi atas pekerjaan saya sendiri** (klaim #142; awalan `spec/04`) |
+| Keputusan | **12 butir K** diambil sendiri atas permintaan pemilik → [`KEPUTUSAN-DIDELEGASIKAN.md`](KEPUTUSAN-DIDELEGASIKAN.md). **K-9 membuka blokir Sprint 0 tugas 0.1.** Nol dari 12 mengubah V0 |
 
 ### 🔴🔴 Temuan terbesar: hitungan BERURUTAN meleset ke bawah secara sistematis
 
@@ -460,6 +463,34 @@ ambang lebih buruk daripada membiarkannya terbuka) · **B-25** di
 bukan prosa.** Pelajaran repo ini sendiri — *“aturan yang dinyatakan tetapi
 tidak dijaga”* — sudah muncul berkali-kali; keputusan yang cuma ditulis akan
 bernasib sama.
+
+### 📋 Daftar tutup sesi — apa yang menunggu sesi berikutnya
+
+**Sisa milik pemilik, dan hanya pemilik:**
+
+| Butir | Kenapa |
+|---|---|
+| **[#139](../../issues/139)** Master Architecture v2.0 | soal **waktu pemilik**. Bukti 3× permintaan + ringkasan 8 pengukuran sudah dipasang di issue-nya |
+| [#3](../../issues/3) siapa mengerjakan V0 · [#20](../../issues/20) cek merek | orang, uang, pembelian |
+| **seluruh butir C** | risikonya ditanggung orang yang tidak ikut memilih |
+| **B-25** di [#77](../../issues/77) · §16.5 & §16.7 di [#153](../../issues/153) | salahnya ditanggung pengguna, atau benda yang bisa melukai orang |
+| [#34](../../issues/34) ambang Confidence | butuh data nyata; menebak lebih buruk daripada membiarkannya terbuka |
+| Nama **Phase 1** · apakah §10.41 digantikan ([#142](../../issues/142)) | tak ada bahannya di repo |
+
+**Yang bisa dikerjakan tanpa pemilik, kalau sesi berikutnya mau lanjut:**
+
+- terapkan **uji naik-turun K-9** ke ~40 nama sisa di ≥3 pohon
+  ([`SENSUS-MODUL.md`](SENSUS-MODUL.md) Tabel B) — mekanis, aturannya sudah ada;
+- **[#30](../../issues/30)** PromptOps 7 dari 14 agent — angkanya berubah sesudah
+  **K-5** menyaring mana yang benar-benar agent;
+- **[#41](../../issues/41)** batas Knowledge lawan Memory — uji K-9 berlaku,
+  tetapi batas isinya masih perlu dibaca dari naskah.
+
+⚠️ **Sebelum menyentuh apa pun**: `git status` · `git log` ·
+`grep -n "^## Sesi" docs/SESSION-LOG.md`. Sesi paralel sudah terjadi 3×, dan
+selama sesi ini pun entri memori proyek lain diperbarui sesi lain.
+
+---
 
 ### Yang menunggu keputusan pemilik
 
