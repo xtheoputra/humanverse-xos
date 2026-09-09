@@ -153,6 +153,47 @@ auditnya sendiri.
 
 ---
 
+## 🔴🔴 Separuh kedua #38 — awalan rute API — dan arahnya TERBALIK
+
+[#38](../../issues/38) punya dua sumbu; yang kedua **awalan rute**. Sepuluh
+catatan menandainya sebagai *“`/v1/…` lagi, bukan `/api/v1`”* — kalimat yang
+menempatkan naskah di pihak yang menyimpang.
+
+Sensus mengatakan sebaliknya:
+
+| | |
+|---|---|
+| rute `/v1/…` di naskah | **111 unik**, di **12 dokumen** |
+| rute `/api/v1/…` di naskah | **NOL** |
+
+92 dari 111 berbentuk `/v1/<domain>/<...>` — persis bentuk yang ditetapkan
+**standar penamaan pemilik sendiri**, [`101`](101-L22-ENGINEERING-STANDARDS.md)
+Layer 22: `/v1/fashion/outfits`.
+
+⇒ **Naskahnya konsisten — 111 rute, satu bentuk, nol pengecualian. Yang
+menyimpang [`../spec/04`](../spec/04-API-CONTRACTS.md), dan itu berkas saya.**
+
+### 🛑 Dan janjinya sudah tercatat — lalu tidak dijalankan
+
+Komentar yang **menutup** [#38](../../issues/38) menuliskannya sendiri:
+
+> *“Yang menyimpang justru `spec/04` yang saya tulis `/api/v1/…`. **Itu bagian
+> saya, akan diselaraskan.**”*
+
+`spec/04` tetap `/api/v1` sesudah itu, dan **sepuluh catatan berikutnya terus
+menandai naskah** — sisi yang tidak dijanjikan berubah.
+
+✅ **Diselesaikan 9 September 2026:** `spec/04` kini berawalan `/v1`. Endpoint
+di dalamnya ditulis tanpa awalan, jadi perubahannya satu baris.
+
+> 💡 **Pelajaran: janji perbaikan yang ditulis di komentar issue yang DITUTUP
+> tidak punya penjaga.** Issue tertutup berhenti dibaca; catatan berikutnya
+> mengulang gejalanya tanpa memeriksa apakah pihak yang berjanji sudah
+> bergerak. Tanyakan: **“ada janji yang tercatat di sini, dan siapa yang
+> memeriksanya?”**
+
+---
+
 ## Yang sensus ini **tidak** putuskan
 
 Tidak membuka ulang [#38](../../issues/38), tidak mengusulkan penggantian nama,

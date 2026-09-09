@@ -22,7 +22,7 @@
 | — berlaku lintas-naskah (termasuk `99`) | 7 |
 | Berkas di [`../spec/`](../spec/README.md) | 8 |
 | Naskah pemilik yang direkam | **24** (Phase 20 = fase terakhir) |
-| Baris dokumen `docs/` | 41.844 |
+| Baris dokumen `docs/` | 41.916 |
 | Berkas kode | **0** — disengaja |
 
 ---
@@ -674,7 +674,7 @@ tetap murni merekam visi pemilik. Lihat [`../spec/README.md`](../spec/README.md)
 | [`01-DATABASE-SCHEMA.md`](../spec/01-DATABASE-SCHEMA.md) | 23 tabel DDL |
 | [`02-ERD.md`](../spec/02-ERD.md) | Relasi antar tabel + 6 aturan kepemilikan data |
 | [`03-EVENT-CONTRACTS.md`](../spec/03-EVENT-CONTRACTS.md) | 22 event — **`domain.verb` huruf kecil** |
-| [`04-API-CONTRACTS.md`](../spec/04-API-CONTRACTS.md) | Kontrak API — **awalan `/api/v1`** |
+| [`04-API-CONTRACTS.md`](../spec/04-API-CONTRACTS.md) | Kontrak API — **awalan `/v1`** (diselaraskan dengan naskah, [#38](../../issues/38)) |
 | [`05-AGENT-CONTRACTS.md`](../spec/05-AGENT-CONTRACTS.md) | Kontrak agent & aturan scope |
 | [`06-MODULE-BOUNDARIES.md`](../spec/06-MODULE-BOUNDARIES.md) | Batas modul modular monolith + **6 aturan ketergantungan** yang ditegakkan CI |
 | [`07-BACKLOG-V0.md`](../spec/07-BACKLOG-V0.md) | **51 tugas** dalam 7 sprint, satu tugas per baris |

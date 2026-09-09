@@ -26,7 +26,7 @@ manusia + agent + data + knowledge + simulation + automation**.
 | Dokumen | **268 berkas** di `docs/` (naskah + audit + 3 sensus + peta fase + catatan sesi) + **8 berkas** di `spec/` |
 | Naskah pemilik | **24** — terakhir: **Phase 20 Civilization Platform** (39 bagian) — **fase TERAKHIR** |
 | Keputusan tertutup | **24 butir H** — nama · MVP · struktur repo · ambang konfirmasi · model memory · memory meluruh · gerbang policy · context package · peta 15 fase · dua tangga R/L · manifest dipulihkan · **model transisi belajar dari galat sendiri** · **monetisasi punya fase (Phase 14)**. 🛑 **H-20 PATAH, dan petanya TERBUKA-UJUNG** — **empat naskah berturut-turut masing-masing menambah satu fase** di kalimat penutupnya: naskah 19 → **Phase 16**, naskah 20 → **Phase 17**, naskah 21 → **Phase 18**, naskah 22 → **Phase 19 Civilization Intelligence**. ⭐ **Naskah 23 MEMBALIKKAN polanya sebagian** — ia mengubah Phase 19 menjadi *Scientific Discovery Engine*, memindahkan Civilization ke **Phase 20**, dan **mengumumkan perubahan itu beserta alasannya**: pertama kalinya dalam lima naskah, dan ia menyebut **Phase 20 sebagai fase TERAKHIR**. 🛑 Tapi ia menyandarkannya pada *“roadmap 20 fase yang sudah kita tetapkan sebelumnya”* — yang **tidak pernah ada** ([#132](../../issues/132), [#133](../../issues/133), [#101](../../issues/101), [#108](../../issues/108)). ⚠️ **H-13** ([#72](../../issues/72)) dan **H-11** ([#78](../../issues/78)) juga perlu ditinjau ulang |
-| Keputusan terbuka | **26 pertanyaan A** · **154 ketidakcocokan E** · **20 lubang G** |
+| Keputusan terbuka | **26 pertanyaan A** · **155 ketidakcocokan E** · **20 lubang G** |
 | Tanggal dokumen | 8 September 2026 |
 
 > ⚠️ **Nol baris kode itu disengaja — dan penghambatnya terus berkurang.**
@@ -131,6 +131,18 @@ disebut sekali**. ⭐ Irisan ketiga registry umum — yang berisi 14, 22, dan 25
 agent — tepat **enam**: `Career · Fashion · Habit · Learning · Social · Travel`,
 **semuanya agent domain**. 💡 *Menjumlahkan daftar bukan menghitung himpunan —
 dan yang menentukan bukan totalnya melainkan irisannya.*
+
+🔴🔴 **Dan separuh kedua [#38](../../issues/38) ternyata terbalik arahnya.**
+Sepuluh catatan menandai naskah sebagai *“`/v1/…` lagi, bukan `/api/v1`”* —
+sensus: **111 rute `/v1/…` di 12 naskah, dan NOL `/api/v1`**, 92 di antaranya
+persis bentuk yang ditetapkan **standar penamaan pemilik sendiri** (naskah 7
+Layer 22, `/v1/fashion/outfits`). Naskahnya konsisten; yang menyimpang
+`spec/04` — berkas saya. 🛑 Dan komentar yang **menutup** #38 sudah menuliskan
+janjinya (*“itu bagian saya, akan diselaraskan”*) — janji itu tak pernah
+dijalankan, sementara sepuluh catatan berikutnya menandai sisi yang tidak
+dijanjikan berubah. ✅ **Diselesaikan: `spec/04` kini berawalan `/v1`** (satu
+baris). 💡 *Janji perbaikan di komentar issue yang DITUTUP tidak punya penjaga —
+tanyakan “ada janji tercatat di sini, siapa yang memeriksanya?”*
 
 ✅ **Ditutup:** [#1](../../issues/1) rencana kanonik → V0–V6 ·
 [#8](../../issues/8) struktur repo · [#12](../../issues/12) Weather/Calendar = tool ·

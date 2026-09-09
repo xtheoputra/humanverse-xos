@@ -2,7 +2,16 @@
 
 > ⚠️ **Bukan kata pemilik** — lihat [`README.md`](README.md).
 
-REST, JSON, `/api/v1`. Autentikasi `Authorization: Bearer <access_token>`.
+REST, JSON, awalan **`/v1`**. Autentikasi `Authorization: Bearer <access_token>`.
+
+> 🔧 **Diselaraskan 9 September 2026 (dari `/api/v1`).** Ini menuntaskan janji
+> yang tercatat di komentar penutup [#38](../../issues/38) — *“yang menyimpang
+> justru `spec/04` yang saya tulis `/api/v1/…`; itu bagian saya, akan
+> diselaraskan”* — dan janji itu tidak pernah dijalankan. Standar penamaan
+> pemilik sendiri ([`../docs/101`](../docs/101-L22-ENGINEERING-STANDARDS.md)
+> Layer 22) menetapkan `/v1/fashion/outfits`, dan sensus atas seluruh `docs/`
+> menemukan **111 rute `/v1/…` di 12 naskah, dan NOL `/api/v1`**.
+> Endpoint di bawah ditulis tanpa awalan, jadi hanya baris ini yang berubah.
 
 ---
 

@@ -14,8 +14,9 @@
 | Dokumen ditambah | **4 berkas** — [`SENSUS-MODUL.md`](SENSUS-MODUL.md) 321 · [`PETA-FASE.md`](PETA-FASE.md) 187 · [`SENSUS-EVENT.md`](SENSUS-EVENT.md) 164 · [`SENSUS-AGENT.md`](SENSUS-AGENT.md) 122 |
 | Dokumen total | 264 → **268** di `docs/`, + 8 di `spec/` |
 | Berkas kode | tetap **0** — skrip pengukur sengaja **tidak** disimpan di repo |
+| `spec/` diubah | **1 baris** — [`04`](../spec/04-API-CONTRACTS.md) `/api/v1` → `/v1`, menuntaskan janji di [#38](../../issues/38) |
 | Issue | 145 → **150** (130 terbuka, 20 ditutup); **#146**–**#150** baru, plus komentar bukti di **#139** dan **#142** |
-| Temuan | **E-151** · **E-152** · **E-153** · **E-154** · **G-20** · 5 cacat indeks diperbaiki · 1 koreksi atas audit sendiri |
+| Temuan | **E-151**–**E-155** · **G-20** · 5 cacat indeks diperbaiki · **2 koreksi atas pekerjaan saya sendiri** (klaim #142; awalan `spec/04`) |
 
 ### 🔴🔴 Temuan terbesar: hitungan BERURUTAN meleset ke bawah secara sistematis
 
@@ -227,6 +228,35 @@ tujuh — **sengaja tidak dipakai**: menyamakannya KEPUTUSAN, bukan pengukuran.
 cuma pernah disebut sekali** — kandidat terkuat untuk *bukan agent*.
 💡 **Menjumlahkan daftar bukan menghitung himpunan.**
 → **E-154** / [#150](../../issues/150).
+
+### 🔴🔴 Separuh kedua #38 — dan janji yang tercatat lalu tidak dijalankan
+
+[#38](../../issues/38) punya dua sumbu; yang kedua **awalan rute API**. Sepuluh
+catatan menandainya sebagai *“`/v1/…` lagi, bukan `/api/v1`”* — kalimat yang
+menempatkan **naskah** di pihak yang menyimpang.
+
+Sensus mengatakan sebaliknya: **111 rute `/v1/…` unik di 12 naskah, dan NOL
+`/api/v1`.** 92 di antaranya berbentuk `/v1/<domain>/<...>` — persis bentuk
+yang ditetapkan **standar penamaan pemilik sendiri**
+([`101`](101-L22-ENGINEERING-STANDARDS.md) Layer 22 `/v1/fashion/outfits`).
+
+⇒ Naskahnya **konsisten**: 111 rute, satu bentuk, nol pengecualian. Yang
+menyimpang [`../spec/04`](../spec/04-API-CONTRACTS.md) — **berkas saya**.
+
+🛑 **Dan janjinya sudah tercatat.** Komentar yang **MENUTUP** #38 menulis:
+*“yang menyimpang justru `spec/04` yang saya tulis `/api/v1/…`; **itu bagian
+saya, akan diselaraskan**”*. Janji itu **tidak pernah dijalankan** — dan sepuluh
+catatan sesudahnya terus menandai sisi yang tidak dijanjikan berubah.
+
+✅ **Diselesaikan hari ini**: `spec/04` berawalan `/v1`; endpoint di dalamnya
+ditulis tanpa awalan sehingga perubahannya **satu baris**. Bukan keputusan
+baru — menjalankan janji yang sudah tercatat.
+
+💡 **PELAJARAN: janji perbaikan yang ditulis di komentar issue yang DITUTUP
+tidak punya penjaga.** Issue tertutup berhenti dibaca; catatan berikutnya
+mengulang gejalanya tanpa memeriksa apakah pihak yang berjanji sudah bergerak.
+**Tanyakan: “ada janji tercatat di sini — siapa yang memeriksanya?”**
+→ **E-155**, komentar di [#38](../../issues/38).
 
 ### Yang menunggu keputusan pemilik
 
