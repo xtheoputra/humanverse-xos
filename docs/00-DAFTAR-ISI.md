@@ -16,13 +16,13 @@
 
 | Hal | Jumlah |
 |---|---|
-| Berkas di `docs/` | **265** — 264 dokumen + daftar ini |
+| Berkas di `docs/` | **266** — 265 dokumen + daftar ini |
 | — bernomor `01`–`275` | 261 |
-| — tanpa nomor (`GERBANG-SKEMA`, `SENSUS-MODUL`, `SESSION-LOG`) | 3 |
-| — berlaku lintas-naskah (termasuk `99`) | 4 |
+| — tanpa nomor (`GERBANG-SKEMA`, `PETA-FASE`, `SENSUS-MODUL`, `SESSION-LOG`) | 4 |
+| — berlaku lintas-naskah (termasuk `99`) | 5 |
 | Berkas di [`../spec/`](../spec/README.md) | 8 |
 | Naskah pemilik yang direkam | **24** (Phase 20 = fase terakhir) |
-| Baris dokumen `docs/` | 41.220 |
+| Baris dokumen `docs/` | 41.475 |
 | Berkas kode | **0** — disengaja |
 
 ---
@@ -33,7 +33,7 @@ Diperiksa dengan skrip, bukan dengan penglihatan:
 
 | Pemeriksaan | Hasil |
 |---|---|
-| Dokumen yang harus terdaftar | **264** (di luar daftar ini) |
+| Dokumen yang harus terdaftar | **265** (di luar daftar ini) |
 | Nomor ganda | **NIHIL** |
 | Berkas tanpa judul `H1` | **NIHIL** |
 | Judul `H1` yang nomornya tidak cocok nama berkas | **NIHIL** |
@@ -58,19 +58,21 @@ Repo ini terlalu besar untuk dibaca dari `01`. Empat jalur masuk:
 | **mulai menulis kode** | [`../spec/`](../spec/README.md) → [`GERBANG-SKEMA.md`](GERBANG-SKEMA.md) → [`75`](75-URUTAN-PEMBANGUNAN-V0-V6.md) |
 | **memahami arsitektur akhir** | [`275`](275-ROADMAP-ARSITEKTUR-FINAL-PETA-20-FASE-DAN-MASTER-ARCHITECTURE.md) → mundur ke fase yang menarik |
 | **menyatukan modul / hapus overlap** | [`SENSUS-MODUL.md`](SENSUS-MODUL.md) → [#55](../../issues/55) → [#139](../../issues/139) |
+| **memahami peta fase & apa yang berubah** | [`PETA-FASE.md`](PETA-FASE.md) → [#133](../../issues/133) → [#142](../../issues/142) |
 | **melihat riwayat kerja** | [`SESSION-LOG.md`](SESSION-LOG.md) |
 
 ---
 
 ## Berkas lintas-naskah
 
-Empat berkas ini **tidak** merekam satu naskah tertentu; keempatnya berlaku
+Lima berkas ini **tidak** merekam satu naskah tertentu; kelimanya berlaku
 untuk seluruh repo.
 
 | Berkas | Isi | Baris |
 |---|---|---|
 | [**Catatan Audit & Keputusan Terbuka**](99-CATATAN-AUDIT.md) | Butir **A** (pertanyaan pemilik) · **B** (risiko teknis) · **C** (hukum & kepatuhan) · **D** (celah) · **E** (ketidakcocokan antar-naskah) · **F** (sudah diperiksa, benar) · **G** (lubang di dalam naskah) · **H** (sudah diputuskan). **Bukan kata pemilik.** | 1.307 |
 | [**Gerbang Skema**](GERBANG-SKEMA.md) | Apa yang mengunci — dan apa yang **tidak** mengunci — Engineering Spec. | 116 |
+| [**Peta Fase**](PETA-FASE.md) | Tiga peta fase dibandingkan dengan yang benar-benar terjadi; nama Phase 1–20 beserta buktinya; deret permintaan pemilik yang berulang. **Bukan kata pemilik.** | 187 |
 | [**Sensus Modul Lintas Fase**](SENSUS-MODUL.md) | Hitungan **38 pohon repositori** di 24 naskah: 424 nama direktori, 128 dipakai lebih dari satu pohon. Bahan untuk *“menghapus overlap antar-modul”* ([#139](../../issues/139)). **Bukan kata pemilik.** | 321 |
 | [**Catatan Sesi**](SESSION-LOG.md) | Ringkasan tiap sesi kerja, terbaru di atas. | — ⁽¹⁾ |
 

@@ -6,16 +6,16 @@
 
 ## Sesi 25 — 9 September 2026
 
-**Tidak ada naskah baru. Overlap antar-modul DIHITUNG untuk pertama kalinya — dan hitungan lama meleset separuh.**
+**Tidak ada naskah baru. Dua hal diukur untuk pertama kalinya — overlap antar-modul dan peta fase — dan keduanya membalik angka yang selama ini dipakai.**
 
 | Hal | Hasil |
 |---|---|
 | Naskah baru | **tidak ada** |
-| Dokumen ditambah | **1 berkas** ([`SENSUS-MODUL.md`](SENSUS-MODUL.md), 321 baris) |
-| Dokumen total | 264 → **265** di `docs/`, + 8 di `spec/` |
+| Dokumen ditambah | **2 berkas** — [`SENSUS-MODUL.md`](SENSUS-MODUL.md) (321 baris) + [`PETA-FASE.md`](PETA-FASE.md) (187 baris) |
+| Dokumen total | 264 → **266** di `docs/`, + 8 di `spec/` |
 | Berkas kode | tetap **0** — skrip pengukur sengaja **tidak** disimpan di repo |
-| Issue | 145 → **147** (127 terbuka, 20 ditutup); **#146**, **#147** baru |
-| Temuan | **E-151** · **G-20** · 5 cacat indeks diperbaiki |
+| Issue | 145 → **148** (128 terbuka, 20 ditutup); **#146**–**#148** baru, plus komentar bukti di **#139** dan **#142** |
+| Temuan | **E-151** · **E-152** · **G-20** · 5 cacat indeks diperbaiki · 1 koreksi atas audit sendiri |
 
 ### 🔴🔴 Temuan terbesar: hitungan BERURUTAN meleset ke bawah secara sistematis
 
@@ -85,6 +85,71 @@ sudah **1.795** — ia satu-satunya berkas yang masih bertambah **sesudah** daft
 isi menghitungnya. Angkanya diganti penanda `—` dengan catatan kaki, bukan
 diperbarui: **angka yang mustahil dipelihara lebih baik tidak ditulis daripada
 salah tiap sesi.**
+
+### 🔴🔴 Peta fase juga diukur — dan dua peta gagal dengan cara yang PERSIS SAMA
+
+Untuk `Phase` ternyata ada **tiga** peta, bukan dua: naskah 8
+([`113`](113-PETA-FASE-5-12.md)) · §10.41 ([`175`](175-REPO-API-DB-ROADMAP-DOD.md)) ·
+§20.36 ([`275`](275-ROADMAP-ARSITEKTUR-FINAL-PETA-20-FASE-DAN-MASTER-ARCHITECTURE.md)).
+
+| Peta | Fase diramalkan | Tepat | Pola kesalahan |
+|---|---|---|---|
+| naskah 8 | 8 (Phase 5–12) | **4** | empat **terdekat** benar, empat **terjauh** salah |
+| §10.41 | 5 (Phase 11–15) | **3** (+1 sebagian) | yang **terjauh** salah |
+
+⇒ **Jangkauan andal sebuah peta fase di repo ini ± 3–4 fase.** Dua peta, ditulis
+enam naskah berjarak, gagal identik.
+
+⭐ Bukan alasan berhenti membuat peta — **7 dari 13 ramalan benar**, dan yang
+benar itulah yang dipakai orang. Alasan untuk **tidak menggantungkan keputusan
+pada baris TERJAUH sebuah peta**. → **E-152** / [#148](../../issues/148).
+
+### 🔴 Koreksi yang MEMPERKECIL pekerjaan: sisa #142 satu nama, bukan delapan baris
+
+[#142](../../issues/142) menyimpulkan *“Phase 1–8 belum pernah didaftar dalam 24
+naskah”* dari:
+
+```
+grep -rohE "Phase [1-8] +[A-Z]{3,}" docs/  →  0
+```
+
+Angka nolnya **benar** — diverifikasi ulang. Tetapi polanya menuntut **huruf
+besar semua** sesudah nomor fase, sehingga ia **mustahil** cocok dengan
+*“Phase 5: HumanVerse Research Lab”*. Yang diukur **kesesuaian FORMAT**, bukan
+keberadaan.
+
+**Tujuh dari delapan fase sudah punya nama** — dan sudah terkumpul di
+[`99-CATATAN-AUDIT.md`](99-CATATAN-AUDIT.md) baris 17–20 sejak lama. Yang
+benar-benar tidak ada cuma **Phase 1**.
+
+💡 **Pelajaran: `grep` yang mengembalikan NOL membuktikan *“tidak ada yang
+berbentuk ini”*, bukan *“tidak ada”*. Periksa apa yang polanya MUSTAHIL cocoki
+sebelum menyimpulkan dari angka nol.**
+
+### 🔴🔴 Permintaan yang sama sudah diajukan pemilik TIGA KALI
+
+Belum pernah dicatat sebagai deret. Ditelusuri dari penutup tiap naskah:
+
+| # | Kapan | Yang diminta | Nasib |
+|---|---|---|---|
+| 1 | naskah 4 | Blueprint Engineering v1.0 | ✅ **dikerjakan** |
+| 2 | naskah 5 | Engineering Specification v1.0 | ✅ **dikerjakan** |
+| 3 | naskah 8 | **Phase 12 “Blueprint Implementation”** — *“ini yang paling besar”* | ❌ digantikan |
+| 4 | naskah 18 | arsitektur teknis Phase 14 | ❌ tidak pernah dimulai |
+| 5 | naskah 24 | **Master Architecture v2.0** | ⏳ [#139](../../issues/139) |
+
+**Empat butir muncul UTUH di ketiga permintaan yang belum dikerjakan** — skema
+basis data · skema/kontrak event · Docker/Kubernetes·deployment topology ·
+urutan implementasi. ⚠️ Kontrak API dan struktur repositori hanya 2 dari 3;
+**dua sel kosong itu sengaja tidak dibulatkan** jadi klaimnya empat, bukan tujuh.
+
+🛑 **Yang membedakan bukan isi permintaan melainkan apa yang datang sesudahnya:
+dua yang dikerjakan dijawab SEBELUM naskah berikutnya tiba.** Naskah 18 bahkan
+sudah menuliskan bahwa pekerjaannya *“bisa dimulai tanpa keputusan baru dari
+pemilik”* ([`218`](218-REPO-DATA-EVENT-ROADMAP-DOD.md) L682) — enam naskah
+kemudian ia belum dimulai. Bukti ini dipasang sebagai komentar di
+[#139](../../issues/139), bukan issue baru, supaya ia berada di tempat
+keputusannya diambil.
 
 ### Yang menunggu keputusan pemilik
 
