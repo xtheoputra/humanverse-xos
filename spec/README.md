@@ -21,7 +21,7 @@ sini kecuali dibutuhkan V0 — menulisnya sekarang berarti menebak.
 |---|---|
 | [`01-DATABASE-SCHEMA.md`](01-DATABASE-SCHEMA.md) | DDL PostgreSQL lengkap — **23 tabel**, tipe, PK, FK, index, constraint |
 | [`02-ERD.md`](02-ERD.md) | Relasi antar tabel + aturan kepemilikan data |
-| [`03-EVENT-CONTRACTS.md`](03-EVENT-CONTRACTS.md) | Envelope, versi skema, idempotensi, 21 event + payload |
+| [`03-EVENT-CONTRACTS.md`](03-EVENT-CONTRACTS.md) | Envelope, versi skema, idempotensi, **22 event** + payload |
 | [`04-API-CONTRACTS.md`](04-API-CONTRACTS.md) | Endpoint REST V0, request/response, kode galat |
 | [`05-AGENT-CONTRACTS.md`](05-AGENT-CONTRACTS.md) | Manifest schema, tool registry, permission & risk |
 | [`06-MODULE-BOUNDARIES.md`](06-MODULE-BOUNDARIES.md) | Batas modul di dalam modular monolith + aturan ketergantungan |

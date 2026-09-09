@@ -4,6 +4,97 @@
 
 ---
 
+## Sesi 25 — 9 September 2026
+
+**Tidak ada naskah baru. Overlap antar-modul DIHITUNG untuk pertama kalinya — dan hitungan lama meleset separuh.**
+
+| Hal | Hasil |
+|---|---|
+| Naskah baru | **tidak ada** |
+| Dokumen ditambah | **1 berkas** ([`SENSUS-MODUL.md`](SENSUS-MODUL.md), 321 baris) |
+| Dokumen total | 264 → **265** di `docs/`, + 8 di `spec/` |
+| Berkas kode | tetap **0** — skrip pengukur sengaja **tidak** disimpan di repo |
+| Issue | 145 → **147** (127 terbuka, 20 ditutup); **#146**, **#147** baru |
+| Temuan | **E-151** · **G-20** · 5 cacat indeks diperbaiki |
+
+### 🔴🔴 Temuan terbesar: hitungan BERURUTAN meleset ke bawah secara sistematis
+
+Sepuluh kali `99-CATATAN-AUDIT.md` mencatat *“H-10 tergerus ke-N kalinya”* —
+sepuluh catatan di sepuluh berkas, masing-masing menyebut duplikasi yang
+terlihat **saat itu**. Tidak pernah ada satu sensus.
+
+Sensus atas seluruh `docs/` (38 blok pohon di 36 dokumen):
+
+| | Catatan berurutan | Sensus |
+|---|---|---|
+| `simulation/` | **6** (*“keenam kalinya”*, E-145) | **15 pohon** |
+| `sdk/` | tidak pernah dihitung | **14 pohon** |
+| `agents/` | *“sejak naskah 2”*, tanpa angka | **10 pohon** |
+| `memory/` | tidak pernah | **8 pohon** |
+
+⭐ **Yang paling banyak diduplikasi ternyata `sdk/`, bukan `simulation/`** — dan
+`sdk/` tidak pernah sekali pun dihitung, sementara `simulation/` dilacak lima
+naskah berturut-turut.
+
+💡 **Pelajaran yang bisa dipakai ulang:** menghitung *“ini yang ke berapa”* satu
+per satu, di berkas yang berbeda-beda, **meleset ke bawah**. Yang dibutuhkan
+bukan catatan yang lebih rajin melainkan **satu sensus**. Pertanyaannya bukan
+*“apakah ini duplikat?”* melainkan **“berapa banyak seluruhnya, dihitung
+sekali?”** → **E-151** / [#146](../../issues/146).
+
+### 🛑 Pemeriksaan yang belum pernah dijalankan: duplikat DI DALAM satu pohon
+
+§9.38 menaruh `scenario/` **dan** `counterfactual/` di `world-model/` **dan** di
+`simulation/` — pasangan yang sama, utuh, dua kali, di dalam satu diagram.
+Ditambah `preference/` di `memory-engine/` dan `prediction/`.
+
+Kalau pengguna bertanya *“bagaimana kalau saya tidur satu jam lebih lama?”* —
+modul mana yang **menjawab**, modul mana yang **menyimpan**? →
+**G-20** / [#147](../../issues/147).
+
+✅ **Dan tiga perempat temuan pemindai itu ternyata BUKAN cacat.** Enam nama
+ganda di [`83`](83-STRUKTUR-REPO-FINAL.md) (`agents/`×3, `security/`×3, …)
+semuanya sah — induknya berbeda peran (kode · `prompts/` · `docs/` · `tests/`).
+Dicatat justru supaya pembaca berikutnya tidak “memperbaikinya”.
+
+### 🔴 Sapuan Sesi 24 membuktikan `docs/` — dan tidak pernah menyentuh `spec/`
+
+Sembilan pemeriksaan Sesi 24 semuanya bercakupan `docs/`. Diperiksa dengan
+pemeriksaan yang setara, `spec/` menyimpan **lima cacat**, semuanya di berkas
+**indeks**:
+
+| Cacat | Yang benar |
+|---|---|
+| `00-DAFTAR-ISI.md` — `02-ERD.md` = *“Mesin keadaan”* | tidak ada mesin keadaan di sana; isinya **relasi + 6 aturan kepemilikan** |
+| `00-DAFTAR-ISI.md` — `06-MODULE-BOUNDARIES.md` = *“51 tugas V0”* | itu isi `07`; `06` = **6 aturan ketergantungan** |
+| `00-DAFTAR-ISI.md` — `07-BACKLOG-V0.md` = *“Kriteria selesai V0”* | `07` = **51 tugas** dalam 7 sprint (dihitung: 8+7+7+8+9+6+6 = 51) |
+| `00-DAFTAR-ISI.md` — baris `README.md` **kosong** | diisi |
+| `spec/README.md` — *“21 event”* | **22** (dihitung; berkasnya sendiri berjudul *“22 event — 21 dari naskah 5 §7 + 1 usulan”*) |
+
+⭐ **Deretnya konsisten: keterangan `02`, `06`, `07` bergeser satu baris.**
+Tabel `docs/` dibangun dari isi direktori; Lampiran B `spec/` ditulis tangan —
+dan yang ditulis tangan itulah yang melenceng.
+
+💡 **Pertanyaan yang menemukannya:** *“sapuan yang membuktikan kelengkapan itu
+mencakup berkas jenis apa — dan jenis apa yang tidak pernah dibukanya?”*
+
+### ⭐ 262 dari 263 hitungan baris tepat; yang meleset justru berkas yang mustahil dipelihara
+
+`SESSION-LOG.md` ditulis **1.726** padahal saat commit yang sama selesai isinya
+sudah **1.795** — ia satu-satunya berkas yang masih bertambah **sesudah** daftar
+isi menghitungnya. Angkanya diganti penanda `—` dengan catatan kaki, bukan
+diperbarui: **angka yang mustahil dipelihara lebih baik tidak ditulis daripada
+salah tiap sesi.**
+
+### Yang menunggu keputusan pemilik
+
+Tidak berubah: **[#139](../../issues/139) — Master Architecture v2.0 dimulai
+sekarang atau tidak.** Yang berubah hanya bahannya — butir pertamanya
+(*“menghapus overlap antar-modul”*) sekarang punya **daftar 128 nama** yang bisa
+dicoret satu per satu.
+
+---
+
 ## Sesi 24 — 8 September 2026
 
 **Tidak ada naskah baru. Seluruh dokumen disusun berurutan dan kelengkapannya dibuktikan.**
