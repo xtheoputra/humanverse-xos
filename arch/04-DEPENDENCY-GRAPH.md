@@ -262,7 +262,7 @@ Pengamannya ada di `embodiment/safety-kernel/` di tepi
 
 | Pemeriksaan | Hasil |
 |---|---|
-| Graf §1 asiklik | ✅ — diperiksa `madge --circular` di CI |
+| Graf §1 asiklik | ✅ — `import-linter` kontrak `independence` (**M-1**) |
 | Batas keras | **6**, dan **6 punya penegak** di [`11`](11-PENEGAKAN.md) |
 | Gerbang di rantai kanonik | **12** — memuat seluruh gerbang dari keempat rantai naskah |
 | Gerbang yang hilang dari §14.20 (`Consent`·`Rate Limit`·`Confirmation`) | ✅ **ketiganya ada** |
