@@ -60,34 +60,41 @@ manusia + agent + data + knowledge + simulation + automation**.
 
 ## 📌 Pekerjaan terbuka = GitHub Issues
 
-**153 issue** dalam 3 milestone — **33 ditutup**. Baca issue-nya, jangan analisis
-ulang naskahnya.
+**157 issue** dalam 3 milestone — **59 ditutup, 98 terbuka**. Baca issue-nya,
+jangan analisis ulang naskahnya.
+
+> ⭐ **26 ditutup pada 10 Sep 2026** oleh [`arch/`](arch/README.md) — bukan
+> dengan menjawabnya satu per satu, melainkan dengan **memberi bentuk kanonik**
+> tempat masing-masing terjawab: satu peta fase · satu pohon monorepo · satu
+> rantai gerbang · satu amplop event · empat kelas penyimpanan.
 
 | Milestone | Isi | Issue |
 |---|---|---|
-| **M1 — Keputusan sebelum kode** | 34 terbuka, 6 ditutup | [#1](../../issues/1)–[#9](../../issues/9), [#38](../../issues/38), [#58](../../issues/58)–[#59](../../issues/59), [#72](../../issues/72), [#80](../../issues/80), [#90](../../issues/90)–[#93](../../issues/93), [#98](../../issues/98)–[#101](../../issues/101), [#103](../../issues/103), [#105](../../issues/105), [#108](../../issues/108), [#111](../../issues/111)–[#113](../../issues/113) |
-| **M2 — Blueprint & Platform** | 60 terbuka, 25 ditutup | [#10](../../issues/10)–[#19](../../issues/19), [#26](../../issues/26)–[#37](../../issues/37), [#39](../../issues/39), [#41](../../issues/41)–[#45](../../issues/45), [#47](../../issues/47)–[#49](../../issues/49), [#51](../../issues/51), [#54](../../issues/54)–[#56](../../issues/56), [#60](../../issues/60)–[#70](../../issues/70), [#73](../../issues/73)–[#74](../../issues/74), [#77](../../issues/77)–[#79](../../issues/79), [#82](../../issues/82)–[#84](../../issues/84), [#87](../../issues/87)–[#89](../../issues/89), [#94](../../issues/94), [#96](../../issues/96)–[#97](../../issues/97), [#106](../../issues/106)–[#107](../../issues/107), [#109](../../issues/109)–[#110](../../issues/110) |
-| **M3 — Sebelum ada pengguna nyata** | 26 terbuka, 2 ditutup | [#20](../../issues/20)–[#25](../../issues/25), [#40](../../issues/40), [#46](../../issues/46), [#50](../../issues/50), [#52](../../issues/52)–[#53](../../issues/53), [#57](../../issues/57), [#71](../../issues/71), [#75](../../issues/75)–[#76](../../issues/76), [#81](../../issues/81), [#85](../../issues/85)–[#86](../../issues/86), [#95](../../issues/95), [#102](../../issues/102), [#104](../../issues/104), [#114](../../issues/114) |
+| **M1 — Keputusan sebelum kode** | **28 terbuka, 15 ditutup** | [#1](../../issues/1)–[#9](../../issues/9), [#38](../../issues/38), [#58](../../issues/58)–[#59](../../issues/59), [#72](../../issues/72), [#80](../../issues/80), [#90](../../issues/90)–[#93](../../issues/93), [#98](../../issues/98)–[#101](../../issues/101), [#103](../../issues/103), [#105](../../issues/105), [#108](../../issues/108), [#111](../../issues/111)–[#113](../../issues/113) |
+| **M2 — Blueprint & Platform** | **44 terbuka, 42 ditutup** | [#10](../../issues/10)–[#19](../../issues/19), [#26](../../issues/26)–[#37](../../issues/37), [#39](../../issues/39), [#41](../../issues/41)–[#45](../../issues/45), [#47](../../issues/47)–[#49](../../issues/49), [#51](../../issues/51), [#54](../../issues/54)–[#56](../../issues/56), [#60](../../issues/60)–[#70](../../issues/70), [#73](../../issues/73)–[#74](../../issues/74), [#77](../../issues/77)–[#79](../../issues/79), [#82](../../issues/82)–[#84](../../issues/84), [#87](../../issues/87)–[#89](../../issues/89), [#94](../../issues/94), [#96](../../issues/96)–[#97](../../issues/97), [#106](../../issues/106)–[#107](../../issues/107), [#109](../../issues/109)–[#110](../../issues/110) |
+| **M3 — Sebelum ada pengguna nyata** | **26 terbuka, 2 ditutup** | [#20](../../issues/20)–[#25](../../issues/25), [#40](../../issues/40), [#46](../../issues/46), [#50](../../issues/50), [#52](../../issues/52)–[#53](../../issues/53), [#57](../../issues/57), [#71](../../issues/71), [#75](../../issues/75)–[#76](../../issues/76), [#81](../../issues/81), [#85](../../issues/85)–[#86](../../issues/86), [#95](../../issues/95), [#102](../../issues/102), [#104](../../issues/104), [#114](../../issues/114) |
 
-⚠️ **[#55](../../issues/55) meninjau ulang keputusan yang sudah ditutup:**
-monorepo final (H-10) kini tergerus **SEPULUH kali** — tiga pohon dari naskah
-9/10/11, **enam** dari naskah 18, **`spatial-os/`** (naskah 19), **`robotics/`**
-(naskah 20), **`health-bio/`** (naskah 21, [#120](../../issues/120)), dan
-**`global-intelligence/`** (naskah 22, [#129](../../issues/129)), dan
-**`scientific-discovery/`** (naskah 23, [#138](../../issues/138)), dan
-**`civilization-platform/`** (naskah 24, [#143](../../issues/143)) — sehingga pohon
-keamanan menjadi **sebelas** (`security/` · `agent-security/` ·
-`spatial-os/safety/` · `spatial-os/privacy/` · `robotics/safety/` ·
-`health-bio/safety/` · `health-bio/privacy/` · `global-intelligence/security/` ·
-`global-intelligence/privacy/` · `scientific-discovery/safety/` · `sovereignty/privacy/`) dan aturan impor
-§8.42 tidak lagi bisa dinyatakan. **DUA BELAS naskah berturut-turut menyentuh
-struktur repo.** 🔴 `governance/` muncul di naskah 22 — **di dalam pohon
-fase** — lalu naskah 23 **tidak mewarisinya sama sekali**, memakai `ethics/` +
-`safety/` sendiri: pembuktian langsung bahwa tata kelola yang hidup di satu fase
-tidak diwarisi fase berikutnya ([#138](../../issues/138)).
-🛑 Naskah 20 bahkan memberi struktur repo **dua kali di dalam satu naskah**
-([#109](../../issues/109)).
-Sprint 0 tugas 0.1 menunggu jawabannya.
+✅ **H-10 SELESAI — [`arch/03`](arch/03-MONOREPO-FINAL.md).** Monorepo final
+sempat tergerus **sepuluh kali** oleh sepuluh naskah berturut-turut, sehingga
+pohon keluarga keamanan mencapai **sembilan belas** dan aturan impor §8.42
+(*“kode agent tidak boleh mengimpor `security/`”*) **tidak bisa DINYATAKAN** —
+tidak ada satu `security/` untuk dirujuk.
+
+| | Sebelum | Sesudah |
+|---|---|---|
+| pohon repositori | **38** | **28 folder** tingkat-atas |
+| **pohon keluarga keamanan** | 🛑 **19** | ✅ **1** (+ `governance/` berdiri sendiri) |
+| nama dipakai >1 pohon | **128** | **0 tabrakan konsep** |
+| `sdk/` · `simulation/` · `agents/` · `memory/` | 14 · 13 · 10 · 8 | 1 · 1 mesin + 4 plugin bernama · 1 · 1 |
+
+Yang menutupnya bukan keputusan kesebelas melainkan **aturan komposisi**: uji
+naik-turun [K-9](docs/KEPUTUSAN-DIDELEGASIKAN.md) dengan **tiga** hasil (naik ·
+tinggal · **ganti nama**), ditambah satu syarat yang tidak ada di K-9 — **uji
+hanya dijalankan atas nama yang dipakai TANPA induknya**. Ke-54 nama yang
+dipakai ≥3 pohon divonis satu per satu; sisa 74 diselesaikan prosedur mekanis
+saat pohonnya dibangun.
+
+⇒ **Sprint 0 tugas 0.1 tidak menunggu apa pun lagi.**
 
 🔴🔴 **Dan sekarang seluruhnya sudah DIHITUNG, bukan diingat** —
 [`docs/SENSUS-MODUL.md`](docs/SENSUS-MODUL.md) ([#146](../../issues/146)):

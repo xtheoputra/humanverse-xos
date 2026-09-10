@@ -4,6 +4,128 @@
 
 ---
 
+## Sesi 26 — 10 September 2026
+
+**Pemilik memerintahkan: *“kerjakan semua tugas dan fase yang masih tersisa”*. Yang tersisa adalah [#139](../../issues/139) — Master Architecture v2.0, permintaan penutup naskah 24, dan permintaan KELIMA dalam deret yang isinya sebagian besar sama; dua yang pertama dikerjakan, tiga terakhir hilang tanpa keputusan. Dikerjakan: [`../arch/`](../arch/README.md), dua belas berkas, sebelas butir yang pemilik sebut dijawab satu per satu.**
+
+**Dan mengerjakannya menemukan tiga hal yang membaca tidak akan menemukan — semuanya di `spec/`, bukan di naskah.**
+
+| Hal | Hasil |
+|---|---|
+| Naskah baru | **tidak ada** |
+| Folder baru | **`arch/`** — 12 berkas, cakupan **Phase 1–20** (`spec/` tetap V0 saja) |
+| Dokumen total | **272** di `docs/` · **8** di `spec/` · **12** di `arch/` |
+| Berkas kode | tetap **0** |
+| `spec/` diubah | **5 dari 8** — `01` (`max_risk`) · `05` (aturan 3 ditulis ulang, manifest v2) · `06` (Python) · `07` (Python, B-22, K-14) · `README` |
+| Issue | 153 → **157** (98 terbuka, **59 ditutup** — **26 ditutup sesi ini**); **#154**–**#157** baru |
+| Keputusan | **K-13** (bahasa backend) · **K-14** (pemanggilan agent = pemanggilan tool) |
+| Temuan | **E-158** · **A-36** · **A-37** · **G-21** |
+
+### 🔑 Aturan pengutamaan — tiga lapis dokumen, dan itu yang pertama ditetapkan
+
+Tanpa ini, `docs/` · `spec/` · `arch/` akan dibaca sebagai tiga jawaban untuk satu pertanyaan.
+
+> **`arch/` mengikat NAMA dan BATAS. `spec/` mengikat BENTUK. Untuk V0, `spec/` menang. Naskah tidak pernah menang atas keduanya, dan tidak pernah diubah.**
+
+⚠️ Aturan ketiga punya biaya yang harus disebut: pembaca naskah Phase 16 akan menemukan `robotics/planning/`, sementara `arch/03` menamainya `robotics/motion-planning/`. Itu **disengaja** — menyunting naskah menghapus bukti bahwa tabrakannya pernah ada, dan bukti itu satu-satunya alasan tabrakannya bisa ditemukan.
+
+---
+
+### 🔴🔴 TEMUAN TERBESAR: `spec/` berganti bahasa backend tanpa mencatatnya
+
+```
+grep -rl  "FastAPI" docs/                        →  1 berkas  (naskah 1, di tabel DAN diagram)
+grep -rlo "Node.js|NestJS|Express|Golang" docs/  →  0 berkas
+```
+
+**FastAPI adalah satu-satunya kerangka backend yang pernah dinamai dalam 24 naskah.** Namun `spec/06` memakai `index.ts`/`routes.ts` dan `spec/07` menuntut `npm test` — **tanpa satu kalimat pun yang menyatakan pergantiannya.**
+
+🛑 Dan ia memblokir **Sprint 0 tugas 0.3** — *kerangka `apps/api`*, berkas pertama yang akan ditulis di repo ini.
+
+💡 **Bentuknya sama dengan pola terbesar repo ini — sebuah klaim berhenti benar tanpa memberi tahu pembacanya — tetapi kali ini terjadi di berkas yang seluruh tugasnya adalah memberi tahu pembacanya apa yang harus dikoding.**
+
+🔑 **Dan cara menemukannya layak diingat:** bukan dengan membaca `spec/` (di sana ia konsisten dengan dirinya sendiri), melainkan dengan **membandingkan `spec/` terhadap naskah tentang hal yang `spec/` tidak pernah nyatakan**. *Kekosongan tidak muncul saat dibaca; ia muncul saat dibandingkan.*
+
+⇒ **K-13: Python + FastAPI.** ADR-004 sudah mengunci LangGraph (Python lebih dulu), dan **enam dari dua puluh fase natively Python** — terutama **Phase 16, karena ROS 2 tidak punya klien Node yang didukung resmi**. `spec/06` dan `spec/07` diselaraskan; `spec/01`–`05` bebas bahasa dan tidak disentuh.
+
+⭐ Keuntungan tak disengaja: **`import-linter` menggantikan `no-restricted-imports` DAN `madge --circular` sekaligus** ⇒ batas modul **dan** enam batas keras menjadi **satu berkas kontrak, satu perintah CI**.
+
+---
+
+### 🔴 TEMUAN KEDUA: menguji K-5 pada empat agent V0 menemukan lubang di GERBANGNYA
+
+`spec/05` menutup bagian K-5 dengan *“keempat agent V0 lulus ketiga uji”* — **dinyatakan, tidak diperiksa.**
+
+| Agent V0 | (b) memilih tool saat jalan | Vonis |
+|---|---|---|
+| `coach-agent` | ✅ 7 tool | agent |
+| `habit-agent` | ✅ 3 tool | agent |
+| `memory-agent` | ⚠️ 2 tool, pemakaian hampir selalu tetap | **perbatasan** → [#155](../../issues/155) |
+| **`orchestrator-agent`** | 🛑 **`tools: —`** | 🛑 **GAGAL** |
+
+Lubangnya bukan di orchestrator melainkan **di kata *“tool”***: ia memilih **agent**. Dan akibatnya bukan perkara istilah —
+
+> 🛑 **Selama memanggil agent bukan pemanggilan tool, sisi-sisi pohon eksekusi (`parent_run_id`) tidak pernah melewati risk gate — tepat di simpul yang melihat seluruh pohon.**
+
+⇒ **K-14.** Dan penerapannya langsung menemukan angka yang salah di V0: `orchestrator-agent` naik **R0 → R2**, sebab ia memanggil `agent.habit` (R2). Angka lama tampak benar **hanya selama pemanggilan agent tidak dihitung**.
+
+💡 **Dua agent pertama lulus dengan mudah.** Kalau pemeriksaannya berhenti di sana, K-5 akan tampak selesai. **Jalankan aturan yang baru dibuat pada kasus yang terasa paling sepele — itu yang menguji ALASANNYA, bukan hasilnya.**
+
+---
+
+### 🔴 TEMUAN KETIGA: tiga keputusan yang sudah DITUTUP tidak pernah sampai ke `spec/`
+
+| Keputusan | Ditutup sejak | Belum diterapkan di |
+|---|---|---|
+| [#52](../../issues/52) `requires_confirmation` pindah ke Policy Engine | naskah 15 | `spec/01` masih punya kolomnya |
+| **H-21** / [#67](../../issues/67) `R` ≠ `L` | naskah 15 | `agents.risk_level` masih satu angka |
+| **B-22** / [#59](../../issues/59) `consents.purpose` sebelum baris data pertama | (terbuka) | `spec/07` tugas 1.4 tidak menyebutnya |
+
+Ketiganya kini diterapkan. **Pelajaran [#38](../../issues/38) muncul lagi: janji di issue tertutup tidak punya penjaga.** Dan ditemukan bukan dengan membaca daftar issue, melainkan dengan **membandingkan `spec/` terhadap keputusan yang mengaku sudah berlaku atasnya.**
+
+---
+
+### Angka yang berubah karena diukur ulang lalu diselesaikan
+
+| Sumbu | Sebelum | Sesudah |
+|---|---|---|
+| pohon repositori | **38** di 24 naskah | **28 folder** tingkat-atas |
+| **pohon keluarga keamanan** | 🛑 **19** | ✅ **1** (+ `governance/` berdiri sendiri) |
+| nama dipakai >1 pohon | **128** | **0 tabrakan konsep** |
+| `simulation/` | 13 pohon, **5 arti** | 1 mesin bersama + 4 plugin bernama |
+| nama tabel | **247**, 19 berdefinisi ganda | 19 divonis; **4 kelas penyimpanan** |
+| nama agent | **59**, 44 disebut sekali | **6 agent + 53 kandidat** — bawaan `service` |
+| rantai keselamatan | 9 · 11 · 5 · 5 gerbang | **satu rantai kanonik, 12 gerbang** |
+| peta fase | tiga peta, tak satu pun kanonik | **satu peta, versi 3, tertutup, BERNOMOR VERSI** |
+
+### ⭐ Empat butir yang bentuknya paling layak dipakai ulang
+
+**1 · `world-model` MENYIMPAN, `simulation` MENJALANKAN — dan `simulation/` dipecah menurut apa yang SAMA, bukan apa yang berbeda.** Nama yang paling banyak berulang (13 pohon) ternyata lima mesin. Tetapi yang **sama** di kelimanya justru bagian yang paling penting dijaga: `scenario` · `counterfactual` · `seed` · determinisme · **isolasi dari data nyata**. ⇒ yang **naik** bagian samanya; yang **tinggal** mesinnya. Dan itu yang membuat §12.16 bisa ditegakkan **satu kali**, bukan lima kali.
+
+**2 · Uji naik-turun butuh satu syarat yang tidak ada di K-9: ia hanya dijalankan atas nama yang dipakai TANPA induknya.** `runtime/` ada di 7 pohon tetapi tak seorang pun menulis *“Runtime Engine”* telanjang; `simulation/` ditulis telanjang, dan [#130](../../issues/130) merekam *“Simulation Engine dengan lima arti”*. Syarat ini juga menjelaskan **6 dari 10 positif palsu** pemindai duplikasi sebelumnya.
+
+**3 · Sebuah GERBANG dijadwalkan SEBELUM hal yang dijaganya — dan itu bisa diperiksa mesin.** Enam catatan di enam naskah melaporkan bentuk yang sama (keselamatan dijadwalkan terakhir). ⇒ **R-1**: untuk tiap pasangan (gerbang **G**, hal yang dijaga **T**), `index(G) < index(T)`. Dijalankan hari ini: **enam roadmap fase GAGAL, `spec/07` dan `arch/10` LULUS.** 🔑 **Yang lulus keduanya ditulis sebagai PEKERJAAN, bukan sebagai peta fase** — roadmap yang ditulis untuk dikerjakan menaruh gerbangnya lebih dulu; yang ditulis untuk menggambarkan menaruh yang paling menarik lebih dulu.
+
+**4 · Bawaan `max_risk: 0` berlawanan arah dengan K-12, dan justru itu buktinya prinsipnya benar.** K-12 menolak bawaan `risk_level: 0` untuk **tool** (tool yang lupa diisi jadi paling tidak dijaga). `max_risk` adalah **pagu**, jadi `0` berarti agent yang lupa diisi **tidak bisa memanggil apa pun di atas R0**. 💡 Yang ditanyakan bukan *“berapa bawaannya”* melainkan ***“kalau seseorang lupa mengisinya, ke sisi mana ia jatuh?”***
+
+### ⚠️ Satu tabrakan nama yang HAMPIR saya buat sendiri
+
+`arch/06` sempat memakai `subject_type` untuk *siapa yang datanya* — sementara amplop event `spec/03` **sudah** memakai `subject_type` untuk *jenis entitas* (`"habit"`, `"goal"`). Itu akan menambah satu baris ke kamus tabrakan, **di berkas yang tugasnya menghapusnya**. Diganti `data_subject`. 💡 Tertangkap dengan **memeriksa nama usulan terhadap `spec/` sebelum menulisnya** — murah, dan layak diulang untuk tiap nama kolom baru.
+
+### 🔑 Satu baris yang paling berguna dari seluruh sesi ini
+
+> **T0 sampai T5 tidak diblokir oleh satu pun keputusan yang belum diambil — kecuali [#3](../../issues/3), yaitu siapa yang mengerjakannya. Mulai T6 ke atas, setiap tahap menunggu keputusan yang hanya bisa diambil pemilik.**
+
+Bentuknya konsisten: T6–T12 adalah tahap yang datanya menyangkut **orang yang tidak punya akun** (tetangga, tamu, pejalan kaki, karyawan, penduduk kota) atau **badan orang** (biometrik, gaya, gerak). Persis kelas keputusan yang aturan pemilah serahkan kepada pemiliknya.
+
+Dan [#20](../../issues/20) memblokir **peluncuran**, bukan pengkodean ⇒ **penghambat untuk MEMULAI tinggal satu.**
+
+### Yang sengaja TIDAK diputuskan
+
+**Nol butir C.** Ditambah: **Phase 1 tetap tanpa nama** (K-6 dipertahankan — tetapi bentuk celahnya berubah: penomoran fase dimulai di naskah 3, jadi isi Phase 1 sudah bisa **ditunjuk**; yang hilang cuma **labelnya**) · §16.5 dan §16.7 · lima angka keselamatan fisik [#112](../../issues/112) · empat urutan tangga cakupan [#130](../../issues/130) · L5 lawan Autonomy Contract [#98](../../issues/98) · urutan ulang enam roadmap fase.
+
+---
+
 ## Sesi 25 — 9 September 2026
 
 **Tidak ada naskah baru. DELAPAN hal diukur untuk pertama kalinya — overlap antar-modul · peta fase · nama event · rute API · daftar agent · nama tabel · tangga risiko · rantai keputusan — dan semuanya membalik angka yang dipakai. Polanya: hitungan BERURUTAN meleset ke bawah · KEJADIAN bukan AKIBAT · PENJUMLAHAN bukan HIMPUNAN · hitungan yang BERHENTI DIPELIHARA · tuduhan yang ARAHNYA TERBALIK · dan kegagalan yang dilaporkan TANPA DENOMINATOR.**

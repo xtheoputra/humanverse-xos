@@ -7,8 +7,8 @@
 > Cara pakai: kalau pemilik memutuskan sebuah butir, keputusannya **naik** ke
 > berkas visi yang sesuai, lalu butirnya turun ke bagian **H**.
 
-> 📌 **Butir di berkas ini sudah jadi 145 GitHub Issue** dalam 3 milestone —
-> 125 terbuka, 20 ditutup. Baca issue-nya, jangan analisis ulang naskahnya.
+> 📌 **Butir di berkas ini sudah jadi 157 GitHub Issue** dalam 3 milestone —
+> **98 terbuka, 59 ditutup**. Baca issue-nya, jangan analisis ulang naskahnya.
 >
 > 🔧 Hasil kerja engineering ada di [`../spec/`](../spec/README.md) (V0) dan
 > [`../arch/`](../arch/README.md) (**Master Architecture v2.0**, Phase 1–20) —

@@ -264,8 +264,20 @@ konsekuensi yang belum ditulis: **Safety Kernel juga.**
 ⭐ Dan itu sekaligus menjawab **B-32** ([#110](../../issues/110)). §16.22
 menggambar `HumanVerse → ROS Adapter → ROS2 → Robot`, sehingga siapa pun yang
 bisa bicara ke ROS2 menggerakkan robot **tanpa** melewati pengaman di sisi
-HumanVerse. Dengan Safety Kernel **di bawah adapter, di sisi robot**, jalur
-pintas itu tertutup secara fisik — bukan dengan aturan, melainkan dengan letak.
+HumanVerse. Nyata, sebab DDS ROS 2 bawaan menerima peserta se-jaringan tanpa
+autentikasi kuat, dan alat diagnostik pabrikan bicara langsung ke lapisan itu.
+
+🔧 **Tiga aturan yang menutupnya, dan ketiganya soal LETAK, bukan kebijakan:**
+
+| # | Aturan | Kenapa letak, bukan aturan |
+|---|---|---|
+| 1 | **`embodiment/safety-kernel/` berada DI BAWAH adapter, di sisi robot** | jalur pintas tertutup **secara fisik** — tidak ada jalan dari ROS 2 ke aktuator yang tidak melewatinya |
+| 2 | **domain ROS 2 terisolasi, SROS 2 menyala** (autentikasi & enkripsi DDS) | tanpa ini, “se-jaringan” berarti siapa pun di jaringan yang sama |
+| 3 | **Emergency Stop bukan pesan ROS biasa** — ia jalur terpisah di `safety-kernel/`, tidak antre di belakang lalu lintas ROS | rem yang menunggu giliran bukan rem |
+
+⚠️ Dan `POST /v1/robot/emergency-stop` §16.29 lewat HTTP **hilang saat jaringan
+putus** — yaitu pemicu darurat nomor empat §16.20. Ia **kenyamanan, bukan
+pengaman**.
 
 ### `identity/` — manusia dan agent bukan hal yang sama
 
