@@ -22,7 +22,7 @@ Yang **tetap milik pemilik**, dan tidak saya sentuh:
 | waktu & orang | [#3](../../issues/3) siapa mengerjakan V0 | bukan soal teknis |
 | uang & hukum | [#20](../../issues/20) cek merek · seluruh butir **C** | menuntut pembelian, nasihat hukum, atau menanggung risiko orang lain |
 | cakupan produk | [#4](../../issues/4) Mental Wellness dibuang atau ditunda | pemilik yang menanggung akibatnya |
-| urutan kerja pemilik | [#139](../../issues/139) Master Architecture v2.0 | soal waktu pemilik sendiri |
+| urutan kerja pemilik | ~~[#139](../../issues/139)~~ — ✅ diperintahkan 10 Sep 2026 | ~~soal waktu pemilik sendiri~~ |
 
 ⇒ **Nol butir C saya putuskan.** Semuanya menyangkut orang yang tidak ikut
 memilih.
@@ -290,11 +290,54 @@ Tiga tabrakan penomoran punya satu bentuk yang sama: **satu nomor, banyak arti.*
 
 ---
 
+## K-13 · Bahasa backend = **Python + FastAPI**
+
+**Menutup celah yang belum pernah dicatat:** [`../spec/`](../spec/README.md)
+berganti bahasa tanpa menyebutnya. Memblokir **Sprint 0 tugas 0.3**.
+
+| | |
+|---|---|
+| **Keputusan** | Backend ditulis dalam **Python** dengan **FastAPI**. [`../spec/06`](../spec/06-MODULE-BOUNDARIES.md) dan [`../spec/07`](../spec/07-BACKLOG-V0.md) **diselaraskan**, bukan dibiarkan berbeda. |
+| **Bukti** | `grep -rl "FastAPI" docs/` → **1 berkas** ([`05`](05-ARSITEKTUR.md), naskah 1, disebut di tabel **dan** diagram). `grep -rlo "Node.js\|NestJS\|Express\|Golang" docs/` → **0 berkas**. FastAPI adalah **satu-satunya kerangka backend yang pernah dinamai dalam 24 naskah**. Ditambah **ADR-004** yang sudah mengunci **LangGraph** (Python lebih dulu), dan **enam dari dua puluh fase natively Python** — Phase 10 · 12 · **16 (ROS 2: `rclpy`/`rclcpp`, tak ada klien Node resmi)** · 17 · 19 · sebagian 5 & 9. |
+| **Bacaan yang DITOLAK** | *“`spec/` sudah ditulis untuk TypeScript, jadi TypeScript yang menang.”* 🛑 **Ditolak dengan alasan yang membalik arahnya:** `spec/` tidak pernah **memutuskan** bahasa — ia **mengasumsikannya**, diam-diam, di dua berkas (`index.ts`, `npm test`). Asumsi yang tidak pernah dinyatakan tidak bisa mengalahkan keputusan yang dinyatakan dua kali. |
+| **Yang TIDAK berubah** | `spec/01`–`05` **bebas bahasa**: 23 tabel, ERD, 22 event, endpoint, manifest — tidak satu pun disentuh oleh keputusan ini. |
+| **Biaya** | **Nol baris kode.** Ini kesempatan terakhir biaya itu nol. |
+| **Cara membalikkan** | Balik tabel padanan di [`../arch/05`](../arch/05-TECHNOLOGY-STACK.md) §2. Sesudah Sprint 0 selesai, biayanya seluruh Sprint 0. |
+
+⭐ **Satu keuntungan yang tidak disengaja:** `import-linter` menggantikan
+`no-restricted-imports` **dan** `madge --circular` sekaligus — sehingga batas
+modul (`spec/06` aturan 1–4) dan **enam batas keras**
+([`../arch/04`](../arch/04-DEPENDENCY-GRAPH.md) §2) menjadi **satu berkas
+kontrak** yang dibaca satu perintah CI.
+
+---
+
+## K-14 · Memanggil agent lain **adalah** pemanggilan tool
+
+**Menutup:** [#97](../../issues/97) (**E-119**) · menutup lubang gerbang yang
+ditemukan saat **menguji K-5 terhadap keempat agent V0**
+
+| | |
+|---|---|
+| **Keputusan** | Agent yang bisa dipanggil agent lain **wajib terdaftar di tool registry** dengan `kind: agent`, dan `risk_level` entri itu = **`max_risk`** agent yang dipanggil. Pemanggilannya melewati rantai gerbang seperti tool lain. Ditambah: properti agent adalah **`max_risk`** (pagu), bukan `risk_level`; aturan validasi 3 `spec/05` ditulis ulang menjadi **setiap tool wajib `risk_level <= max_risk`**. |
+| **Bukti** | `spec/05` menutup bagian K-5 dengan *“keempat agent V0 lulus ketiga uji”* — **dinyatakan, tidak diperiksa**. Diperiksa: `orchestrator-agent` punya `tools: —` (nol tool) sementara uji (b) menuntut *“memilih di antara beberapa **tool**”*. Ia memilih **agent**. ⇒ sisi-sisi pohon eksekusi (`parent_run_id`) **tidak pernah melewati risk gate**, tepat di simpul yang melihat seluruh pohon. |
+| **Bacaan yang DITOLAK** | *“Longgarkan uji (b) menjadi ‘tool **atau agent**’.”* **Ditolak** — itu memperbaiki definisinya tetapi **membiarkan lubang gerbangnya**: orchestrator akan lulus sebagai agent dan tetap memanggil tanpa gerbang. |
+| **Akibat nyata di V0** | `orchestrator-agent` mendapat tiga entri tool `kind: agent`, dan `max_risk`-nya **naik R0 → R2** — sebab ia memanggil `agent.habit` (R2). Angka lama tampak benar hanya selama pemanggilan agent tidak dihitung. |
+| **Cara membalikkan** | Longgarkan uji (b), dan terima bahwa sisi pohon eksekusi tidak digerbang. |
+
+> 💡 **Cara menemukannya layak diingat: JALANKAN aturan yang baru dibuat pada
+> kasus yang terasa paling sepele.** Dua agent pertama lulus dengan mudah; kalau
+> pemeriksaannya berhenti di sana, K-5 akan tampak selesai. Yang ketiga —
+> `orchestrator-agent`, yang “jelas-jelas agent” — justru yang gagal, dan
+> kegagalannya menunjuk lubang di **gerbangnya**, bukan di definisinya.
+
+---
+
 ## Yang sengaja **tidak** saya putuskan
 
 | Butir | Kenapa |
 |---|---|
-| [#139](../../issues/139) Master Architecture v2.0 | soal **waktu pemilik**, bukan soal teknis. Angkanya sudah tersedia di issue-nya |
+| ~~[#139](../../issues/139) Master Architecture v2.0~~ | ✅ **pemilik memerintahkannya 10 Sep 2026** (*“kerjakan semua tugas dan fase yang masih tersisa”*) — dikerjakan, hasilnya [`../arch/`](../arch/README.md) |
 | [#3](../../issues/3) siapa mengerjakan V0 | orang dan waktu |
 | [#20](../../issues/20) cek merek & domain | menuntut pencarian merek dan pembelian |
 | **seluruh butir C** (hukum & privasi) | risikonya ditanggung orang yang tidak ikut memilih |

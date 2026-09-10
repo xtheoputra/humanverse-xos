@@ -20,14 +20,14 @@ manusia + agent + data + knowledge + simulation + automation**.
 
 | Hal | Keadaan |
 |---|---|
-| Tahap | **Spesifikasi engineering siap** — belum ada kode (disengaja) |
+| Tahap | **Master Architecture v2.0 selesai** — spesifikasi V0 siap, belum ada kode (disengaja) |
 | Berkas kode | 0 |
 | Repo git | privat `xtheoputra/humanverse-xos`, branch `master` |
-| Dokumen | **272 berkas** di `docs/` (naskah + audit + 6 sensus + peta fase + keputusan + catatan sesi) + **8 berkas** di `spec/` |
+| Dokumen | **272 berkas** di `docs/` + **8 berkas** di `spec/` + **12 berkas** di [`arch/`](arch/README.md) |
 | Naskah pemilik | **24** — terakhir: **Phase 20 Civilization Platform** (39 bagian) — **fase TERAKHIR** |
-| Keputusan tertutup | **24 butir H** — nama · MVP · struktur repo · ambang konfirmasi · model memory · memory meluruh · gerbang policy · context package · peta 15 fase · dua tangga R/L · manifest dipulihkan · **model transisi belajar dari galat sendiri** · **monetisasi punya fase (Phase 14)**. 🛑 **H-20 PATAH, dan petanya TERBUKA-UJUNG** — **empat naskah berturut-turut masing-masing menambah satu fase** di kalimat penutupnya: naskah 19 → **Phase 16**, naskah 20 → **Phase 17**, naskah 21 → **Phase 18**, naskah 22 → **Phase 19 Civilization Intelligence**. ⭐ **Naskah 23 MEMBALIKKAN polanya sebagian** — ia mengubah Phase 19 menjadi *Scientific Discovery Engine*, memindahkan Civilization ke **Phase 20**, dan **mengumumkan perubahan itu beserta alasannya**: pertama kalinya dalam lima naskah, dan ia menyebut **Phase 20 sebagai fase TERAKHIR**. 🛑 Tapi ia menyandarkannya pada *“roadmap 20 fase yang sudah kita tetapkan sebelumnya”* — yang **tidak pernah ada** ([#132](../../issues/132), [#133](../../issues/133), [#101](../../issues/101), [#108](../../issues/108)). ⚠️ **H-13** ([#72](../../issues/72)) dan **H-11** ([#78](../../issues/78)) juga perlu ditinjau ulang |
-| Keputusan terbuka | **26 pertanyaan A** · **39 risiko B** · **157 ketidakcocokan E** · **20 lubang G** — dan **12 butir K** sudah saya putuskan sendiri |
-| Tanggal dokumen | 8 September 2026 |
+| Keputusan tertutup | **24 butir H** — nama · MVP · struktur repo · ambang konfirmasi · model memory · memory meluruh · gerbang policy · context package · dua tangga R/L · manifest dipulihkan · **model transisi belajar dari galat sendiri** · **monetisasi punya fase (Phase 14)**. ✅ **H-20 (peta fase) DIPULIHKAN sebagai [`arch/01`](arch/01-PETA-20-FASE.md) — peta versi 3, 20 baris TERTUTUP, dan peta kini BERNOMOR VERSI** sehingga *“roadmap yang sudah kita tetapkan”* selalu punya rujukan yang bisa dibuka ([#101](../../issues/101) · [#108](../../issues/108) · [#132](../../issues/132) · [#133](../../issues/133) · [#142](../../issues/142)). ✅ **H-13 ([#72](../../issues/72)) DISELESAIKAN:** `Phase` dan `V0–V6` bukan dua rencana yang bersaing melainkan **dua sumbu** — `Phase` menghitung dokumen, `V` menghitung rilis. ⚠️ **H-11** ([#78](../../issues/78)) masih perlu ditinjau ulang |
+| Keputusan terbuka | **26 pertanyaan A** · **39 risiko B** · **158 ketidakcocokan E** · **20 lubang G** — dan **14 butir K** sudah saya putuskan sendiri |
+| Tanggal dokumen | 10 September 2026 |
 
 > ⚠️ **Nol baris kode itu disengaja — dan penghambatnya terus berkurang.**
 > Lima naskah sudah menjawab: **nama** (A-7), **MVP** (A-2), **struktur repo**
@@ -44,9 +44,14 @@ manusia + agent + data + knowledge + simulation + automation**.
 > Neo4j baru di V2 · **#33** memory → **sudah ditutup** (`kind` + `scope`, plus
 > `tier` dari H-16).
 >
-> 🛑 **Penghambat V0 yang sebenarnya cuma dua, dan keduanya bukan soal skema:**
-> **[#3](../../issues/3)** (siapa mengerjakan 12 fitur dalam 4–6 minggu) dan
-> **[#20](../../issues/20)** (cek merek, domain, nama paket).
+> 🛑 **Penghambat untuk MEMULAI kode tinggal SATU: [#3](../../issues/3)**
+> — siapa yang mengerjakan 12 fitur dalam 4–6 minggu.
+> [#20](../../issues/20) (merek & domain) memblokir **peluncuran**, bukan
+> pengkodean ([`arch/10`](arch/10-URUTAN-IMPLEMENTASI.md) §2).
+> ⭐ Dan **T0–T5** dari tiga belas tahap implementasi **tidak diblokir satu pun
+> keputusan yang belum diambil**; mulai **T6** ke atas tiap tahap menunggu
+> keputusan pemilik — dan semuanya menyangkut orang yang tidak punya akun atau
+> badan orang.
 >
 > 🔑 Rekonsiliasi lengkap kedua dokumen ada di
 > [`docs/GERBANG-SKEMA.md`](docs/GERBANG-SKEMA.md).
@@ -180,11 +185,12 @@ di antaranya*), §16.5 (*tujuan manusia langsung ke kendali sendi*), §16.7
 (*punya `Collision Check`, tetapi itu menjawab "aman secara fisik", bukan
 "boleh dilakukan"*).
 
-## 🔧 Dua belas keputusan yang diambil sendiri — [`docs/KEPUTUSAN-DIDELEGASIKAN.md`](docs/KEPUTUSAN-DIDELEGASIKAN.md)
+## 🔧 Empat belas keputusan yang diambil sendiri — [`docs/KEPUTUSAN-DIDELEGASIKAN.md`](docs/KEPUTUSAN-DIDELEGASIKAN.md)
 
 Atas permintaan pemilik (*"beri keputusan sendiri sesuai aturan"*, 9 Sep 2026),
-dua belas pertanyaan **engineering** diputuskan dan ditegakkan di `spec/` — tiap
-butir dengan **bacaan yang ditolak** dan **cara membalikkannya**:
+**empat belas** pertanyaan **engineering** diputuskan dan ditegakkan di `spec/`
+dan `arch/` — tiap butir dengan **bacaan yang ditolak** dan **cara
+membalikkannya**:
 
 | | Keputusan | Ditegakkan di |
 |---|---|---|
@@ -200,6 +206,8 @@ butir dengan **bacaan yang ditolak** dan **cara membalikkannya**:
 | **K-10** | **Satu amplop event**; `SecurityEvent` → domain `security.*` | `spec/03` |
 | **K-11** | Tiap tangga bernomor membawa **awalan** (`DP-L6`, `ARCH1`, `D6.1`) | — |
 | **K-12** | `risk_level` **wajib**; larangan scope + `spatial`·`location`·`people`·`csi` | `spec/05` aturan 8 & 9 |
+| **K-13** 🆕 | Bahasa backend = **Python + FastAPI** — `spec/` diam-diam berganti bahasa | `spec/06` · `spec/07` |
+| **K-14** 🆕 | **Memanggil agent lain ADALAH pemanggilan tool**; agent memakai `max_risk`, bukan `risk_level` | `spec/01` · `spec/05` aturan 3 |
 
 🛑 **Yang sengaja TIDAK saya putuskan:** [#139](../../issues/139) (waktu pemilik) ·
 [#3](../../issues/3) (orang) · [#20](../../issues/20) (merek) · **seluruh butir C**
@@ -261,6 +269,35 @@ lagi membandingkan.
 
 ---
 
+## 🗺️ HumanVerse Master Architecture v2.0 — [`arch/`](arch/README.md)
+
+**Dikerjakan 10 September 2026 atas perintah pemilik** (*“kerjakan semua tugas
+dan fase yang masih tersisa”*), menjawab penutup naskah 24 dan
+[#139](../../issues/139). Cakupannya **Phase 1–20**; `spec/` tetap **V0 saja**.
+
+> 🔑 **Aturan pengutamaan: `arch/` mengikat NAMA & BATAS, `spec/` mengikat
+> BENTUK. Untuk V0, `spec/` menang. Naskah tidak pernah diubah.**
+
+| Berkas | Yang berubah dari “kalimat” menjadi “daftar” |
+|---|---|
+| [`arch/01`](arch/01-PETA-20-FASE.md) | **peta fase v3** — 20 baris tertutup, satu kata kerja per fase; `Phase` dan `V0–V6` **didamaikan** (dua sumbu, bukan dua rencana) |
+| [`arch/02`](arch/02-BOUNDED-CONTEXT.md) | **17 bounded context**, tiap konteks memiliki kosakatanya; **kamus tabrakan** 9 kata |
+| [`arch/03`](arch/03-MONOREPO-FINAL.md) | **54 nama** ≥3 pohon divonis satu per satu; **19 pohon keamanan → 1**; 38 pohon → **28 folder** |
+| [`arch/04`](arch/04-DEPENDENCY-GRAPH.md) | graf asiklik + **6 batas keras** + **rantai tindakan kanonik 12 gerbang** |
+| [`arch/05`](arch/05-TECHNOLOGY-STACK.md) | tumpukan final; **temuan: `spec/` berganti bahasa backend tanpa mencatatnya** |
+| [`arch/06`](arch/06-DATA-ARCHITECTURE.md) | **247 nama tabel** → 4 kelas penyimpanan; **19 definisi ganda** selesai; retensi wajib |
+| [`arch/07`](arch/07-EVENT-CONTRACTS.md) | satu amplop; **39 domain terdaftar**; aturan apa yang **bukan** event |
+| [`arch/08`](arch/08-AGENT-CONTRACTS.md) | **59 nama** diuji K-5; Konstitusi §20.16 diberi **penegak per pasal** |
+| [`arch/09`](arch/09-DEPLOYMENT-TOPOLOGY.md) | D0–D5 dengan **pemicu terukur**; apa yang tak boleh meninggalkan perangkat |
+| [`arch/10`](arch/10-URUTAN-IMPLEMENTASI.md) | **T0–T12** — dan **T0–T5 tidak diblokir keputusan apa pun kecuali [#3](../../issues/3)** |
+| [`arch/11`](arch/11-PENEGAKAN.md) | **25 pemeriksaan CI**; **4 bisa jalan sekarang tanpa kode** |
+
+🛑 **Nol butir C diputuskan.** Yang menyangkut hukum, uang, orang, dan cakupan
+produk tetap milik pemilik — `arch/` menyediakan **mekanisme yang menegakkan apa
+pun yang pemilik putuskan**, bukan keputusannya.
+
+---
+
 ## 🔧 Engineering Specification v1.0 — [`spec/`](spec/README.md)
 
 Lapisan **04** dari peta 14 lapisan naskah 6, dikerjakan penuh. **Bukan kata
@@ -272,7 +309,7 @@ pemilik** — sengaja di luar `docs/` supaya berkas naskah tetap murni.
 | [`spec/02-ERD.md`](spec/02-ERD.md) | Relasi + 6 aturan kepemilikan data |
 | [`spec/03-EVENT-CONTRACTS.md`](spec/03-EVENT-CONTRACTS.md) | Envelope, **versi · urutan · idempotensi**, 22 event, consumer |
 | [`spec/04-API-CONTRACTS.md`](spec/04-API-CONTRACTS.md) | Endpoint REST V0 + Privacy Center |
-| [`spec/05-AGENT-CONTRACTS.md`](spec/05-AGENT-CONTRACTS.md) | Manifest schema (6 aturan validasi), tool registry, risk gate |
+| [`spec/05-AGENT-CONTRACTS.md`](spec/05-AGENT-CONTRACTS.md) | Manifest schema (**9 aturan validasi**), tool registry, risk gate |
 | [`spec/06-MODULE-BOUNDARIES.md`](spec/06-MODULE-BOUNDARIES.md) | Batas modul + 6 aturan yang **ditegakkan CI** |
 | [`spec/07-BACKLOG-V0.md`](spec/07-BACKLOG-V0.md) | **51 tugas** dalam 7 sprint, siap diberikan ke AI coding agent |
 
@@ -583,12 +620,12 @@ NASKAH 1 — 12 modul               NASKAH 4 — Agent Registry §12
 | Lapisan | Teknologi |
 |---|---|
 | Aplikasi | Flutter (mobile & web) · desktop & admin-dashboard **belum ditetapkan** |
-| Backend | FastAPI · 12 microservice |
+| Backend | **Python + FastAPI** (🔧 K-13) · V0 modular monolith, 12 modul |
 | AgentOS | Registry · Scheduler · Task Queue · Workflow · Tool Registry · Memory Manager · Event Bus · Policy Engine |
 | AI | LangGraph · MCP · Tool Calling · **Model Router** (small/medium/large) |
-| Data | **PostgreSQL · Qdrant · Neo4j · Redis** — naskah 5 membuang ClickHouse & Kafka |
+| Data | **PostgreSQL · Qdrant · Neo4j · Redis** — naskah 5 membuang ClickHouse & Kafka; deret waktu lewat **TimescaleDB** (ekstensi, bukan penyimpanan kelima) |
 | Event | Event Bus; antrean di **Redis** (Kafka baru bila skalanya menuntut) |
-| Infra | **V0: Docker Compose** → Cloud VM → Kubernetes · ArgoCD · Terraform · Vault |
+| Infra | **D0 Docker Compose** → D1 Cloud VM → D2 Postgres terkelola → D3 worker → D4 Kubernetes → D5 tepi+cloud — tiap langkah punya **pemicu terukur** ([`arch/09`](arch/09-DEPLOYMENT-TOPOLOGY.md)) |
 | Observability | OpenTelemetry · Prometheus · Grafana · Loki · Tempo · Sentry · **Agent Health** |
 | Keamanan | OAuth · RBAC · Vault · AES-256 · TLS · Immutable Log · Permission Engine · Risk Engine |
 | Privasi | Privacy Center · Personal Data Vault · On-device AI (V5) · Federated ML (V5) |

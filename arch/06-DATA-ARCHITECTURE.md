@@ -143,7 +143,7 @@ Tabel tanpa retensi sudah tercatat **empat kali**
 disimpan bukan kendali.
 
 🔧 **Aturan: setiap tabel menyatakan tiga hal, dan migrasi tanpa ketiganya
-ditolak CI** ([`11`](11-PENEGAKAN.md) P-6):
+ditolak CI** ([`11`](11-PENEGAKAN.md) P-1):
 
 ```sql
 -- @retention   : 24 months | forever | 90 days | until-account-deleted
@@ -181,13 +181,23 @@ dan **patah** pada fase pertama yang datanya tentang **tempat**, bukan orang:
 
 🔧 **Perluasan prinsip 6, bukan penggantinya:**
 
-> **Setiap tabel wajib punya `subject_type`. Kalau `subject_type = 'user'`, maka
+> **Setiap tabel wajib punya `data_subject`. Kalau `data_subject = 'user'`, maka
 > `user_id` WAJIB TIDAK NULL. Kalau tidak, `user_id` TIDAK BOLEH ADA sama
 > sekali — bukan `NULL`.**
 
 ```
-subject_type : 'user' | 'bystander' | 'world' | 'system'
+data_subject : 'user' | 'bystander' | 'world' | 'system'
 ```
+
+> ⚠️ **Namanya `data_subject`, bukan `subject_type` — dan itu bukan selera.**
+> Amplop event [`../spec/03`](../spec/03-EVENT-CONTRACTS.md) **sudah** memakai
+> `subject_type`, dengan arti lain: *jenis entitas* yang diacu event
+> (`"habit"`, `"goal"`). Memakai kata yang sama untuk *siapa yang datanya* akan
+> menambah satu baris lagi ke kamus tabrakan [`02`](02-BOUNDED-CONTEXT.md) §4 —
+> di berkas yang tugasnya menghapusnya.
+> 💡 Tertangkap dengan memeriksa nama usulan terhadap `spec/` **sebelum**
+> menulisnya, bukan sesudah. Itu pemeriksaan yang murah dan layak diulang untuk
+> tiap nama kolom baru.
 
 | Kenapa bukan `user_id NULL` | |
 |---|---|
@@ -207,7 +217,7 @@ kalau ia ada, ia **tidak menyamar sebagai pengguna**.
 
 ### `world_observations` — satu-satunya tabel tanpa pembatas alami
 
-🔧 Setiap tabel `subject_type='world'` **wajib** punya kunci partisi selain
+🔧 Setiap tabel `data_subject='world'` **wajib** punya kunci partisi selain
 waktu (`region_id`, `source_id`, atau `topic`) **dan** batas atas laju tulis
 yang dinyatakan. Tanpa itu ia bukan tabel; ia aliran yang menyamar sebagai
 tabel — dan tempatnya K2/K3, bukan K1.
@@ -247,7 +257,7 @@ pemilik** — ia menentukan apa yang tidak boleh keluar dari negara pengguna.
 
 ---
 
-## §8 🛑 Nol perubahan untuk V0
+## §8 Perubahan untuk V0: satu, dan ia keputusan lama
 
 | | |
 |---|---|
@@ -256,6 +266,7 @@ pemilik** — ia menentukan apa yang tidak boleh keluar dari negara pengguna.
 | K2 dipakai sejak | Phase 10 / V5 |
 | K3 dipakai sejak | Phase 15 |
 | Kolom baru yang dituntut berkas ini untuk V0 | **`retention` sebagai komentar migrasi** — nol kolom, nol migrasi |
+| Kolom yang **berubah** | **1** — `agents.risk_level` → `max_risk`, `requires_confirmation` dihapus. Bukan keputusan baru: [#52](../../issues/52) + **H-21** + **E-119**, tiga keputusan yang tidak pernah sampai ke DDL |
 
 ⚠️ Satu-satunya hal yang **harus** masuk V0 dan belum ada:
 **`consents.purpose` + `kind='model_training'`** — **B-22**
@@ -278,8 +289,8 @@ tanpa itu **tidak bisa melatih model apa pun** di Phase 5.
 | Nama berdefinisi ganda tanpa vonis | **NIHIL** — 19 dari 19, §4 |
 | Kelas penyimpanan | **4**, dan uji admisinya mekanis (§2) |
 | `source='sensor'` di `events` | ❌ **sengaja tidak ada** |
-| Tabel tanpa `retention` | ditolak CI — [`11`](11-PENEGAKAN.md) P-6 |
-| Tabel tanpa `subject_type` | ditolak CI — P-7 |
-| Tabel `user_id NULL` | ❌ **dilarang** — kolomnya absen, bukan null |
-| Tabel `sensitivity ≥ 3` di luar vault | ditolak CI — P-8 |
+| Tabel tanpa `retention` | ditolak CI — [`11`](11-PENEGAKAN.md) P-1 |
+| Tabel tanpa `data_subject` | ditolak CI — P-2 |
+| Tabel `user_id NULL` | ditolak CI — P-3; kolomnya absen, bukan null |
+| Tabel `sensitivity ≥ 3` di luar vault | ditolak CI — P-4 |
 | Tabel V0 | **23**, tidak berubah |

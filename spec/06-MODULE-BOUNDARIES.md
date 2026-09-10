@@ -15,8 +15,8 @@ tidak boleh dilanggar** — supaya pemisahan nanti (V2) jadi pekerjaan sehari,
 bukan penulisan ulang.
 
 ```
-apps/api/                    ← satu proses, satu deploy
-└── src/modules/
+apps/api/                    ← satu proses, satu deploy (Python + FastAPI)
+└── modules/
     ├── identity/
     ├── profile/
     ├── goals/
@@ -35,20 +35,26 @@ Setiap modul berbentuk sama:
 
 ```
 modules/habits/
-├── index.ts          ← SATU-SATUNYA pintu keluar (public API modul)
-├── routes.ts         ← HTTP; tidak boleh diimpor modul lain
-├── service.ts        ← aturan bisnis
-├── repository.ts     ← SQL; hanya menyentuh tabel milik modul ini
-├── events.ts         ← event yang diterbitkan & didengarkan
-└── types.ts
+├── __init__.py       ← SATU-SATUNYA pintu keluar (public API modul)
+├── routes.py         ← HTTP; tidak boleh diimpor modul lain
+├── service.py        ← aturan bisnis
+├── repository.py     ← SQL; hanya menyentuh tabel milik modul ini
+├── events.py         ← event yang diterbitkan & didengarkan
+└── schemas.py
 ```
+
+> 🔧 **Bahasa backend: Python + FastAPI (K-13, 10 Sep 2026).** Versi pertama
+> berkas ini ditulis untuk TypeScript/Node **tanpa pernah menyatakannya**,
+> sementara naskah 1 ([`../docs/05`](../docs/05-ARSITEKTUR.md)) menetapkan
+> FastAPI di dua tempat dan ADR-004 mengunci LangGraph. Bukti lengkap dan cara
+> membalikkannya di [`../arch/05`](../arch/05-TECHNOLOGY-STACK.md) §2.
 
 ---
 
 ## Kepemilikan tabel
 
 **Satu tabel dimiliki tepat satu modul.** Modul lain tidak boleh menyentuhnya
-dengan SQL — harus lewat `index.ts` pemiliknya.
+dengan SQL — harus lewat `__init__.py` pemiliknya.
 
 | Modul | Tabel |
 |---|---|
@@ -92,11 +98,11 @@ dengan SQL — harus lewat `index.ts` pemiliknya.
 
 | # | Aturan | Ditegakkan oleh |
 |---|---|---|
-| 1 | Modul hanya boleh mengimpor `index.ts` modul lain, tidak pernah berkas dalamnya | lint rule `no-restricted-imports` |
-| 2 | Tidak ada impor melingkar | `madge --circular` di CI |
+| 1 | Modul hanya boleh mengimpor `__init__.py` modul lain, tidak pernah berkas dalamnya | `import-linter` kontrak `forbidden` |
+| 2 | Tidak ada impor melingkar | `import-linter` kontrak `independence` |
 | 3 | Modul domain (`goals`…`activities`) **tidak boleh** saling mengimpor — komunikasinya lewat event | lint + review |
-| 4 | `agents` boleh membaca modul lain; **tidak ada** modul yang mengimpor `agents` | lint rule |
-| 5 | `repository.ts` hanya boleh menyebut tabel milik modulnya | uji: grep nama tabel per modul |
+| 4 | `agents` boleh membaca modul lain; **tidak ada** modul yang mengimpor `agents` | `import-linter` |
+| 5 | `repository.py` hanya boleh menyebut tabel milik modulnya | uji: grep nama tabel per modul |
 | 6 | Setiap tulisan ke tabel domain **wajib** menerbitkan event | uji integrasi per modul |
 
 > Aturan **3** yang paling sering dilanggar dan paling mahal dibatalkan. Kalau
@@ -114,7 +120,7 @@ dengan SQL — harus lewat `index.ts` pemiliknya.
 
 Ketika satu modul perlu dipisah jadi service:
 
-1. `index.ts`-nya sudah jadi kontrak — ganti isinya dengan klien HTTP/gRPC.
+1. `__init__.py`-nya sudah jadi kontrak — ganti isinya dengan klien HTTP/gRPC.
 2. Tabelnya sudah tidak disentuh modul lain — pindahkan basis datanya.
 3. Event-nya sudah mengalir lewat antrean — tidak ada yang berubah bagi
    consumer.

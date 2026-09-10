@@ -9,6 +9,11 @@
 Lapisan **04. Engineering Specification** dari peta 14 lapisan
 ([`../docs/98`](../docs/98-PETA-14-LAPISAN-ENGINEERING.md)).
 
+> 🗺️ **Untuk cakupan Phase 1–20, lihat
+> [`../arch/`](../arch/README.md) — HumanVerse Master Architecture v2.0.**
+> Aturan pengutamaan: **`arch/` mengikat NAMA & BATAS, `spec/` mengikat
+> BENTUK.** Untuk V0, `spec/` menang.
+
 **Cakupan: V0 saja.** V0 adalah satu-satunya lingkup tertutup yang pernah
 ditetapkan pemilik (naskah 5 §29–§32). Tabel untuk V1+ **tidak** ditulis di
 sini kecuali dibutuhkan V0 — menulisnya sekarang berarti menebak.
@@ -27,6 +32,28 @@ sini kecuali dibutuhkan V0 — menulisnya sekarang berarti menebak.
 | [`06-MODULE-BOUNDARIES.md`](06-MODULE-BOUNDARIES.md) | Batas modul di dalam modular monolith + aturan ketergantungan |
 | [`07-BACKLOG-V0.md`](07-BACKLOG-V0.md) | Backlog 7 sprint, satu tugas per baris untuk AI coding agent |
 
+> 🔧 **Bahasa backend: Python + FastAPI** (K-13, 10 Sep 2026). Versi pertama
+> `06` dan `07` ditulis untuk TypeScript/Node **tanpa pernah menyatakannya**,
+> sementara naskah 1 menetapkan FastAPI di dua tempat dan ADR-004 mengunci
+> LangGraph. Bukti & cara membalikkannya:
+> [`../arch/05`](../arch/05-TECHNOLOGY-STACK.md) §2.
+
+### Tiga perubahan V0 (10 Sep 2026) — ketiganya penerapan keputusan lama
+
+Angkanya tidak bergeser: **23 tabel · 22 event · 51 tugas · 12 modul · 4 agent.**
+
+| | Perubahan | Menerapkan |
+|---|---|---|
+| 1 | [`01`](01-DATABASE-SCHEMA.md): `agents.risk_level` → **`max_risk`**, `requires_confirmation` **dihapus** | [#52](../../issues/52) + **H-21**/[#67](../../issues/67) + **E-119**/[#97](../../issues/97) |
+| 2 | [`07`](07-BACKLOG-V0.md) 1.4: `consents.purpose` + `kind='model_training'` | **B-22**/[#59](../../issues/59) |
+| 3 | [`07`](07-BACKLOG-V0.md) 4.3 + [`05`](05-AGENT-CONTRACTS.md): tiga entri tool `kind: agent` | **K-14** |
+
+> 🔑 **Ketiganya punya bentuk yang sama:** keputusan diambil, issue ditutup,
+> lalu **tidak pernah diterapkan pada berkas yang paling berkepentingan** —
+> pelajaran [#38](../../issues/38) muncul lagi. Ditemukan dengan membandingkan
+> `spec/` terhadap keputusan yang mengaku sudah berlaku atasnya, bukan dengan
+> membaca daftar issue.
+
 ---
 
 ## Empat keputusan yang mengunci skema — dan cara saya menanganinya
@@ -44,8 +71,11 @@ tidak menyentuh V0 sama sekali.
 | **#7** model graf | isi Neo4j | ✅ **Tidak menyentuh V0.** V0 adalah *modular monolith* dengan PostgreSQL + Redis (naskah 5 §1, §32 Sprint 0). Neo4j baru masuk V2. Butir ini memblokir **V2**, bukan spesifikasi ini. |
 
 > **Artinya V0 bisa dimulai sekarang.** Yang tersisa sebagai penghambat nyata
-> hanyalah **#3** (12 fitur & 7 sprint dalam 4–6 minggu) dan **#20** (cek
-> merek) — keduanya bukan soal skema.
+> hanyalah **#3** (siapa yang mengerjakan 12 fitur & 7 sprint dalam 4–6 minggu)
+> dan **#20** (cek merek) — keduanya bukan soal skema.
+> ⭐ Dan **#20 memblokir peluncuran, bukan pengkodean**
+> ([`../arch/10`](../arch/10-URUTAN-IMPLEMENTASI.md) §2) ⇒ penghambat untuk
+> **memulai** tinggal **satu**.
 
 ---
 

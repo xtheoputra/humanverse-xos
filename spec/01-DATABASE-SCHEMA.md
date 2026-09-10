@@ -556,9 +556,8 @@ CREATE TABLE agents (
                           CHECK (kind IN ('core','domain','third_party')),
   status                text NOT NULL DEFAULT 'draft'
                           CHECK (status IN ('draft','active','deprecated','disabled')),
-  risk_level            smallint NOT NULL DEFAULT 1
-                          CHECK (risk_level BETWEEN 0 AND 4),
-  requires_confirmation text[] NOT NULL DEFAULT '{}',
+  max_risk              smallint NOT NULL DEFAULT 0     -- 🔧 PAGU risiko aksi (H-21)
+                          CHECK (max_risk BETWEEN 0 AND 4),
   manifest              jsonb NOT NULL,
   created_at            timestamptz NOT NULL DEFAULT now(),
   updated_at            timestamptz NOT NULL DEFAULT now(),
@@ -566,6 +565,28 @@ CREATE TABLE agents (
 );
 CREATE UNIQUE INDEX agents_one_active_idx
   ON agents (name) WHERE status = 'active';
+
+> 🔧 **`risk_level` → `max_risk`, dan `requires_confirmation` dihapus
+> (10 Sep 2026).** Bukan keputusan baru — penerapan dua keputusan yang sudah
+> diambil dan tidak pernah sampai ke DDL:
+> **[#52](../../issues/52)** memindahkan `requires_confirmation` ke Policy
+> Engine, dan **H-21**/[#67](../../issues/67) memisahkan `R` (risiko **aksi**)
+> dari `L` (otonomi **agent**) — sehingga satu angka pada baris agent tidak bisa
+> berarti keduanya (**E-119** / [#97](../../issues/97)). Konfirmasi kini turunan
+> dari `R` lewat tabel gerbang
+> [`../arch/04`](../arch/04-DEPENDENCY-GRAPH.md) §3.
+>
+> ⚠️ **Bawaannya `0`, dan arahnya kebalikan dari [K-12](../docs/KEPUTUSAN-DIDELEGASIKAN.md).**
+> K-12 menolak bawaan `risk_level: 0` untuk **tool**, sebab tool yang lupa diisi
+> menjadi yang **paling tidak dijaga**. Di sini `max_risk` adalah **pagu**, jadi
+> `0` berarti agent yang lupa diisi **tidak bisa memanggil tool apa pun di atas
+> R0** — gagal dengan keras, bukan diam-diam.
+> 💡 Prinsipnya sama, angkanya berlawanan: yang ditanyakan bukan *“berapa
+> bawaannya”* melainkan ***“kalau seseorang lupa mengisinya, ke sisi mana ia
+> jatuh?”***
+>
+> `autonomy.max_level`, `kill_condition`, dan `deploy` tetap di `manifest jsonb`
+> sampai Phase 11 — belum ada gerbang V0 yang membacanya.
 
 CREATE TABLE agent_tools (
   id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),

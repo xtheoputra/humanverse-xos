@@ -33,7 +33,7 @@ L166) dan [#139](../../issues/139):
 | agent contracts | [`08`](08-AGENT-CONTRACTS.md) | **59 nama** diuji K-5 → agent atau service; Konstitusi §20.16 diberi penegak |
 | deployment topology | [`09`](09-DEPLOYMENT-TOPOLOGY.md) | V0 → produksi, dan **aturan tepi**: apa yang tak boleh meninggalkan perangkat |
 | urutan implementasi V0 → production | [`10`](10-URUTAN-IMPLEMENTASI.md) | dua rencana didamaikan; **gerbang mendahului yang dijaganya** |
-| — (pelajaran repo ini sendiri) | [`11`](11-PENEGAKAN.md) | **23 pemeriksaan CI**; aturan tanpa penegak tidak dihitung selesai |
+| — (pelajaran repo ini sendiri) | [`11`](11-PENEGAKAN.md) | **25 pemeriksaan CI**; aturan tanpa penegak tidak dihitung selesai |
 
 ⚠️ Butir **kontrak API** tidak disebut naskah 24 — celah itu sudah dicatat di
 [`../docs/PETA-FASE.md`](../docs/PETA-FASE.md) dan diisi dari tempat lain:
@@ -87,9 +87,30 @@ dibaca sebagai tiga jawaban untuk satu pertanyaan.
 | daftar agent **“> 40”** | [`08`](08-AGENT-CONTRACTS.md) | himpunannya **59**, dan 44 di antaranya hanya pernah disebut sekali |
 
 ⚠️ **Yang TIDAK digantikan:** [`../spec/`](../spec/README.md) seluruhnya.
-V0 tidak berubah satu baris pun karena berkas ini — 23 tabel tetap 23, 22 event
-tetap 22, 51 tugas tetap 51. Itu **hasil pemeriksaan**, bukan niat: lihat
-[`10`](10-URUTAN-IMPLEMENTASI.md) §6.
+
+### Apa yang berubah di V0 — tiga hal, dan ketiganya bukan keputusan baru
+
+Angka-angkanya tidak bergeser: **23 tabel tetap 23 · 22 event tetap 22 · 51
+tugas tetap 51 · 12 modul tetap 12 · 4 agent tetap 4.** Yang berubah adalah tiga
+**penerapan keputusan yang sudah diambil dan tidak pernah sampai ke `spec/`**:
+
+| | Perubahan | Menerapkan keputusan |
+|---|---|---|
+| 1 | [`../spec/01`](../spec/01-DATABASE-SCHEMA.md): `agents.risk_level` → **`max_risk`**, `requires_confirmation` **dihapus** | [#52](../../issues/52) (`requires_confirmation` pindah ke Policy Engine) + **H-21**/[#67](../../issues/67) + **E-119**/[#97](../../issues/97) |
+| 2 | [`../spec/07`](../spec/07-BACKLOG-V0.md) 1.4: `consents.purpose` + `kind='model_training'` | **B-22**/[#59](../../issues/59) — *sebelum baris data pertama* |
+| 3 | `spec/07` 4.3: tiga entri tool `kind: agent` | **K-14** ([`08`](08-AGENT-CONTRACTS.md) §2) |
+
+➕ Dan satu perubahan **bentuk**, bukan isi: bahasa backend dinyatakan
+(**K-13**, [`05`](05-TECHNOLOGY-STACK.md) §2) ⇒ `spec/06` dan `spec/07` memakai
+`.py`/`pytest`/`import-linter`. Nol tabel, nol event, nol tugas berubah
+karenanya.
+
+> 🔑 **Ketiganya punya bentuk yang sama, dan itu temuan tersendiri:** sebuah
+> keputusan diambil, ditutup sebagai issue, lalu **tidak pernah diterapkan pada
+> berkas yang paling berkepentingan** — persis pelajaran [#38](../../issues/38)
+> (*janji di issue tertutup tidak punya penjaga*). Ketiganya ditemukan bukan
+> dengan membaca issue, melainkan dengan **membandingkan `spec/` dengan
+> keputusan yang mengaku sudah berlaku atasnya**.
 
 ---
 

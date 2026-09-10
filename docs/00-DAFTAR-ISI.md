@@ -21,6 +21,7 @@
 | — tanpa nomor (`GERBANG-SKEMA`, `PETA-FASE`, `SENSUS-AGENT`, `SENSUS-EVENT`, `SENSUS-MODUL`, `KEPUTUSAN-DIDELEGASIKAN`, `SENSUS-RANTAI`, `SENSUS-TABEL`, `SENSUS-TANGGA`, `SESSION-LOG`) | 10 |
 | — berlaku lintas-naskah (termasuk `99`) | 11 |
 | Berkas di [`../spec/`](../spec/README.md) | 8 |
+| Berkas di [`../arch/`](../arch/README.md) — **Master Architecture v2.0** | **12** |
 | Naskah pemilik yang direkam | **24** (Phase 20 = fase terakhir) |
 | Baris dokumen `docs/` | 42.907 |
 | Berkas kode | **0** — disengaja |
@@ -56,8 +57,10 @@ Repo ini terlalu besar untuk dibaca dari `01`. Empat jalur masuk:
 |---|---|
 | **tahu apa yang belum diputuskan** | [`99-CATATAN-AUDIT.md`](99-CATATAN-AUDIT.md) → GitHub Issues |
 | **tahu apa yang sudah saya putuskan sendiri** | [`KEPUTUSAN-DIDELEGASIKAN.md`](KEPUTUSAN-DIDELEGASIKAN.md) |
-| **mulai menulis kode** | [`../spec/`](../spec/README.md) → [`GERBANG-SKEMA.md`](GERBANG-SKEMA.md) → [`75`](75-URUTAN-PEMBANGUNAN-V0-V6.md) |
-| **memahami arsitektur akhir** | [`275`](275-ROADMAP-ARSITEKTUR-FINAL-PETA-20-FASE-DAN-MASTER-ARCHITECTURE.md) → mundur ke fase yang menarik |
+| **mulai menulis kode** | [`../spec/07`](../spec/07-BACKLOG-V0.md) Sprint 0 → [`../arch/11`](../arch/11-PENEGAKAN.md) → [`GERBANG-SKEMA.md`](GERBANG-SKEMA.md) |
+| **memahami arsitektur akhir** | [`../arch/README.md`](../arch/README.md) — **Master Architecture v2.0**, lalu [`275`](275-ROADMAP-ARSITEKTUR-FINAL-PETA-20-FASE-DAN-MASTER-ARCHITECTURE.md) |
+| **tahu apa yang dikerjakan berikutnya** | [`../arch/10`](../arch/10-URUTAN-IMPLEMENTASI.md) — tiga belas tahap T0–T12 |
+| **melihat daftar 20 fase yang kanonik** | [`../arch/01`](../arch/01-PETA-20-FASE.md) — peta versi 3, tertutup |
 | **memeriksa jalur tindakan** | [`SENSUS-RANTAI.md`](SENSUS-RANTAI.md) → [#111](../../issues/111) → [#153](../../issues/153) |
 | **menetapkan ambang risiko** | [`SENSUS-TANGGA.md`](SENSUS-TANGGA.md) → [#60](../../issues/60) → [#152](../../issues/152) |
 | **merancang skema data** | [`SENSUS-TABEL.md`](SENSUS-TABEL.md) → [`../spec/01`](../spec/01-DATABASE-SCHEMA.md) → [#151](../../issues/151) |

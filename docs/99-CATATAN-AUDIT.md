@@ -10,10 +10,11 @@
 > 📌 **Butir di berkas ini sudah jadi 145 GitHub Issue** dalam 3 milestone —
 > 125 terbuka, 20 ditutup. Baca issue-nya, jangan analisis ulang naskahnya.
 >
-> 🔧 Hasil kerja engineering ada di [`../spec/`](../spec/README.md) —
-> **bukan kata pemilik**, dan sengaja di luar `docs/`.
+> 🔧 Hasil kerja engineering ada di [`../spec/`](../spec/README.md) (V0) dan
+> [`../arch/`](../arch/README.md) (**Master Architecture v2.0**, Phase 1–20) —
+> keduanya **bukan kata pemilik**, dan sengaja di luar `docs/`.
 
-Diperbarui: 8 September 2026 · Mencakup **dua puluh empat naskah**:
+Diperbarui: 10 September 2026 · Mencakup **dua puluh empat naskah**:
 **1 HumanOS** · **2 HumanVerse X** · **3 Phase 2 Enterprise Blueprint** ·
 **4 Phase 3 AI-Native Human Ecosystem** · **5 Blueprint Engineering v1.0** ·
 **6 Peta 14 lapisan engineering** · **7 Phase 4 Enterprise OS (Layer 21–50)** · **8 Peta Phase 5–12** · **9 Phase 5 Research Lab** · **10 Phase 6 Developer Platform** ·
@@ -26,9 +27,59 @@ Diperbarui: 8 September 2026 · Mencakup **dua puluh empat naskah**:
 | [B](#b-risiko-teknis) | Risiko teknis | 38 |
 | [C](#c-risiko-hukum--kepatuhan) | Risiko hukum & kepatuhan | 30 |
 | [D](#d-celah-yang-belum-tertutup) | Celah yang belum tertutup | 5 |
-| [E](#e-ketidakcocokan-antar-naskah) | **Ketidakcocokan antar-naskah** | 150 |
+| [E](#e-ketidakcocokan-antar-naskah) | **Ketidakcocokan antar-naskah** | 151 |
 | [F](#f-yang-sudah-saya-periksa-dan-ternyata-benar) | Sudah diperiksa, ternyata benar | 136 |
 | [G](#g-lubang-di-dalam-naskah-sendiri) | Lubang di dalam naskah sendiri | 19 |
+
+---
+
+## 🗺️ Master Architecture v2.0 (10 Sep 2026) — apa yang berubah bagi berkas ini
+
+Pemilik memerintahkan (*“kerjakan semua tugas dan fase yang masih tersisa”*),
+maka [#139](../../issues/139) dikerjakan. Hasilnya
+[`../arch/`](../arch/README.md), 12 berkas.
+
+**Butir yang TIDAK perlu dianalisis ulang — jawabannya sudah ada di `arch/`:**
+
+| Butir | Ke mana |
+|---|---|
+| peta fase (H-20 · [#101](../../issues/101) · [#108](../../issues/108) · [#132](../../issues/132) · [#133](../../issues/133) · [#142](../../issues/142)) | [`arch/01`](../arch/01-PETA-20-FASE.md) — **versi 3, tertutup, dan peta kini bernomor versi** |
+| H-13 / [#72](../../issues/72) — `V0–V6` lawan `Phase` | [`arch/01`](../arch/01-PETA-20-FASE.md) §4 — **dua sumbu, bukan dua rencana** |
+| H-10 sepuluh kali tergerus ([#109](../../issues/109) · [#120](../../issues/120) · [#129](../../issues/129) · [#138](../../issues/138) · [#143](../../issues/143)) | [`arch/03`](../arch/03-MONOREPO-FINAL.md) — **54 nama divonis; 19 pohon keamanan → 1** |
+| E-141 / [#130](../../issues/130) — World Model lawan Global Twin | [`arch/03`](../arch/03-MONOREPO-FINAL.md) §5 — satu `world-model/`, `civilization-twin/` submodul |
+| G-20 / [#147](../../issues/147) | [`arch/02`](../arch/02-BOUNDED-CONTEXT.md) — K-2 ditegakkan |
+| E-89 / [#74](../../issues/74) · B-31 / [#107](../../issues/107) · B-34 / [#119](../../issues/119) · B-35 / [#127](../../issues/127) | [`arch/06`](../arch/06-DATA-ARCHITECTURE.md) — **empat kelas penyimpanan + uji admisi `events`** |
+| E-156 / [#151](../../issues/151) — 19 tabel berdefinisi ganda | [`arch/06`](../arch/06-DATA-ARCHITECTURE.md) §4 |
+| E-119 / [#97](../../issues/97) — `risk` sebagai properti agent | [`arch/08`](../arch/08-AGENT-CONTRACTS.md) §3 + **K-14**, sudah masuk `spec/01` & `spec/05` |
+| G-14 (bagian [#98](../../issues/98)) — didaftar lengkap, diskemakan sebagian | [`arch/07`](../arch/07-EVENT-CONTRACTS.md) §6 — **kembaran kegagalan wajib** |
+| E-154 / [#150](../../issues/150) · G-13 / [#89](../../issues/89) | [`arch/08`](../arch/08-AGENT-CONTRACTS.md) §1 — **bawaan `service`, bukan `agent`** |
+
+### 🔴 E-158 — temuan baru: `spec/` berganti bahasa backend tanpa mencatatnya
+
+`grep -rl "FastAPI" docs/` → **1 berkas** (naskah 1, di tabel **dan** diagram).
+`grep -rlo "Node.js|NestJS|Express|Golang" docs/` → **0**.
+Namun `spec/06` memakai `index.ts`/`routes.ts` dan `spec/07` menuntut
+`npm test` — **tanpa satu kalimat pun yang menyatakan pergantiannya.**
+🛑 Ia memblokir **Sprint 0 tugas 0.3**, yaitu berkas pertama yang akan ditulis.
+⇒ **K-13**; `spec/06` dan `spec/07` sudah diselaraskan.
+
+💡 **Bentuknya sama dengan pola terbesar repo ini:** sebuah klaim berhenti benar
+tanpa memberi tahu pembacanya — kali ini di berkas yang seluruh tugasnya adalah
+memberi tahu pembacanya apa yang harus dikoding.
+
+### 🔴 Tiga keputusan yang sudah ditutup tetapi tidak pernah sampai ke `spec/`
+
+Ditemukan dengan **membandingkan `spec/` terhadap keputusan yang mengaku sudah
+berlaku atasnya** — bukan dengan membaca daftar issue.
+
+| Keputusan | Sudah ditutup sejak | Belum diterapkan di |
+|---|---|---|
+| [#52](../../issues/52) `requires_confirmation` pindah ke Policy Engine | naskah 15 | `spec/01` masih punya kolomnya |
+| **H-21** / [#67](../../issues/67) `R` ≠ `L` | naskah 15 | `agents.risk_level` masih satu angka |
+| **B-22** / [#59](../../issues/59) `consents.purpose` sebelum baris data pertama | — (terbuka) | `spec/07` tugas 1.4 tidak menyebutnya |
+
+⇒ ketiganya kini diterapkan. **Pelajaran [#38](../../issues/38) muncul untuk
+kesekian kali: janji di issue tertutup tidak punya penjaga.**
 
 ---
 

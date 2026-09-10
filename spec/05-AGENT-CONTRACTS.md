@@ -36,8 +36,11 @@ model:
   class:    reasoning             # simple | reasoning | vision | embedding
   fallback: simple
 
-risk_level: 1                     # 0-4
-requires_confirmation: []         # daftar capability yang selalu minta izin
+max_risk:   R1                    # 🔧 pagu RISIKO AKSI yang boleh dilakukan agent ini
+autonomy:
+  max_level: L2                   # 🔧 tangga OTONOMI, terpisah dari R (H-21)
+  kill_condition: []              # 🔧 syarat berhenti tanpa menunggu manusia
+deploy:     cloud                 # 🔧 edge | cloud | both
 
 evaluation:
   suite: coach-agent-v1
@@ -55,7 +58,7 @@ Aturan validasi yang ditegakkan saat registrasi:
 |---|---|
 | 1 | Setiap nama di `tools` **harus ada** di tool registry. Manifest dengan tool tak dikenal ditolak. |
 | 2 | Setiap scope di `memory.read`/`write` **harus ada** di daftar scope resmi. |
-| 3 | `risk_level >= 3` **wajib** punya isi `requires_confirmation`. |
+| 3 🔧 | **Setiap tool di `tools:` wajib punya `risk_level <= max_risk`.** Manifest yang mendaftarkan tool lebih berisiko daripada pagunya **ditolak**. (Menggantikan aturan lama *“`risk_level >= 3` wajib punya `requires_confirmation`”* — [#52](../../issues/52) sudah memindahkan `requires_confirmation` ke Policy Engine.) |
 | 4 | `evaluation.gates.safety` **wajib** ada dan `>= 0.95`. |
 | 5 | Satu `name` hanya boleh punya **satu** baris `status: active`. |
 | 6 | `kind: third_party` **tidak boleh** meminta scope `journal`, `finance`, atau `health`. |
@@ -85,6 +88,20 @@ Aturan validasi yang ditegakkan saat registrasi:
 > tool level 3 atau 4. Ia berlaku begitu Phase 11 mulai dikodekan.
 > Cara membalikkannya ada di
 > [`../docs/KEPUTUSAN-DIDELEGASIKAN.md`](../docs/KEPUTUSAN-DIDELEGASIKAN.md) K-1.
+
+> 🔧 **Aturan 3 ditulis ulang (10 Sep 2026, K-14).** Dua alasan, keduanya sudah
+> tercatat: [#52](../../issues/52) memindahkan `requires_confirmation` ke Policy
+> Engine — jadi aturan lama memeriksa medan yang seharusnya tidak lagi ada di
+> manifest; dan **E-119** ([#97](../../issues/97)) menunjukkan `risk_level`
+> sebagai properti **agent** membalik pemisahan R/L yang **H-21** selesaikan.
+> Satu agent bisa membaca kalender (R0) **dan** memesan hotel (R3) — satu angka
+> tidak bisa menjadi keduanya, tetapi sebuah **pagu** bisa.
+>
+> ⭐ Aturan baru membuat manifest **tidak bisa berbohong**: `max_risk: R1` sambil
+> mendaftarkan tool R3 ditolak **saat registrasi**, bukan ditemukan saat ia
+> memesan hotel. Konfirmasi tidak lagi dinyatakan di manifest sama sekali — ia
+> turunan dari `R` lewat tabel gerbang
+> [`../arch/04`](../arch/04-DEPENDENCY-GRAPH.md) §3.
 
 > 🔧 **Aturan 8 dan 9 (K-12).** **G-11** mencatat 13 tool persepsi §10.26 tanpa
 > satu pun `risk_level`, dan §15.24 mengulanginya untuk lima panggilan SDK
@@ -123,7 +140,15 @@ services.”* Itu satu-satunya peringatan semacam itu dalam 24 naskah, dan
 sensus menemukan **44 dari 59 nama agent hanya pernah disebut sekali**
 ([`../docs/SENSUS-AGENT.md`](../docs/SENSUS-AGENT.md)).
 
-⚠️ Keempat agent V0 lulus ketiga uji. Kriteria ini **tidak** mengubah V0.
+⚠️ **Diperiksa, bukan dinyatakan (10 Sep 2026).** `coach-agent` dan
+`habit-agent` lulus ketiganya. `orchestrator-agent` **gagal uji (b)** — ia punya
+`tools: —`; yang dipilihnya **agent lain**. Itu bukan perkara istilah:
+selama memanggil agent bukan pemanggilan tool, **sisi-sisi pohon eksekusi
+(`parent_run_id`) tidak pernah melewati risk gate**. ⇒ **K-14**: memanggil agent
+lain adalah pemanggilan tool, terdaftar dengan `kind: agent` dan
+`risk_level = max_risk` agent yang dipanggil. `memory-agent` **perbatasan** —
+diputuskan saat Sprint 3–4 ditulis. Rinciannya di
+[`../arch/08`](../arch/08-AGENT-CONTRACTS.md) §2.
 
 ---
 
@@ -178,12 +203,18 @@ Tool V0:
 
 ## Empat agent V0
 
-| Agent | Risk | Tools | Memory read | Memory write |
+| Agent | `max_risk` | Tools | Memory read | Memory write |
 |---|---|---|---|---|
-| `orchestrator-agent` | 0 | — (hanya memanggil agent lain) | — | — |
-| `coach-agent` | 1 | habit.list, habit.streak, goal.list, checkin.get, mood.recent, memory.search, recommendation.create | habits, goals, checkins, mood, coaching_notes | coaching_notes |
-| `habit-agent` | 2 | habit.list, habit.streak, habit.complete | habits | — |
-| `memory-agent` | 2 | memory.search, memory.write | semua scope **kecuali** `journal_raw` | memories |
+| `orchestrator-agent` | **R2** ⁽¹⁾ | `agent.coach` · `agent.habit` · `agent.memory` (**`kind: agent`**, K-14) | — | — |
+| `coach-agent` | R1 | habit.list, habit.streak, goal.list, checkin.get, mood.recent, memory.search, recommendation.create | habits, goals, checkins, mood, coaching_notes | coaching_notes |
+| `habit-agent` | R2 | habit.list, habit.streak, habit.complete | habits | — |
+| `memory-agent` | R2 | memory.search, memory.write | semua scope **kecuali** `journal_raw` | memories |
+
+⁽¹⁾ 🔧 **`orchestrator-agent` naik dari `risk_level: 0` ke `max_risk: R2`**, dan
+itu konsekuensi langsung aturan 3 yang baru: ia memanggil `agent.habit`
+(`risk_level` = `max_risk` `habit-agent` = **R2**), jadi pagu R0 akan
+**ditolak validator**. Angka lama tampak benar hanya selama pemanggilan agent
+tidak dihitung sebagai tool.
 
 > **`memory-agent` boleh membaca hampir semua scope tetapi tidak `journal_raw`.**
 > Ia mengekstrak memori **dari** jurnal lewat pipeline tertutup, bukan dengan
@@ -199,9 +230,9 @@ Alur wajib sebelum aksi dijalankan:
 ```
 capability diminta
       ↓
-risk_level agent & tool  → ambil yang TERTINGGI
+risk_level TOOL  (bukan agent — agent hanya punya PAGU `max_risk`)
       ↓
-capability ada di requires_confirmation?  → ya → minta izin
+R >= 3 ?  → ya → konfirmasi manusia WAJIB  (H-15 / #5)
       ↓
 permissions(user, agent, scope, action) → 'deny' → tolak & catat
                                         → 'ask'  → minta izin
@@ -223,3 +254,10 @@ jalankan · catat agent_runs · catat audit_logs
 > V0 tidak punya satu pun tool level 3 atau 4. Itu disengaja: janji *"Act
 > selalu di bawah kontrol pengguna"* paling mudah ditepati dengan tidak
 > memberi agent kemampuan yang belum perlu.
+
+> 🔧 **Gerbang di atas adalah bentuk V0 dari rantai kanonik 12 gerbang**
+> [`../arch/04`](../arch/04-DEPENDENCY-GRAPH.md) §3. Yang belum ada di V0 —
+> `IMPACT`, `DELIBERATE`, `OVERRIDE` — memang belum punya hal untuk dijaga:
+> tidak ada tool V0 yang menyentuh orang lain (`reaches_third_party: false`
+> pada kesembilannya) dan tidak ada aksi yang berjalan cukup lama untuk
+> di-override. Keduanya masuk bersama Phase 11.

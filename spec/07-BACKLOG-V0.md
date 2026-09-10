@@ -24,12 +24,18 @@ Tidak ada tugas yang boleh masuk `main` tanpa baris **HUMAN REVIEW**.
 | 0.3 | Kerangka `apps/api` + `/health` | `GET /health` → 200 `{status, version, db, redis}` |
 | 0.4 | Alat migrasi + migrasi 0001 (23 tabel) | migrasi naik & turun bersih; skema cocok dengan [`01`](01-DATABASE-SCHEMA.md) |
 | 0.5 | Logging terstruktur + `request_id` | tiap baris log punya `request_id`, `user_id?`, `latency_ms` |
-| 0.6 | Kerangka uji + cakupan | `npm test` jalan; gerbang cakupan ≥ 70 % |
+| 0.6 | Kerangka uji + cakupan | `pytest` jalan; gerbang cakupan ≥ 70 % |
 | 0.7 | CI: lint → typecheck → test → build → scan | PR gagal kalau salah satu merah |
-| 0.8 | Lint batas modul (aturan 1–4 [`06`](06-MODULE-BOUNDARIES.md)) | impor lintas-modul yang melanggar **gagal di CI** |
+| 0.8 | Batas modul & **enam batas keras** — `import-linter` (aturan 1–4 [`06`](06-MODULE-BOUNDARIES.md) + B-1…B-6 [`../arch/11`](../arch/11-PENEGAKAN.md)) | impor yang melanggar **gagal di CI** |
 
 > **0.8 sebelum kode domain ditulis, bukan sesudah.** Batas modul yang tidak
 > ditegakkan mesin akan dilanggar dalam dua minggu.
+>
+> 🔧 **Backend: Python + FastAPI** (K-13) — lihat
+> [`../arch/05`](../arch/05-TECHNOLOGY-STACK.md) §2.
+> 🔧 **1.4 kini memuat B-22** ([#59](../../issues/59)): `consents.purpose`
+> harus ada **sebelum baris data pertama**. Biayanya nol sekarang; data V0 yang
+> dikumpulkan tanpa itu tidak bisa melatih model apa pun di Phase 5.
 
 ---
 
@@ -40,7 +46,7 @@ Tidak ada tugas yang boleh masuk `main` tanpa baris **HUMAN REVIEW**.
 | 1.1 | Modul `identity`: register, login, refresh, logout | argon2id; refresh token berotasi; uji integrasi hijau |
 | 1.2 | Sesi di Redis + middleware auth | token dicabut → 401 seketika |
 | 1.3 | `profiles` + `GET /me`, `PATCH /me/profile` | timezone IANA divalidasi |
-| 1.4 | `consents`: catat persetujuan saat daftar | riwayat append-only; pencabutan = baris baru |
+| 1.4 | `consents`: catat persetujuan saat daftar, **termasuk `purpose` + `kind='model_training'`** | riwayat append-only; pencabutan = baris baru; uji: `data.purpose ⊆ consent.purpose` ditegakkan |
 | 1.5 | Permission engine: `check(user, subject, scope, action)` | default `ask`; hasil di-cache di Redis; uji untuk allow/deny/ask/expired |
 | 1.6 | `audit_logs` + helper `audit()` | `UPDATE`/`DELETE` ditolak; login, izin, ekspor, hapus tercatat |
 | 1.7 | Batas laju per pengguna & per IP | 429 dengan `Retry-After` |
@@ -85,8 +91,8 @@ Tidak ada tugas yang boleh masuk `main` tanpa baris **HUMAN REVIEW**.
 | # | Tugas | Selesai bila |
 |---|---|---|
 | 4.1 | AI Gateway + Model Router (simple/reasoning) | "catat mood" **tidak** memanggil model besar |
-| 4.2 | Registry agent: muat & validasi manifest | 6 aturan validasi [`05`](05-AGENT-CONTRACTS.md) ditegakkan; manifest salah **ditolak** |
-| 4.3 | Tool registry + 9 tool V0 | tool di luar registry tidak bisa dipanggil |
+| 4.2 | Registry agent: muat & validasi manifest | **9 aturan validasi** [`05`](05-AGENT-CONTRACTS.md) ditegakkan; manifest salah **ditolak** |
+| 4.3 | Tool registry + 9 tool V0 + **3 entri `kind: agent`** (K-14) | tool di luar registry tidak bisa dipanggil; pemanggilan agent ikut melewati gerbang |
 | 4.4 | Agent runtime + `agent_runs` sebagai audit | tiap run mencatat tools, scope, decision, confidence, cost |
 | 4.5 | Risk gate + alur konfirmasi | risk 2 minta izin sekali; risk 3 minta setiap kali |
 | 4.6 | `orchestrator-agent` | `parent_run_id` membentuk pohon eksekusi |
