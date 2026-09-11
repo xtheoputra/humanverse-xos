@@ -30,15 +30,31 @@
 
 ## §2 Kapan tiap pemeriksaan dipasang
 
-| Kelompok | Dipasang di | Butuh kode? |
+| Kelompok | Dipasang di | Butuh kode **produksi**? |
 |---|---|---|
-| **B** batas keras (6) | Sprint 0 tugas **0.8**, diperluas | sebagian — B-3·B-4·B-5 menyusul bersama modulnya |
+| **B** batas keras (6) | Sprint 0 tugas **0.8** | ya — kecuali **B-6 SUDAH JALAN** atas pohon [`03`](03-MONOREPO-FINAL.md) |
 | **M** modul & nama (4) | Sprint 0 **0.7 · 0.8** | ya |
-| **P** penyimpanan & migrasi (6) | Sprint 0 **0.4** (alat migrasi) | ya |
-| **E** event (5) | Sprint 3 **3.1**; **E-1 · E-2 · E-5 SUDAH JALAN** atas `docs/`·`spec/`·`arch/` | sebagian |
-| **A** agent & tool (3) | Sprint 4 **4.2** (validasi manifest) | ya |
+| **P** penyimpanan & migrasi (6) | Sprint 0 **0.4** | ❌ untuk **P-1 · P-2 · P-3** — DDL-nya sudah ada di [`../spec/01`](../spec/01-DATABASE-SCHEMA.md) |
+| **E** event (5) | Sprint 3 **3.1** | ❌ untuk **E-1 · E-2 · E-4 · E-5** |
+| **A** agent & tool (3) | Sprint 4 **4.2** | ❌ untuk **A-2 · A-3** — manifestnya sudah ada di [`../spec/05`](../spec/05-AGENT-CONTRACTS.md) |
 | **G** governance (1) | **SUDAH JALAN** atas tabel [`08`](08-AGENT-CONTRACTS.md) §4 | ❌ |
 | **R** roadmap (1) | **SUDAH JALAN** atas tiap roadmap di `docs/` & `arch/` | ❌ |
+
+### 🔴🔴 Kolom ketiga pernah salah untuk DELAPAN pemeriksaan
+
+Sampai 11 September 2026 tabel di atas menjawab *“butuh kode? **ya**”* untuk
+seluruh kelompok **P**, **A**, dan untuk **B-6** — dan jawaban itu benar untuk
+**artefak yang BERJALAN**. Tetapi yang diperiksa P-1/P-2/P-3 adalah **DDL**,
+A-2/A-3 adalah **manifest**, B-6 adalah **pohon direktori** — dan ketiganya
+**sudah ada, sebagai dokumen**, sejak `spec/01`, `spec/05`, dan
+[`03`](03-MONOREPO-FINAL.md) ditulis.
+
+> 💡💡 **Pertanyaan yang terlewat bukan *“apakah aturannya benar”* melainkan
+> ***“apakah yang diperiksanya sudah ada dalam bentuk lain?”*** Delapan
+> pemeriksaan menunggu kode yang belum ditulis, sementara yang mereka periksa
+> sudah tergeletak di repo selama berhari-hari.**
+
+⇒ yang bisa jalan tanpa kode produksi: **4 → 12 dari 26.**
 
 ### ✅ Lima pemeriksaan berhenti menjadi rencana — 11 September 2026
 
@@ -49,12 +65,38 @@ sebelum berkas kode pertama ditulis.
 
 ```
 $ python tools/periksa_dokumen.py
-E-1  154 nama diperiksa   ✅ LULUS
-E-2  154 nama diperiksa   ✅ LULUS
+B-6  28 direktori         ✅ LULUS
+P-1  23 tabel             ✅ LULUS
+P-2  23 tabel             ✅ LULUS
+P-3  20 kolom user_id     ✅ LULUS
+E-1  154 nama             ✅ LULUS
+E-2  154 nama             ✅ LULUS
+E-4  6 pasangan wajib     ✅ LULUS
 E-5  130 kandidat         ✅ LULUS
+A-2  15 pasangan tool     ✅ LULUS
+A-3  3 entri kind:agent   ✅ LULUS
 G-1  10 pasal             ✅ LULUS
-R-1  10 pasangan          🛑 GAGAL — 7 temuan
+R-1  10 pasangan          🛑 GAGAL — 7 temuan (keputusan cakupan pemilik)
 ```
+
+### ✅ Dan MERAHnya dibuktikan, bukan diandaikan
+
+```
+$ python tools/uji_mutasi.py
+12 mutasi · 12 terbukti BERBUNYI
+```
+
+> 🔑 **Dua belas LULUS tidak berarti apa pun sampai bisa ditunjukkan bahwa
+> kedua belasnya SANGGUP GAGAL.** Regex yang tidak pernah cocok dan tabel yang
+> tidak pernah terbaca memulangkan LULUS dengan tenang —
+> [`../tools/uji_mutasi.py`](../tools/README.md) merusak satu hal yang tiap
+> pemeriksaan **klaim** deteksi, lalu menuntut kode keluar 1.
+>
+> 🔴 **Putaran pertamanya menuduh G-1 buta.** Mutasinya mengubah **nama** pasal
+> (`Reversibility` → `Reversibility X`) dan G-1 diam — padahal G-1 memang tidak
+> memeriksa nama pasal, ia memeriksa **adanya penegak**. Yang cacat mutasinya.
+> ⇒ **sebuah uji yang tidak menguji apa yang dikiranya diuji akan menuduh yang
+> benar**, dan itu lebih berbahaya daripada uji yang tidak ada.
 
 > 🛑🛑 **DAN GERBANGNYA SENDIRI TIDAK PERNAH BERJALAN.** Jalan pertama
 > `.github/workflows/periksa-dokumen.yml` — satu-satunya yang pernah ada di repo
@@ -156,7 +198,7 @@ A14 10 · R16 10 · H17 12 · G18 10 · S19 10 · C20 12 · `spec/07` **51 tugas
 | **E-1** | segmen pertama `event_type` ada di registry domain | daftar 39 domain [`07`](07-EVENT-CONTRACTS.md) §2; **bisa jalan sekarang atas `docs/`** |
 | **E-2** | format dua segmen, huruf kecil, kata kerja lampau | regex; **bisa jalan sekarang** |
 | **E-3** | tidak ada `source='sensor'` di `events` | grep DDL + uji admisi |
-| **E-4** | tiap kata kerja pengubah keadaan punya kembaran kegagalan/pemulihan | daftar pasangan wajib [`07`](07-EVENT-CONTRACTS.md) §6 |
+| **E-4** | tiap kata kerja pengubah keadaan punya kembaran kegagalan/pemulihan | daftar pasangan wajib [`07`](07-EVENT-CONTRACTS.md) §6; **jalan sekarang** — namanya dicari di [`../spec/03`](../spec/03-EVENT-CONTRACTS.md) SAJA, sebab mencarinya di `07` berarti pemeriksa membaca daftar tuntutannya sendiri |
 | **E-5** 🆕 | tiap nama event di naskah punya baris di tabel padanan [`../spec/03`](../spec/03-EVENT-CONTRACTS.md) | panen PascalCase seluruh `docs/`, disaring kata kerja penutup yang tabel itu sendiri pakai; **jalan sekarang** |
 
 > 🔑 **E-5 ada karena pertanyaan yang ditujukan kepada E-1 dan E-2 sendiri:
@@ -259,9 +301,10 @@ sebenarnya.
 | Jumlah pemeriksaan | **26** |
 | Batas keras tanpa penegak | **NIHIL** — 6 dari 6 |
 | Aturan 🔧 di `arch/` tanpa baris di §3 | **NIHIL** |
-| Pemeriksaan yang bisa jalan tanpa kode | **5** — E-1 · E-2 · **E-5** · G-1 · R-1 |
-| Pemeriksaan yang **benar-benar sudah dijalankan** | **5 dari 5** — 11 Sep 2026 |
-| Pemeriksaan yang masih menunggu kode | **21 dari 26** |
+| Pemeriksaan yang bisa jalan tanpa kode produksi | **12** — B-6 · P-1 · P-2 · P-3 · E-1 · E-2 · E-4 · E-5 · A-2 · A-3 · G-1 · R-1 |
+| Pemeriksaan yang **benar-benar sudah dijalankan** | **12 dari 12** |
+| Pemeriksaan yang **terbukti sanggup GAGAL** | **12 dari 12** — [`../tools/uji_mutasi.py`](../tools/README.md) |
+| Pemeriksaan yang masih menunggu kode | **14 dari 26** |
 | Perkakas yang dibutuhkan | **1** — `import-linter` menangani B-1·B-2·B-3, M-1·M-2·M-3 |
 | Roadmap yang lulus R-1 | **2 dari 8** — dan keduanya ditulis untuk dikerjakan |
 

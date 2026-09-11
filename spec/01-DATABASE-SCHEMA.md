@@ -64,8 +64,13 @@ END $$ LANGUAGE plpgsql;
 ## 1 · Identity
 
 ```sql
+-- @retention   : until-account-deleted
+-- @who-can-set : system
+-- @on-delete   : hard
 CREATE TABLE users (
   id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  data_subject text NOT NULL DEFAULT 'user'
+                 CHECK (data_subject IN ('user','bystander','world','system')),
   email           citext NOT NULL UNIQUE,
   password_hash   text   NOT NULL,              -- argon2id
   status          text   NOT NULL DEFAULT 'active'
@@ -78,8 +83,13 @@ CREATE TABLE users (
 );
 CREATE INDEX users_status_idx ON users (status) WHERE deleted_at IS NULL;
 
+-- @retention   : until-account-deleted
+-- @who-can-set : system
+-- @on-delete   : hard
 CREATE TABLE profiles (
   user_id      uuid PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+  data_subject text NOT NULL DEFAULT 'user'
+                 CHECK (data_subject IN ('user','bystander','world','system')),
   display_name text NOT NULL,
   timezone     text NOT NULL DEFAULT 'UTC',     -- IANA, mis. 'Asia/Jakarta'
   locale       text NOT NULL DEFAULT 'id-ID',
@@ -96,9 +106,14 @@ CREATE TABLE profiles (
 > #2 dijawab, kolom yang sering dibaca dipromosikan jadi kolom nyata.
 
 ```sql
+-- @retention   : until-account-deleted
+-- @who-can-set : system
+-- @on-delete   : hard
 CREATE TABLE consents (
   id             uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id        uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  data_subject text NOT NULL DEFAULT 'user'
+                 CHECK (data_subject IN ('user','bystander','world','system')),
   kind           text NOT NULL,                 -- 'terms','privacy','ai_processing','location',...
   policy_version text NOT NULL,
   granted        boolean NOT NULL,
@@ -116,9 +131,14 @@ CREATE INDEX consents_user_kind_idx ON consents (user_id, kind, created_at DESC)
 > dijawab setahun kemudian (naskah 5 §25 *Consent management*).
 
 ```sql
+-- @retention   : until-account-deleted
+-- @who-can-set : system
+-- @on-delete   : hard
 CREATE TABLE permissions (
   id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id       uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  data_subject text NOT NULL DEFAULT 'user'
+                 CHECK (data_subject IN ('user','bystander','world','system')),
   subject_type  text NOT NULL CHECK (subject_type IN ('agent','tool','integration')),
   subject_id    text NOT NULL,                  -- 'fashion-agent', 'weather.get'
   scope         text NOT NULL,                  -- 'wardrobe', 'fashion_preferences'
@@ -145,9 +165,14 @@ CREATE INDEX permissions_lookup_idx
 ## 2 · Goals & Habits
 
 ```sql
+-- @retention   : until-account-deleted
+-- @who-can-set : user
+-- @on-delete   : hard
 CREATE TABLE goals (
   id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id     uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  data_subject text NOT NULL DEFAULT 'user'
+                 CHECK (data_subject IN ('user','bystander','world','system')),
   parent_id   uuid REFERENCES goals(id) ON DELETE SET NULL,  -- Goal Graph naskah 4 §9
   title       text NOT NULL,
   description text,
@@ -164,8 +189,13 @@ CREATE TABLE goals (
 CREATE INDEX goals_user_status_idx ON goals (user_id, status) WHERE deleted_at IS NULL;
 CREATE INDEX goals_parent_idx      ON goals (parent_id) WHERE parent_id IS NOT NULL;
 
+-- @retention   : until-account-deleted
+-- @who-can-set : user
+-- @on-delete   : hard
 CREATE TABLE goal_milestones (
   id           uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  data_subject text NOT NULL DEFAULT 'user'
+                 CHECK (data_subject IN ('user','bystander','world','system')),
   goal_id      uuid NOT NULL REFERENCES goals(id) ON DELETE CASCADE,
   user_id      uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   title        text NOT NULL,
@@ -185,9 +215,14 @@ CREATE INDEX goal_milestones_goal_idx ON goal_milestones (goal_id, position);
 > kolom, tanpa Neo4j.
 
 ```sql
+-- @retention   : until-account-deleted
+-- @who-can-set : user
+-- @on-delete   : hard
 CREATE TABLE habits (
   id               uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id          uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  data_subject text NOT NULL DEFAULT 'user'
+                 CHECK (data_subject IN ('user','bystander','world','system')),
   goal_id          uuid REFERENCES goals(id) ON DELETE SET NULL,
   title            text NOT NULL,
   period           text NOT NULL DEFAULT 'week'
@@ -203,8 +238,13 @@ CREATE TABLE habits (
 );
 CREATE INDEX habits_user_status_idx ON habits (user_id, status) WHERE deleted_at IS NULL;
 
+-- @retention   : until-account-deleted
+-- @who-can-set : user
+-- @on-delete   : hard
 CREATE TABLE habit_completions (
   id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  data_subject text NOT NULL DEFAULT 'user'
+                 CHECK (data_subject IN ('user','bystander','world','system')),
   habit_id      uuid NOT NULL REFERENCES habits(id) ON DELETE CASCADE,
   user_id       uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   for_date      date NOT NULL,                  -- tanggal LOKAL pengguna
@@ -237,9 +277,14 @@ CREATE INDEX habit_completions_user_date_idx
 ## 3 · Catatan harian pengguna
 
 ```sql
+-- @retention   : until-account-deleted
+-- @who-can-set : user
+-- @on-delete   : hard
 CREATE TABLE daily_checkins (
   id           uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id      uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  data_subject text NOT NULL DEFAULT 'user'
+                 CHECK (data_subject IN ('user','bystander','world','system')),
   for_date     date NOT NULL,
   energy       smallint CHECK (energy BETWEEN 1 AND 5),
   focus        smallint CHECK (focus  BETWEEN 1 AND 5),
@@ -250,9 +295,14 @@ CREATE TABLE daily_checkins (
   UNIQUE (user_id, for_date)
 );
 
+-- @retention   : until-account-deleted
+-- @who-can-set : user
+-- @on-delete   : hard
 CREATE TABLE mood_entries (
   id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id     uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  data_subject text NOT NULL DEFAULT 'user'
+                 CHECK (data_subject IN ('user','bystander','world','system')),
   occurred_at timestamptz NOT NULL DEFAULT now(),
   valence     smallint NOT NULL CHECK (valence BETWEEN 1 AND 5),
   label       text,                              -- 'cemas', 'lega', ...
@@ -269,9 +319,14 @@ CREATE INDEX mood_entries_user_time_idx
 > **ditaksir sistem**. Butir **E-34**.
 
 ```sql
+-- @retention   : until-account-deleted
+-- @who-can-set : user
+-- @on-delete   : hard
 CREATE TABLE journal_entries (
   id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id     uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  data_subject text NOT NULL DEFAULT 'user'
+                 CHECK (data_subject IN ('user','bystander','world','system')),
   occurred_at timestamptz NOT NULL DEFAULT now(),
   title       text,
   body        text NOT NULL,
@@ -293,9 +348,14 @@ CREATE INDEX journal_entries_user_time_idx
 > Selama #21 belum dijawab, nilainya tetap `NULL`.
 
 ```sql
+-- @retention   : until-account-deleted
+-- @who-can-set : user
+-- @on-delete   : hard
 CREATE TABLE activities (
   id               uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id          uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  data_subject text NOT NULL DEFAULT 'user'
+                 CHECK (data_subject IN ('user','bystander','world','system')),
   kind             text NOT NULL,                -- 'workout','meal','learning','meeting',...
   occurred_at      timestamptz NOT NULL,
   ended_at         timestamptz,
@@ -320,9 +380,14 @@ CREATE INDEX activities_user_kind_idx  ON activities (user_id, kind, occurred_at
 ## 4 · Event — tulang punggung
 
 ```sql
+-- @retention   : until-account-deleted
+-- @who-can-set : system
+-- @on-delete   : hard
 CREATE TABLE events (
   id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id         uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  data_subject text NOT NULL DEFAULT 'user'
+                 CHECK (data_subject IN ('user','bystander','world','system')),
   event_type      text NOT NULL,                 -- 'habit.completed'
   schema_version  smallint NOT NULL DEFAULT 1,
   occurred_at     timestamptz NOT NULL,          -- kapan TERJADI
@@ -357,10 +422,15 @@ CREATE INDEX events_payload_gin      ON events USING gin (payload jsonb_path_ops
 ## 5 · Memory
 
 ```sql
+-- @retention   : until-account-deleted
+-- @who-can-set : user
+-- @on-delete   : hard
 CREATE TABLE memories (
   id                uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id           uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
 
+  data_subject text NOT NULL DEFAULT 'user'
+                 CHECK (data_subject IN ('user','bystander','world','system')),
   kind              text NOT NULL CHECK (kind IN
                       ('working','episodic','semantic','behavioral',
                        'preference','procedural')),
@@ -409,9 +479,14 @@ CREATE INDEX memories_active_idx     ON memories (user_id, last_reinforced_at DE
 ## 6 · Human State
 
 ```sql
+-- @retention   : until-account-deleted
+-- @who-can-set : system
+-- @on-delete   : hard
 CREATE TABLE human_states (
   id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id       uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  data_subject text NOT NULL DEFAULT 'user'
+                 CHECK (data_subject IN ('user','bystander','world','system')),
   for_date      date NOT NULL,
   metrics       jsonb NOT NULL DEFAULT '{}'::jsonb,
   model_version text NOT NULL,
@@ -445,9 +520,14 @@ Bentuk `metrics`:
 ## 7 · AI & rekomendasi
 
 ```sql
+-- @retention   : until-account-deleted
+-- @who-can-set : user
+-- @on-delete   : hard
 CREATE TABLE ai_conversations (
   id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id         uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  data_subject text NOT NULL DEFAULT 'user'
+                 CHECK (data_subject IN ('user','bystander','world','system')),
   title           text,
   started_at      timestamptz NOT NULL DEFAULT now(),
   last_message_at timestamptz,
@@ -459,8 +539,13 @@ CREATE INDEX ai_conversations_user_idx
   ON ai_conversations (user_id, last_message_at DESC NULLS LAST)
   WHERE deleted_at IS NULL;
 
+-- @retention   : until-account-deleted
+-- @who-can-set : user
+-- @on-delete   : hard
 CREATE TABLE ai_messages (
   id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  data_subject text NOT NULL DEFAULT 'user'
+                 CHECK (data_subject IN ('user','bystander','world','system')),
   conversation_id uuid NOT NULL REFERENCES ai_conversations(id) ON DELETE CASCADE,
   user_id         uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   role            text NOT NULL CHECK (role IN ('user','assistant','tool','system')),
@@ -482,9 +567,14 @@ CREATE INDEX ai_messages_conversation_idx
 > saat sudah terlambat.
 
 ```sql
+-- @retention   : until-account-deleted
+-- @who-can-set : system
+-- @on-delete   : hard
 CREATE TABLE recommendations (
   id               uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id          uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  data_subject text NOT NULL DEFAULT 'user'
+                 CHECK (data_subject IN ('user','bystander','world','system')),
   agent_id         uuid,                         -- FK ke agents, ditambah di bawah
   agent_run_id     uuid,
   domain           text NOT NULL,                -- 'habit','goal','wellbeing'
@@ -511,8 +601,13 @@ CREATE TABLE recommendations (
 CREATE INDEX recommendations_user_status_idx
   ON recommendations (user_id, status, created_at DESC);
 
+-- @retention   : until-account-deleted
+-- @who-can-set : system
+-- @on-delete   : hard
 CREATE TABLE recommendation_feedback (
   id                uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  data_subject text NOT NULL DEFAULT 'user'
+                 CHECK (data_subject IN ('user','bystander','world','system')),
   recommendation_id uuid NOT NULL REFERENCES recommendations(id) ON DELETE CASCADE,
   user_id           uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   action            text NOT NULL
@@ -548,8 +643,13 @@ CREATE INDEX recommendation_feedback_user_idx
 ## 8 · Agent registry & audit
 
 ```sql
+-- @retention   : forever
+-- @who-can-set : system
+-- @on-delete   : not-applicable
 CREATE TABLE agents (
   id                    uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  data_subject text NOT NULL DEFAULT 'system'
+                 CHECK (data_subject IN ('user','bystander','world','system')),
   name                  text NOT NULL,               -- 'coach-agent'
   version               text NOT NULL,               -- '1.0.0'
   kind                  text NOT NULL DEFAULT 'core'
@@ -588,8 +688,13 @@ CREATE UNIQUE INDEX agents_one_active_idx
 > `autonomy.max_level`, `kill_condition`, dan `deploy` tetap di `manifest jsonb`
 > sampai Phase 11 — belum ada gerbang V0 yang membacanya.
 
+-- @retention   : forever
+-- @who-can-set : system
+-- @on-delete   : not-applicable
 CREATE TABLE agent_tools (
   id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  data_subject text NOT NULL DEFAULT 'system'
+                 CHECK (data_subject IN ('user','bystander','world','system')),
   agent_id    uuid NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
   tool_name   text NOT NULL,                    -- 'weather.get'
   permission  text NOT NULL DEFAULT 'execute'
@@ -609,9 +714,14 @@ CREATE TABLE agent_tools (
 > Butir **E-42**.
 
 ```sql
+-- @retention   : until-account-deleted
+-- @who-can-set : system
+-- @on-delete   : hard
 CREATE TABLE agent_runs (
   id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id         uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  data_subject text NOT NULL DEFAULT 'user'
+                 CHECK (data_subject IN ('user','bystander','world','system')),
   agent_id        uuid NOT NULL REFERENCES agents(id),
   agent_version   text NOT NULL,
   conversation_id uuid REFERENCES ai_conversations(id) ON DELETE SET NULL,
@@ -662,8 +772,13 @@ ALTER TABLE recommendations
 > satu permintaan pengguna bisa jadi pohon eksekusi yang bisa ditelusuri.
 
 ```sql
+-- @retention   : forever
+-- @who-can-set : system
+-- @on-delete   : anonymise
 CREATE TABLE audit_logs (
   id           bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  data_subject text NOT NULL DEFAULT 'user'
+                 CHECK (data_subject IN ('user','bystander','world','system')),
   occurred_at  timestamptz NOT NULL DEFAULT now(),
   actor_type   text NOT NULL CHECK (actor_type IN ('user','agent','system','admin')),
   actor_id     text NOT NULL,
@@ -673,7 +788,14 @@ CREATE TABLE audit_logs (
   subject_id   text,
   request_id   text,
   ip_hash      text,                             -- hash, bukan IP mentah
-  metadata     jsonb NOT NULL DEFAULT '{}'::jsonb
+  metadata     jsonb NOT NULL DEFAULT '{}'::jsonb,
+
+  -- arch/06 §6 sebagai CHECK, bukan sebagai NOT NULL kolom:
+  -- `audit_logs` satu-satunya tabel V0 yang barisnya bisa milik
+  -- pengguna ATAU milik sistem, jadi `data_subject` di sini sifat
+  -- BARIS. Tanpa CHECK ini, RLS `user_id = current_user` meloloskan
+  -- NULL pada sebagian konfigurasi.
+  CHECK ((data_subject = 'user') = (user_id IS NOT NULL))
 );
 CREATE INDEX audit_logs_user_time_idx   ON audit_logs (user_id, occurred_at DESC);
 CREATE INDEX audit_logs_action_time_idx ON audit_logs (action, occurred_at DESC);
@@ -712,7 +834,7 @@ Menutup janji *Delete* di Privacy Center (naskah 5 §26) tanpa merusak audit:
 
 ---
 
-## Ringkasan 22 tabel
+## Ringkasan 23 tabel
 
 | # | Tabel | Sumber | V0 |
 |---|---|---|---|

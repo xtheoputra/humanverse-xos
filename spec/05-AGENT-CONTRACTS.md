@@ -181,7 +181,7 @@ rate_limit:   60/min/user
 > orang lain — dua hal yang risikonya berbeda jauh, dan satu medan tidak bisa
 > memisahkannya. Seluruh tool V0 bernilai `false`.
 
-Tool V0:
+Tool V0 — **9 tool + 3 entri `kind: agent`**:
 
 | Tool | Kind | Risk | Dipakai |
 |---|---|---|---|
@@ -194,6 +194,31 @@ Tool V0:
 | `memory.search` | read | 0 | Coach, Memory |
 | `memory.write` | write | 2 | Memory |
 | `recommendation.create` | write | 1 | Coach |
+| `agent.coach` | **agent** | 1 | Orchestrator |
+| `agent.habit` | **agent** | 2 | Orchestrator |
+| `agent.memory` | **agent** | 2 | Orchestrator |
+
+> 🔧 **Tiga baris terakhir ditambahkan 11 September 2026 — menerapkan
+> [K-14](../docs/KEPUTUSAN-DIDELEGASIKAN.md), yang sudah diputuskan
+> 10 September.** K-14 berbunyi *“setiap agent yang bisa dipanggil agent
+> lain **wajib terdaftar di tool registry** dengan `kind: agent`”*, dan
+> [`07`](07-BACKLOG-V0.md) 4.3 sudah **menghitungnya** (*“9 tool V0 + 3
+> entri `kind: agent`”*) — tetapi **registry-nya sendiri tetap 9 baris.**
+> `risk_level` tiap entri = `max_risk` agent yang dipanggil (K-14).
+>
+> 🛑 **Akibatnya bukan kerapian: selama ketiganya tidak punya baris,
+> aturan validasi 3 (*tiap tool wajib `risk_level <= max_risk`*) TIDAK
+> BISA DIJALANKAN untuk `orchestrator-agent`** — tool yang dipakainya
+> tidak punya `risk_level` untuk dibandingkan. Gerbangnya ada,
+> angkanya tidak.
+>
+> 💡 **Ini kali KEEMPAT bentuk yang sama tercatat** (#52 · H-21/#67 ·
+> B-22/#59, ketiganya di Sesi 26) — sebuah keputusan diambil, ditutup,
+> **lalu tidak pernah diterapkan pada berkas yang paling
+> berkepentingan**. Kali ini yang terlewat adalah keputusan yang dibuat
+> **sehari sebelumnya**, oleh orang yang menulis catatannya sendiri.
+> Ditemukan [`../tools/periksa_dokumen.py`](../tools/README.md) **A-3**,
+> bukan dengan membaca ulang.
 
 > **`weather.get` dan `calendar.get` tidak ada di V0** — keduanya tool
 > (butir **H-11**), tapi Fashion dan Context baru masuk V2. Ditulis di

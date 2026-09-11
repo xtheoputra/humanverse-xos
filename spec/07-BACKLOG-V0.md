@@ -22,7 +22,7 @@ Tidak ada tugas yang boleh masuk `main` tanpa baris **HUMAN REVIEW**.
 | 0.1 | Monorepo + workspace sesuai [`../docs/83`](../docs/83-STRUKTUR-REPO-FINAL.md) | `apps/`, `services/`, `packages/`, `tests/`, `infrastructure/`, `docs/` ada; `AGENTS.md`, `ARCHITECTURE.md`, `CONTRIBUTING.md`, `SECURITY.md` terisi |
 | 0.2 | `docker-compose.yml`: PostgreSQL 16 + Redis 7 | `docker compose up` → keduanya sehat, port terdokumentasi |
 | 0.3 | Kerangka `apps/api` + `/health` | `GET /health` → 200 `{status, version, db, redis}` |
-| 0.4 | Alat migrasi + migrasi 0001 (23 tabel) | migrasi naik & turun bersih; skema cocok dengan [`01`](01-DATABASE-SCHEMA.md) |
+| 0.4 | Alat migrasi + migrasi 0001 (23 tabel, **tiap tabel membawa `data_subject` + tiga anotasi retensi** — K-16) | migrasi naik & turun bersih; skema cocok dengan [`01`](01-DATABASE-SCHEMA.md); **P-1 · P-2 · P-3** [`../arch/11`](../arch/11-PENEGAKAN.md) hijau |
 | 0.5 | Logging terstruktur + `request_id` | tiap baris log punya `request_id`, `user_id?`, `latency_ms` |
 | 0.6 | Kerangka uji + cakupan | `pytest` jalan; gerbang cakupan ≥ 70 % |
 | 0.7 | CI: lint → typecheck → test → build → scan | PR gagal kalau salah satu merah |

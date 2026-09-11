@@ -22,14 +22,15 @@ manusia + agent + data + knowledge + simulation + automation**.
 |---|---|
 | Tahap | **Master Architecture v2.0 selesai** — spesifikasi V0 siap, belum ada kode produksi (disengaja) |
 | Berkas **kode produksi** | **0** — menunggu [#3](../../issues/3) |
-| Berkas **perkakas dokumen** | **1** — [`tools/periksa_dokumen.py`](tools/README.md), menjalankan **5 dari 26** pemeriksaan [`arch/11`](arch/11-PENEGAKAN.md) tanpa kode produksi |
+| Berkas **perkakas dokumen** | **2** — [`tools/`](tools/README.md): `periksa_dokumen.py` menjalankan **12 dari 26** pemeriksaan [`arch/11`](arch/11-PENEGAKAN.md) tanpa kode produksi; `uji_mutasi.py` membuktikan kedua belasnya **sanggup gagal** |
 | Repo git | privat `xtheoputra/humanverse-xos`, branch `master` |
 | Dokumen | **272 berkas** di `docs/` + **8 berkas** di `spec/` + **12 berkas** di [`arch/`](arch/README.md) |
-| Gerbang yang **sudah dijalankan** | **E-1 ✅ · E-2 ✅ · E-5 ✅ · G-1 ✅ · R-1 🛑 7 temuan** — `python tools/periksa_dokumen.py`, **manual** |
+| Gerbang yang **sudah dijalankan** | **11 ✅ · R-1 🛑 7 temuan** (keputusan cakupan pemilik) — `python tools/periksa_dokumen.py`, **manual** |
+| Merahnya **terbukti bisa terjadi** | **12 dari 12** — `python tools/uji_mutasi.py` |
 | ⚠️ Gerbang **otomatis** | 🛑 **belum pernah jalan** — GitHub Actions terhalang tagihan akun ([#160](../../issues/160)) |
 | Naskah pemilik | **24** — terakhir: **Phase 20 Civilization Platform** (39 bagian) — **fase TERAKHIR** |
 | Keputusan tertutup | **24 butir H** — nama · MVP · struktur repo · ambang konfirmasi · model memory · memory meluruh · gerbang policy · context package · dua tangga R/L · manifest dipulihkan · **model transisi belajar dari galat sendiri** · **monetisasi punya fase (Phase 14)**. ✅ **H-20 (peta fase) DIPULIHKAN sebagai [`arch/01`](arch/01-PETA-20-FASE.md) — peta versi 3, 20 baris TERTUTUP, dan peta kini BERNOMOR VERSI** sehingga *“roadmap yang sudah kita tetapkan”* selalu punya rujukan yang bisa dibuka ([#101](../../issues/101) · [#108](../../issues/108) · [#132](../../issues/132) · [#133](../../issues/133) · [#142](../../issues/142)). ✅ **H-13 ([#72](../../issues/72)) DISELESAIKAN:** `Phase` dan `V0–V6` bukan dua rencana yang bersaing melainkan **dua sumbu** — `Phase` menghitung dokumen, `V` menghitung rilis. ⚠️ **H-11** ([#78](../../issues/78)) masih perlu ditinjau ulang |
-| Keputusan terbuka | **26 pertanyaan A** · **39 risiko B** · **158 ketidakcocokan E** · **20 lubang G** — dan **15 butir K** sudah saya putuskan sendiri |
+| Keputusan terbuka | **26 pertanyaan A** · **39 risiko B** · **158 ketidakcocokan E** · **20 lubang G** — dan **16 butir K** sudah saya putuskan sendiri |
 | Tanggal dokumen | 11 September 2026 |
 
 > ⚠️ **Nol baris kode itu disengaja — dan penghambatnya terus berkurang.**
@@ -227,7 +228,8 @@ membalikkannya**:
 | **K-12** | `risk_level` **wajib**; larangan scope + `spatial`·`location`·`people`·`csi` | `spec/05` aturan 8 & 9 |
 | **K-13** 🆕 | Bahasa backend = **Python + FastAPI** — `spec/` diam-diam berganti bahasa | `spec/06` · `spec/07` |
 | **K-14** | **Memanggil agent lain ADALAH pemanggilan tool**; agent memakai `max_risk`, bukan `risk_level` | `spec/01` · `spec/05` aturan 3 |
-| **K-15** 🆕 | **Domain event diambil dari registry, bukan dari kata pertama nama** — K-3 benar sebagai transkripsi, tidak pernah jadi aturan kepemilikan | `spec/03` (64 nama) · `arch/07` §2 §4 §6 |
+| **K-15** | **Domain event diambil dari registry, bukan dari kata pertama nama** — K-3 benar sebagai transkripsi, tidak pernah jadi aturan kepemilikan | `spec/03` (64 nama) · `arch/07` §2 §4 §6 |
+| **K-16** 🆕 | **`data_subject` + tiga anotasi retensi masuk 23 tabel V0 sekarang** — uji yang dipakai: *yang boleh masuk V0 hanyalah yang TIDAK BISA ditambahkan nanti* | `spec/01` · `spec/07` 0.4 · `arch/06` §5 §6 |
 
 🛑 **Yang sengaja TIDAK saya putuskan:** [#139](../../issues/139) (waktu pemilik) ·
 [#3](../../issues/3) (orang) · [#20](../../issues/20) (merek) · **seluruh butir C**

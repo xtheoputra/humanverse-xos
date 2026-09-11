@@ -4,6 +4,108 @@
 
 ---
 
+## Sesi 28 — 11 September 2026
+
+**Pemilik mengulang: *“lanjutkan semua tugas dan fase”*. Sesi 27 menutup dengan kalimat *“yang tersisa dan tidak diblokir cuma satu, dan sudah dikerjakan”* — dan kalimat itu berhenti benar begitu satu pertanyaan ditanyakan pada `arch/11` sendiri: *apakah yang diperiksa tiap aturan sudah ada dalam bentuk lain?* Jawabannya memindahkan DELAPAN pemeriksaan dari “menunggu kode” ke “jalan hari ini”.**
+
+| Hal | Hasil |
+|---|---|
+| Naskah baru | **tidak ada** |
+| Kode **produksi** | tetap **0** — menunggu [#3](../../issues/3) |
+| Pemeriksaan yang jalan tanpa kode produksi | 5 → **12 dari 26** |
+| Pemeriksaan yang **terbukti sanggup GAGAL** | 0 → **12 dari 12** ([`../tools/uji_mutasi.py`](../tools/README.md)) |
+| `spec/` diubah | **4 dari 8** — `01` (23 tabel) · `03` · `05` · `07` |
+| `arch/` diubah | **4 dari 12** — `06` · `07` · `10` · `11` |
+| Issue | 160 → **162**; **#161** & **#162** baru |
+| Keputusan | **K-16** (`data_subject` + retensi masuk V0 sekarang) |
+| Temuan | **B-39** · **E-160** · **G-23** |
+
+---
+
+### 🔑🔑 SATU PERTANYAAN, DELAPAN PEMERIKSAAN
+
+[`../arch/11`](../arch/11-PENEGAKAN.md) §2 menjawab *“butuh kode?”* dengan **ya** untuk kelompok **P**, **A**, dan **B-6**. Jawaban itu benar — untuk **artefak yang BERJALAN**.
+
+Tetapi yang diperiksa **P-1/P-2/P-3** adalah **DDL**, **A-2/A-3** adalah **manifest**, **B-6** adalah **pohon direktori** — dan ketiganya **sudah ada, sebagai dokumen**, sejak `spec/01`, `spec/05`, dan `arch/03` ditulis.
+
+> 💡💡 **Pertanyaan yang terlewat bukan *“apakah aturannya benar”* melainkan ***“apakah yang diperiksanya sudah ada dalam bentuk lain?”*** Delapan pemeriksaan menunggu kode yang belum ditulis, sementara yang mereka periksa sudah tergeletak di repo selama berhari-hari.**
+
+---
+
+### 🔴🔴 TEMUAN TERBESAR: DDL V0 gagal gerbangnya sendiri, 23 dari 23
+
+| | Hasil |
+|---|---|
+| **P-1** tiap tabel menyatakan `@retention` · `@who-can-set` · `@on-delete` | 🛑 **23 dari 23** — nol anotasi |
+| **P-2** tiap tabel punya `data_subject` | 🛑 **23 dari 23** — nol kolom |
+| **P-3** tidak ada `user_id` nullable tanpa penjaga | 🛑 **1** — `audit_logs` |
+
+[`../arch/06`](../arch/06-DATA-ARCHITECTURE.md) §8 sudah menulis *“tabel tanpa `data_subject` → ditolak CI — P-2”*. **DDL yang akan dimigrasikan Sprint 0 tugas 0.4 melanggarnya sejak baris pertama.**
+
+⚠️ Dan [`../arch/10`](../arch/10-URUTAN-IMPLEMENTASI.md) §4 menyatakan sebaliknya: *“ini **satu-satunya** tambahan yang seluruh `arch/` tuntut terhadap V0”*. **Bentuk yang sama dengan [#158](../../issues/158)**: ringkasan yang benar-sendiri, tidak pernah dijalankan terhadap detail yang diringkasnya.
+
+⇒ **K-16.** Nilainya **tidak dikarang**: `until-account-deleted`+`hard` dari **Prosedur hapus akun** tahap 3, `forever`+`anonymise` untuk `audit_logs` dari tahap 5, `who-can-set` dari contoh yang `arch/06` §5 berikan sendiri. [#161](../../issues/161)
+
+---
+
+### 🔴 `audit_logs` membongkar aturan yang menuntut kolomnya
+
+`arch/06` §6: *“setiap tabel wajib punya `data_subject`; kalau `'user'`, `user_id` WAJIB TIDAK NULL; kalau tidak, `user_id` TIDAK BOLEH ADA.”*
+
+`audit_logs` memuat baris yang pelakunya **pengguna** dan baris yang pelakunya **sistem** — satu tabel, dua subjek.
+
+⇒ **`data_subject` adalah sifat BARIS, bukan tetapan TABEL.** Aturannya sendiri sudah ditulis dalam bentuk baris; yang keliru menganggapnya bisa diwujudkan di tingkat kolom. Penegakannya `CHECK ((data_subject = 'user') = (user_id IS NOT NULL))`.
+
+💡 **Contoh tandingannya ada DI DALAM V0 — dan §6 tidak melihatnya karena ia hanya memeriksa tabel Phase 15+ yang menjadi alasannya ditulis.**
+
+---
+
+### 🔴 K-14 mendarat di dua tempat dan melewatkan yang ketiga — SEHARI sesudah diputuskan
+
+`spec/05` tabel agent ✅ mencantumkan tiga entri · `spec/07` 4.3 ✅ menghitungnya (*“9 tool + 3 entri `kind: agent`”*) · **registry tool `spec/05` sendiri 🛑 tetap 9 baris.**
+
+🛑 Akibatnya: aturan validasi 3 (*tiap tool `risk_level <= max_risk`*) **tidak bisa dijalankan** untuk `orchestrator-agent`. **Gerbangnya ada, angkanya tidak.**
+
+> 💡 **Kali KEEMPAT bentuk yang sama** (#52 · H-21/#67 · B-22/#59). Yang baru: keputusannya dibuat **sehari sebelumnya**, oleh orang yang menulis catatannya sendiri. ⇒ **kedekatan waktu bukan penjaga.** [#162](../../issues/162)
+
+---
+
+### 🔴 Dua kalimat `arch/07` yang tidak bisa keduanya benar
+
+`agent.paused` di tabel kembaran §6 **tidak pernah ada di naskah mana pun**; yang ada `agent.suspended`, **dan kembarannya `agent.resumed` sudah lengkap sejak awal**. ⇒ pasangannya benar, **daftar tuntutannya** yang salah.
+
+§7 satu tabel dua baris: *“Event V0: 22, tidak berubah”* **dan** *“`tool.failed` dituntut untuk V0 — tugas 4.3”*. Tugas 4.3 **tidak menyebut event sama sekali**.
+
+⭐ **Uji yang menyelesaikannya, dan ia berlaku umum:**
+
+> **Yang boleh ditambahkan ke V0 hanyalah hal yang TIDAK BISA ditambahkan nanti.**
+
+`consents.purpose` ✅ · `data_subject` ✅ · **`tool.failed` 🛑 ditolak** — sebuah event bisa mulai diterbitkan kapan saja tanpa kehilangan apa pun.
+
+⚠️ **Tetapi kekosongan yang ditunjuknya nyata dan tersisa:** `agent_runs` menyimpan `tools_used` dan `status` **pada tingkat RUN** — satu tool gagal di tengah run yang akhirnya sukses **tidak meninggalkan satu baris pun**. Di tabel yang `spec/07` 4.4 sebut *“`agent_runs` sebagai audit”*.
+
+---
+
+### 🚨🚨 DAN SEBELAS HIJAU TIDAK BERARTI APA PUN SAMPAI MERAHNYA DIBUKTIKAN
+
+[`../tools/uji_mutasi.py`](../tools/README.md) merusak **satu** hal yang tiap pemeriksaan **klaim** deteksi, lalu menuntut kode keluar 1. **12 mutasi, 12 berbunyi.**
+
+> 🔑 **Regex yang tidak pernah cocok dan tabel yang tidak pernah terbaca memulangkan LULUS dengan tenang** — dan itu bentuk kegagalan yang seluruh `arch/11` dibangun untuk menutupnya.
+
+🔴 **Putaran pertamanya menuduh G-1 buta.** Mutasinya mengubah **nama** pasal (`Reversibility` → `Reversibility X`) dan G-1 diam — padahal G-1 tidak memeriksa nama pasal, ia memeriksa **adanya penegak**. Yang cacat mutasinya.
+
+> 💡💡 **Sebuah uji yang tidak menguji apa yang dikiranya diuji akan MENUDUH YANG BENAR** — dan itu lebih berbahaya daripada uji yang tidak ada, sebab ia menghasilkan pekerjaan perbaikan atas sesuatu yang tidak rusak.
+
+🔴 **E-4 juga sempat LULUS secara melingkar**: ia membaca daftar tuntutannya dari `arch/07` §6, lalu mencari namanya di himpunan yang **ikut memanen `arch/07`**. Semua ada, tentu saja. Diperbaiki: E-4 mencari **hanya di `spec/03`** — dan langsung menemukan dua.
+
+---
+
+### 🛑 Yang TETAP milik pemilik
+
+**Nol butir C diputuskan.** R-1 tetap 7 temuan (keputusan cakupan). **#160** (Actions terhalang tagihan) belum dibuka ⇒ **gerbangnya masih MANUAL**. Kode produksi menunggu [#3](../../issues/3).
+
+---
+
 ## Sesi 27 — 11 September 2026
 
 **Pemilik: *“lanjutkan semua tugas dan fase”*. Yang tersisa dan TIDAK diblokir keputusan pemilik cuma satu: [#157](../../issues/157) butir 1 — *“jalankan E-1, E-2, G-1, R-1 sekarang sebagai satu skrip pemeriksa dokumen”*. Dikerjakan. Dan menjalankannya menemukan enam hal yang membaca tidak akan menemukan.**

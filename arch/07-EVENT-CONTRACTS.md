@@ -210,10 +210,21 @@ melihat pola yang tersusun dari kejadian kecil.
 |---|---|
 | `agent.retired` | **`agent.restored`** |
 | `agent.throttled` | `agent.unthrottled` |
-| `agent.paused` | `agent.resumed` |
+| `agent.suspended` | `agent.resumed` ⚠️ |
 | `mission.completed` | **`mission.failed`** |
 | `emergency.stopped` | **`emergency.recovery_started`** · `emergency.recovery_completed` |
 | `tool.called` | `tool.failed` |
+
+> ⚠️ **Baris `agent.suspended` dikoreksi 11 September 2026.** Tabel ini
+> semula menulis `agent.paused` — nama yang **tidak pernah ada di naskah
+> mana pun** dan tidak pernah masuk [`../spec/03`](../spec/03-EVENT-CONTRACTS.md).
+> Yang ada di sana adalah `agent.suspended` (dari `AgentSuspended`,
+> naskah 187) — **dan kembarannya `agent.resumed` sudah ada sejak awal**.
+> ⇒ pasangannya sudah lengkap; yang salah **daftar tuntutannya**, bukan
+> yang dituntut. 💡 Sebuah tabel wajib yang menyebut nama karangan
+> sendiri akan selalu tampak seperti pekerjaan yang belum selesai.
+> Ditemukan **E-4**, dan hanya setelah E-4 berhenti mencari namanya di
+> berkas INI (lihat [`11`](11-PENEGAKAN.md) §2).
 
 ⭐ **Modelnya sudah ada di repo ini, dan patut disebut:** Phase 16 menulis
 `MissionFailed` **berdampingan** `MissionCompleted`, dan `RecoveryStarted`
@@ -234,7 +245,31 @@ yang tidak didengar siapa pun bukan pengaman — ia catatan.
 | Event V0 | **22**, tidak berubah — [`../spec/03`](../spec/03-EVENT-CONTRACTS.md) |
 | Amplop | tidak berubah |
 | Domain V0 yang dipakai | 12, semuanya milik `human-core` + `memory` |
-| Kembaran kegagalan yang dituntut untuk V0 | **`tool.failed`** saja — Sprint 4 tugas 4.3 |
+| Kembaran kegagalan yang dituntut untuk V0 | 🛑 **NIHIL** — dikoreksi 11 Sep 2026 |
+
+> 🔴 **Baris terakhir semula berbunyi *“`tool.failed` saja — Sprint 4
+> tugas 4.3”*, dan dua hal di dalamnya salah.** Tugas 4.3
+> ([`../spec/07`](../spec/07-BACKLOG-V0.md)) berbunyi *“Tool registry +
+> 9 tool V0 + 3 entri `kind: agent`”* — **ia tidak menyebut event sama
+> sekali**; dan `tool.called` sendiri tidak pernah ada di `spec/03`,
+> sehingga menuntut kembarannya berarti menuntut kembaran dari sesuatu
+> yang belum lahir. Baris itu juga **membantah baris pertama tabel yang
+> sama** (*“Event V0: 22, tidak berubah”*).
+>
+> 🔑 **Aturan yang dipakai untuk memutuskannya, dan ia berlaku umum:
+> yang boleh ditambahkan ke V0 hanyalah hal yang TIDAK BISA ditambahkan
+> nanti.** `consents.purpose` (B-22) dan `data_subject` (K-16) lulus uji
+> itu — sesudah baris data pertama, keduanya tidak bisa dipulihkan dari
+> apa pun. Sebuah **event** tidak begitu: ia bisa mulai diterbitkan kapan
+> saja tanpa kehilangan apa pun yang sudah ada.
+>
+> ⚠️ **Tetapi kekosongan yang ditunjuknya nyata, dan dicatat terpisah:**
+> `agent_runs` menyimpan `tools_used text[]` dan `status` **pada tingkat
+> RUN**. Kalau sebuah run memakai tiga tool dan satu gagal sementara
+> agent-nya pulih, run itu tercatat `succeeded` dan **tidak ada satu
+> baris pun yang menyebut tool mana yang gagal** — persis bentuk yang §6
+> daftarkan (*jejak audit hanya merekam tindakan terberat*), kali ini di
+> dalam V0.
 
 ---
 

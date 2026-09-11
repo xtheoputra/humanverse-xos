@@ -7,8 +7,8 @@
 > Cara pakai: kalau pemilik memutuskan sebuah butir, keputusannya **naik** ke
 > berkas visi yang sesuai, lalu butirnya turun ke bagian **H**.
 
-> 📌 **Butir di berkas ini sudah jadi 160 GitHub Issue** dalam 3 milestone —
-> **100 terbuka, 60 ditutup**. Baca issue-nya, jangan analisis ulang naskahnya.
+> 📌 **Butir di berkas ini sudah jadi 162 GitHub Issue** dalam 3 milestone —
+> **102 terbuka, 60 ditutup**. Baca issue-nya, jangan analisis ulang naskahnya.
 >
 > ✅ **Sejak 11 Sep 2026 sebagian butir punya PENJAGA, bukan hanya catatan:**
 > `python tools/periksa_dokumen.py` menjalankan lima pemeriksaan
@@ -32,9 +32,9 @@ Diperbarui: 11 September 2026 · Mencakup **dua puluh empat naskah**:
 | [B](#b-risiko-teknis) | Risiko teknis | 38 |
 | [C](#c-risiko-hukum--kepatuhan) | Risiko hukum & kepatuhan | 30 |
 | [D](#d-celah-yang-belum-tertutup) | Celah yang belum tertutup | 5 |
-| [E](#e-ketidakcocokan-antar-naskah) | **Ketidakcocokan antar-naskah** | 152 |
+| [E](#e-ketidakcocokan-antar-naskah) | **Ketidakcocokan antar-naskah** | 153 |
 | [F](#f-yang-sudah-saya-periksa-dan-ternyata-benar) | Sudah diperiksa, ternyata benar | 136 |
-| [G](#g-lubang-di-dalam-naskah-sendiri) | Lubang di dalam naskah sendiri | 20 |
+| [G](#g-lubang-di-dalam-naskah-sendiri) | Lubang di dalam naskah sendiri | 21 |
 
 ---
 
@@ -196,9 +196,59 @@ tetap tidak berbunyi — dan ia lolos justru karena berkasnya **benar**.
 
 ---
 
+### 🔴 B-39 — delapan pemeriksaan menunggu kode yang belum ditulis
+
+[`../arch/11`](../arch/11-PENEGAKAN.md) §2 menjawab *“butuh kode?”* dengan **ya**
+untuk kelompok **P**, **A**, dan **B-6** — benar untuk artefak yang **berjalan**,
+dan salah untuk apa yang sebenarnya diperiksa: **DDL** (`spec/01`), **manifest**
+(`spec/05`), dan **pohon direktori** (`arch/03`), yang ketiganya sudah ada
+sebagai dokumen.
+
+💡💡 ***Apakah yang diperiksanya sudah ada dalam bentuk lain?*** — pertanyaan itu
+memindahkan **delapan** pemeriksaan dari “menunggu kode” ke “jalan hari ini”.
+⇒ 5 → **12 dari 26**.
+
+🛑 Dijalankan: **P-1 gagal 23 dari 23**, **P-2 gagal 23 dari 23**, **P-3 gagal 1**.
+`arch/06` §8 sudah menulis *“tabel tanpa `data_subject` → ditolak CI”*, dan DDL
+yang akan dimigrasikan Sprint 0 tugas 0.4 melanggarnya sejak baris pertama.
+⚠️ Sementara `arch/10` §4 menyatakan *“satu-satunya tambahan”* — ringkasan yang
+tidak pernah dijalankan terhadap detailnya, bentuk yang sama dengan
+[#158](../../issues/158). ⇒ **K-16**. [#161](../../issues/161)
+
+🔴 **`audit_logs` membongkar aturan yang menuntut kolomnya:** ia memuat baris
+pengguna **dan** baris sistem ⇒ **`data_subject` sifat BARIS, bukan tetapan
+TABEL**. Contoh tandingannya ada **di dalam V0**, dan §6 tidak melihatnya karena
+ia hanya memeriksa tabel Phase 15+ yang menjadi alasannya ditulis.
+
+### 🔴 E-160 / G-23 — K-14 melewatkan registry-nya sendiri, sehari sesudah diputuskan
+
+`spec/05` tabel agent ✅ · `spec/07` 4.3 ✅ menghitungnya · **registry tool
+`spec/05` sendiri 🛑 tetap 9 baris** ⇒ aturan validasi 3 **tidak bisa
+dijalankan** untuk `orchestrator-agent`: gerbangnya ada, angkanya tidak.
+**Kali keempat** bentuk yang sama (#52 · H-21/#67 · B-22/#59); yang baru,
+keputusannya dibuat **sehari sebelumnya**. ⇒ **kedekatan waktu bukan penjaga.**
+[#162](../../issues/162)
+
+⚠️ Tersisa dan sengaja tidak diperbaiki: **`agent_runs` menyimpan `tools_used`
+dan `status` pada tingkat RUN** — satu tool gagal di tengah run yang akhirnya
+sukses tidak meninggalkan satu baris pun, di tabel yang `spec/07` 4.4 sebut
+*“`agent_runs` sebagai audit”*.
+
+### 🚨 Dan sebelas hijau tidak berarti apa pun sampai merahnya dibuktikan
+
+[`../tools/uji_mutasi.py`](../tools/README.md): **12 mutasi, 12 berbunyi.**
+🔴 Putaran pertamanya **menuduh G-1 buta** — mutasinya mengubah *nama* pasal,
+sementara G-1 memeriksa *adanya penegak*. Yang cacat mutasinya.
+💡💡 **Sebuah uji yang tidak menguji apa yang dikiranya diuji akan MENUDUH YANG
+BENAR** — lebih berbahaya daripada uji yang tidak ada.
+🔴 **E-4 sempat LULUS secara melingkar**: daftar tuntutannya dari `arch/07` §6,
+namanya dicari di himpunan yang ikut memanen `arch/07`. Diperbaiki ⇒ dua temuan.
+
+---
+
 ## H. Sudah diputuskan / ditutup
 
-> 🔧 **Lima belas butir K (9–11 Sep 2026) diputuskan oleh SAYA, bukan pemilik** —
+> 🔧 **Enam belas butir K (9–11 Sep 2026) diputuskan oleh SAYA, bukan pemilik** —
 > atas permintaan pemilik sendiri (*“beri keputusan sendiri sesuai aturan”*).
 > Semuanya bertanda **usulan** dan tiap butir menyebut **bacaan yang ditolak**
 > serta **cara membalikkannya**: lihat
@@ -219,8 +269,11 @@ tetap tidak berbunyi — dan ia lolos justru karena berkasnya **benar**.
 > **K-12** `risk_level` wajib + larangan scope diperluas ([#77](../../issues/77), sebagian) ·
 > **K-13** bahasa backend **Python + FastAPI** ([#154](../../issues/154)) ·
 > **K-14** memanggil agent lain **adalah** pemanggilan tool ([#97](../../issues/97)) ·
-> **K-15** 🆕 **domain event diambil dari registry, bukan dari kata pertama nama** —
-> 64 nama diganti, V0 tidak bergeser ([#158](../../issues/158)).
+> **K-15** **domain event diambil dari registry, bukan dari kata pertama nama** —
+> 64 nama diganti, V0 tidak bergeser ([#158](../../issues/158)) ·
+> **K-16** 🆕 **`data_subject` + tiga anotasi retensi masuk 23 tabel V0 sekarang**;
+> uji yang dipakai: *yang boleh masuk V0 hanyalah yang TIDAK BISA ditambahkan
+> nanti* ([#161](../../issues/161)).
 >
 > 💡 **Dan satu sapuan baru berbuah dua penutupan:** *“adakah issue yang
 > jawabannya SUDAH ada di `spec/` tetapi issue-nya tak pernah ditutup?”* —

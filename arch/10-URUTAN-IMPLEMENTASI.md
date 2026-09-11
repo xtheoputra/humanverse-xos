@@ -156,7 +156,7 @@ V0 sudah memulai separuhnya.** Yang benar-benar belum ada: `vault`,
 
 ---
 
-## §4 Yang harus masuk V0 dan belum ada — satu butir
+## §4 Yang harus masuk V0 dan belum ada — dua butir
 
 **B-22** / [#59](../../issues/59) — `consents.purpose` + `kind='model_training'`
 **sebelum baris data pertama**. Penegakannya satu operasi himpunan:
@@ -171,8 +171,36 @@ data.purpose  ⊆  consent.purpose
 | Biaya nanti | hampir mustahil — data V0 tanpa itu **tidak bisa melatih model apa pun** di Phase 5 |
 | Masuk di | **Sprint 1 tugas 1.4**, bukan tahap tersendiri |
 
-⚠️ Ini satu-satunya tambahan yang seluruh `arch/` tuntut terhadap V0. Selain
-ini: **23 tabel tetap 23, 22 event tetap 22, 51 tugas tetap 51.**
+### Butir kedua — `data_subject` pada 23 tabel (**K-16**)
+
+> 🔴 **Ditambahkan 11 September 2026. Sampai hari itu bagian ini berbunyi
+> *“satu butir”* dan *“ini satu-satunya tambahan yang seluruh `arch/`
+> tuntut terhadap V0”* — dan itu salah.**
+> [`06`](06-DATA-ARCHITECTURE.md) §5 dan §6 menuntut **dua** hal lagi dari
+> setiap tabel, dan [`11`](11-PENEGAKAN.md) menjadikan keduanya gerbang CI
+> (**P-1**, **P-2**). Dijalankan atas DDL V0: **23 dari 23 tabel gagal
+> keduanya.** Klaim *“satu butir”* tidak pernah diperiksa terhadap `06`.
+
+| | |
+|---|---|
+| Yang ditambahkan | kolom `data_subject` + tiga anotasi retensi pada **23 tabel** |
+| Biaya sekarang | **nol** — nol baris data |
+| Biaya nanti | tiap baris yang sudah ada harus **ditebak** subjeknya; RLS yang ditulis Sprint 1 sudah mengandaikan `user_id` |
+| Masuk di | **Sprint 0 tugas 0.4** (migrasi 0001), bukan tahap tersendiri |
+
+### 🔑 Uji yang memutuskan apa yang boleh masuk V0 — dan yang menolak sisanya
+
+> **Yang boleh ditambahkan ke V0 hanyalah hal yang TIDAK BISA ditambahkan
+> nanti.**
+
+| Calon | Lulus? | Kenapa |
+|---|---|---|
+| `consents.purpose` (**B-22**) | ✅ | persetujuan masa lalu tidak bisa direka ulang |
+| `data_subject` (**K-16**) | ✅ | subjek baris yang sudah terlanjur ditulis tidak bisa dipulihkan |
+| `tool.failed` sebagai event | 🛑 **ditolak** | sebuah event bisa mulai diterbitkan kapan saja tanpa kehilangan apa pun — lihat [`07`](07-EVENT-CONTRACTS.md) §7 |
+
+⚠️ Dengan dua butir itu: **23 tabel tetap 23, 22 event tetap 22, 51 tugas
+tetap 51.** Yang bertambah kolom dan anotasi, bukan tabel.
 
 ---
 

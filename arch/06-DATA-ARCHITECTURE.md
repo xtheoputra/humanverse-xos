@@ -148,8 +148,18 @@ ditolak CI** ([`11`](11-PENEGAKAN.md) P-1):
 ```sql
 -- @retention   : 24 months | forever | 90 days | until-account-deleted
 -- @who-can-set : system | user | law
--- @on-delete   : hard | anonymise | keep-metadata-only
+-- @on-delete   : hard | anonymise | keep-metadata-only | not-applicable
 ```
+
+> 🔧 **`not-applicable` ditambahkan 11 September 2026**, saat aturan ini
+> dipasang pada 23 tabel V0 ([`../spec/01`](../spec/01-DATABASE-SCHEMA.md)).
+> Tiga nilai pertama semuanya menjawab *“apa yang terjadi pada baris ini
+> ketika sebuah AKUN dihapus”* — dan katalog sistem (`agents`,
+> `agent_tools`, `data_subject='system'`) **tidak punya akun untuk
+> dihapus**. Memaksanya memilih salah satu dari tiga berarti menulis
+> jawaban yang tidak benar supaya kolomnya terisi.
+> 💡 **Kosakata yang tidak punya nilai untuk “tidak berlaku” akan
+> mengumpulkan kebohongan kecil di baris-baris yang tidak cocok.**
 
 | Nilai `who-can-set` | Artinya | Contoh |
 |---|---|---|
@@ -184,6 +194,24 @@ dan **patah** pada fase pertama yang datanya tentang **tempat**, bukan orang:
 > **Setiap tabel wajib punya `data_subject`. Kalau `data_subject = 'user'`, maka
 > `user_id` WAJIB TIDAK NULL. Kalau tidak, `user_id` TIDAK BOLEH ADA sama
 > sekali — bukan `NULL`.**
+
+> ⚠️ **Dipertajam 11 September 2026: `data_subject` adalah sifat BARIS,
+> bukan tetapan TABEL — dan contoh tandingannya sudah ada di dalam V0.**
+> `audit_logs` memuat baris yang pelakunya pengguna **dan** baris yang
+> pelakunya sistem (`actor_type IN ('user','agent','system','admin')`).
+> Untuk tabel semacam itu aturan di atas tidak bisa ditegakkan sebagai
+> `NOT NULL` pada kolom; ia ditegakkan sebagai **CHECK**:
+>
+> ```sql
+> CHECK ((data_subject = 'user') = (user_id IS NOT NULL))
+> ```
+>
+> 💡 Aturan aslinya sudah ditulis dalam bentuk BARIS (*“kalau
+> `data_subject = 'user'`, maka…”*); yang keliru adalah menganggapnya
+> bisa diwujudkan di tingkat kolom. Ditemukan **P-3**
+> ([`11`](11-PENEGAKAN.md)) — dan hanya karena §6 dijalankan atas tabel
+> yang SUDAH ADA, bukan atas tabel Phase 15 yang menjadi alasannya
+> ditulis.
 
 ```
 data_subject : 'user' | 'bystander' | 'world' | 'system'
@@ -290,7 +318,9 @@ tanpa itu **tidak bisa melatih model apa pun** di Phase 5.
 | Kelas penyimpanan | **4**, dan uji admisinya mekanis (§2) |
 | `source='sensor'` di `events` | ❌ **sengaja tidak ada** |
 | Tabel tanpa `retention` | ditolak CI — [`11`](11-PENEGAKAN.md) P-1 |
-| Tabel tanpa `data_subject` | ditolak CI — P-2 |
+| Tabel tanpa `data_subject` | **NIHIL** — 23 dari 23 tabel V0, dipasang **K-16** 11 Sep 2026; ditolak CI — P-2 ✅ **jalan** |
+| Tabel tanpa tiga anotasi retensi | **NIHIL** — 23 dari 23; ditolak CI — P-1 ✅ **jalan** |
+| `user_id` nullable tanpa penjaga | **NIHIL** — `audit_logs` memakai CHECK §6; ditolak CI — P-3 ✅ **jalan** |
 | Tabel `user_id NULL` | ditolak CI — P-3; kolomnya absen, bukan null |
 | Tabel `sensitivity ≥ 3` di luar vault | ditolak CI — P-4 |
 | Tabel V0 | **23**, tidak berubah |

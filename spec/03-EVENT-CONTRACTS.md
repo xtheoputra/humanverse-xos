@@ -315,6 +315,42 @@ di bagian atas berkas ini; sisanya milik Phase 9–20.
 
 ---
 
+---
+
+## 🔧 Nama control-plane yang DICADANGKAN — bukan V0
+
+> Ditambahkan 11 September 2026. Ditemukan
+> [`../tools/periksa_dokumen.py`](../tools/README.md) **E-4**.
+
+[`../arch/07`](../arch/07-EVENT-CONTRACTS.md) §6 menuntut kembaran kegagalan
+dan pemulihan untuk setiap kata kerja kendali. Sebagian namanya **bukan nama
+naskah** — tidak ada `AgentRetired` maupun `ToolCalled` di dua puluh empat
+naskah — jadi tabel padanan di atas bukan tempatnya. Ia juga bukan V0.
+
+🔑 **Kenapa dicadangkan sekarang, padahal implementasinya jauh:** aturan
+[§5](#versi--dan-satu-aturan-yang-lebih-penting-daripada-nomornya) berbunyi
+*nama event tidak pernah diganti sekali diterbitkan*. Mencadangkan nama hari
+ini berbiaya **nol**; membiarkannya kosong berarti Phase 11 akan mengarang
+namanya sendiri, dan nama karangan itu **tidak bisa diganti lagi** begitu
+baris pertamanya terbit.
+
+| `event_type` | Pasangannya | Fase |
+|---|---|---|
+| `agent.retired` | `agent.restored` | 11 · 14 |
+| `agent.throttled` | `agent.unthrottled` | 14 |
+| `emergency.recovery_completed` | melengkapi `emergency.recovery_started` | 16 |
+| `tool.called` | `tool.failed` | 11 |
+
+⚠️ **Nol di antaranya masuk V0.** V0 tetap **22 event domain**; aturan yang
+dipakai: *yang boleh ditambahkan ke V0 hanyalah hal yang **tidak bisa**
+ditambahkan nanti* — dan sebuah event selalu bisa mulai diterbitkan kemudian.
+
+🛑 **`agent.restored` bukan kerapian.** §14.29 menjadikan `RESTORE` **setara**
+`RETIRE`; tanpa kembarannya, jejak audit hanya merekam sisi yang mematikan
+agent dan tidak pernah sisi yang menghidupkannya kembali.
+
+---
+
 ## 🔧 Security event memakai amplop yang sama (K-10)
 
 > Ditambahkan 9 September 2026 — **keputusan didelegasikan K-10**, menutup

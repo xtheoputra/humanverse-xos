@@ -369,6 +369,38 @@ sesudahnya.
 
 ---
 
+## K-16 · `data_subject` dan anotasi retensi masuk 23 tabel V0 sekarang
+
+> Diputuskan 11 September 2026. Menerapkan [`../arch/06`](../arch/06-DATA-ARCHITECTURE.md)
+> §5 dan §6, yang sudah ditetapkan 10 September dan **tidak pernah sampai ke DDL**.
+
+| | |
+|---|---|
+| **Keputusan** | Ke-23 tabel V0 [`../spec/01`](../spec/01-DATABASE-SCHEMA.md) mendapat kolom `data_subject` dan tiga anotasi `@retention` · `@who-can-set` · `@on-delete`. `audit_logs` — satu-satunya tabel V0 yang barisnya bisa milik pengguna **atau** milik sistem — menegakkan aturan §6 sebagai `CHECK ((data_subject = 'user') = (user_id IS NOT NULL))`, bukan sebagai `NOT NULL` kolom. |
+| **Bukti** | Dijalankan mesin atas DDL: **P-1 gagal 23 dari 23**, **P-2 gagal 23 dari 23**, **P-3 gagal 1**. Semuanya gerbang CI yang sudah dinyatakan [`../arch/11`](../arch/11-PENEGAKAN.md) §3 — dan DDL yang akan dimigrasikan Sprint 0 tugas 0.4 melanggar ketiganya sejak baris pertama. |
+| **Nilainya tidak dikarang** | `until-account-deleted` + `hard` untuk seluruh tabel milik pengguna datang dari **Prosedur hapus akun** `spec/01` tahap 3 (`DELETE FROM users` cascade); `forever` + `anonymise` untuk `audit_logs` dari tahap 5 (*“`audit_logs` tetap, `user_id` diacak jadi id semu”*). `who-can-set` memakai contoh yang [`../arch/06`](../arch/06-DATA-ARCHITECTURE.md) §5 berikan sendiri: `journal_entries` = `user`, `agent_runs` = `system`. |
+| **Bacaan yang DITOLAK** | *“V0 hanya punya data pemilik akun, jadi `data_subject` mubazir sampai Phase 15.”* **Ditolak** — benar tentang V0 dan salah tentang biayanya. Menambahkannya nanti berarti **menebak** subjek tiap baris yang sudah terlanjur ditulis, dan RLS yang ditulis Sprint 1 sudah mengandaikan `user_id` sebagai satu-satunya sumbu kepemilikan. |
+| **Yang TIDAK berubah** | **23 tabel tetap 23 · 22 event tetap 22 · 51 tugas tetap 51.** Yang bertambah kolom dan komentar, bukan tabel. |
+| **Cara membalikkan** | Hapus kolom dan anotasinya, lalu cabut P-1/P-2/P-3 dari [`../arch/11`](../arch/11-PENEGAKAN.md) §3 — keduanya harus dilakukan bersama, sebab meninggalkan gerbang yang DDL-nya gagal adalah keadaan yang lebih buruk daripada keduanya. |
+
+> 🔑 **Uji yang dipakai untuk memutuskan, dan ia menolak sesuatu di hari yang
+> sama: yang boleh ditambahkan ke V0 hanyalah hal yang TIDAK BISA ditambahkan
+> nanti.** `consents.purpose` lulus (persetujuan masa lalu tak bisa direka
+> ulang). `data_subject` lulus. **`tool.failed` sebagai event DITOLAK** — sebuah
+> event bisa mulai diterbitkan kapan saja tanpa kehilangan apa pun yang sudah
+> ada, dan [`../arch/07`](../arch/07-EVENT-CONTRACTS.md) §7 yang menuntutnya
+> justru menunjuk tugas 4.3 yang tidak menyebut event sama sekali.
+>
+> 💡 **Cara menemukannya adalah pertanyaan yang sama dengan K-15, satu lapis
+> lebih tinggi:** [`../arch/11`](../arch/11-PENEGAKAN.md) §2 menggolongkan
+> kelompok **P** sebagai *“butuh kode: ya”* — dan itu benar untuk artefak yang
+> **berjalan**. Tetapi yang diperiksa P-1/P-2/P-3 adalah **DDL**, dan DDL-nya
+> sudah ada sebagai **dokumen** sejak `spec/01` ditulis. ⇒ ***apakah yang
+> diperiksanya sudah ada dalam bentuk lain?*** — pertanyaan itu memindahkan
+> **delapan** pemeriksaan dari “menunggu kode” ke “jalan hari ini”.
+
+---
+
 ## Yang sengaja **tidak** saya putuskan
 
 | Butir | Kenapa |

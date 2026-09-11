@@ -13,8 +13,12 @@ name: periksa-dokumen
 #    gerbang sesudah hal yang dijaganya (#99 #111 #116 #121 #131 #144).
 #    Mengurutkannya ulang adalah keputusan CAKUPAN, milik pemilik. Karena
 #    itu R-1 dijalankan terpisah dan TIDAK menggagalkan alur — ia
-#    melaporkan. Yang menggagalkan alur adalah E-1 · E-2 · E-5 · G-1,
-#    yang keempatnya hijau dan harus tetap hijau.
+#    melaporkan. Yang menggagalkan alur adalah sebelas pemeriksaan lain,
+#    yang kesebelasnya hijau dan harus tetap hijau.
+#
+# 🔑 Langkah uji mutasi ada supaya "sebelas hijau" tidak bisa berarti
+#    "sebelas pemeriksaan yang tidak melihat apa pun": ia merusak satu
+#    hal yang tiap pemeriksaan KLAIM deteksi dan menuntut merahnya.
 
 on:
   push:
@@ -33,8 +37,13 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: E-1 · E-2 · E-5 · G-1 — wajib hijau
-        run: python tools/periksa_dokumen.py E-1 E-2 E-5 G-1
+      - name: Sebelas pemeriksaan dokumen — wajib hijau
+        run: >
+          python tools/periksa_dokumen.py
+          B-6 P-1 P-2 P-3 E-1 E-2 E-4 E-5 A-2 A-3 G-1
+
+      - name: Uji mutasi — buktikan kedua belasnya sanggup GAGAL
+        run: python tools/uji_mutasi.py
 
       - name: R-1 — dilaporkan, tidak menggagalkan (keputusan cakupan pemilik)
         if: always()
