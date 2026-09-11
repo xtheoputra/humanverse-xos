@@ -1,0 +1,41 @@
+name: periksa-dokumen
+
+# Menjalankan lima dari dua puluh enam pemeriksaan `arch/11` yang tidak
+# membutuhkan kode produksi. Ini BUKAN CI kode — CI kode adalah tugas 0.7
+# `spec/07`, dan ia menunggu #3.
+#
+# 🔑 Alur ini ada supaya aturan repo berhenti menjadi sesuatu yang harus
+#    DIINGAT seseorang. Sebuah skrip yang bisa dijalankan tetapi tidak
+#    pernah dijalankan masih aturan tanpa penjaga — persis pola yang
+#    `arch/11` §1 daftar enam kali.
+#
+# ⚠️ R-1 GAGAL hari ini, dan itu benar: enam roadmap fase menjadwalkan
+#    gerbang sesudah hal yang dijaganya (#99 #111 #116 #121 #131 #144).
+#    Mengurutkannya ulang adalah keputusan CAKUPAN, milik pemilik. Karena
+#    itu R-1 dijalankan terpisah dan TIDAK menggagalkan alur — ia
+#    melaporkan. Yang menggagalkan alur adalah E-1 · E-2 · E-5 · G-1,
+#    yang keempatnya hijau dan harus tetap hijau.
+
+on:
+  push:
+    paths: ['docs/**', 'spec/**', 'arch/**', 'tools/**', '.github/workflows/**']
+  pull_request:
+    paths: ['docs/**', 'spec/**', 'arch/**', 'tools/**']
+  workflow_dispatch:
+
+jobs:
+  periksa:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: E-1 · E-2 · E-5 · G-1 — wajib hijau
+        run: python tools/periksa_dokumen.py E-1 E-2 E-5 G-1
+
+      - name: R-1 — dilaporkan, tidak menggagalkan (keputusan cakupan pemilik)
+        if: always()
+        run: python tools/periksa_dokumen.py R-1 || true

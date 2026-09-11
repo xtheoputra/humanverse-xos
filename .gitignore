@@ -3,3 +3,7 @@ desktop.ini
 .DS_Store
 *.tmp
 ~$*
+
+# perkakas dokumen (tools/)
+__pycache__/
+*.pyc

@@ -35,18 +35,71 @@
 | **B** batas keras (6) | Sprint 0 tugas **0.8**, diperluas | sebagian — B-3·B-4·B-5 menyusul bersama modulnya |
 | **M** modul & nama (4) | Sprint 0 **0.7 · 0.8** | ya |
 | **P** penyimpanan & migrasi (6) | Sprint 0 **0.4** (alat migrasi) | ya |
-| **E** event (4) | Sprint 3 **3.1**; **E-1 · E-2 bisa jalan SEKARANG atas `docs/`** | sebagian |
+| **E** event (5) | Sprint 3 **3.1**; **E-1 · E-2 · E-5 SUDAH JALAN** atas `docs/`·`spec/`·`arch/` | sebagian |
 | **A** agent & tool (3) | Sprint 4 **4.2** (validasi manifest) | ya |
-| **G** governance (1) | **sekarang** — atas tabel [`08`](08-AGENT-CONTRACTS.md) §4 | ❌ |
-| **R** roadmap (1) | **sekarang** — atas tiap roadmap di `docs/` & `arch/` | ❌ |
+| **G** governance (1) | **SUDAH JALAN** atas tabel [`08`](08-AGENT-CONTRACTS.md) §4 | ❌ |
+| **R** roadmap (1) | **SUDAH JALAN** atas tiap roadmap di `docs/` & `arch/` | ❌ |
 
-⭐ **Empat pemeriksaan bisa dijalankan hari ini, dengan nol baris kode
-produksi**: **E-1**, **E-2**, **G-1**, **R-1**. Keempatnya membaca dokumen, dan
-dokumenlah yang selama ini menjadi tempat aturan dilanggar tanpa ketahuan.
+### ✅ Lima pemeriksaan berhenti menjadi rencana — 11 September 2026
+
+[`../tools/periksa_dokumen.py`](../tools/periksa_dokumen.py) menjalankan
+**E-1 · E-2 · E-5 · G-1 · R-1** dengan **nol baris kode produksi**. Ia keluar
+dengan kode **1** kalau ada yang gagal, jadi ia bisa dipasang sebagai gerbang CI
+sebelum berkas kode pertama ditulis.
+
+```
+$ python tools/periksa_dokumen.py
+E-1  154 nama diperiksa   ✅ LULUS
+E-2  154 nama diperiksa   ✅ LULUS
+E-5  130 kandidat         ✅ LULUS
+G-1  10 pasal             ✅ LULUS
+R-1  10 pasangan          🛑 GAGAL — 7 temuan
+```
+
+> 🔑 **Tiga aturan rancangan yang membuatnya tidak menjadi salinan kedua dari
+> dokumen:**
+>
+> 1. **Registry dibaca DARI dokumennya.** Daftar 46 domain diambil dari
+>    [`07`](07-EVENT-CONTRACTS.md) §2, daftar pasal dari
+>    [`08`](08-AGENT-CONTRACTS.md) §4, daftar pasangan gerbang dari blok
+>    ```` ```r1 ```` di [`10`](10-URUTAN-IMPLEMENTASI.md) §2.1. Tidak satu pun
+>    ditulis ulang di dalam kodenya. Kalau dokumennya berubah, pemeriksa ikut;
+>    **kalau dokumennya hilang, pemeriksa GAGAL dengan galat — bukan lulus
+>    karena tidak menemukan apa pun untuk diperiksa.**
+> 2. **Populasi yang diperiksa dinyatakan.** `--senarai` mencetak tiap nama
+>    beserta baris asalnya, dan daftar pengecualian menyertakan **alasan per
+>    baris** — supaya pengecualian tidak menjadi tempat menyembunyikan temuan.
+> 3. **Angka di prosa diperiksa terhadap tabel di atasnya.** Itu yang menangkap
+>    *“39 domain”* di §2 [`07`](07-EVENT-CONTRACTS.md) yang tabelnya memuat 45.
+
+### 🔴 Dan alat ukurnya sendiri salah dua kali sebelum benar
+
+Dicatat karena bentuknya berulang di repo ini, dan karena laporan yang tidak
+menyebutkan ini akan terbaca lebih kuat daripada yang sebenarnya:
+
+| | Yang keliru | Akibat kalau tidak ketahuan |
+|---|---|---|
+| 1 | panen butir roadmap **ikut membaca catatan audit saya sendiri** ⇒ `G18.11 Safety, Privacy & Governance` — milestone yang hanya saya **usulkan** — terhitung sebagai milestone yang **ada** | Phase 18 akan tampak punya gerbang keselamatan. **Alat yang mencari kegagalan justru menutupinya** |
+| 2 | panen nama event **hanya membaca token di dalam backtick** ⇒ kedelapan nama `security.*` (K-10) tidak pernah diperiksa | seluruh keluarga event **keamanan** lolos E-1 dan E-2 — keluarga yang paling mungkin diaudit |
+
+> 💡💡 **Pembeda untuk keliru 1 tidak dikarang: `docs/SENSUS-EVENT.md` sudah
+> mengujinya** — percobaan *“semua baris `>` itu catatan saya”* SALAH (naskah
+> juga mengutip pemilik dengan `>`), dan yang lulus validasi silang adalah
+> menilai blok dari **baris pertamanya**. Aturan itu dipakai ulang apa adanya.
+>
+> 💡💡 **Keduanya ditemukan dengan satu pertanyaan yang sama, dan ia layak
+> ditanyakan setiap kali sesuatu berubah menjadi hijau: *apa yang alat ukur ini
+> TIDAK PERNAH lihat?*** Bukan *“apakah hasilnya benar”* — hasilnya benar untuk
+> populasi yang dilihatnya. Yang salah populasinya.
+
+✅ **Bukti kedua pembetulan sah:** sesudahnya, kedelapan roadmap memulangkan
+jumlah butir yang **sama dengan angka yang dokumennya sendiri sebutkan** —
+A14 10 · R16 10 · H17 12 · G18 10 · S19 10 · C20 12 · `spec/07` **51 tugas** ·
+`arch/10` **13 tahap**.
 
 ---
 
-## §3 Dua puluh lima pemeriksaan
+## §3 Dua puluh enam pemeriksaan
 
 ### B · Batas keras — [`04`](04-DEPENDENCY-GRAPH.md) §2
 
@@ -91,6 +144,22 @@ dokumenlah yang selama ini menjadi tempat aturan dilanggar tanpa ketahuan.
 | **E-2** | format dua segmen, huruf kecil, kata kerja lampau | regex; **bisa jalan sekarang** |
 | **E-3** | tidak ada `source='sensor'` di `events` | grep DDL + uji admisi |
 | **E-4** | tiap kata kerja pengubah keadaan punya kembaran kegagalan/pemulihan | daftar pasangan wajib [`07`](07-EVENT-CONTRACTS.md) §6 |
+| **E-5** 🆕 | tiap nama event di naskah punya baris di tabel padanan [`../spec/03`](../spec/03-EVENT-CONTRACTS.md) | panen PascalCase seluruh `docs/`, disaring kata kerja penutup yang tabel itu sendiri pakai; **jalan sekarang** |
+
+> 🔑 **E-5 ada karena pertanyaan yang ditujukan kepada E-1 dan E-2 sendiri:
+> *apa yang keduanya TIDAK PERNAH lihat?*** Jawabannya tajam: keduanya hanya
+> membaca nama yang **sudah** masuk tabel padanan. Sebuah nama yang tidak pernah
+> masuk **tidak punya `event_type` sama sekali**, jadi tidak ada yang bisa
+> ditolak — ia lolos karena tak terlihat, bukan karena benar.
+>
+> 🔴 **Dijalankan pertama kali, ia langsung menemukan satu: `MeetingCreated`**
+> ([`../docs/167`](../docs/167-AUDIO-VOICE-VIDEO-TEMPORAL.md) L29) — nama event
+> tulisan pemilik, di ujung alur `Speech → … → Event`, yang **tidak pernah
+> sampai ke tabel padanan**. Ia terlewat sebab
+> [`../docs/SENSUS-EVENT.md`](../docs/SENSUS-EVENT.md) memanen **bagian yang
+> JUDULNYA menyebut “Event”**, dan nama ini berdiri di sebuah **contoh**.
+> ⇒ sensusnya benar untuk populasi yang dipanennya; **populasinya yang kurang
+> satu naskah.**
 
 ### A · Agent & tool — [`08`](08-AGENT-CONTRACTS.md)
 
@@ -114,23 +183,31 @@ dokumenlah yang selama ini menjadi tempat aturan dilanggar tanpa ketahuan.
 
 ---
 
-## §4 🔴 Apa yang R-1 temukan kalau dijalankan atas roadmap yang SUDAH ada
+## §4 🔴 Apa yang R-1 temukan — dan sekarang ia DIHITUNG, bukan dibaca
 
-Dijalankan hari ini, tanpa kode, atas roadmap di `docs/`:
+> ✅ **Diperbarui 11 September 2026.** Tabel ini semula dihitung tangan.
+> [`../tools/periksa_dokumen.py`](../tools/periksa_dokumen.py) `R-1`
+> menghitungnya sendiri sekarang, dari daftar pasangan di
+> [`10`](10-URUTAN-IMPLEMENTASI.md) §2.1 dan dari nomor butir yang dipanen
+> langsung dari `docs/`. **Vonis tangan terbukti benar untuk kedelapan
+> roadmap** — dan satu angkanya bertambah tajam: yang gagal bukan enam
+> *roadmap* melainkan **tujuh pasangan gerbang**, sebab Phase 16 melanggar
+> **dua** aturan sekaligus, bukan satu.
 
 | Roadmap | Pasangan | Hasil |
 |---|---|---|
 | `A14.x` Phase 14 | federasi (A14.1) ← Security Mesh (A14.7) | 🛑 **GAGAL** — [#99](../../issues/99) |
 | `R16.x` Phase 16 | humanoid · drone · manipulasi ← `R16.10` Safety Kernel | 🛑 **GAGAL** — [#111](../../issues/111) |
+| `R16.x` Phase 16 | manipulasi · humanoid · drone · armada ← `R16.9` Simulation | 🛑 **GAGAL** — §16.26 `Code → Simulation → Safety Test → Hardware` |
 | `H17.x` Phase 17 | seluruh MVP ← `H17.12` Health Safety (**di luar MVP**) | 🛑 **GAGAL** — [#116](../../issues/116) |
 | Phase 18 | §18.30 Query Engine ← §18.22 Safety Kernel (**tanpa milestone**) | 🛑 **GAGAL** — [#121](../../issues/121) |
 | `S19.x` Phase 19 | Digital Laboratory ← `S19.10` Ethics & Safety | 🛑 **GAGAL** — [#131](../../issues/131) |
 | `C20.x` Phase 20 | `C20.6` Coordination ← `C20.7` Governance | 🛑 **GAGAL** — [#144](../../issues/144) |
 | **`../spec/07` Sprint 0–6** | kode domain ← 0.8 lint; agent (4.6–4.7) ← 4.5 risk gate | ✅ **LULUS** |
-| **`arch/10` T0–T12** | tiap tahap ← gerbangnya | ✅ **LULUS** |
+| **`arch/10` T0–T12** | tiap tahap ← **T2** PROTECT | ✅ **LULUS** |
 
-> 🔑 **Enam roadmap gagal, dua lulus — dan yang lulus keduanya ditulis sebagai
-> pekerjaan engineering, bukan sebagai peta fase.** Itu perbedaan yang lebih
+> 🔑 **Enam roadmap gagal (tujuh pasangan), dua lulus — dan yang lulus
+> keduanya ditulis sebagai pekerjaan engineering, bukan sebagai peta fase.** Itu perbedaan yang lebih
 > berguna daripada menyalahkan naskah mana pun: roadmap yang ditulis untuk
 > **dikerjakan** menaruh gerbangnya lebih dulu; roadmap yang ditulis untuk
 > **menggambarkan** menaruh yang paling menarik lebih dulu.
@@ -166,9 +243,18 @@ sebenarnya.
 
 | | Hasil |
 |---|---|
-| Jumlah pemeriksaan | **25** |
+| Jumlah pemeriksaan | **26** |
 | Batas keras tanpa penegak | **NIHIL** — 6 dari 6 |
 | Aturan 🔧 di `arch/` tanpa baris di §3 | **NIHIL** |
-| Pemeriksaan yang bisa jalan tanpa kode | **4** — E-1 · E-2 · G-1 · R-1 |
+| Pemeriksaan yang bisa jalan tanpa kode | **5** — E-1 · E-2 · **E-5** · G-1 · R-1 |
+| Pemeriksaan yang **benar-benar sudah dijalankan** | **5 dari 5** — 11 Sep 2026 |
+| Pemeriksaan yang masih menunggu kode | **21 dari 26** |
 | Perkakas yang dibutuhkan | **1** — `import-linter` menangani B-1·B-2·B-3, M-1·M-2·M-3 |
 | Roadmap yang lulus R-1 | **2 dari 8** — dan keduanya ditulis untuk dikerjakan |
+
+> 🛑 **Baris keempat dan kelima sengaja dipisah.** Sampai 10 September 2026
+> berkas ini menulis *“4 pemeriksaan bisa jalan tanpa kode”* — dan **nol** di
+> antaranya pernah dijalankan. Itu bentuk yang sama dengan seluruh §1: aturan
+> yang benar, ditulis serius, tanpa sesuatu yang berkata *tidak*. Sebuah berkas
+> penegakan adalah tempat paling tidak masuk akal untuk mengulanginya, dan ia
+> mengulanginya selama satu hari.

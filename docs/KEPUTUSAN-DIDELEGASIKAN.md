@@ -61,15 +61,15 @@ memilih.
 
 ---
 
-## K-3 · 127 nama event dipadankan — **naskah tidak diubah**
+## K-3 · 128 nama event dipadankan — **naskah tidak diubah**
 
 **Menutup:** [#149](../../issues/149) (**E-153**) · melanjutkan [#38](../../issues/38)
 
 | | |
 |---|---|
 | **Keputusan** | Naskah **tidak** ditulis ulang. Tabel padanan `PascalCase → domain.verb` diterbitkan di [`../spec/03`](../spec/03-EVENT-CONTRACTS.md), dan **`spec/03` menjadi satu-satunya sumber nama yang sampai ke kode**. Padanannya mekanis: kata pertama → domain, sisanya → verb snake_case. |
-| **Bukti** | [#38](../../issues/38) sudah memilih dua segmen huruf kecil; 127 nama pasca-keputusan memakai PascalCase ([`SENSUS-EVENT.md`](SENSUS-EVENT.md)). Belum ada kode, jadi belum ada nama yang terkunci. |
-| **Bacaan yang DITOLAK** | *“Perbaiki saja nama-namanya langsung di naskah.”* **Ditolak** — aturan 1 repo ini menyatakan berkas naskah merekam kata pemilik apa adanya. Menyunting 127 nama di sana akan menghapus bukti bahwa keputusannya pernah dilanggar, dan itu justru satu-satunya alasan pola ini bisa ditemukan. |
+| **Bukti** | [#38](../../issues/38) sudah memilih dua segmen huruf kecil; **128** nama pasca-keputusan memakai PascalCase ([`SENSUS-EVENT.md`](SENSUS-EVENT.md) — angkanya 127 saat K-3 diputuskan; `MeetingCreated` ditambahkan 11 Sep 2026 lewat **E-5**). Belum ada kode, jadi belum ada nama yang terkunci. |
+| **Bacaan yang DITOLAK** | *“Perbaiki saja nama-namanya langsung di naskah.”* **Ditolak** — aturan 1 repo ini menyatakan berkas naskah merekam kata pemilik apa adanya. Menyunting 128 nama di sana akan menghapus bukti bahwa keputusannya pernah dilanggar, dan itu justru satu-satunya alasan pola ini bisa ditemukan. |
 | **Tiga tabrakan KOSAKATA** | Diselesaikan ke arah `spec/03`, sebab nama itu **sudah ada di DDL**: `SleepEnded` → **`sleep.completed`** · `MeetingEnded` → **`meeting.completed`** · `MoodChanged` → **`mood.logged`**. Ketiganya bukan beda bentuk melainkan beda kata kerja. |
 | **Cara membalikkan** | Ubah tabel padanan di `spec/03`. Naskah tidak perlu disentuh sama sekali. |
 
@@ -330,6 +330,42 @@ ditemukan saat **menguji K-5 terhadap keempat agent V0**
 > pemeriksaannya berhenti di sana, K-5 akan tampak selesai. Yang ketiga —
 > `orchestrator-agent`, yang “jelas-jelas agent” — justru yang gagal, dan
 > kegagalannya menunjuk lubang di **gerbangnya**, bukan di definisinya.
+
+---
+
+## K-15 · Domain event diambil dari **registry**, bukan dari kata pertama nama
+
+> Diputuskan 11 September 2026. Mempersempit **K-3**; tidak membukanya kembali.
+
+K-3 memadankan 127 nama `PascalCase` menjadi `domain.verb` dengan aturan
+*“kata pertama → domain, sisanya → verb `snake_case`”*. Aturan itu **mekanis dan
+benar sebagai transkripsi** — dan tidak pernah dijalankan terhadap registry
+domain [`../arch/07`](../arch/07-EVENT-CONTRACTS.md) §2, yang lahir sehari
+sesudahnya.
+
+| | |
+|---|---|
+| **Keputusan** | Kalau kata pertama sebuah nama **adalah domain terdaftar**, ia menjadi domain dan sisanya menjadi verb. Kalau **bukan**, domainnya diambil dari [`../arch/07`](../arch/07-EVENT-CONTRACTS.md) §4 (domain tujuan per fase) dan **seluruh nama** menjadi verb. Verb wajib berakhir kata kerja **lampau**. Satu-satunya domain yang ditambahkan ke registry adalah **`health`**, dan ia bukan domain baru: catatan kaki §4 sudah menyatakannya milik `human-core` sejak awal — tabel §2 yang melewatkannya. |
+| **Bukti** | Dijalankan mesin: **66 dari 127 baris** mendarat di domain yang tidak ada di registry, dan **enam nama** berakhir bukan kata kerja lampau. Yang paling menentukan bukan jumlahnya melainkan isinya: `LargeScaleScenarioCreated` → domain **`large`**, `InterestRateChanged` → **`interest`**, `OilPriceChanged` → **`oil`**. ⇒ **kata pertama sebuah nama tidak selalu subjeknya.** |
+| **Arahnya ditentukan aturan yang sudah ada, bukan selera** | [`../arch/07`](../arch/07-EVENT-CONTRACTS.md) §2 sudah menulis: *“Domain baru ditambahkan hanya bersama konteks pemiliknya — dan penambahan itu adalah perubahan arsitektur, bukan penamaan.”* ⇒ **namanya yang pindah, bukan registry yang tumbuh.** Kalau ditempuh sebaliknya, registry membengkak dari 46 menjadi 96 dan berhenti menjadi registry: seluruh alasannya ada supaya `stuff.happened` **tidak** lolos. |
+| **Bacaan yang DITOLAK** | *“Tambahkan saja 50 domain itu ke registry — toh naskah memang menyebutnya.”* **Ditolak** dua kali: (a) aturan §2 di atas, (b) `large`, `oil`, `interest`, `heart`, `supply`, `scientific` **bukan konteks apa pun** — memasukkannya berarti menyatakan bahwa ada konteks bernama `large`, dan tidak ada yang bisa memilikinya. |
+| **Akibat nyata** | **64 nama diganti**, tiga di antaranya **menyatu** dengan baris lain (`TaskCompleted` → `agent.task_completed` · `MapUpdated` → `spatial.map_updated` · `SupplyChainDisruption` → `world.supply_chain_disrupted`) ⇒ dua nama naskah, satu `event_type`. **Nol perubahan untuk V0: 22 event tetap 22**, sebab ke-22-nya sudah memakai domain terdaftar. |
+| **Biayanya nol hari ini** | Aturan §5 melarang mengganti nama event **sesudah diterbitkan**. Repo ini nol baris kode ⇒ nol baris data ⇒ **tidak ada yang diterbitkan**. Sesudah baris pertama masuk tabel `events`, biaya yang sama menjadi migrasi riwayat atau kehilangan perilaku. |
+| **Cara membalikkannya** | Kembalikan aturan K-3 apa adanya dan tambahkan 50 domain ke [`../arch/07`](../arch/07-EVENT-CONTRACTS.md) §2. Keduanya satu suntingan; yang hilang adalah kemampuan menjawab *“domain ini milik konteks mana”* untuk separuh nama. |
+
+> 💡💡 **Cara menemukannya adalah bentuk yang sudah berbuah empat kali di repo
+> ini, dan kali ini paling murah: JALANKAN DUA DOKUMEN YANG TIDAK PERNAH SALING
+> DIUJI TERHADAP SATU SAMA LAIN.** `spec/03` konsisten sendiri. `arch/07` §2
+> konsisten sendiri. Keduanya ditulis pada hari yang sama oleh orang yang sama.
+> Tabrakan 66 baris itu **tidak muncul saat salah satunya dibaca** — ia muncul
+> saat yang satu dijalankan sebagai aturan atas yang lain.
+>
+> ⚠️ **Dan `arch/07` §4 mengaku sudah melakukannya.** Kolom *“Domain tujuan”*
+> menuliskan apa yang seharusnya terjadi (Phase 11 → `agent`·`approval`·`tool`)
+> — sebuah klaim, bukan hasil. Diukur: ke-22 nama Phase 11 mendarat di `agent`
+> saja; `approval` dan `tool` **nol**. ⇒ pelajaran [#38](../../issues/38) sekali
+> lagi, dalam bentuk paling halus: **sebuah tabel yang MENGGAMBARKAN hasil
+> terbaca persis seperti tabel yang MENGUKURNYA.**
 
 ---
 

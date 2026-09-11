@@ -4,6 +4,126 @@
 
 ---
 
+## Sesi 27 — 11 September 2026
+
+**Pemilik: *“lanjutkan semua tugas dan fase”*. Yang tersisa dan TIDAK diblokir keputusan pemilik cuma satu: [#157](../../issues/157) butir 1 — *“jalankan E-1, E-2, G-1, R-1 sekarang sebagai satu skrip pemeriksa dokumen”*. Dikerjakan. Dan menjalankannya menemukan enam hal yang membaca tidak akan menemukan.**
+
+| Hal | Hasil |
+|---|---|
+| Naskah baru | **tidak ada** |
+| Berkas baru | **`tools/`** — `periksa_dokumen.py` + `README.md` |
+| Kode **produksi** | tetap **0** — menunggu [#3](../../issues/3) |
+| Pemeriksaan `arch/11` | 25 → **26**; yang bisa jalan tanpa kode 4 → **5**; yang **benar-benar dijalankan** 0 → **5** |
+| `spec/` diubah | **1 dari 8** — `03` (64 nama diganti, 1 nama ditambah) |
+| `arch/` diubah | **4 dari 12** — `07` · `10` · `11` · `README` |
+| Issue | 157 → **159**; **#157 DITUTUP**, **#158** & **#159** baru |
+| Keputusan | **K-15** (domain event diambil dari registry, bukan dari kata pertama nama) |
+| Temuan | **E-159** · **G-22** |
+
+---
+
+### 🔑 Kenapa justru butir ini, dan bukan yang lain
+
+`arch/10` §2 sudah menjawabnya pada sesi sebelumnya: **T0–T5 tidak diblokir satu pun keputusan yang belum diambil, kecuali [#3](../../issues/3) — siapa yang mengerjakan.** Sembilan puluh delapan issue terbuka, dan yang bisa dikerjakan tanpa pemilik tinggal satu baris: butir 1 #157.
+
+> 🛑 **Dan bentuknya sendiri adalah temuan.** [`arch/11`](../arch/11-PENEGAKAN.md) dibangun dari satu pelajaran — *aturan yang dinyatakan tetapi tidak dijaga akan dilanggar* — lalu menyatakan **25 aturan dan menjaga NOL**. §2-nya menulis *“empat pemeriksaan bisa dijalankan hari ini”*, dan tidak satu pun dijalankan. **Berkas penegakan adalah tempat paling tidak masuk akal untuk mengulangi pelanggaran yang ia daftar sendiri**, dan ia mengulanginya selama satu hari.
+
+---
+
+### 🔴🔴 TEMUAN TERBESAR: 66 dari 127 nama event mendarat di domain yang tidak ada
+
+`spec/03` memadankan 127 nama `PascalCase` dengan aturan **K-3** (*kata pertama → domain*). `arch/07` §2 menetapkan registry domain, dan menyatakan nama di luarnya **ditolak CI**. **Keduanya konsisten sendiri-sendiri. Tidak satu pun pernah dijalankan terhadap yang lain.**
+
+| Nama naskah | K-3 menghasilkan | Domainnya |
+|---|---|---|
+| `LargeScaleScenarioCreated` | `large.scale_scenario_created` | **`large`** |
+| `OilPriceChanged` | `oil.price_changed` | **`oil`** |
+| `InterestRateChanged` | `interest.rate_changed` | **`interest`** |
+| `HeartRateRecorded` | `heart.rate_recorded` | **`heart`** |
+
+> 🔑 **Kata pertama sebuah nama tidak selalu SUBJEKNYA.** K-3 benar sebagai aturan **transkripsi**; ia tidak pernah menjadi aturan **kepemilikan**.
+
+⭐ **Arahnya tidak dipilih — ia sudah tertulis di `arch/07` §2 sejak awal:** *“Domain baru ditambahkan hanya bersama konteks pemiliknya — penambahan itu perubahan arsitektur, bukan penamaan.”* ⇒ **namanya yang pindah, bukan registry yang tumbuh.** Bacaan yang ditolak (*“tambahkan saja 50 domain itu”*) membengkakkan registry 46 → 96 dan menghapus seluruh alasannya ada: supaya `stuff.happened` **tidak** lolos.
+
+⇒ **K-15**, 64 nama diganti, **V0 tidak bergeser — 22 event tetap 22.** Biayanya nol hari ini; sesudah baris pertama masuk `events` ia menjadi migrasi riwayat. [#158](../../issues/158)
+
+---
+
+### 🔴 TEMUAN KEDUA: `arch/07` §4 MENGAKU sudah memeriksanya
+
+Kolom *“Domain tujuan”* menuliskan Phase 11 → `agent` · `approval` · `tool`. Diukur: ke-22 nama Phase 11 mendarat di **`agent` saja**; `approval` dan `tool` **nol**.
+
+> 💡 **Sebuah tabel yang MENGGAMBARKAN hasil terbaca persis seperti tabel yang MENGUKURNYA.** Itu pelajaran [#38](../../issues/38) dalam bentuk paling halus, dan bentuk yang sama dengan *“keempat agent V0 lulus ketiga uji”* di sesi 26.
+
+Plus: §2 menulis ***“39 domain”*** untuk tabel berisi **45** — hitungan yang berhenti dipelihara, persis *“99 tabel”* yang ternyata 247.
+
+---
+
+### 🔴 TEMUAN KETIGA: `emergency.stop` bertabrakan dengan §6-nya sendiri
+
+E-2 menolak enam nama yang berakhir bukan kata kerja lampau: `battery.low` · `emergency.stop` · `deadline.approaching` · `supply.chain_disruption` · `agent.policy_violation` · `agent.security_violation`.
+
+🛑 Yang kedua bukan soal tata bahasa: `arch/07` §6 menuntut kembaran untuk **`emergency.stopped`**. Dua berkas, satu kejadian, **dua nama** — dan proyeksi yang membaca salah satunya akan selalu kehilangan separuh riwayat, **tanpa galat**.
+
+---
+
+### 🔴 TEMUAN KEEMPAT: satu nama event pemilik tak pernah sampai ke tabel padanan
+
+**Ditemukan E-5 — pemeriksaan yang lahir dari pertanyaan yang ditujukan kepada E-1 dan E-2 sendiri:** *apa yang keduanya TIDAK PERNAH lihat?* Jawabannya tajam: keduanya memeriksa `event_type`, jadi keduanya hanya melihat nama yang **sudah** masuk tabel. Nama yang tidak pernah masuk **tidak punya `event_type` sama sekali** — ia lolos karena **tak terlihat**, bukan karena benar.
+
+**`MeetingCreated`** — [`167`](167-AUDIO-VOICE-VIDEO-TEMPORAL.md) L29, penutup alur `Speech → … → Event`. Terlewat sebab [`SENSUS-EVENT.md`](SENSUS-EVENT.md) memanen **bagian yang JUDULNYA menyebut “Event”**, dan naskah 167 tidak punya satu pun — namanya berdiri di sebuah **contoh**.
+
+⇒ populasi pemilik **133 → 134**; pelanggaran sesudah #38 **128 → 129**; baris tabel **127 → 128**. Kesimpulan sensus tidak berubah; besarannya naik. [#159](../../issues/159)
+
+---
+
+### 🔴🔴 DAN ALAT UKURNYA SENDIRI SALAH DUA KALI SEBELUM BENAR
+
+Ditulis di sini karena laporan yang tidak menyebutkannya akan terbaca lebih kuat daripada yang sebenarnya.
+
+| | Yang keliru | Kalau tidak ketahuan |
+|---|---|---|
+| 1 | panen butir roadmap ikut membaca **catatan audit saya sendiri** ⇒ `G18.11 Safety, Privacy & Governance` — milestone yang hanya **saya usulkan** — terhitung **ada** | Phase 18 tampak punya gerbang keselamatan. **Alat yang mencari kegagalan justru menutupinya** |
+| 2 | panen nama event **hanya membaca token di dalam backtick** ⇒ kedelapan nama `security.*` (K-10) hidup di blok kode **tanpa** backtick | seluruh keluarga event **keamanan** lolos E-1 dan E-2 — keluarga yang paling mungkin diaudit |
+
+💡 Pembeda untuk keliru 1 **tidak dikarang**: `SENSUS-EVENT.md` sudah mengujinya — percobaan *“semua baris `>` itu catatan saya”* **salah** (naskah juga mengutip pemilik dengan `>`); yang lulus validasi silang adalah menilai blok dari **baris pertamanya**. Dipakai ulang apa adanya.
+
+✅ **Bukti pembetulannya sah:** sesudahnya kedelapan roadmap memulangkan jumlah butir yang **sama dengan angka yang dokumennya sendiri sebutkan** — A14 10 · R16 10 · H17 12 · G18 10 · S19 10 · C20 12 · `spec/07` **51 tugas** · `arch/10` **13 tahap**.
+
+---
+
+### ✅ G-1 dan R-1 MEMBENARKAN vonis tangan — dan satu angka bertambah tajam
+
+Sepuluh pasal Konstitusi punya penegak; Pasal 8 **sebagian** dan batasnya dinyatakan. Enam roadmap gagal, `spec/07` dan `arch/10` lulus — persis yang `arch/11` §4 tulis tangan.
+
+🔴 Yang berubah: yang gagal **tujuh pasangan gerbang**, bukan enam. **Phase 16 melanggar dua aturan sekaligus** — `R16.10` Safety Kernel (indeks 10, menjaga 8 butir) **dan** `R16.9` Simulation (indeks 9, menjaga manipulasi · humanoid · drone · armada), yang kedua atas dasar §16.26: `Code → Simulation → Safety Test → Hardware` adalah **urutan wajib**. ⇒ dari enam roadmap yang gagal, Phase 16 yang **paling** terlambat. [#111](../../issues/111)
+
+---
+
+### 🔧 Tiga aturan rancangan yang membuat alatnya bukan salinan kedua dokumen
+
+| | |
+|---|---|
+| 1 | **Registry dibaca DARI dokumennya.** 46 domain dari `arch/07` §2; 10 pasal dari `arch/08` §4; pasangan gerbang dari blok ` ```r1 ` di `arch/10` §2.1. **Kalau dokumennya hilang, pemeriksa GAGAL dengan galat — bukan lulus karena tidak menemukan apa pun untuk diperiksa.** |
+| 2 | **Populasi yang diperiksa dinyatakan.** `--senarai` mencetak tiap nama + baris asalnya; tiap pengecualian menyertakan **alasannya**, supaya ia tidak jadi tempat menyembunyikan temuan. |
+| 3 | **Angka di prosa diperiksa terhadap tabel di atasnya.** Itu yang menangkap *“39 domain”*. |
+
+⚠️ **R-1 tidak menebak pasangan gerbangnya sendiri.** Roadmap baru yang belum punya baris di blok ` ```r1 ` **tidak diperiksa** — disengaja: gerbang yang ditebak mesin akan salah menuduh, lalu diabaikan orang.
+
+---
+
+### 🛑 Yang TETAP milik pemilik — tidak bergerak
+
+**Nol butir C diputuskan.** Ketujuh temuan R-1 adalah keputusan **cakupan** ([#99](../../issues/99) · [#111](../../issues/111) · [#116](../../issues/116) · [#121](../../issues/121) · [#131](../../issues/131) · [#144](../../issues/144)). **21 dari 26** pemeriksaan menunggu kode, dan kode menunggu [#3](../../issues/3).
+
+> 💡💡 **Dua kalimat yang layak dibawa keluar dari sesi ini:**
+>
+> **1 · Jalankan dua dokumen yang tidak pernah saling diuji terhadap satu sama lain.** Tabrakan 66 baris tidak muncul saat salah satunya **dibaca** — ia muncul saat yang satu **dijalankan sebagai aturan** atas yang lain.
+>
+> **2 · Setiap kali sesuatu berubah menjadi hijau, tanyakan: apa yang alat ukur ini TIDAK PERNAH lihat?** Bukan *“apakah hasilnya benar”* — hasilnya benar untuk populasi yang dilihatnya. Yang salah **populasinya**. Pertanyaan itu berbuah **tiga kali** dalam satu sesi.
+
+---
+
 ## Sesi 26 — 10 September 2026
 
 **Pemilik memerintahkan: *“kerjakan semua tugas dan fase yang masih tersisa”*. Yang tersisa adalah [#139](../../issues/139) — Master Architecture v2.0, permintaan penutup naskah 24, dan permintaan KELIMA dalam deret yang isinya sebagian besar sama; dua yang pertama dikerjakan, tiga terakhir hilang tanpa keputusan. Dikerjakan: [`../arch/`](../arch/README.md), dua belas berkas, sebelas butir yang pemilik sebut dijawab satu per satu.**

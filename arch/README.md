@@ -33,7 +33,7 @@ L166) dan [#139](../../issues/139):
 | agent contracts | [`08`](08-AGENT-CONTRACTS.md) | **59 nama** diuji K-5 → agent atau service; Konstitusi §20.16 diberi penegak |
 | deployment topology | [`09`](09-DEPLOYMENT-TOPOLOGY.md) | V0 → produksi, dan **aturan tepi**: apa yang tak boleh meninggalkan perangkat |
 | urutan implementasi V0 → production | [`10`](10-URUTAN-IMPLEMENTASI.md) | dua rencana didamaikan; **gerbang mendahului yang dijaganya** |
-| — (pelajaran repo ini sendiri) | [`11`](11-PENEGAKAN.md) | **25 pemeriksaan CI**; aturan tanpa penegak tidak dihitung selesai |
+| — (pelajaran repo ini sendiri) | [`11`](11-PENEGAKAN.md) | **26 pemeriksaan CI**; aturan tanpa penegak tidak dihitung selesai — dan **5 di antaranya sudah DIJALANKAN** ([`../tools/`](../tools/README.md)) |
 
 ⚠️ Butir **kontrak API** tidak disebut naskah 24 — celah itu sudah dicatat di
 [`../docs/PETA-FASE.md`](../docs/PETA-FASE.md) dan diisi dari tempat lain:
@@ -65,7 +65,7 @@ dibaca sebagai tiga jawaban untuk satu pertanyaan.
 3. **Naskah tidak pernah menang atas keduanya, dan tidak pernah diubah.**
    Naskah merekam kata pemilik apa adanya (aturan 1 repo ini). Kalau naskah dan
    `arch/` berbeda, yang ditulis adalah **tabel padanan**, bukan suntingan —
-   persis cara [K-3](../docs/KEPUTUSAN-DIDELEGASIKAN.md) menangani 127 nama
+   persis cara [K-3](../docs/KEPUTUSAN-DIDELEGASIKAN.md) menangani 128 nama
    event.
 
 > 🛑 **Aturan 3 punya biaya yang harus disebut:** pembaca yang membuka naskah
@@ -140,6 +140,7 @@ alasannya satu kalimat:
 
 | Kalau Anda ingin… | Buka |
 |---|---|
+| **memeriksa apakah `arch/` masih benar** | `python tools/periksa_dokumen.py` — [`../tools/`](../tools/README.md) |
 | tahu apa yang dikerjakan berikutnya | [`10`](10-URUTAN-IMPLEMENTASI.md) |
 | menulis baris kode pertama | [`../spec/07`](../spec/07-BACKLOG-V0.md) Sprint 0, lalu [`11`](11-PENEGAKAN.md) |
 | menambah modul baru | [`03`](03-MONOREPO-FINAL.md) §2 (uji naik-turun) |
@@ -147,3 +148,34 @@ alasannya satu kalimat:
 | menambah event baru | [`07`](07-EVENT-CONTRACTS.md) §3 (uji admisi) |
 | menambah agent baru | [`08`](08-AGENT-CONTRACTS.md) §2 (tiga uji K-5) |
 | tahu kenapa sesuatu diputuskan begitu | tiap berkas punya bagian **BACAAN YANG DITOLAK** |
+
+---
+
+## Apa yang berubah 11 September 2026 — `arch/` diuji terhadap dirinya sendiri
+
+[`11`](11-PENEGAKAN.md) menyatakan **empat** pemeriksaan bisa jalan tanpa kode.
+Selama satu hari, **nol** di antaranya pernah dijalankan — bentuk yang persis
+sama dengan seluruh §1 berkas itu (*aturan benar, ditulis serius, tanpa sesuatu
+yang berkata tidak*). [`../tools/periksa_dokumen.py`](../tools/README.md)
+menjalankannya, dan hasilnya mengubah tiga berkas `arch/`:
+
+| Ditemukan | Di mana | Diselesaikan |
+|---|---|---|
+| **66 dari 127** nama event mendarat di domain **di luar registry** — `large` · `oil` · `interest` · `heart` | [`07`](07-EVENT-CONTRACTS.md) §2 lawan [`../spec/03`](../spec/03-EVENT-CONTRACTS.md) | **[K-15](../docs/KEPUTUSAN-DIDELEGASIKAN.md)** — 64 nama diganti, **V0 tidak bergeser** |
+| registry menulis ***“39 domain”***, tabelnya memuat **45** | [`07`](07-EVENT-CONTRACTS.md) §2 | 46 (`health` ikut masuk — §4 sudah menyatakannya) |
+| §4 kolom *“Domain tujuan”* menuliskan **niat**, bukan **hasil** | [`07`](07-EVENT-CONTRACTS.md) §4 | diganti angka terukur per fase |
+| §6 menuntut kembaran `recovery.started`, domain `recovery` **tidak terdaftar** | [`07`](07-EVENT-CONTRACTS.md) §6 | `emergency.recovery_started` |
+| **6 nama** berakhir bukan kata kerja lampau (`battery.low` · `emergency.stop` · `…violation`) | [`../spec/03`](../spec/03-EVENT-CONTRACTS.md) | diperbaiki; `emergency.stop` ternyata **bertabrakan dengan §6-nya sendiri** |
+| **`MeetingCreated`** — nama event pemilik yang tak pernah sampai ke tabel padanan | [`../docs/167`](../docs/167-AUDIO-VOICE-VIDEO-TEMPORAL.md) L29 | **E-5**, pemeriksaan ke-26 |
+
+✅ **G-1 dan R-1 justru MEMBENARKAN klaim tangan yang sudah ditulis** — sepuluh
+pasal punya penegak, enam roadmap gagal, `spec/07` dan `arch/10` lulus. Satu
+angka bertambah tajam: yang gagal **tujuh pasangan gerbang**, bukan enam, sebab
+Phase 16 melanggar **dua** aturan sekaligus (`R16.10` Safety Kernel **dan**
+`R16.9` Simulation).
+
+> 💡💡 **Bentuk yang paling layak dibawa ke repo mana pun: JALANKAN DUA DOKUMEN
+> YANG TIDAK PERNAH SALING DIUJI.** `spec/03` konsisten sendiri; `07` §2
+> konsisten sendiri; keduanya ditulis pada hari yang sama oleh orang yang sama.
+> Tabrakan 66 baris itu **tidak muncul saat salah satunya dibaca** — ia muncul
+> saat yang satu dijalankan sebagai aturan atas yang lain.

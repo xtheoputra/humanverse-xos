@@ -194,11 +194,48 @@ di dalamnya ditulis tanpa awalan, jadi perubahannya satu baris.
 
 ---
 
+## 🔴 KOREKSI 11 September 2026 — populasinya kurang satu naskah
+
+> Ditemukan [`../tools/periksa_dokumen.py`](../tools/periksa_dokumen.py) **E-5**,
+> bukan dengan membaca ulang sensus ini.
+
+Sensus ini memanen **bagian yang judulnya menyebut “Event”**. Aturan itu benar
+untuk kesembilan naskah yang punya model event — dan **buta terhadap nama event
+yang berdiri di luar bagian semacam itu**.
+
+| | |
+|---|---|
+| Yang terlewat | **`MeetingCreated`** — [`167`](167-AUDIO-VOICE-VIDEO-TEMPORAL.md) L29 |
+| Di mana ia berdiri | penutup sebuah **contoh alur suara**: `Speech → Text → Intent Extraction → Calendar Entity → Temporal Entity → Event`, lalu *“Kemudian: `MeetingCreated`”* |
+| Kenapa terlewat | naskah 167 (Phase 9) **tidak punya satu pun bagian berjudul Event**, jadi ia tidak pernah masuk daftar berkas yang dipanen |
+| Angkanya | nama PascalCase pemilik **133 → 134**; sesudah keputusan **128 → 129**; baris tabel padanan `spec/03` **127 → 128** |
+
+⇒ Kesimpulan sensus **tidak berubah** — *“nol nama baru dalam format yang
+dipilih sejak naskah 5”* tetap benar, dan `MeetingCreated` justru menguatkannya.
+Yang berubah cuma besarannya, dan arahnya **ke atas**.
+
+> 💡💡 **Pelajarannya sejajar dengan dua kekeliruan yang sudah dicatat di atas,
+> dan melengkapinya:** dua yang pertama salah tentang **cara memilah** populasi;
+> yang ini salah tentang **batas** populasi. Pembeda yang sudah diuji tetap tidak
+> menolong kalau ia diterapkan pada himpunan berkas yang kurang satu.
+>
+> 🔑 **Pertanyaan yang menemukannya bisa dipakai ulang di mana pun: *apa yang
+> alat ukur ini TIDAK PERNAH lihat?*** — bukan *“apakah hasilnya benar”*.
+> Hasilnya benar; populasinya yang kurang.
+
+⚠️ Sejak 11 September 2026 pertanyaan itu punya penjaga: **E-5**
+([`../arch/11`](../arch/11-PENEGAKAN.md) §3) memanen **seluruh `docs/`** tanpa
+menuntut judul bagian, lalu menolak nama mana pun yang tidak punya baris di
+tabel padanan.
+
+---
+
 ## Yang sensus ini **tidak** putuskan
 
 Tidak membuka ulang [#38](../../issues/38), tidak mengusulkan penggantian nama,
 dan tidak memilih format. Ia hanya mengganti kalimat *“pelanggaran kesepuluh”*
-dengan angka: **128 nama, sembilan dari sembilan naskah yang mendefinisikan
-model event, nol nama baru dalam format yang dipilih sejak naskah 5.**
+dengan angka: **129 nama** (dikoreksi 11 Sep 2026)**, sembilan dari sembilan
+naskah yang mendefinisikan model event — plus satu contoh di naskah 167 — nol
+nama baru dalam format yang dipilih sejak naskah 5.**
 
 Terbit sebagai **[#149](../../issues/149)** (**E-153**).

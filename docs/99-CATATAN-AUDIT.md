@@ -7,14 +7,19 @@
 > Cara pakai: kalau pemilik memutuskan sebuah butir, keputusannya **naik** ke
 > berkas visi yang sesuai, lalu butirnya turun ke bagian **H**.
 
-> 📌 **Butir di berkas ini sudah jadi 157 GitHub Issue** dalam 3 milestone —
-> **98 terbuka, 59 ditutup**. Baca issue-nya, jangan analisis ulang naskahnya.
+> 📌 **Butir di berkas ini sudah jadi 159 GitHub Issue** dalam 3 milestone —
+> **99 terbuka, 60 ditutup**. Baca issue-nya, jangan analisis ulang naskahnya.
+>
+> ✅ **Sejak 11 Sep 2026 sebagian butir punya PENJAGA, bukan hanya catatan:**
+> `python tools/periksa_dokumen.py` menjalankan lima pemeriksaan
+> [`../arch/11`](../arch/11-PENEGAKAN.md) atas dokumen repo ini dan keluar
+> dengan kode **1** kalau ada yang dilanggar — [`../tools/`](../tools/README.md).
 >
 > 🔧 Hasil kerja engineering ada di [`../spec/`](../spec/README.md) (V0) dan
 > [`../arch/`](../arch/README.md) (**Master Architecture v2.0**, Phase 1–20) —
 > keduanya **bukan kata pemilik**, dan sengaja di luar `docs/`.
 
-Diperbarui: 10 September 2026 · Mencakup **dua puluh empat naskah**:
+Diperbarui: 11 September 2026 · Mencakup **dua puluh empat naskah**:
 **1 HumanOS** · **2 HumanVerse X** · **3 Phase 2 Enterprise Blueprint** ·
 **4 Phase 3 AI-Native Human Ecosystem** · **5 Blueprint Engineering v1.0** ·
 **6 Peta 14 lapisan engineering** · **7 Phase 4 Enterprise OS (Layer 21–50)** · **8 Peta Phase 5–12** · **9 Phase 5 Research Lab** · **10 Phase 6 Developer Platform** ·
@@ -27,9 +32,9 @@ Diperbarui: 10 September 2026 · Mencakup **dua puluh empat naskah**:
 | [B](#b-risiko-teknis) | Risiko teknis | 38 |
 | [C](#c-risiko-hukum--kepatuhan) | Risiko hukum & kepatuhan | 30 |
 | [D](#d-celah-yang-belum-tertutup) | Celah yang belum tertutup | 5 |
-| [E](#e-ketidakcocokan-antar-naskah) | **Ketidakcocokan antar-naskah** | 151 |
+| [E](#e-ketidakcocokan-antar-naskah) | **Ketidakcocokan antar-naskah** | 152 |
 | [F](#f-yang-sudah-saya-periksa-dan-ternyata-benar) | Sudah diperiksa, ternyata benar | 136 |
-| [G](#g-lubang-di-dalam-naskah-sendiri) | Lubang di dalam naskah sendiri | 19 |
+| [G](#g-lubang-di-dalam-naskah-sendiri) | Lubang di dalam naskah sendiri | 20 |
 
 ---
 
@@ -51,6 +56,7 @@ maka [#139](../../issues/139) dikerjakan. Hasilnya
 | E-89 / [#74](../../issues/74) · B-31 / [#107](../../issues/107) · B-34 / [#119](../../issues/119) · B-35 / [#127](../../issues/127) | [`arch/06`](../arch/06-DATA-ARCHITECTURE.md) — **empat kelas penyimpanan + uji admisi `events`** |
 | E-156 / [#151](../../issues/151) — 19 tabel berdefinisi ganda | [`arch/06`](../arch/06-DATA-ARCHITECTURE.md) §4 |
 | E-119 / [#97](../../issues/97) — `risk` sebagai properti agent | [`arch/08`](../arch/08-AGENT-CONTRACTS.md) §3 + **K-14**, sudah masuk `spec/01` & `spec/05` |
+| E-153 / [#149](../../issues/149) — 128 nama event dipadankan | [`../spec/03`](../spec/03-EVENT-CONTRACTS.md) + **K-15** — domainnya dari registry [`arch/07`](../arch/07-EVENT-CONTRACTS.md) §2, bukan dari kata pertama nama |
 | G-14 (bagian [#98](../../issues/98)) — didaftar lengkap, diskemakan sebagian | [`arch/07`](../arch/07-EVENT-CONTRACTS.md) §6 — **kembaran kegagalan wajib** |
 | E-154 / [#150](../../issues/150) · G-13 / [#89](../../issues/89) | [`arch/08`](../arch/08-AGENT-CONTRACTS.md) §1 — **bawaan `service`, bukan `agent`** |
 
@@ -83,16 +89,108 @@ kesekian kali: janji di issue tertutup tidak punya penjaga.**
 
 ---
 
+## ✅ Penegakan dijalankan (11 Sep 2026) — apa yang berubah bagi berkas ini
+
+[`arch/11`](../arch/11-PENEGAKAN.md) menyatakan **25 aturan dan menjaga NOL**,
+dan §2-nya menulis *“empat pemeriksaan bisa dijalankan hari ini”* — tanpa satu
+pun pernah dijalankan. [`../tools/periksa_dokumen.py`](../tools/README.md)
+menjalankannya. Pemeriksaannya kini **26**, lima di antaranya **jalan tanpa
+kode produksi**, dan kelimanya **sudah dijalankan**.
+
+> 🛑 **Bentuknya sendiri adalah temuan, dan tempatnya di berkas ini:** sebuah
+> berkas penegakan yang mendaftar enam aturan-tanpa-penjaga lalu menjadi yang
+> ketujuh. Ia bertahan satu hari — tapi *satu hari* bukan pembelaan; yang
+> menutupnya kebetulan cepat membacanya lagi, bukan sesuatu yang berkata
+> *tidak*.
+
+### 🔴 E-159 — 66 dari 127 nama event mendarat di domain yang tidak ada
+
+`spec/03` memadankan 127 nama dengan **K-3** (*kata pertama → domain*).
+`arch/07` §2 menetapkan registry domain dan menyatakan nama di luarnya
+**ditolak CI**. Keduanya konsisten **sendiri-sendiri**; tidak satu pun pernah
+dijalankan terhadap yang lain.
+
+| Nama naskah | K-3 menghasilkan | Domainnya |
+|---|---|---|
+| `LargeScaleScenarioCreated` | `large.scale_scenario_created` | **`large`** |
+| `OilPriceChanged` | `oil.price_changed` | **`oil`** |
+| `InterestRateChanged` | `interest.rate_changed` | **`interest`** |
+| `HeartRateRecorded` | `heart.rate_recorded` | **`heart`** |
+
+🔑 **Kata pertama sebuah nama tidak selalu SUBJEKNYA.** K-3 benar sebagai aturan
+**transkripsi**; ia tidak pernah menjadi aturan **kepemilikan**.
+⇒ **K-15**, 64 nama diganti, **V0 tidak bergeser — 22 event tetap 22**.
+[#158](../../issues/158)
+
+⚠️ **Dan `arch/07` §4 MENGAKU sudah memeriksanya**: kolomnya menuliskan
+Phase 11 → `agent`·`approval`·`tool`; diukur, ke-22 nama mendarat di `agent`
+saja. 💡 **Tabel yang MENGGAMBARKAN hasil terbaca persis seperti tabel yang
+MENGUKURNYA** — [#38](../../issues/38) dalam bentuk paling halus. Plus §2
+menulis *“39 domain”* untuk tabel berisi **45**, bentuk yang sama dengan
+*“99 tabel”* yang ternyata 247.
+
+🛑 Dan **`emergency.stop` bertabrakan dengan `arch/07` §6-nya sendiri**, yang
+menuntut kembaran untuk `emergency.stopped`: satu kejadian, dua nama, dan
+proyeksi yang membaca salah satunya kehilangan separuh riwayat **tanpa galat**.
+
+### 🔴 G-22 — satu nama event pemilik tak pernah sampai ke tabel padanan
+
+**`MeetingCreated`** — [`167`](167-AUDIO-VOICE-VIDEO-TEMPORAL.md) L29, penutup
+alur `Speech → … → Event`. Terlewat sebab
+[`SENSUS-EVENT.md`](SENSUS-EVENT.md) memanen **bagian yang JUDULNYA menyebut
+“Event”**, dan naskah 167 tidak punya satu pun — namanya berdiri di sebuah
+**contoh**. ⇒ populasi pemilik **133 → 134**; pelanggaran sesudah #38
+**128 → 129**. [#159](../../issues/159)
+
+⭐ Penjaganya lahir bersamanya: **E-5**, pemeriksaan ke-26, memanen seluruh
+`docs/` tanpa menuntut judul bagian — **berlaku untuk naskah ke-25 juga,
+sebelum naskahnya ada.**
+
+### 🔴 Alat ukurnya sendiri salah dua kali sebelum benar
+
+| | Yang keliru | Kalau tidak ketahuan |
+|---|---|---|
+| 1 | panen butir roadmap ikut membaca **catatan audit di berkas INI dan saudaranya** ⇒ `G18.11 Safety, Privacy & Governance` — milestone yang hanya **diusulkan** — terhitung **ada** | Phase 18 tampak punya gerbang keselamatan; **alat yang mencari kegagalan justru menutupinya** |
+| 2 | panen nama event **hanya membaca token di dalam backtick** ⇒ kedelapan nama `security.*` (K-10) tidak pernah diperiksa | seluruh keluarga event **keamanan** lolos E-1 dan E-2 |
+
+💡 Pembeda untuk keliru 1 **tidak dikarang**: `SENSUS-EVENT.md` sudah mengujinya
+— percobaan *“semua baris `>` itu catatan saya”* **salah** (naskah juga mengutip
+pemilik dengan `>`); yang lulus validasi silang adalah menilai blok dari **baris
+pertamanya**. Dipakai ulang apa adanya.
+
+### ✅ Yang justru DIBENARKAN mesin
+
+| Klaim tangan | Vonis mesin |
+|---|---|
+| sepuluh pasal Konstitusi punya penegak (Pasal 8 sebagian) | ✅ **benar** |
+| enam roadmap fase gagal R-1; `spec/07` & `arch/10` lulus | ✅ **benar** |
+| tabel padanan mencakup seluruh nama pasca-keputusan | ✅ **benar**, sesudah `MeetingCreated` masuk |
+
+🔴 Satu angka bertambah tajam: yang gagal **tujuh pasangan gerbang**, bukan
+enam — **Phase 16 melanggar dua aturan sekaligus**, `R16.10` Safety Kernel
+**dan** `R16.9` Simulation (§16.26: `Code → Simulation → Safety Test → Hardware`
+adalah urutan wajib). [#111](../../issues/111)
+
+> 💡💡 **Dua kalimat yang layak dibawa keluar:**
+> **(1) Jalankan dua dokumen yang tidak pernah saling diuji** — tabrakan 66
+> baris tidak muncul saat salah satunya dibaca, ia muncul saat yang satu
+> dijalankan sebagai aturan atas yang lain.
+> **(2) Setiap kali sesuatu berubah menjadi hijau, tanyakan: apa yang alat ukur
+> ini TIDAK PERNAH lihat?** Hasilnya benar untuk populasi yang dilihatnya; yang
+> salah **populasinya**. Berbuah **tiga kali** dalam satu sesi.
+
+---
+
 ## H. Sudah diputuskan / ditutup
 
-> 🔧 **Delapan butir K (9 Sep 2026) diputuskan oleh SAYA, bukan pemilik** —
+> 🔧 **Lima belas butir K (9–11 Sep 2026) diputuskan oleh SAYA, bukan pemilik** —
 > atas permintaan pemilik sendiri (*“beri keputusan sendiri sesuai aturan”*).
 > Semuanya bertanda **usulan** dan tiap butir menyebut **bacaan yang ditolak**
 > serta **cara membalikkannya**: lihat
 > [`KEPUTUSAN-DIDELEGASIKAN.md`](KEPUTUSAN-DIDELEGASIKAN.md).
 > **K-1** pihak ketiga = min R3 ([#152](../../issues/152)) ·
 > **K-2** `world-model` menyimpan / `simulation` menjalankan ([#147](../../issues/147)) ·
-> **K-3** 127 nama event dipadankan, naskah tak diubah ([#149](../../issues/149)) ·
+> **K-3** **128** nama event dipadankan, naskah tak diubah ([#149](../../issues/149)) ·
 > **K-4** presedensi tabel ganda ([#151](../../issues/151)) ·
 > **K-5** tiga uji agent lawan service ([#89](../../issues/89)) ·
 > **K-6** tujuh kata kerja Phase 2–8 ([#142](../../issues/142), sebagian) ·
@@ -103,7 +201,11 @@ kesekian kali: janji di issue tertutup tidak punya penjaga.**
 > **membuka blokir Sprint 0 tugas 0.1**) ·
 > **K-10** satu amplop event, `security.*` jadi domain ([#63](../../issues/63)) ·
 > **K-11** tiap tangga bernomor membawa awalan ([#54](../../issues/54), [#56](../../issues/56)) ·
-> **K-12** `risk_level` wajib + larangan scope diperluas ([#77](../../issues/77), sebagian).
+> **K-12** `risk_level` wajib + larangan scope diperluas ([#77](../../issues/77), sebagian) ·
+> **K-13** bahasa backend **Python + FastAPI** ([#154](../../issues/154)) ·
+> **K-14** memanggil agent lain **adalah** pemanggilan tool ([#97](../../issues/97)) ·
+> **K-15** 🆕 **domain event diambil dari registry, bukan dari kata pertama nama** —
+> 64 nama diganti, V0 tidak bergeser ([#158](../../issues/158)).
 >
 > 💡 **Dan satu sapuan baru berbuah dua penutupan:** *“adakah issue yang
 > jawabannya SUDAH ada di `spec/` tetapi issue-nya tak pernah ditutup?”* —

@@ -125,22 +125,62 @@ menyusul — supaya nama dan bentuknya tidak berubah nanti.
 > [`../docs/KEPUTUSAN-DIDELEGASIKAN.md`](../docs/KEPUTUSAN-DIDELEGASIKAN.md).
 
 [#38](../../issues/38) memilih **dua segmen huruf kecil**. Sejak naskah 5,
-naskah menamai **127 event baru** dengan `PascalCase` dan **nol** memakai
+naskah menamai **128 event baru** dengan `PascalCase` dan **nol** memakai
 format yang dipilih ([`../docs/SENSUS-EVENT.md`](../docs/SENSUS-EVENT.md)).
 
 **Berkas naskah tidak diubah** — aturan repo menyatakan naskah merekam kata
 pemilik apa adanya. Tabel ini yang menjadi jembatannya, dan **berkas ini
 adalah satu-satunya sumber nama yang sampai ke kode**.
 
-Padanannya mekanis dan bisa diperiksa: **kata pertama → domain, sisanya →
-verb `snake_case`**.
+### 🔧 K-15 — aturan padanannya dipersempit, dan alasannya terukur
 
-⚠️ **Tiga baris bertanda ⚠️ bukan sekadar beda bentuk — kata kerjanya berbeda
+> Diperbarui 11 September 2026 — **[K-15](../docs/KEPUTUSAN-DIDELEGASIKAN.md)**,
+> ditemukan [`../tools/periksa_dokumen.py`](../tools/periksa_dokumen.py) **E-1**.
+
+K-3 menulis aturannya *“kata pertama → domain, sisanya → verb `snake_case`”*.
+Dijalankan mesin terhadap registry domain [`../arch/07`](../arch/07-EVENT-CONTRACTS.md) §2,
+**66 dari 127 baris** mendarat di domain yang **tidak ada di registry** — dan
+sebagiannya membuktikan kenapa: `LargeScaleScenarioCreated` menghasilkan domain
+**`large`**, `InterestRateChanged` menghasilkan **`interest`**, `OilPriceChanged`
+menghasilkan **`oil`**.
+
+> 🔑 **Kata pertama sebuah nama tidak selalu SUBJEKNYA.** K-3 benar sebagai
+> aturan **transkripsi**; ia tidak pernah menjadi aturan **kepemilikan**.
+
+🛑 Yang menentukan arah perbaikannya bukan selera, melainkan kalimat yang sudah
+berdiri di [`../arch/07`](../arch/07-EVENT-CONTRACTS.md) §2 sejak awal:
+***“Domain baru ditambahkan hanya bersama konteks pemiliknya — dan penambahan
+itu adalah perubahan arsitektur, bukan penamaan.”*** ⇒ **namanya yang pindah,
+bukan registry yang tumbuh.**
+
+**Aturan padanan yang berlaku sekarang:**
+
+| | |
+|---|---|
+| 1 | Kalau kata pertama **adalah domain terdaftar**, ia jadi domain; sisanya jadi verb. |
+| 2 | Kalau bukan, domainnya diambil dari [`../arch/07`](../arch/07-EVENT-CONTRACTS.md) §4 (domain tujuan per fase) dan **seluruh nama** jadi verb. |
+| 3 | Verb wajib berakhir kata kerja **lampau** — [`../arch/11`](../arch/11-PENEGAKAN.md) **E-2**. |
+
+⚠️ Satu-satunya domain yang **ditambahkan** ke registry adalah `health`, dan ia
+bukan domain baru: catatan kaki [`../arch/07`](../arch/07-EVENT-CONTRACTS.md) §4
+sudah menyatakannya milik `human-core` sejak awal — tabel §2 yang melewatkannya.
+
+⚠️ **Enam baris bertanda ⚠️ bukan sekadar beda bentuk — kata kerjanya berbeda
 untuk kejadian yang sama**, dan diselesaikan ke arah berkas ini sebab nama itu
-sudah ada di DDL.
+sudah ada di DDL. Tiga di antaranya (`TaskCompleted` · `MapUpdated` ·
+`SupplyChainDisruption`) **menyatu dengan baris lain** sesudah K-15 — dua nama
+naskah, satu `event_type`.
+
+🆕 **`MeetingCreated` ([`167`](../docs/167-AUDIO-VOICE-VIDEO-TEMPORAL.md) L29)
+ditambahkan 11 September 2026.** Ia terlewat dari
+[`../docs/SENSUS-EVENT.md`](../docs/SENSUS-EVENT.md) karena sensus memanen
+**bagian yang judulnya menyebut “Event”**, sementara nama ini berdiri di sebuah
+**contoh alur suara**. Ditemukan **E-5** — pemeriksaan yang lahir justru dari
+pertanyaan *“apa yang E-1 dan E-2 TIDAK PERNAH lihat?”*, dan jawabannya: nama
+yang tidak pernah masuk tabel ini tidak punya `event_type` sama sekali.
 
 ⚠️ Tabel ini **tidak** menambahkan satu pun event ke V0. V0 tetap **22 event**
-di bagian atas berkas ini; sisanya milik Phase 10–20.
+di bagian atas berkas ini; sisanya milik Phase 9–20.
 
 | PascalCase di naskah | `domain.verb` | Naskah |
 |---|---|---|
@@ -168,12 +208,12 @@ di bagian atas berkas ini; sisanya milik Phase 10–20.
 | `AgentPermissionRevoked` | **`agent.permission_revoked`** | `187` |
 | `AgentPlanApproved` | **`agent.plan_approved`** | `187` |
 | `AgentPlanGenerated` | **`agent.plan_generated`** | `187` |
-| `AgentPolicyViolation` | **`agent.policy_violation`** | `187` |
+| `AgentPolicyViolation` | **`agent.policy_violated`** | `187` |
 | `AgentProposalCreated` | **`agent.proposal_created`** | `218` |
 | `AgentQuarantined` | **`agent.quarantined`** | `218` |
 | `AgentResumed` | **`agent.resumed`** | `187` |
 | `AgentRevoked` | **`agent.revoked`** | `218` |
-| `AgentSecurityViolation` | **`agent.security_violation`** | `218` |
+| `AgentSecurityViolation` | **`agent.security_violated`** | `218` |
 | `AgentStarted` | **`agent.started`** | `187` |
 | `AgentStopped` | **`agent.stopped`** | `187` |
 | `AgentSuspended` | **`agent.suspended`** | `187` |
@@ -182,23 +222,23 @@ di bagian atas berkas ini; sisanya milik Phase 10–20.
 | `AgentTaskFailed` | **`agent.task_failed`** | `187` |
 | `AgentTrustUpdated` | **`agent.trust_updated`** | `218` |
 | `AgentUsageRecorded` | **`agent.usage_recorded`** | `218` |
-| `AnchorCreated` | **`anchor.created`** | `226` |
-| `AudioCaptured` | **`audio.captured`** | `174` |
-| `BatteryLow` | **`battery.low`** | `235` |
-| `CivilizationEventDetected` | **`civilization.event_detected`** | `273` |
-| `CivilizationRiskChanged` | **`civilization.risk_changed`** | `273` |
-| `ClimateSignalDetected` | **`climate.signal_detected`** | `273` |
-| `CompanyAcquired` | **`company.acquired`** | `247` |
-| `DeadlineApproaching` | **`deadline.approaching`** | `201` |
-| `DiseaseOutbreakReported` | **`disease.outbreak_reported`** | `247` |
-| `DocumentUploaded` | **`document.uploaded`** | `174` |
-| `EarthquakeDetected` | **`earthquake.detected`** | `247` |
-| `EconomicStateChanged` | **`economic.state_changed`** | `273` |
-| `EmergencyStop` | **`emergency.stop`** | `235` |
-| `EnergyChanged` | **`energy.changed`** | `201` |
-| `FlightCancelled` | **`flight.cancelled`** | `247` |
-| `GestureDetected` | **`gesture.detected`** | `174` |
-| `GestureRecognized` | **`gesture.recognized`** | `226` |
+| `AnchorCreated` | **`spatial.anchor_created`** | `226` |
+| `AudioCaptured` | **`perception.audio_captured`** | `174` |
+| `BatteryLow` | **`robot.battery_low_detected`** | `235` |
+| `CivilizationEventDetected` | **`world.civilization_event_detected`** | `273` |
+| `CivilizationRiskChanged` | **`world.civilization_risk_changed`** | `273` |
+| `ClimateSignalDetected` | **`world.climate_signal_detected`** | `273` |
+| `CompanyAcquired` | **`world.company_acquired`** | `247` |
+| `DeadlineApproaching` | **`notification.deadline_approached`** | `201` |
+| `DiseaseOutbreakReported` | **`world.disease_outbreak_reported`** | `247` |
+| `DocumentUploaded` | **`perception.document_uploaded`** | `174` |
+| `EarthquakeDetected` | **`world.earthquake_detected`** | `247` |
+| `EconomicStateChanged` | **`world.economic_state_changed`** | `273` |
+| `EmergencyStop` | **`emergency.stopped`** | `235` |
+| `EnergyChanged` | **`checkin.energy_changed`** | `201` |
+| `FlightCancelled` | **`world.flight_cancelled`** | `247` |
+| `GestureDetected` | **`perception.gesture_detected`** | `174` |
+| `GestureRecognized` | **`spatial.gesture_recognized`** | `226` |
 | `GoalChanged` | **`goal.changed`** | `201` |
 | `GoalCreated` | **`goal.created`** | `201` |
 | `HabitCompleted` | **`habit.completed`** | `201` |
@@ -207,67 +247,68 @@ di bagian atas berkas ini; sisanya milik Phase 10–20.
 | `HealthConsentRevoked` | **`health.consent_revoked`** | `244` |
 | `HealthInsightGenerated` | **`health.insight_generated`** | `244` |
 | `HealthRecommendationCreated` | **`health.recommendation_created`** | `244` |
-| `HeartRateRecorded` | **`heart.rate_recorded`** | `244` |
-| `HumanDetected` | **`human.detected`** | `235` |
-| `ImageCaptured` | **`image.captured`** | `174` |
-| `ImpactAssessmentCompleted` | **`impact.assessment_completed`** | `273` |
-| `InfrastructureFailureDetected` | **`infrastructure.failure_detected`** | `273` |
-| `InterestRateChanged` | **`interest.rate_changed`** | `247` |
-| `LargeScaleScenarioCreated` | **`large.scale_scenario_created`** | `273` |
-| `LocationChanged` | **`location.changed`** | `174` · `201` |
-| `MapUpdated` | **`map.updated`** | `226` |
-| `MarketMoved` | **`market.moved`** | `247` |
+| `HeartRateRecorded` | **`health.heart_rate_recorded`** | `244` |
+| `HumanDetected` | **`robot.human_detected`** | `235` |
+| `ImageCaptured` | **`perception.image_captured`** | `174` |
+| `ImpactAssessmentCompleted` | **`governance.impact_assessment_completed`** | `273` |
+| `InfrastructureFailureDetected` | **`world.infrastructure_failure_detected`** | `273` |
+| `InterestRateChanged` | **`world.interest_rate_changed`** | `247` |
+| `LargeScaleScenarioCreated` | **`simulation.large_scale_scenario_created`** | `273` |
+| `LocationChanged` | **`perception.location_changed`** | `174` · `201` |
+| `MapUpdated` | **`spatial.map_updated`** ⚠️ | `226` |
+| `MarketMoved` | **`world.market_moved`** | `247` |
 | `MealDetected` | **`meal.detected`** | `244` |
+| `MeetingCreated` | **`meeting.created`** 🆕 | `167` |
 | `MeetingEnded` | **`meeting.completed`** ⚠️ | `201` |
 | `MeetingStarted` | **`meeting.started`** | `201` |
 | `MissionCompleted` | **`mission.completed`** | `235` |
 | `MissionFailed` | **`mission.failed`** | `235` |
 | `MoodChanged` | **`mood.logged`** ⚠️ | `201` |
-| `NavigationFinished` | **`navigation.finished`** | `226` |
-| `NavigationStarted` | **`navigation.started`** | `226` |
-| `NutritionLogged` | **`nutrition.logged`** | `244` |
-| `ObjectDetected` | **`object.detected`** | `174` · `226` |
-| `ObjectGrasped` | **`object.grasped`** | `235` |
-| `ObjectLost` | **`object.lost`** | `226` |
-| `ObjectMoved` | **`object.moved`** | `226` |
-| `ObjectReleased` | **`object.released`** | `235` |
-| `ObstacleDetected` | **`obstacle.detected`** | `235` |
-| `OccupancyChanged` | **`occupancy.changed`** | `226` |
-| `OilPriceChanged` | **`oil.price_changed`** | `247` |
-| `PersonDetected` | **`person.detected`** | `174` |
-| `PersonEntered` | **`person.entered`** | `226` |
-| `PersonExited` | **`person.exited`** | `226` |
-| `PolicyChanged` | **`policy.changed`** | `247` · `273` |
-| `ProductLaunched` | **`product.launched`** | `247` |
+| `NavigationFinished` | **`spatial.navigation_finished`** | `226` |
+| `NavigationStarted` | **`spatial.navigation_started`** | `226` |
+| `NutritionLogged` | **`health.nutrition_logged`** | `244` |
+| `ObjectDetected` | **`perception.object_detected`** | `174` · `226` |
+| `ObjectGrasped` | **`robot.object_grasped`** | `235` |
+| `ObjectLost` | **`spatial.object_lost`** | `226` |
+| `ObjectMoved` | **`spatial.object_moved`** | `226` |
+| `ObjectReleased` | **`robot.object_released`** | `235` |
+| `ObstacleDetected` | **`robot.obstacle_detected`** | `235` |
+| `OccupancyChanged` | **`presence.occupancy_changed`** | `226` |
+| `OilPriceChanged` | **`world.oil_price_changed`** | `247` |
+| `PersonDetected` | **`perception.person_detected`** | `174` |
+| `PersonEntered` | **`presence.person_entered`** | `226` |
+| `PersonExited` | **`presence.person_exited`** | `226` |
+| `PolicyChanged` | **`world.policy_changed`** | `247` · `273` |
+| `ProductLaunched` | **`world.product_launched`** | `247` |
 | `RecommendationAccepted` | **`recommendation.accepted`** | `201` |
 | `RecommendationRejected` | **`recommendation.rejected`** | `201` |
-| `RecoveryChanged` | **`recovery.changed`** | `244` |
-| `RecoveryStarted` | **`recovery.started`** | `235` |
-| `ResearchPublished` | **`research.published`** | `247` |
+| `RecoveryChanged` | **`health.recovery_changed`** | `244` |
+| `RecoveryStarted` | **`emergency.recovery_started`** | `235` |
+| `ResearchPublished` | **`knowledge.research_published`** | `247` |
 | `RobotArrived` | **`robot.arrived`** | `235` |
 | `RobotMoved` | **`robot.moved`** | `235` |
 | `RobotStarted` | **`robot.started`** | `235` |
 | `RobotStopped` | **`robot.stopped`** | `235` |
-| `RoomScanned` | **`room.scanned`** | `226` |
-| `SceneChanged` | **`scene.changed`** | `174` |
-| `ScientificDiscoveryPublished` | **`scientific.discovery_published`** | `273` |
-| `SensorReadingReceived` | **`sensor.reading_received`** | `174` |
+| `RoomScanned` | **`spatial.room_scanned`** | `226` |
+| `SceneChanged` | **`perception.scene_changed`** | `174` |
+| `ScientificDiscoveryPublished` | **`knowledge.scientific_discovery_published`** | `273` |
+| `SensorReadingReceived` | **`perception.sensor_reading_received`** | `174` |
 | `SleepEnded` | **`sleep.completed`** ⚠️ | `201` · `244` |
 | `SleepQualityChanged` | **`sleep.quality_changed`** | `244` |
 | `SleepStarted` | **`sleep.started`** | `16` · `201` · `244` |
 | `SpatialMapUpdated` | **`spatial.map_updated`** | `174` |
-| `SpeechDetected` | **`speech.detected`** | `174` |
-| `StormFormed` | **`storm.formed`** | `247` |
-| `StressIndicatorChanged` | **`stress.indicator_changed`** | `244` |
-| `SupplyChainDisrupted` | **`supply.chain_disrupted`** | `247` |
-| `SupplyChainDisruption` | **`supply.chain_disruption`** | `273` |
-| `TaskCompleted` | **`task.completed`** | `201` |
-| `TechnologyBreakthroughDetected` | **`technology.breakthrough_detected`** | `273` |
-| `TechnologyReleased` | **`technology.released`** | `247` |
-| `TrafficChanged` | **`traffic.changed`** | `247` |
-| `VideoCaptured` | **`video.captured`** | `174` |
-| `WearableReadingReceived` | **`wearable.reading_received`** | `174` |
-| `WiFiMotionDetected` | **`wifi.motion_detected`** | `226` |
+| `SpeechDetected` | **`perception.speech_detected`** | `174` |
+| `StormFormed` | **`world.storm_formed`** | `247` |
+| `StressIndicatorChanged` | **`health.stress_indicator_changed`** | `244` |
+| `SupplyChainDisrupted` | **`world.supply_chain_disrupted`** | `247` |
+| `SupplyChainDisruption` | **`world.supply_chain_disrupted`** ⚠️ | `273` |
+| `TaskCompleted` | **`agent.task_completed`** ⚠️ | `201` |
+| `TechnologyBreakthroughDetected` | **`world.technology_breakthrough_detected`** | `273` |
+| `TechnologyReleased` | **`world.technology_released`** | `247` |
+| `TrafficChanged` | **`world.traffic_changed`** | `247` |
+| `VideoCaptured` | **`perception.video_captured`** | `174` |
+| `WearableReadingReceived` | **`perception.wearable_reading_received`** | `174` |
+| `WiFiMotionDetected` | **`presence.wifi_motion_detected`** | `226` |
 | `WorkoutCompleted` | **`workout.completed`** | `16` · `201` · `244` |
 | `WorkoutStarted` | **`workout.started`** | `244` |
 | `WorldStateChanged` | **`world.state_changed`** | `273` |

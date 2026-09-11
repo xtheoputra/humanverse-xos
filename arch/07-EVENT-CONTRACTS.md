@@ -30,7 +30,7 @@ membuat sebuah event bisa **diaudit**. Dan security event adalah jenis yang
 **paling mungkin diaudit**.
 
 ⚠️ **`user_id` boleh kosong** untuk event yang subjeknya bukan pemegang akun
-(`spatial.person_entered`, `robot.human_detected`) — tetapi ia kosong dengan
+(`presence.person_entered`, `robot.human_detected`) — tetapi ia kosong dengan
 cara yang dinyatakan: `data_subject` di sisi tabelnya
 ([`06`](06-DATA-ARCHITECTURE.md) §6), bukan `user_id: null` yang menyamar.
 
@@ -48,7 +48,7 @@ tanpa daftar domain yang sah, `stuff.happened` lolos.
 | Konteks pemilik | Domain event |
 |---|---|
 | `identity` | `identity` · `consent` · `permission` · `session` |
-| `human-core` | `profile` · `goal` · `habit` · `checkin` · `mood` · `journal` · `activity` · `meal` · `sleep` · `workout` · `travel` · `learning` · `meeting` · `outfit` · `purchase` |
+| `human-core` | `profile` · `goal` · `habit` · `checkin` · `mood` · `journal` · `activity` · `meal` · `sleep` · `workout` · `travel` · `learning` · `meeting` · `outfit` · `purchase` · `health`⁽¹⁾ |
 | `events` | — (ia bus-nya) |
 | `memory` | `memory` |
 | `context` | — (tidak menerbitkan apa pun) |
@@ -65,9 +65,17 @@ tanpa daftar domain yang sah, `stuff.happened` lolos.
 | `governance` | `governance` · `constitution` |
 | `platform` | `platform` · `billing` · `notification` |
 
-**39 domain, 15 konteks penerbit.** Domain baru ditambahkan hanya bersama
+**46 domain, 15 konteks penerbit.** Domain baru ditambahkan hanya bersama
 konteks pemiliknya — dan penambahan itu adalah perubahan arsitektur, bukan
 penamaan.
+
+⁽¹⁾ `health` ditambahkan 11 September 2026. Ia **bukan** domain baru: §4
+catatan kaki sudah menyatakannya milik `human-core` sejak berkas ini ditulis —
+tabel di atas yang melewatkannya. Ditemukan [`../tools/periksa_dokumen.py`](../tools/periksa_dokumen.py)
+E-1, bukan dengan membaca ulang. ⚠️ **Angka di baris ini pernah tertulis
+“39” sementara tabelnya memuat 45** — hitungan yang berhenti dipelihara,
+bentuk yang sama dengan “99 tabel” yang ternyata 247 ([`06`](06-DATA-ARCHITECTURE.md)).
+Sekarang ia diperiksa mesin: prosa dan tabel wajib sama angkanya.
 
 ⚠️ **Bentuk tiga segmen tidak dipakai.** [#38](../../issues/38) menawarkan
 `fashion.outfit.selected`; pencarian atas seluruh `docs/` menemukannya **hanya
@@ -101,22 +109,43 @@ melainkan dengan menyatakan apa yang tidak pernah masuk.
 (padanan mekanis, tabel di `spec/03`, naskah utuh). Yang ditambahkan di sini:
 **tiap nama juga mendapat DOMAIN dari §2**, sehingga padanannya lengkap.
 
-| Fase | Nama PascalCase | Domain tujuan |
+| Fase | Nama PascalCase | Domain tujuan — **diukur, bukan diklaim** |
 |---|---|---|
-| 8 | `SecurityEvent` | `security` |
-| 10 | 14 nama persepsi | `perception` — **sesudah lulus §3** |
-| 11 | 22 nama agent | `agent` · `approval` · `tool` |
-| 13 | 15 nama otomasi | `agent` · `notification` |
-| 14 | 16 nama kolektif | `agent` · `delegation` · `message` |
-| 15 | 13 nama spasial | `spatial` · `presence` |
-| 16 | 13 nama robotik | `robot` · `mission` · `emergency` |
-| 17 | 15 nama kesehatan | `health`⁽¹⁾ |
-| 18 | 14 nama dunia | `world` · `knowledge` |
-| 20 | 12 nama peradaban | `governance` · `world` |
+| 8 | `SecurityEvent` | `security` — 8 nama, lewat K-10 bukan lewat tabel |
+| **9** | **1 nama suara** 🆕 | `meeting` — [`../spec/03`](../spec/03-EVENT-CONTRACTS.md) **E-5** |
+| 10 | 14 nama persepsi | `perception`×12 · `activity` · `spatial` — **sesudah lulus §3** |
+| 11 | 22 nama agent | `agent`×22 |
+| 13 | 15 nama otomasi | 11 domain `human-core`/`agent`/`notification` — nama otomasi memakai domain hal yang diotomasi |
+| 14 | 16 nama kolektif | `agent`×16 |
+| 15 | 13 nama spasial | `spatial`×8 · `presence`×4 · `perception` |
+| 16 | 13 nama robotik | `robot`×9 · `emergency`×2 · `mission`×2 |
+| 17 | 15 nama kesehatan | `health`×9⁽¹⁾ · `sleep`×3 · `workout`×2 · `meal` |
+| 18 | 14 nama dunia | `world`×13 · `knowledge` |
+| 20 | 12 nama peradaban | `world`×9 · `governance` · `simulation` · `knowledge` |
 
-⁽¹⁾ `health` sebagai **domain event** dimiliki `human-core`; data klinis Level
-3–4 tidak diterbitkan sebagai event sama sekali — ia hidup di
-`security/vault/` ([`06`](06-DATA-ARCHITECTURE.md) §7).
+⁽¹⁾ `health` sebagai **domain event** dimiliki `human-core` dan sejak
+11 September 2026 tercantum di §2; data klinis Level 3–4 tidak diterbitkan
+sebagai event sama sekali — ia hidup di `security/vault/`
+([`06`](06-DATA-ARCHITECTURE.md) §7).
+
+> 🔴 **Kolom ketiga ini pernah salah untuk 66 dari 127 baris, dan salahnya tidak
+> terlihat saat dibaca.** Versi pertamanya menuliskan *niat* (Phase 11 →
+> `agent`·`approval`·`tool`), bukan *hasil* — sementara tabel padanan di
+> `spec/03` memakai aturan K-3 (*kata pertama → domain*) yang menghasilkan
+> `large`, `oil`, `interest`, `heart`. Dua berkas ditulis pada hari yang sama,
+> keduanya benar sendiri-sendiri, **dan tidak satu pun pernah dijalankan
+> terhadap yang lain**. Ditemukan **E-1**
+> ([`../tools/periksa_dokumen.py`](../tools/periksa_dokumen.py)); diselesaikan
+> **[K-15](../docs/KEPUTUSAN-DIDELEGASIKAN.md)**.
+
+⚠️ **Tujuh belas dari 46 domain terdaftar belum dipakai satu nama pun**
+(`identity` · `consent` · `permission` · `session` · `profile` · `memory` ·
+`insight` · `prediction` · `pattern` · `twin` · `approval` · `delegation` ·
+`message` · `constitution` · `platform` · `billing` + `notification` hanya 1).
+Itu **bukan cacat** — registry menyatakan ruang nama yang SAH, dan V0 menerbitkan
+lewat modulnya sendiri. Dicatat supaya angkanya tidak dikira daftar pemakaian.
+
+---
 
 ### Tiga tabrakan yang bukan soal ejaan
 
@@ -183,7 +212,7 @@ melihat pola yang tersusun dari kejadian kecil.
 | `agent.throttled` | `agent.unthrottled` |
 | `agent.paused` | `agent.resumed` |
 | `mission.completed` | **`mission.failed`** |
-| `emergency.stopped` | **`recovery.started`** · `recovery.completed` |
+| `emergency.stopped` | **`emergency.recovery_started`** · `emergency.recovery_completed` |
 | `tool.called` | `tool.failed` |
 
 ⭐ **Modelnya sudah ada di repo ini, dan patut disebut:** Phase 16 menulis
@@ -211,14 +240,23 @@ yang tidak didengar siapa pun bukan pengaman — ia catatan.
 
 ## §8 Pemeriksaan yang harus lulus
 
-| Pemeriksaan | Hasil |
-|---|---|
-| Amplop event | **1** |
-| Domain terdaftar | **39**, tiap domain **tepat satu** konteks pemilik |
-| `event_type` di luar registry | ditolak CI — [`11`](11-PENEGAKAN.md) E-1 |
-| `event_type` bukan `domain.verb` huruf kecil | ditolak CI — E-2 |
-| Nama tiga segmen | **NIHIL** — tidak pernah dipakai |
-| Aliran mentah masuk `events` | ditolak CI — E-3 (`source='sensor'` tidak ada) |
-| Kata kerja pengubah keadaan tanpa kembaran | ditolak CI — E-4 |
-| Nama event yang pernah diganti | **NIHIL** — aturan §5 |
-| Event V0 | **22**, tidak berubah |
+| Pemeriksaan | Hasil | Diperiksa mesin? |
+|---|---|---|
+| Amplop event | **1** | — |
+| Domain terdaftar | **46**, tiap domain **tepat satu** konteks pemilik | ✅ E-1 menolak dua pemilik |
+| Angka di prosa = jumlah baris tabel | **46 = 46** | ✅ E-1 |
+| `event_type` di luar registry | **NIHIL** — 154 nama diperiksa | ✅ **dijalankan 11 Sep 2026** |
+| `event_type` bukan `domain.verb` huruf kecil lampau | **NIHIL** — 154 nama diperiksa | ✅ **dijalankan 11 Sep 2026** |
+| Nama event di naskah tanpa baris padanan | **NIHIL** — 130 kandidat diperiksa | ✅ **E-5**, baru |
+| Nama tiga segmen | **NIHIL** — tidak pernah dipakai | ✅ E-2 |
+| Aliran mentah masuk `events` | ditolak CI — E-3 (`source='sensor'` tidak ada) | menunggu kode |
+| Kata kerja pengubah keadaan tanpa kembaran | ditolak CI — E-4 | menunggu kode |
+| Nama event yang pernah diganti **sesudah terbit** | **NIHIL** — aturan §5 | menunggu kode |
+| Event V0 | **22**, tidak berubah | ✅ diperiksa ulang |
+
+> ⚠️ **Baris kelima dari bawah dibaca apa adanya, jangan lebih.** K-15
+> mengganti **64 nama** pada 11 September 2026 — tetapi aturan §5 melarang
+> penggantian **sesudah sebuah nama diterbitkan**, dan repo ini masih nol baris
+> kode. Biayanya nol hari ini dan hampir mustahil sesudah baris data pertama;
+> itu justru alasan mengerjakannya sekarang, bukan pengecualian terhadap §5.
+

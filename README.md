@@ -20,14 +20,16 @@ manusia + agent + data + knowledge + simulation + automation**.
 
 | Hal | Keadaan |
 |---|---|
-| Tahap | **Master Architecture v2.0 selesai** — spesifikasi V0 siap, belum ada kode (disengaja) |
-| Berkas kode | 0 |
+| Tahap | **Master Architecture v2.0 selesai** — spesifikasi V0 siap, belum ada kode produksi (disengaja) |
+| Berkas **kode produksi** | **0** — menunggu [#3](../../issues/3) |
+| Berkas **perkakas dokumen** | **1** — [`tools/periksa_dokumen.py`](tools/README.md), menjalankan **5 dari 26** pemeriksaan [`arch/11`](arch/11-PENEGAKAN.md) tanpa kode produksi |
 | Repo git | privat `xtheoputra/humanverse-xos`, branch `master` |
 | Dokumen | **272 berkas** di `docs/` + **8 berkas** di `spec/` + **12 berkas** di [`arch/`](arch/README.md) |
+| Gerbang yang **sudah dijalankan** | **E-1 ✅ · E-2 ✅ · E-5 ✅ · G-1 ✅ · R-1 🛑 7 temuan** — `python tools/periksa_dokumen.py` |
 | Naskah pemilik | **24** — terakhir: **Phase 20 Civilization Platform** (39 bagian) — **fase TERAKHIR** |
 | Keputusan tertutup | **24 butir H** — nama · MVP · struktur repo · ambang konfirmasi · model memory · memory meluruh · gerbang policy · context package · dua tangga R/L · manifest dipulihkan · **model transisi belajar dari galat sendiri** · **monetisasi punya fase (Phase 14)**. ✅ **H-20 (peta fase) DIPULIHKAN sebagai [`arch/01`](arch/01-PETA-20-FASE.md) — peta versi 3, 20 baris TERTUTUP, dan peta kini BERNOMOR VERSI** sehingga *“roadmap yang sudah kita tetapkan”* selalu punya rujukan yang bisa dibuka ([#101](../../issues/101) · [#108](../../issues/108) · [#132](../../issues/132) · [#133](../../issues/133) · [#142](../../issues/142)). ✅ **H-13 ([#72](../../issues/72)) DISELESAIKAN:** `Phase` dan `V0–V6` bukan dua rencana yang bersaing melainkan **dua sumbu** — `Phase` menghitung dokumen, `V` menghitung rilis. ⚠️ **H-11** ([#78](../../issues/78)) masih perlu ditinjau ulang |
-| Keputusan terbuka | **26 pertanyaan A** · **39 risiko B** · **158 ketidakcocokan E** · **20 lubang G** — dan **14 butir K** sudah saya putuskan sendiri |
-| Tanggal dokumen | 10 September 2026 |
+| Keputusan terbuka | **26 pertanyaan A** · **39 risiko B** · **158 ketidakcocokan E** · **20 lubang G** — dan **15 butir K** sudah saya putuskan sendiri |
+| Tanggal dokumen | 11 September 2026 |
 
 > ⚠️ **Nol baris kode itu disengaja — dan penghambatnya terus berkurang.**
 > Lima naskah sudah menjawab: **nama** (A-7), **MVP** (A-2), **struktur repo**
@@ -55,6 +57,15 @@ manusia + agent + data + knowledge + simulation + automation**.
 >
 > 🔑 Rekonsiliasi lengkap kedua dokumen ada di
 > [`docs/GERBANG-SKEMA.md`](docs/GERBANG-SKEMA.md).
+>
+> ⭐ **11 Sep 2026 — aturan repo ini berhenti hanya dinyatakan.**
+> [`tools/periksa_dokumen.py`](tools/README.md) menjalankan lima pemeriksaan
+> [`arch/11`](arch/11-PENEGAKAN.md) atas dokumennya sendiri, dan menemukan
+> **66 dari 127 nama event mendarat di domain yang tidak ada di registry**
+> (`large` · `oil` · `interest` · `heart`), registry menulis *“39 domain”*
+> untuk tabel berisi **45**, dan satu nama event tulisan pemilik
+> (`MeetingCreated`) **tidak pernah sampai ke tabel padanan**. Ketiganya
+> diselesaikan; **V0 tidak bergeser — 22 event tetap 22.**
 
 ---
 
@@ -203,7 +214,7 @@ membalikkannya**:
 |---|---|---|
 | **K-1** | Kapabilitas yang menyentuh **pihak ketiga** = minimum **R3** | `spec/05` aturan 7 + medan `reaches_third_party` |
 | **K-2** | `world-model/` **menyimpan**, `simulation/` **menjalankan** | — |
-| **K-3** | 127 nama event **dipadankan**; naskah **tidak** diubah | `spec/03` tabel padanan |
+| **K-3** | **128** nama event **dipadankan**; naskah **tidak** diubah | `spec/03` tabel padanan |
 | **K-4** | Tabel berdefinisi ganda: `spec/01` menang, lalu fase terawal | `spec/01` |
 | **K-5** | **Tiga uji** agent lawan service | `spec/05` |
 | **K-6** | Tujuh **kata kerja** Phase 2–8 | — |
@@ -214,7 +225,8 @@ membalikkannya**:
 | **K-11** | Tiap tangga bernomor membawa **awalan** (`DP-L6`, `ARCH1`, `D6.1`) | — |
 | **K-12** | `risk_level` **wajib**; larangan scope + `spatial`·`location`·`people`·`csi` | `spec/05` aturan 8 & 9 |
 | **K-13** 🆕 | Bahasa backend = **Python + FastAPI** — `spec/` diam-diam berganti bahasa | `spec/06` · `spec/07` |
-| **K-14** 🆕 | **Memanggil agent lain ADALAH pemanggilan tool**; agent memakai `max_risk`, bukan `risk_level` | `spec/01` · `spec/05` aturan 3 |
+| **K-14** | **Memanggil agent lain ADALAH pemanggilan tool**; agent memakai `max_risk`, bukan `risk_level` | `spec/01` · `spec/05` aturan 3 |
+| **K-15** 🆕 | **Domain event diambil dari registry, bukan dari kata pertama nama** — K-3 benar sebagai transkripsi, tidak pernah jadi aturan kepemilikan | `spec/03` (64 nama) · `arch/07` §2 §4 §6 |
 
 🛑 **Yang sengaja TIDAK saya putuskan:** [#139](../../issues/139) (waktu pemilik) ·
 [#3](../../issues/3) (orang) · [#20](../../issues/20) (merek) · **seluruh butir C**

@@ -48,6 +48,22 @@ Event Bus → Context Engine → Behavior Engine → Memory → Cognitive Runtim
 >
 > Nama event **tidak boleh diganti setelah dipakai**, jadi ini harus selesai
 > sebelum baris pertama. Lihat **E-88**.
+>
+> 🔴 **Tabel di atas DIGANTIKAN [K-15](KEPUTUSAN-DIDELEGASIKAN.md)
+> (11 Sep 2026) — dibiarkan berdiri karena ia buktinya, bukan karena ia
+> berlaku.** Ketujuh padanannya memakai aturan *“kata pertama → domain”*, dan
+> dijalankan terhadap registry domain [`../arch/07`](../arch/07-EVENT-CONTRACTS.md)
+> §2 **tak satu pun lolos**: `image` · `speech` · `person` · `scene` ·
+> `location` · `sensor` bukan domain terdaftar, dan `spatial_map` bahkan
+> memakai garis bawah **di dalam segmen domain**. Yang berlaku sekarang ada di
+> [`../spec/03`](../spec/03-EVENT-CONTRACTS.md): ketujuhnya menjadi
+> `perception.*`, kecuali `SpatialMapUpdated` → `spatial.map_updated`.
+>
+> 💡 **Dan usul ini sendiri pernah mengotori pengukuran.** `spatial_map.updated`
+> sempat terhitung sebagai nama yang “sudah sesuai format” di percobaan pertama
+> [`SENSUS-EVENT.md`](SENSUS-EVENT.md) — padahal ia usul saya, bukan kata
+> pemilik. Catatan audit yang berdiri berdampingan dengan naskah akan terbaca
+> sebagai naskah oleh alat mana pun yang tidak diajari membedakannya.
 
 > 🛑🛑 **Dan yang lebih berat daripada namanya: event ini tidak muat di tabel
 > `events`.**

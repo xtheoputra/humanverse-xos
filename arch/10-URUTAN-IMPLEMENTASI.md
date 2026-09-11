@@ -62,6 +62,59 @@ ditulis) dan bukan `V` (urutan produk dirilis) — lihat
 | **T11** | **Health & Bio** (Phase 17) | klinis · biometrik | vault · `sensitivity` · `consent.purpose` | **[#115](../../issues/115)** · **[#118](../../issues/118)** — pemilik |
 | **T12** | **World · Science · Civilization** (18–20) | global intelligence · discovery · coordination | governance bergigi [`08`](08-AGENT-CONTRACTS.md) §4 | **[#122](../../issues/122)** · **[#123](../../issues/123)** · **[#141](../../issues/141)** — pemilik |
 
+### §2.1 🔧 Daftar pasangan R-1 — dan ia dibaca mesin, bukan dibaca orang
+
+[`11`](11-PENEGAKAN.md) R-1 berbunyi *“daftar pasangannya dari `10` §2”*.
+Selama daftar itu hidup di dalam prosa, ia tetap sesuatu yang harus
+**diingat seseorang** — persis kelas kegagalan yang seluruh
+[`11`](11-PENEGAKAN.md) §1 dibangun untuk menutupnya. Karena itu daftarnya
+ditulis di sini dalam bentuk yang bisa dibaca mesin, dan
+[`../tools/periksa_dokumen.py`](../tools/periksa_dokumen.py) membacanya dari
+blok ini — **bukan menyalinnya ke dalam kodenya sendiri**.
+
+> 🔑 **Dokumen tetap sumber kebenaran. Kalau blok ini hilang, R-1 GAGAL
+> dengan galat — bukan lulus karena tidak menemukan apa pun untuk diperiksa.**
+
+```r1
+# (gerbang) -> (butir yang dijaganya). Indeks diambil dari nomor butir di
+# roadmap masing-masing; syaratnya index(gerbang) < index(tiap yang dijaga).
+# `TIDAK-ADA` = gerbangnya tidak punya butir roadmap sama sekali.
+
+[A14]                       # Phase 14 — docs/218 §14.66
+A14.7  -> A14.1 A14.2 A14.3 A14.4 A14.5 A14.6
+
+[R16]                       # Phase 16 — docs/235 §16.34
+R16.10 -> R16.1 R16.2 R16.3 R16.4 R16.5 R16.6 R16.7 R16.8
+R16.9  -> R16.4 R16.5 R16.7 R16.8      # §16.26: Simulation sebelum Hardware
+
+[H17]                       # Phase 17 — docs/245 §17.52
+H17.12 -> H17.1 H17.2 H17.3 H17.4 H17.5 H17.6 H17.7 H17.8 H17.9 H17.10 H17.11
+
+[G18]                       # Phase 18 — docs/255 §18.32
+TIDAK-ADA -> G18.3 G18.4 G18.6 G18.7 G18.8 G18.9   # §18.22 Safety Kernel
+
+[S19]                       # Phase 19 — docs/265 §19.33
+S19.10 -> S19.1 S19.2 S19.3 S19.4 S19.5 S19.6 S19.7 S19.8 S19.9
+
+[C20]                       # Phase 20 — docs/275 §20.39
+C20.7  -> C20.6
+
+[spec/07]                   # Backlog V0 — gerbang mendahului kode domain
+0.8 -> 1.1 2.1 3.1 4.1 5.1 6.1
+4.5 -> 4.6 4.7
+
+[arch/10]                   # tiga belas tahap — T2 lapisan, bukan rilis
+T2 -> T3 T4 T5 T6 T7 T8 T9 T10 T11 T12
+```
+
+⚠️ **Blok ini tidak menetapkan apa pun yang baru.** Kedelapan roadmap dan
+kedelapan vonisnya sudah ditulis di [`11`](11-PENEGAKAN.md) §4 — yang berubah
+hanya **siapa yang menghitungnya**. Vonis yang dihitung tangan berhenti benar
+tanpa memberi tahu siapa pun ketika roadmapnya disunting; vonis yang dihitung
+mesin tidak bisa.
+
+---
+
 ### 🔑 Satu baris yang paling berguna dari seluruh tabel ini
 
 > **T0 sampai T5 tidak diblokir oleh satu pun keputusan yang belum diambil —
