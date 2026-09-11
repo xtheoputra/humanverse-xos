@@ -31,6 +31,14 @@ python tools/periksa_dokumen.py --json         # untuk CI
 
 Nol dependensi. Python 3.10+. Keluar **1** kalau ada yang gagal.
 
+> 🛑 **Jalankan MANUAL sebelum tiap commit.**
+> `.github/workflows/periksa-dokumen.yml` sudah terpasang, tetapi **belum
+> pernah berjalan sekali pun**: GitHub Actions terhalang di tingkat akun
+> (*“recent account payments have failed or your spending limit needs to be
+> increased”*), dan repo ini privat sehingga menitnya ditagih.
+> ⇒ **skripnya hijau, gerbangnya mati** — [#160](../../issues/160), dan ia
+> hanya bisa dibuka pemilik sebab ia soal tagihan.
+
 ---
 
 ## Tiga aturan yang dipegang berkas ini

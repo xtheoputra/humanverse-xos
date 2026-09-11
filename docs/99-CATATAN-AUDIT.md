@@ -7,8 +7,8 @@
 > Cara pakai: kalau pemilik memutuskan sebuah butir, keputusannya **naik** ke
 > berkas visi yang sesuai, lalu butirnya turun ke bagian **H**.
 
-> 📌 **Butir di berkas ini sudah jadi 159 GitHub Issue** dalam 3 milestone —
-> **99 terbuka, 60 ditutup**. Baca issue-nya, jangan analisis ulang naskahnya.
+> 📌 **Butir di berkas ini sudah jadi 160 GitHub Issue** dalam 3 milestone —
+> **100 terbuka, 60 ditutup**. Baca issue-nya, jangan analisis ulang naskahnya.
 >
 > ✅ **Sejak 11 Sep 2026 sebagian butir punya PENJAGA, bukan hanya catatan:**
 > `python tools/periksa_dokumen.py` menjalankan lima pemeriksaan
@@ -171,13 +171,28 @@ enam — **Phase 16 melanggar dua aturan sekaligus**, `R16.10` Safety Kernel
 **dan** `R16.9` Simulation (§16.26: `Code → Simulation → Safety Test → Hardware`
 adalah urutan wajib). [#111](../../issues/111)
 
+### 🛑 A-38 — gerbangnya sendiri tidak pernah berjalan
+
+`.github/workflows/periksa-dokumen.yml` dipasang; jalan pertamanya — satu-satunya
+yang pernah ada di repo ini — berhenti sebelum langkah pertama: *“The job was not
+started because recent account payments have failed or your spending limit needs
+to be increased.”* Repo privat ⇒ menit Actions ditagih.
+⇒ **skripnya hijau, gerbangnya mati.** [#160](../../issues/160) — milik pemilik
+(uang). Sampai dibuka, pemeriksaannya **manual**.
+
+🛑 **Yang salah bukan tagihannya melainkan urutannya: workflow dipasang, lalu
+hijaunya DIASUMSIKAN.** Versi paling halus dari pola §1 — penjaganya **ada**, dan
+tetap tidak berbunyi — dan ia lolos justru karena berkasnya **benar**.
+
 > 💡💡 **Dua kalimat yang layak dibawa keluar:**
 > **(1) Jalankan dua dokumen yang tidak pernah saling diuji** — tabrakan 66
 > baris tidak muncul saat salah satunya dibaca, ia muncul saat yang satu
 > dijalankan sebagai aturan atas yang lain.
 > **(2) Setiap kali sesuatu berubah menjadi hijau, tanyakan: apa yang alat ukur
 > ini TIDAK PERNAH lihat?** Hasilnya benar untuk populasi yang dilihatnya; yang
-> salah **populasinya**. Berbuah **tiga kali** dalam satu sesi.
+> salah **populasinya**. Berbuah **tiga kali** dalam satu sesi — dan **yang
+> keempat** justru yang terlewat: pertanyaan itu tidak ditanyakan pada gerbang
+> yang baru saja dibuat sendiri.
 
 ---
 

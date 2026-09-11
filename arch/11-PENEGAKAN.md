@@ -56,6 +56,19 @@ G-1  10 pasal             ✅ LULUS
 R-1  10 pasangan          🛑 GAGAL — 7 temuan
 ```
 
+> 🛑🛑 **DAN GERBANGNYA SENDIRI TIDAK PERNAH BERJALAN.** Jalan pertama
+> `.github/workflows/periksa-dokumen.yml` — satu-satunya yang pernah ada di repo
+> ini — berhenti sebelum langkah pertama: *“The job was not started because
+> recent account payments have failed or your spending limit needs to be
+> increased.”* Repo privat ⇒ menit Actions ditagih.
+> ⇒ **skripnya hijau (diverifikasi lokal), gerbangnya mati.** Yang salah bukan
+> tagihannya melainkan urutan saya: workflow dipasang, lalu **hijaunya
+> diasumsikan**. Pertanyaan yang seharusnya ditanyakan bukan *“apakah berkasnya
+> benar”* melainkan ***“apakah ia benar-benar JALAN”*** — dan itu pertanyaan
+> yang sama yang hari ini sudah menemukan tiga hal lain.
+> **Sampai [#160](../../issues/160) dibuka pemilik, pemeriksaannya MANUAL:**
+> `python tools/periksa_dokumen.py` sebelum tiap commit.
+
 > 🔑 **Tiga aturan rancangan yang membuatnya tidak menjadi salinan kedua dari
 > dokumen:**
 >

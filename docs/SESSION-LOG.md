@@ -16,9 +16,9 @@
 | Pemeriksaan `arch/11` | 25 → **26**; yang bisa jalan tanpa kode 4 → **5**; yang **benar-benar dijalankan** 0 → **5** |
 | `spec/` diubah | **1 dari 8** — `03` (64 nama diganti, 1 nama ditambah) |
 | `arch/` diubah | **4 dari 12** — `07` · `10` · `11` · `README` |
-| Issue | 157 → **159**; **#157 DITUTUP**, **#158** & **#159** baru |
+| Issue | 157 → **160**; **#157 DITUTUP**, **#158** · **#159** · **#160** baru |
 | Keputusan | **K-15** (domain event diambil dari registry, bukan dari kata pertama nama) |
-| Temuan | **E-159** · **G-22** |
+| Temuan | **E-159** · **G-22** · **A-38** |
 
 ---
 
@@ -97,6 +97,26 @@ Ditulis di sini karena laporan yang tidak menyebutkannya akan terbaca lebih kuat
 Sepuluh pasal Konstitusi punya penegak; Pasal 8 **sebagian** dan batasnya dinyatakan. Enam roadmap gagal, `spec/07` dan `arch/10` lulus — persis yang `arch/11` §4 tulis tangan.
 
 🔴 Yang berubah: yang gagal **tujuh pasangan gerbang**, bukan enam. **Phase 16 melanggar dua aturan sekaligus** — `R16.10` Safety Kernel (indeks 10, menjaga 8 butir) **dan** `R16.9` Simulation (indeks 9, menjaga manipulasi · humanoid · drone · armada), yang kedua atas dasar §16.26: `Code → Simulation → Safety Test → Hardware` adalah **urutan wajib**. ⇒ dari enam roadmap yang gagal, Phase 16 yang **paling** terlambat. [#111](../../issues/111)
+
+---
+
+### 🛑🛑 TEMUAN KELIMA, dan ia tentang sesi ini sendiri: **gerbangnya tidak pernah berjalan**
+
+`.github/workflows/periksa-dokumen.yml` dipasang supaya aturannya berhenti menjadi sesuatu yang harus **diingat seseorang**. Jalan pertamanya — dan satu-satunya yang pernah ada di repo ini — berhenti sebelum langkah pertama:
+
+```
+X periksa in 4s
+  The job was not started because recent account payments have failed
+  or your spending limit needs to be increased.
+```
+
+Repo privat ⇒ menit Actions ditagih. ⇒ **skripnya hijau (diverifikasi lokal, keluar `0`), gerbangnya mati.**
+
+> 🛑 **Yang salah bukan tagihannya, melainkan urutan saya: workflow dipasang, lalu hijaunya DIASUMSIKAN.** Pertanyaan yang seharusnya ditanyakan bukan *“apakah berkasnya benar”* melainkan ***“apakah ia benar-benar JALAN”*** — pertanyaan yang **sama** yang hari ini sudah menemukan tiga hal lain, dan yang tidak saya tanyakan pada hal yang baru saja saya buat sendiri.
+>
+> 💡 **Dan bentuknya persis yang dilaporkan di paragraf pembuka sesi ini:** sebuah gerbang yang tidak pernah berbunyi adalah aturan tanpa penjaga. Kali ini penjaganya **ada** — dan tetap tidak berbunyi. Itu versi paling halus dari pola yang `arch/11` §1 daftar enam kali, dan ia lolos justru karena berkasnya **benar**.
+
+⇒ [#160](../../issues/160) — **milik pemilik**, sebab ia soal tagihan (*uang ⇒ bukan keputusan saya*). Sampai dibuka: **pemeriksaannya MANUAL**, `python tools/periksa_dokumen.py` sebelum tiap commit. ⚠️ Ia juga memblokir **tugas 0.7** `spec/07` (CI), yang seluruh gunanya adalah berjalan otomatis.
 
 ---
 
