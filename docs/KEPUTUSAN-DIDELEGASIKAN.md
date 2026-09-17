@@ -401,12 +401,46 @@ sesudahnya.
 
 ---
 
+## K-17 · Arah IMPOR modul V0: `events` di bawah modul domain
+
+> Diputuskan 16 September 2026, saat Sprint 0 tugas 0.8 menuliskan batas modul
+> [`../spec/06`](../spec/06-MODULE-BOUNDARIES.md) sebagai kontrak `import-linter`.
+
+| | |
+|---|---|
+| **Keputusan** | Lapisan impor V0, atas boleh mengimpor bawah dan tidak pernah sebaliknya: `agents` › `intelligence` › `memory` › `goals \| habits \| checkins \| journal \| activities \| profile` (saling independen) › `events` › `identity` › `platform`. Ditegakkan kontrak `m1-m3-lapisan` di `pyproject.toml`. |
+| **Bukti** | `spec/06` aturan 6: *“setiap tulisan ke tabel domain **wajib** menerbitkan event”* — sebuah modul yang wajib menerbitkan harus bisa **memanggil** penerbitnya. Aturan 4: *“tidak ada modul yang mengimpor `agents`”* ⇒ `agents` di puncak. `platform` *“boleh dipakai semua”* dan (arch/04 §1 aturan 7) tidak boleh tahu aturan domain ⇒ di dasar. `memory` membaca **isi** jurnal untuk ekstraksi (tugas 3.6) — dan isi jurnal sengaja tidak pernah masuk event (`spec/03`: `journal.created` hanya membawa `word_count`) ⇒ `memory` wajib bisa mengimpor `journal`, jadi di atas domain. `intelligence`: 5.3 menulis `human_states` milik `profile`, 5.5 membaca subjek habit & goal ⇒ di atas `memory`. |
+| **Bacaan yang DITOLAK** | *“Gambar `spec/06` menaruh `events` di bawah modul domain dengan panah ke bawah, dan arch/04 §1 menaruh `events` di L2 di atas `services/*` L1 — jadi `events` lapisan yang lebih TINGGI.”* 🛑 **Ditolak:** kedua gambar menggambarkan arah **data** (kejadian mengalir dari domain ke `events` lalu ke `memory`). Kalau arah itu dipakai sebagai arah impor, modul domain tidak bisa menerbitkan event tanpa `events` mengimpor tiap modul domain — kebalikan dari *“komunikasinya lewat event”*. |
+| **Yang TIDAK berubah** | 12 modul · 23 tabel · kepemilikan tabel `spec/06` · aturan 3 (domain tidak saling impor) — seluruhnya tetap. |
+| **Cara membalikkan** | Ubah urutan `layers` kontrak `m1-m3-lapisan`, lalu jalankan `uv run python tools/uji_mutasi_kode.py`. Selama modul domain belum menerbitkan event (Sprint 3), biayanya nol. |
+
+> ⚠️ **Satu hal yang berkas ini TIDAK putuskan, dan akan datang di Sprint 1:**
+> di mana alur *register* membuat baris `profiles` — `identity` di bawah
+> `profile`, jadi `identity` tidak boleh memanggilnya. Dua jalan sah: titik
+> rakit `hvx.main` mengorkestrasi keduanya, atau `profile` mendengarkan
+> kejadian pendaftaran. Dipilih saat tugas 1.1/1.3 ditulis, dengan uji.
+
+---
+
+## K-18 · Satu commit per tugas; PR boleh satu per sprint
+
+> Diputuskan 16 September 2026, saat Sprint 0 (delapan tugas) dibuka sebagai PR.
+
+| | |
+|---|---|
+| **Keputusan** | Unit tinjauan adalah **commit**: tiap tugas `spec/07` satu commit, dengan nomor tugasnya di pesan commit. Satu PR boleh memuat seluruh tugas satu sprint. Baris HUMAN REVIEW §27 tidak berubah — **pemilik yang menggabungkan** (H-25). |
+| **Bukti** | `spec/07` semula menulis *“setiap tugas: satu PR”*. Delapan tugas Sprint 0 saling bergantung dalam satu berkas bersama (`pyproject.toml` memegang konfigurasi uji 0.6, kontrak 0.8, dan dependensi 0.1 sekaligus) — delapan PR bertumpuk akan menuntut pemilik menggabungkan secara berurutan, dan tiap PR sebelum yang terakhir tidak bisa lulus gerbang penuh sendirian. |
+| **Bacaan yang DITOLAK** | *“Satu PR per sprint berarti tinjauan lebih kasar.”* Ditolak sebagian: tinjauan per commit tetap mungkin di antarmuka PR. ⚠️ **Harga yang diakui:** hanya commit TERAKHIR yang dijamin lulus gerbang penuh; commit di tengah tidak diverifikasi satu per satu, dan itu dinyatakan di deskripsi PR. |
+| **Cara membalikkan** | Pecah PR menurut commit (satu branch per tugas, bertumpuk), lalu kembalikan kalimat `spec/07`. |
+
+---
+
 ## Yang sengaja **tidak** saya putuskan
 
 | Butir | Kenapa |
 |---|---|
 | ~~[#139](../../issues/139) Master Architecture v2.0~~ | ✅ **pemilik memerintahkannya 10 Sep 2026** (*“kerjakan semua tugas dan fase yang masih tersisa”*) — dikerjakan, hasilnya [`../arch/`](../arch/README.md) |
-| [#3](../../issues/3) siapa mengerjakan V0 | orang dan waktu |
+| ~~[#3](../../issues/3) siapa mengerjakan V0~~ | ✅ **pemilik memutuskannya 16 Sep 2026** — AI coding agent di branch + PR, pemilik yang menggabungkan (**H-25**). Yang tetap bukan milik saya: **waktu** pemilik untuk meninjau |
 | [#20](../../issues/20) cek merek & domain | menuntut pencarian merek dan pembelian |
 | **seluruh butir C** (hukum & privasi) | risikonya ditanggung orang yang tidak ikut memilih |
 | §16.5 · §16.7 rantai humanoid | benda yang bisa melukai orang — gerbangnya bukan keputusan gaya |

@@ -19,7 +19,7 @@
 > [`../arch/`](../arch/README.md) (**Master Architecture v2.0**, Phase 1–20) —
 > keduanya **bukan kata pemilik**, dan sengaja di luar `docs/`.
 
-Diperbarui: 11 September 2026 · Mencakup **dua puluh empat naskah**:
+Diperbarui: 17 September 2026 · Mencakup **dua puluh empat naskah**:
 **1 HumanOS** · **2 HumanVerse X** · **3 Phase 2 Enterprise Blueprint** ·
 **4 Phase 3 AI-Native Human Ecosystem** · **5 Blueprint Engineering v1.0** ·
 **6 Peta 14 lapisan engineering** · **7 Phase 4 Enterprise OS (Layer 21–50)** · **8 Peta Phase 5–12** · **9 Phase 5 Research Lab** · **10 Phase 6 Developer Platform** ·
@@ -27,14 +27,149 @@ Diperbarui: 11 September 2026 · Mencakup **dua puluh empat naskah**:
 
 | Bagian | Isi | Jumlah |
 |---|---|---|
-| [H](#h-sudah-diputuskan--ditutup) | **Sudah diputuskan / ditutup** | 24 |
+| [H](#h-sudah-diputuskan--ditutup) | **Sudah diputuskan / ditutup** | 25 |
 | [A](#a-perlu-jawaban-pemilik) | Pertanyaan yang memblokir | 26 |
-| [B](#b-risiko-teknis) | Risiko teknis | 38 |
+| [B](#b-risiko-teknis) | Risiko teknis | 41 |
 | [C](#c-risiko-hukum--kepatuhan) | Risiko hukum & kepatuhan | 30 |
 | [D](#d-celah-yang-belum-tertutup) | Celah yang belum tertutup | 5 |
 | [E](#e-ketidakcocokan-antar-naskah) | **Ketidakcocokan antar-naskah** | 153 |
 | [F](#f-yang-sudah-saya-periksa-dan-ternyata-benar) | Sudah diperiksa, ternyata benar | 136 |
 | [G](#g-lubang-di-dalam-naskah-sendiri) | Lubang di dalam naskah sendiri | 21 |
+
+---
+
+## 🔨 Sprint 0 dikodekan (16 Sep 2026) — apa yang berubah bagi berkas ini
+
+Pemilik menjawab [#3](../../issues/3) untuk **memulai** (**H-25**): AI coding
+agent mengerjakan di branch + PR, pemilik yang menggabungkan. Sprint 0
+(`spec/07` 0.1–0.8) dikerjakan di branch `v0/sprint-0-foundation`.
+
+> 🔑 **Menulis kode menemukan hal yang tujuh sesi membaca dan mengukur tidak
+> temukan** — pola **E-42** (*“ditemukan hanya karena mencoba menulis
+> DDL-nya”*) berulang, dan kali ini di DDL yang sudah diperiksa mesin P-1..P-3.
+> Pemeriksa itu benar untuk yang ia periksa; tidak satu pun pernah
+> **menjalankan** DDL-nya.
+
+### 🔴 E-161 — `set_updated_at()` didefinisikan, tidak pernah dipasang
+
+`spec/01` bagian *Awalan* mendefinisikan fungsinya dengan komentar *“dipakai
+semua tabel yang punya `updated_at`”* — dan **nol `CREATE TRIGGER`** di seluruh
+berkas. Sebelas tabel punya `updated_at`; tanpa pemicu kolom itu **berisi waktu
+pembuatan selamanya**, kecuali tiap penulis `repository.py` ingat mengisinya.
+⇒ sebelas pemicu ditambahkan ke `spec/01` §9 dan migrasi 0001; uji integrasi
+menuntut **tiap** tabel ber-`updated_at` punya pemicunya, jadi tabel ke-24 tidak
+bisa lupa.
+
+### 🔴 G-24 — 21 baris markdown di DALAM blok SQL `spec/01`
+
+Catatan `max_risk` (K-14, 10 Sep) ditulis **di dalam** blok ` ```sql ` tabel
+`agents` — pagarnya tidak pernah ditutup sebelum catatan, dan dibuka lagi
+sesudahnya secara kebetulan oleh blok berikutnya. **DDL `spec/01` tidak bisa
+dijalankan apa adanya sejak 10 Sep.** P-1..P-3 tidak melihatnya karena regex
+tabel tetap cocok. Ditemukan saat uji integrasi mencoba menjalankan DDL itu ke
+basis data sungguhan untuk dibandingkan dengan migrasi.
+
+### 🔴 E-162 — `arch/06` §3 menyebut `CHECK` yang bukan milik `events`
+
+Uji admisi `events` menulis himpunan `source` sebagai
+`manual · inferred · integration · agent` — itu himpunan `activities.source`.
+`events.source` sungguhan: `app · agent · integration · backfill`. Dan paragraf
+berikutnya menyuruh *summarizer* sensor menerbitkan `source='inferred'` — nilai
+yang `CHECK` itu **tolak**. Himpunannya dikoreksi; **nilai untuk kejadian hasil
+ringkasan sensor sengaja tidak diputuskan** (tugas pertama `perception/`, T6,
+pemblokirnya [#75](../../issues/75)). Ditemukan **E-3**, pemeriksaan yang
+membaca `CHECK` dari DDL, bukan dari kalimat yang menggambarkannya.
+
+### 🛑 B-40 — `REVOKE` di `audit_logs` tidak menghalangi role yang dipakai api
+
+`spec/01` menutup `audit_logs` dengan `REVOKE UPDATE, DELETE … FROM PUBLIC`.
+Diverifikasi di PostgreSQL 16 sungguhan, sebagai role `hvx` yang dipakai api di
+D0 (superuser **dan** pemilik tabel): **`UPDATE` lolos, `DELETE` lolos.** `REVOKE
+FROM PUBLIC` tidak berlaku bagi pemilik, dan superuser **melewati RLS** apa pun
+yang Sprint 1 tulis. ⇒ tugas 1.6 (*“`UPDATE`/`DELETE` ditolak”*) dan seluruh
+RLS Sprint 1 **tidak bisa benar** selama api memakai role itu. Dicatat di
+`spec/07` tepat di bawah tugas 1.7, supaya ia terbaca **sebelum** 1.5 dan 1.6
+ditulis.
+
+💡 **Bentuknya sama dengan A-38:** penjaganya ada dan ditulis benar — ia hanya
+tidak pernah dijalankan terhadap pelaku yang sebenarnya.
+
+### 🛑 B-41 — `user_id` baris anak tidak diikat ke `user_id` induknya
+
+Ditemukan tinjauan adversarial (bawah), bukan oleh menulis kode — dan diukur
+ulang 17 Sep 2026 di basis data sekali pakai dari migrasi 0001. **Sebelas FK
+satu kolom** menunjuk ke induk yang membawa `user_id` sendiri:
+`goals.parent_id` · `goal_milestones.goal_id` · `habits.goal_id` ·
+`habit_completions.habit_id` · `memories.source_event_id` ·
+`ai_messages.conversation_id` · `ai_messages.agent_run_id` ·
+`recommendations.agent_run_id` · `recommendation_feedback.recommendation_id` ·
+`agent_runs.conversation_id` · `agent_runs.parent_run_id`. Tidak satu pun
+menuntut `anak.user_id = induk.user_id`.
+
+| Diukur | Hasil |
+|---|---|
+| pengguna B menempelkan milestone ke goal milik A | ✅ **diterima** |
+| pengguna B membuat sub-goal dengan `parent_id` = goal milik A | ✅ **diterima** |
+| A menghapus goal-nya | milestone milik **B ikut terhapus** (`CASCADE`) |
+
+RLS yang ditulis kemudian **tidak menolong**: pemeriksaan FK PostgreSQL tidak
+menerapkan RLS, dan `WITH CHECK` hanya melihat `user_id` baris anak.
+
+⇒ **Tidak dibetulkan di Sprint 0, dengan sengaja.** Belum ada satu pun tulisan
+baris anak, dan dua jalan yang sah punya harga berbeda: **FK komposit**
+`(induk_id, user_id) → induk(id, user_id)` — menuntut `UNIQUE (id, user_id)` di
+sebelas induk dan `ON DELETE SET NULL (induk_id)` supaya `user_id` tidak ikut
+dikosongkan — **atau aturan repository yang dijaga uji**. Yang pertama dijaga
+basis data; yang kedua lebih murah tetapi hanya sekuat ujinya. Dicatat di
+`spec/07` tepat sebelum tugas **2.1** — tulisan baris anak pertama — dan di
+`SECURITY.md`.
+
+### 🔍 Tinjauan adversarial sebelum PR — 35 temuan, 33 bertahan
+
+Sebelum PR dibuka, Sprint 0 ditinjau **enam lensa** (definisi selesai ·
+perilaku berjalan · migrasi · penegakan · keamanan & CI · kebenaran dokumen),
+dan **tiap temuan diserahkan ke verifikator terpisah yang berusaha
+membantahnya** — 41 agen. **35 temuan; 2 terbantah; 33 bertahan: 16 medium ·
+17 low · 0 high** (tujuh yang peninjau nilai *high* diturunkan verifikator).
+**32 dibetulkan di branch yang sama; 1 dicatat — B-41.**
+
+| Yang ditemukan | Sekarang |
+|---|---|
+| `/health` dengan batas 1 dtk menjawab sesudah **60 dtk** saat PostgreSQL berhenti menjawab — `asyncio.wait_for` menunggu pembatalan ping asyncpg, yang membuka koneksi baru tanpa batas | pemeriksaan yang lewat waktu dibatalkan **di belakang**; uji *pembatalan yang lambat* |
+| **modul ke-13** di `hvx.modules` lolos M-1 · M-2 · M-3 · B-2 sekaligus; B-2 daftar tulis-tangan; `urllib` · `socket` · `smtplib` lolos | lapisan `exhaustive`; B-2 atas **seluruh `hvx`** + ruff banned-api; uji *modul di disk == kontrak* |
+| **10 dari 12** kontrak M-2 tak pernah dibuktikan sanggup gagal — kontrak yang polanya salah eja tetap KEPT | satu mutasi **per id kontrak**, dituntut `test_penegak.py` |
+| pembanding katalog migrasi buta terhadap **sepuluh** perbedaan (`UNLOGGED`, pemicu mati, `WHEN (false)`, RLS, `RULE`, `COLLATE`, `GENERATED`, `GRANT` kolom, `IDENTITY`, `UPDATE OF`) | 13 bagian katalog; yang tetap tidak dibandingkan **dinyatakan** |
+| uji pemicu `updated_at` menerima pemicu yang tidak memperbarui apa pun | dituntut `BEFORE · ROW · UPDATE · menyala · tanpa WHEN · tanpa UPDATE OF` |
+| **mutasi R-1 hampa**: ia menghapus satu temuan, dan dihitung berbunyi karena enam temuan lain | tiap mutasi dokumen wajib melahirkan temuan **baru** |
+| parser DDL P-1..P-3 hanya membaca satu ejaan — `IF NOT EXISTS`, skema, akhiran `WITH` menyembunyikan tabel | kurung seimbang; uji *tabel yang parser baca == katalog basis data* |
+| `test_penegak.py` mengabaikan langkah **wajib** vs **dilaporkan** — G-1 bisa dipindah ke langkah R-1 tanpa ada yang merah | dipisah; mutasinya dijalankan |
+| 500 tanpa `X-Request-ID`; `/docs` terbuka di produksi bila `HVX_ENV` lupa diisi; DSN berparameter lolos migrasi lalu menggagalkan tiap kueri api; Redis bersama memakai batas 1 dtk milik `/health`; `ikat_pengguna()` dari `def` diam-diam tak berefek | middleware merender amplop `spec/04`; `HVX_ENV` wajib + daftar izin; DSN berparameter ditolak saat mulai; batas Redis terpisah; `ikat_pengguna()` menolak |
+| citra dipatok **tag**, pemindai mendapat **soket Docker**; `pip-audit` di Windows melewatkan `uvloop`; `UV_FROZEN` tidak melihat `uv.lock` basi | digest + SHA (dijaga `test_rantai_pasok.py`); citra sebagai tar hanya-baca; penanda platform dibuang; `uv lock --check` + `--locked` |
+| turun melepas `pgcrypto`/`citext` milik basis data; mode offline Alembic crash | `pgcrypto` dicabut dari `spec/01` (tak dipakai sejak PG 13); `citext` tidak dilepas; `--sql` ditolak jelas |
+| dokumen: angka mutasi basi, #3 masih disebut penghambat T0, catatan *“baris keempat dan kelima”* menunjuk baris yang sudah dihapus | dibetulkan |
+
+> 💡💡 **Separuh temuan medium adalah PENEGAK yang lulus tanpa melihat** —
+> kontrak tanpa `exhaustive`, mutasi yang tidak menguji, katalog yang buta.
+> Pola §1 [`../arch/11`](../arch/11-PENEGAKAN.md) berulang **di dalam alat yang
+> dibangun untuk menutupnya**, dan yang menemukannya bukan pembaca yang
+> memeriksa apakah hasilnya benar, melainkan pembaca yang **berusaha membuktikan
+> penegaknya buta**.
+
+### ✅ Yang dibuktikan, bukan dinyatakan
+
+| Klaim | Bukti |
+|---|---|
+| migrasi 0001 == DDL `spec/01` | katalog dua basis data dibandingkan, 13 bagian: tabel · kolom · komentar & hak akses kolom · constraint · index · pemicu · kebijakan RLS · rule · sequence · fungsi · tipe · ekstensi |
+| naik → turun → naik bersih | basis data kembali kosong (kecuali ekstensi yang sudah ada sebelumnya); naik kedua identik dengan yang pertama |
+| **19 dari 26** pemeriksaan `arch/11` jalan | naik dari 12: B-2 · M-1 · M-2 · M-3 (`import-linter`) · M-4 (pohon nyata) · E-3 · A-1 |
+| **19 dari 19** sanggup gagal | 25 mutasi dokumen (tiap mutasi wajib melahirkan temuan **baru**) · 35 mutasi kode — **dan tiap mutasi kode wajib gagal dengan ALASAN yang dimaksud**, bukan sekadar keluar 1 |
+| lima tahap CI hijau | `tools/ci_lokal.py` — **pindai citra menemukan 2 CVE HIGH (libpcre2) di percobaan pertama**; citra kini menambal paket Debian saat dibangun |
+
+🔴 **Alat ukur salah lagi, dua kali, dan keduanya soal alat ukur itu sendiri:**
+`uji_mutasi.py` mengembalikan berkas ber-LF sebagai **CRLF** (terjemahan akhir
+baris `write_text` di Windows); dan **P-3 bisa dibohongi komentar** SQL yang
+menyebut `CHECK … data_subject … user_id`. Keduanya dibetulkan dan dijaga
+mutasi.
 
 ---
 
@@ -271,9 +406,12 @@ namanya dicari di himpunan yang ikut memanen `arch/07`. Diperbaiki ⇒ dua temua
 > **K-14** memanggil agent lain **adalah** pemanggilan tool ([#97](../../issues/97)) ·
 > **K-15** **domain event diambil dari registry, bukan dari kata pertama nama** —
 > 64 nama diganti, V0 tidak bergeser ([#158](../../issues/158)) ·
-> **K-16** 🆕 **`data_subject` + tiga anotasi retensi masuk 23 tabel V0 sekarang**;
+> **K-16** **`data_subject` + tiga anotasi retensi masuk 23 tabel V0 sekarang**;
 > uji yang dipakai: *yang boleh masuk V0 hanyalah yang TIDAK BISA ditambahkan
-> nanti* ([#161](../../issues/161)).
+> nanti* ([#161](../../issues/161)) ·
+> **K-17** 🆕 **arah IMPOR modul V0: `events` di bawah modul domain** — gambar
+> `spec/06` adalah arah data; aturan 6 (tiap tulisan domain menerbitkan event)
+> yang menentukan arah impor.
 >
 > 💡 **Dan satu sapuan baru berbuah dua penutupan:** *“adakah issue yang
 > jawabannya SUDAH ada di `spec/` tetapi issue-nya tak pernah ditutup?”* —
@@ -317,6 +455,7 @@ butir-butir ini. ⚠️ **H-8 dibatalkan** — lihat barisnya.
 | **H-21** | **E-77 — dua tangga 0–4 dengan arti terbalik di ujung atas** | ✅ **Dipisahkan eksplisit: `R` untuk risiko, `L` untuk otonomi — dan keduanya hidup berdampingan di satu berkas.** §11.15 membuka dengan *“kita sudah memiliki R0–R4”* lalu §11.16 memberi tangga otonomi terpisah (L0 Observe · L1 Recommend · L2 Prepare · L3 Ask Confirmation · L4 Execute within Boundaries — **identik dengan §9.26**, daftar yang diulang tanpa bergeser). Manifest §11.5: `risk_level: R1` + `autonomy: {max_level: L2}`. Kalimat *“agent ini Level 4”* tidak bisa lagi berarti dua hal berlawanan. ⭐⭐ Dan §11.15 **memperketat**: R4 kini `DENY` sebagai bawaan (bukan sekadar wajib konfirmasi), didefinisikan sebagai *irreversible*. ⚠️ Aturan pengikat kedua sumbu belum ditulis sebagai tabel — tersirat: R0/R1→L4 · R2→policy · R3→L3 · R4→ditolak; tanpanya `risk_level: R4` + `max_level: L4` bisa lolos validator. Lihat [`180`](180-RISIKO-OTONOMI-BUDGET.md). |
 | **H-22** | **E-68 — manifest agent kelima meruntuhkan `memory.read`/`write`** | ✅ **Manifest keenam §11.5 memulihkan keduanya, plus `purpose`.** `memory: {read: [...], write: [...]}` kembali jadi dua field — sehingga dua batas paling halus [`../spec/05`](../spec/05-AGENT-CONTRACTS.md) bisa dinyatakan lagi (`coach-agent` hanya menulis `coaching_notes`; `memory-agent` membaca semua **kecuali** `journal_raw`). `purpose` kembali setelah hilang sejak naskah 10. ⭐ Ditambah field baru `autonomy.max_level` (→ **H-21**), dan §11.37 memberi `require_confirmation` bentuk policy yang konkret. ⚠️ Yang belum ada di manifest ini: `kind`, `status`, dan **`evaluation.gates`** — yang ketiga adalah gerbang registrasi aturan 4 spec/05; §11.32/§11.55 memberi pengukuran **setelah** jalan, bukan gerbang **sebelum**. Lihat [`177`](177-HIERARKI-REGISTRY-IDENTITAS.md). |
 | **H-23** | **B-24 — Counterfactual menjanjikan jawaban yang causal reasoning melarang** | ✅ **Model transisi punya sumber: galat prediksinya sendiri.** §12.20 memberi loop `Simulation → Prediction → Real World → Actual Outcome → **Prediction Error** → Evaluation → Model Update`, dan §12.19 memberi bentuk konkretnya (`Expected 75 → Actual 61 → Error Analysis`). Itu **jalan keempat** — di luar tiga yang saya usulkan (eksperimen pengguna / pengetahuan umum / perbandingan relatif) — dan prinsipnya sama dengan `Prediction Calibration` §9.34 yang menutup **B-10**: kebenaran acuan **dihasilkan sistem sendiri** dari hasil teramati, tanpa penilai manusia dan tanpa model menilai model. ⭐⭐ Ditambah **§12.14 Assumption Engine** (*“simulation without assumptions is misleading”*) yang membuat yang dipinjam jadi **terlihat dan bisa dibantah**, dan §12.7 yang membandingkan **delapan dimensi antar-skenario** alih-alih meramal hasil — termasuk `Sustainability`, kata yang belum pernah ada. ⚠️ Sisa: loop ini butuh **titik mulai** (lihat **B-27**), dan model tidak boleh memperbarui diri dari satu galat. Lihat [`194`](194-VERSIONING-REPLAY-LEARNING-LOOP.md). |
+| **H-25** | **A-17 — siapa yang mengerjakan V0** ([#3](../../issues/3)) | ✅ **Diputuskan pemilik 16 Sep 2026, untuk MEMULAI:** AI coding agent mengerjakan tugas `spec/07` **di branch dan lewat PR**; **pemilik yang menggabungkan** — baris HUMAN REVIEW §27 tetap milik manusia. Pilihan lain yang ditawarkan dan **tidak** dipilih: *“belum, dokumen saja”* dan *“langsung ke master”* (yang kedua melewati HUMAN REVIEW). ⭐ Sprint 0 dikerjakan hari itu juga. ⚠️ **Yang tetap terbuka di #3 — dan kini lebih nyata, sebab ada PR yang menunggu ditinjau:** 4–6 minggu itu taksiran atau tenggat · berapa jam per minggu tersedia untuk **meninjau** · gerbang mana yang boleh dilewati kalau waktunya mepet. |
 | **H-24** | **A-27 — proyek dengan model biaya yang diakui dan nol fase pendapatan** | ✅ **Phase 14 adalah rumahnya, dan §14.23 memberi tujuh model sekaligus:** *Agent subscription · Usage-based pricing · Marketplace commission · Enterprise licensing · API usage · Agent team subscription · Developer platform*. Butir **E-86** mencatat peta 15 fase §10.41 membuang *Subscription* dan *Revenue Platform* tanpa rumah baru, sementara **H-6** mengakui biaya inferensi berlipat, **B-2** menuntut paket Free nyaris tidak memanggil model besar, dan **E-41** mencatat `Billing` muncul entah dari mana — kini semuanya berlabuh di satu tempat. ⭐ §14.17–§14.18 sekaligus mengembalikan **Enterprise** yang hilang dari peta yang sama, dan §14.24 memberi biaya **per komponen per agent** (`LLM $0.14 · Search $0.08 · Database $0.02`) sehingga pilihan *cheap vs premium* bisa dibuat mesin. ⚠️ Yang tetap terbuka dari **A-6** ([#18](../../issues/18)): **angkanya** — tangga harga dan bagi hasil dengan developer. Tujuh model adalah bentuk, bukan tarif. ⚠️ Dan §14.24 mendaftarkan `risk` sebagai kriteria memilih agent murah vs mahal **tanpa arah**: untuk aksi di atas R2 yang benar adalah agent yang lebih mahal dan lebih terverifikasi (§11.54), bukan sebaliknya. Lihat [`213`](213-EKONOMI-BILLING-ATENSI.md). |
 
 ---

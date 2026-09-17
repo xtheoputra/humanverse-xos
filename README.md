@@ -20,20 +20,21 @@ manusia + agent + data + knowledge + simulation + automation**.
 
 | Hal | Keadaan |
 |---|---|
-| Tahap | **Master Architecture v2.0 selesai** — spesifikasi V0 siap, belum ada kode produksi (disengaja) |
-| Berkas **kode produksi** | **0** — menunggu [#3](../../issues/3) |
-| Berkas **perkakas dokumen** | **2** — [`tools/`](tools/README.md): `periksa_dokumen.py` menjalankan **12 dari 26** pemeriksaan [`arch/11`](arch/11-PENEGAKAN.md) tanpa kode produksi; `uji_mutasi.py` membuktikan kedua belasnya **sanggup gagal** |
+| Tahap | 🔨 **Sprint 0 dikodekan** (16 Sep 2026) — branch `v0/sprint-0-foundation`, **menunggu HUMAN REVIEW pemilik** |
+| Berkas **kode produksi** | **0 di `master`** · **Sprint 0 (8 dari 51 tugas `spec/07`) di branch** — [#3](../../issues/3) dijawab pemilik untuk memulai (**H-25**): AI coding agent di branch + PR, pemilik yang menggabungkan |
+| Berkas **perkakas** | **4** — [`tools/`](tools/README.md): `periksa_dokumen.py` · `uji_mutasi.py` · 🆕 `uji_mutasi_kode.py` · 🆕 `ci_lokal.py`. Di branch Sprint 0: **19 dari 26** pemeriksaan [`arch/11`](arch/11-PENEGAKAN.md) jalan (di `master`: 12) |
 | Repo git | privat `xtheoputra/humanverse-xos`, branch `master` |
 | Dokumen | **272 berkas** di `docs/` + **8 berkas** di `spec/` + **12 berkas** di [`arch/`](arch/README.md) |
-| Gerbang yang **sudah dijalankan** | **11 ✅ · R-1 🛑 7 temuan** (keputusan cakupan pemilik) — `python tools/periksa_dokumen.py`, **manual** |
-| Merahnya **terbukti bisa terjadi** | **12 dari 12** — `python tools/uji_mutasi.py` |
+| Gerbang yang **sudah dijalankan** | **14 ✅ · R-1 🛑 7 temuan** (keputusan cakupan pemilik) · **15 kontrak `import-linter`** · CI lokal **lint → typecheck → test → build → scan hijau** — `uv run python tools/ci_lokal.py`, **manual** |
+| Merahnya **terbukti bisa terjadi** | **19 dari 19** — 25 mutasi dokumen (tiap mutasi wajib melahirkan temuan **baru**) + 35 mutasi kode (tiap mutasi wajib gagal dengan **alasan yang dimaksud**) · **tiap kontrak `import-linter` punya mutasinya sendiri** |
 | ⚠️ Gerbang **otomatis** | 🛑 **belum pernah jalan** — GitHub Actions terhalang tagihan akun ([#160](../../issues/160)) |
 | Naskah pemilik | **24** — terakhir: **Phase 20 Civilization Platform** (39 bagian) — **fase TERAKHIR** |
-| Keputusan tertutup | **24 butir H** — nama · MVP · struktur repo · ambang konfirmasi · model memory · memory meluruh · gerbang policy · context package · dua tangga R/L · manifest dipulihkan · **model transisi belajar dari galat sendiri** · **monetisasi punya fase (Phase 14)**. ✅ **H-20 (peta fase) DIPULIHKAN sebagai [`arch/01`](arch/01-PETA-20-FASE.md) — peta versi 3, 20 baris TERTUTUP, dan peta kini BERNOMOR VERSI** sehingga *“roadmap yang sudah kita tetapkan”* selalu punya rujukan yang bisa dibuka ([#101](../../issues/101) · [#108](../../issues/108) · [#132](../../issues/132) · [#133](../../issues/133) · [#142](../../issues/142)). ✅ **H-13 ([#72](../../issues/72)) DISELESAIKAN:** `Phase` dan `V0–V6` bukan dua rencana yang bersaing melainkan **dua sumbu** — `Phase` menghitung dokumen, `V` menghitung rilis. ⚠️ **H-11** ([#78](../../issues/78)) masih perlu ditinjau ulang |
-| Keputusan terbuka | **26 pertanyaan A** · **39 risiko B** · **158 ketidakcocokan E** · **20 lubang G** — dan **16 butir K** sudah saya putuskan sendiri |
-| Tanggal dokumen | 11 September 2026 |
+| Keputusan tertutup | **25 butir H** — 🆕 **H-25 siapa mengerjakan V0** · nama · MVP · struktur repo · ambang konfirmasi · model memory · memory meluruh · gerbang policy · context package · dua tangga R/L · manifest dipulihkan · **model transisi belajar dari galat sendiri** · **monetisasi punya fase (Phase 14)**. ✅ **H-20 (peta fase) DIPULIHKAN sebagai [`arch/01`](arch/01-PETA-20-FASE.md) — peta versi 3, 20 baris TERTUTUP, dan peta kini BERNOMOR VERSI** sehingga *“roadmap yang sudah kita tetapkan”* selalu punya rujukan yang bisa dibuka ([#101](../../issues/101) · [#108](../../issues/108) · [#132](../../issues/132) · [#133](../../issues/133) · [#142](../../issues/142)). ✅ **H-13 ([#72](../../issues/72)) DISELESAIKAN:** `Phase` dan `V0–V6` bukan dua rencana yang bersaing melainkan **dua sumbu** — `Phase` menghitung dokumen, `V` menghitung rilis. ⚠️ **H-11** ([#78](../../issues/78)) masih perlu ditinjau ulang |
+| Keputusan terbuka | **26 pertanyaan A** · **41 risiko B** · **158 ketidakcocokan E** · **20 lubang G** — dan **18 butir K** sudah saya putuskan sendiri |
+| Tanggal dokumen | 17 September 2026 |
 
-> ⚠️ **Nol baris kode itu disengaja — dan penghambatnya terus berkurang.**
+> ⚠️ **Nol baris kode di `master` itu disengaja sampai 16 Sep 2026 — dan kini
+> tinggal menunggu HUMAN REVIEW Sprint 0.**
 > Lima naskah sudah menjawab: **nama** (A-7), **MVP** (A-2), **struktur repo**
 > (E-27), **Weather/Calendar = tool** (E-2/E-28), **empat penyimpanan bukan
 > enam** (A-10), **V0–V6 sebagai rencana kanonik** (A-18), dan **Confidence
@@ -48,8 +49,9 @@ manusia + agent + data + knowledge + simulation + automation**.
 > Neo4j baru di V2 · **#33** memory → **sudah ditutup** (`kind` + `scope`, plus
 > `tier` dari H-16).
 >
-> 🛑 **Penghambat untuk MEMULAI kode tinggal SATU: [#3](../../issues/3)**
-> — siapa yang mengerjakan 12 fitur dalam 4–6 minggu.
+> ✅ **Penghambat untuk MEMULAI kode: NOL.** [#3](../../issues/3) dijawab pemilik
+> 16 Sep 2026 (**H-25**) — AI coding agent mengerjakan di branch + PR, pemilik
+> yang menggabungkan. Yang tersisa di #3 soal **waktu**, bukan soal siapa.
 > [#20](../../issues/20) (merek & domain) memblokir **peluncuran**, bukan
 > pengkodean ([`arch/10`](arch/10-URUTAN-IMPLEMENTASI.md) §2).
 > ⭐ Dan **T0–T5** dari tiga belas tahap implementasi **tidak diblokir satu pun
@@ -68,6 +70,49 @@ manusia + agent + data + knowledge + simulation + automation**.
 > untuk tabel berisi **45**, dan satu nama event tulisan pemilik
 > (`MeetingCreated`) **tidak pernah sampai ke tabel padanan**. Ketiganya
 > diselesaikan; **V0 tidak bergeser — 22 event tetap 22.**
+
+---
+
+## 🔨 Sprint 0 — kode pertama (16 Sep 2026)
+
+Pemilik memilih: **AI coding agent mengerjakan di branch + PR, pemilik yang
+menggabungkan** (**H-25**, [#3](../../issues/3)). Sprint 0
+[`spec/07`](spec/07-BACKLOG-V0.md) dikerjakan penuh — satu commit per tugas.
+
+| | Yang dibangun | Bukti mesin |
+|---|---|---|
+| 0.1 | monorepo + workspace `uv`; [`AGENTS.md`](AGENTS.md) · [`ARCHITECTURE.md`](ARCHITECTURE.md) · [`CONTRIBUTING.md`](CONTRIBUTING.md) · [`SECURITY.md`](SECURITY.md) | `uv lock --check` · `uv sync --locked` |
+| 0.2 | [`docker-compose.yml`](docker-compose.yml): PostgreSQL 16 · Redis 7 · migrate · api | `docker compose up --wait` → semua sehat |
+| 0.3 | `apps/api` FastAPI + `GET /health` | `200 {status, version, db, redis}` · `503` kalau satu mati |
+| 0.4 | Alembic + migrasi 0001 — 23 tabel, `data_subject` + anotasi retensi | katalog migrasi **==** DDL `spec/01`; naik → turun → naik identik |
+| 0.5 | log JSON + `request_id` | tiap baris punya `request_id` & `user_id`; penutup punya `latency_ms` |
+| 0.6 | `pytest` + cakupan | **≥ 70 %** (tercapai 93 %) |
+| 0.7 | CI `lint → typecheck → test → build → scan` | [`tools/ci_lokal.py`](tools/ci_lokal.py) — satu sumber untuk lokal & Actions |
+| 0.8 | batas modul + batas keras | **15 kontrak `import-linter`**, tiap kontrak terbukti sanggup gagal |
+
+🔴 **Menulis kodenya menemukan empat hal yang tujuh sesi membaca tidak
+temukan** — [`docs/99-CATATAN-AUDIT.md`](docs/99-CATATAN-AUDIT.md):
+**E-161** `set_updated_at()` didefinisikan tetapi **nol pemicu** di 11 tabel ·
+**G-24** 21 baris markdown **di dalam** blok SQL `spec/01` — DDL-nya tidak bisa
+dijalankan · **E-162** `arch/06` §3 menyebut `CHECK` milik tabel lain ·
+🛑 **B-40** `REVOKE` di `audit_logs` **tidak menghalangi** role yang dipakai api —
+`UPDATE` & `DELETE` lolos, dan superuser melewati RLS. Yang terakhir dicatat di
+`spec/07` tepat sebelum tugas 1.5–1.6 yang bergantung padanya.
+
+🚨 **Dan pindai citra merah di percobaan pertama**: 2 CVE HIGH (libpcre2) di
+citra dasar Debian — gerbangnya berbunyi, citranya kini menambal paket saat
+dibangun.
+
+🔍 **Sebelum PR dibuka: tinjauan AI adversarial** — enam lensa, dan tiap temuan
+diserahkan ke verifikator yang berusaha **membantahnya**. **35 temuan, 33
+bertahan** (16 medium · 17 low · 0 high): **32 dibetulkan** di branch yang sama,
+**1 dicatat** — 🛑 **B-41** `user_id` baris anak tidak diikat ke induknya
+(11 FK), dicatat di `spec/07` sebelum tugas 2.1. Separuh temuan medium adalah
+**penegak yang lulus tanpa melihat**: modul ke-13 lolos semua kontrak, 10 dari
+12 kontrak M-2 tak pernah dibuktikan sanggup gagal, pembanding katalog buta
+terhadap sepuluh perbedaan skema, dan satu mutasi R-1 dihitung berbunyi tanpa
+menguji apa pun. Rinciannya:
+[`docs/99-CATATAN-AUDIT.md`](docs/99-CATATAN-AUDIT.md).
 
 ---
 
@@ -205,10 +250,10 @@ di antaranya*), §16.5 (*tujuan manusia langsung ke kendali sendi*), §16.7
 (*punya `Collision Check`, tetapi itu menjawab "aman secara fisik", bukan
 "boleh dilakukan"*).
 
-## 🔧 Empat belas keputusan yang diambil sendiri — [`docs/KEPUTUSAN-DIDELEGASIKAN.md`](docs/KEPUTUSAN-DIDELEGASIKAN.md)
+## 🔧 Delapan belas keputusan yang diambil sendiri — [`docs/KEPUTUSAN-DIDELEGASIKAN.md`](docs/KEPUTUSAN-DIDELEGASIKAN.md)
 
 Atas permintaan pemilik (*"beri keputusan sendiri sesuai aturan"*, 9 Sep 2026),
-**empat belas** pertanyaan **engineering** diputuskan dan ditegakkan di `spec/`
+**delapan belas** pertanyaan **engineering** diputuskan dan ditegakkan di `spec/`
 dan `arch/` — tiap butir dengan **bacaan yang ditolak** dan **cara
 membalikkannya**:
 
@@ -229,7 +274,9 @@ membalikkannya**:
 | **K-13** 🆕 | Bahasa backend = **Python + FastAPI** — `spec/` diam-diam berganti bahasa | `spec/06` · `spec/07` |
 | **K-14** | **Memanggil agent lain ADALAH pemanggilan tool**; agent memakai `max_risk`, bukan `risk_level` | `spec/01` · `spec/05` aturan 3 |
 | **K-15** | **Domain event diambil dari registry, bukan dari kata pertama nama** — K-3 benar sebagai transkripsi, tidak pernah jadi aturan kepemilikan | `spec/03` (64 nama) · `arch/07` §2 §4 §6 |
-| **K-16** 🆕 | **`data_subject` + tiga anotasi retensi masuk 23 tabel V0 sekarang** — uji yang dipakai: *yang boleh masuk V0 hanyalah yang TIDAK BISA ditambahkan nanti* | `spec/01` · `spec/07` 0.4 · `arch/06` §5 §6 |
+| **K-16** | **`data_subject` + tiga anotasi retensi masuk 23 tabel V0 sekarang** — uji yang dipakai: *yang boleh masuk V0 hanyalah yang TIDAK BISA ditambahkan nanti* | `spec/01` · `spec/07` 0.4 · `arch/06` §5 §6 |
+| **K-17** | **Arah IMPOR modul V0: `events` di bawah modul domain** — gambar `spec/06` arah data; aturan 6 (tiap tulisan domain menerbitkan event) menentukan arah impor | `pyproject.toml` kontrak `m1-m3-lapisan` |
+| **K-18** 🆕 | **Satu commit per tugas; PR boleh satu per sprint** — harga yang diakui: hanya commit terakhir yang dijamin lulus gerbang penuh | `spec/07` · `CONTRIBUTING.md` |
 
 🛑 **Yang sengaja TIDAK saya putuskan:** [#139](../../issues/139) (waktu pemilik) ·
 [#3](../../issues/3) (orang) · [#20](../../issues/20) (merek) · **seluruh butir C**
@@ -311,8 +358,8 @@ dan fase yang masih tersisa”*), menjawab penutup naskah 24 dan
 | [`arch/07`](arch/07-EVENT-CONTRACTS.md) | satu amplop; **39 domain terdaftar**; aturan apa yang **bukan** event |
 | [`arch/08`](arch/08-AGENT-CONTRACTS.md) | **59 nama** diuji K-5; Konstitusi §20.16 diberi **penegak per pasal** |
 | [`arch/09`](arch/09-DEPLOYMENT-TOPOLOGY.md) | D0–D5 dengan **pemicu terukur**; apa yang tak boleh meninggalkan perangkat |
-| [`arch/10`](arch/10-URUTAN-IMPLEMENTASI.md) | **T0–T12** — dan **T0–T5 tidak diblokir keputusan apa pun kecuali [#3](../../issues/3)** |
-| [`arch/11`](arch/11-PENEGAKAN.md) | **25 pemeriksaan CI**; **4 bisa jalan sekarang tanpa kode** |
+| [`arch/10`](arch/10-URUTAN-IMPLEMENTASI.md) | **T0–T12** — dan **T0–T5 tidak diblokir keputusan apa pun**; [#3](../../issues/3) dijawab (**H-25**) |
+| [`arch/11`](arch/11-PENEGAKAN.md) | **26 pemeriksaan CI**; **19 jalan** di branch Sprint 0; blok ` ```penegak ` yang dibaca uji |
 
 🛑 **Nol butir C diputuskan.** Yang menyangkut hukum, uang, orang, dan cakupan
 produk tetap milik pemilik — `arch/` menyediakan **mekanisme yang menegakkan apa
