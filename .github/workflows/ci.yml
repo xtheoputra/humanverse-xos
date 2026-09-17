@@ -1,0 +1,120 @@
+name: ci
+
+# spec/07 tugas 0.7 — lint → typecheck → test → build → scan.
+# PR merah kalau SALAH SATU tahap merah (tiap job bergantung pada job sebelumnya).
+#
+# 🔑 Isi tiap tahap TIDAK ditulis di sini. Tiap job memanggil
+#    `tools/ci_lokal.py <tahap>` — satu sumber urutan perintah untuk Actions dan
+#    mesin lokal. Dua daftar perintah akan menyimpang tanpa ada yang tahu.
+#
+# 🛑 Selama #160 belum dibuka pemilik (Actions terhalang tagihan akun), berkas
+#    ini TIDAK BERJALAN. Gerbang yang sungguh berjalan:
+#      uv run --locked python tools/ci_lokal.py
+#    dijalankan manual sebelum PR dibuka, dan hasilnya ditempel di PR.
+# ⚠️ Dan PR yang merah pun TIDAK terhalang digabung: perlindungan branch &
+#    ruleset tidak tersedia untuk repo privat pada paket akun ini (HTTP 403).
+#    Gerbang penggabungan adalah HUMAN REVIEW pemilik (H-25), bukan cek status.
+#
+# Aksi pihak ketiga dipatok ke SHA commit dan citra ke digest: tag bisa
+# dipindahkan. Dijaga tests/unit/test_rantai_pasok.py.
+
+on:
+  pull_request:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHONIOENCODING: utf-8
+  # --locked: uv.lock yang tidak cocok lagi dengan pyproject GAGAL, bukan dipakai diam-diam.
+  UV_LOCKED: "1"
+
+jobs:
+  lint:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+        with:
+          version: "0.12.15"
+          python-version: "3.12"
+          enable-cache: true
+      - run: uv sync
+      - run: uv run python tools/ci_lokal.py lint
+
+  typecheck:
+    needs: lint
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+        with:
+          version: "0.12.15"
+          python-version: "3.12"
+          enable-cache: true
+      - run: uv sync
+      - run: uv run python tools/ci_lokal.py typecheck
+
+  test:
+    needs: typecheck
+    runs-on: ubuntu-24.04
+    services:
+      postgres:
+        image: postgres:16-alpine@sha256:cf78e76683b9ca8c5733cbbdce6c9262b45b6767934dd0a95e671f9a0fc20685
+        env:
+          POSTGRES_USER: hvx
+          POSTGRES_PASSWORD: hvx-ci-only
+          POSTGRES_DB: hvx
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U hvx -d hvx"
+          --health-interval 5s --health-timeout 3s --health-retries 20
+      redis:
+        image: redis:7-alpine@sha256:ff02b58f971e7d7d156a1267e283fcbbeee91773b6aa36c49dac28ecfe28eadf
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s --health-timeout 3s --health-retries 20
+    env:
+      HVX_TEST_DATABASE_URL: postgresql://hvx:hvx-ci-only@127.0.0.1:5432/hvx
+      HVX_TEST_REDIS_URL: redis://127.0.0.1:6379/0
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+        with:
+          version: "0.12.15"
+          python-version: "3.12"
+          enable-cache: true
+      - run: uv sync
+      - run: uv run python tools/ci_lokal.py test
+
+  # build dan scan SATU job: job Actions tidak berbagi daemon Docker, dan yang
+  # dipindai wajib citra yang barusan dibangun dan diuji asap — bukan bangunan
+  # ulang yang bisa berbeda (apt upgrade saat membangun).
+  build-scan:
+    needs: test
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+        with:
+          version: "0.12.15"
+          python-version: "3.12"
+          enable-cache: true
+      - run: uv sync
+      - run: uv run python tools/ci_lokal.py build scan
