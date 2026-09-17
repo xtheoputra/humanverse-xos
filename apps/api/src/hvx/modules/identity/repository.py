@@ -74,3 +74,72 @@ _PENGGUNA = text(
 async def ambil_pengguna(conn: AsyncConnection, user_id: UUID) -> PenggunaRingkas | None:
     baris = (await conn.execute(_PENGGUNA, {"user_id": user_id})).mappings().first()
     return PenggunaRingkas.model_validate(dict(baris)) if baris else None
+
+
+# ── consents (spec/07 1.4) ──────────────────────────────────────────────────
+# `created_at = clock_timestamp()`, bukan bawaan `now()`: now() membeku di awal
+# transaksi, sehingga "cabut lalu setujui lagi" dalam satu transaksi akan punya
+# waktu yang SAMA — dan urutan riwayat yang hanya-tambah jadi tak tentu.
+_SISIP_PERSETUJUAN = text(
+    """
+    INSERT INTO consents
+      (user_id, kind, purpose, data_scopes, granted, policy_version, source,
+       granted_at, revoked_at, expires_at, created_at)
+    VALUES
+      (:user_id, :kind, :purpose, :data_scopes, :granted, :policy_version, :source,
+       CASE WHEN :granted THEN clock_timestamp() END,
+       CASE WHEN :dicabut THEN clock_timestamp() END,
+       :expires_at, clock_timestamp())
+    """
+)
+
+# Satu baris TERAKHIR per tujuan — riwayat hanya-tambah dibaca dari ujungnya.
+_PERSETUJUAN_TERAKHIR = text(
+    """
+    SELECT DISTINCT ON (purpose) purpose, granted, data_scopes, expires_at,
+           (expires_at IS NULL OR expires_at > now()) AS masih_berlaku
+    FROM consents
+    WHERE user_id = :user_id AND purpose = ANY(:tujuan)
+    ORDER BY purpose, created_at DESC
+    """
+)
+
+
+async def tambah_persetujuan(
+    conn: AsyncConnection,
+    *,
+    user_id: UUID,
+    kind: str,
+    purpose: str,
+    data_scopes: list[str],
+    granted: bool,
+    dicabut: bool,
+    policy_version: str,
+    source: str,
+    expires_at: object | None,
+) -> None:
+    await conn.execute(
+        _SISIP_PERSETUJUAN,
+        {
+            "user_id": user_id,
+            "kind": kind,
+            "purpose": purpose,
+            "data_scopes": data_scopes,
+            "granted": granted,
+            "dicabut": dicabut,
+            "policy_version": policy_version,
+            "source": source,
+            "expires_at": expires_at,
+        },
+    )
+
+
+async def persetujuan_terakhir(
+    conn: AsyncConnection, user_id: UUID, tujuan: list[str]
+) -> dict[str, tuple[bool, frozenset[str], bool]]:
+    """{purpose: (granted, data_scopes, masih_berlaku)}; tujuan tanpa riwayat tidak muncul."""
+    hasil = await conn.execute(_PERSETUJUAN_TERAKHIR, {"user_id": user_id, "tujuan": tujuan})
+    return {
+        b.purpose: (bool(b.granted), frozenset(b.data_scopes or ()), bool(b.masih_berlaku))
+        for b in hasil
+    }

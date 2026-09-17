@@ -263,6 +263,23 @@ MUTASI: list[Mutasi] = [
         harus_memuat="assert 200 == 400",
         kelompok="db",
     ),
+    Mutasi(
+        "1.4",
+        "pembatasan tujuan lupa memeriksa cakupan data — persetujuan 'habits' meloloskan 'journal'",
+        [
+            Sunting(
+                f"{MODUL}/identity/persetujuan.py",
+                "if not (diberikan and masih_berlaku and cakupan <= cakupan_disetujui):",
+                "if not (diberikan and masih_berlaku):",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_persetujuan.py"
+            "::test_tujuan_dan_cakupan_harus_tercakup_persetujuan_terakhir"
+        ),
+        harus_memuat="assert not True",
+        kelompok="db",
+    ),
     # ── peta penegak arch/11 §6 ──────────────────────────────────────────
     Mutasi(
         "§6",

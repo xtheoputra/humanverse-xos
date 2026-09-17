@@ -152,14 +152,31 @@ CREATE TABLE consents (
                    CHECK (source IN ('app','import','admin')),
   granted_at     timestamptz,
   revoked_at     timestamptz,
-  created_at     timestamptz NOT NULL DEFAULT now()
+  created_at     timestamptz NOT NULL DEFAULT now(),
+  -- spec/07 1.4 · B-22 · naskah 12 §8.9 (Why · Scope · Duration) — migrasi 0002
+  purpose        text NOT NULL CHECK (purpose ~ '^[a-z][a-z0-9_]{0,62}$'),
+  data_scopes    text[] NOT NULL DEFAULT '{}',
+  expires_at     timestamptz
 );
 CREATE INDEX consents_user_kind_idx ON consents (user_id, kind, created_at DESC);
+CREATE INDEX consents_user_purpose_idx ON consents (user_id, purpose, created_at DESC);
 ```
 
 > Riwayat persetujuan **append-only** — baris lama tidak diubah, pencabutan
 > ditulis sebagai baris baru. Itu yang membuat *"kapan dia setuju apa"* bisa
 > dijawab setahun kemudian (naskah 5 §25 *Consent management*).
+>
+> 🔧 **`purpose` · `data_scopes` · `expires_at` — spec/07 1.4, B-22
+> ([#59](../../issues/59)), 17 Sep 2026 (migrasi 0002).** Naskah 12 §8.9 memberi
+> persetujuan sembilan sifat; tiga yang tidak punya kolom — **Why/Purpose**,
+> **What/Scope**, **Duration** — kini punya. Aturan pembatasan tujuan §8.10
+> menjadi satu operasi himpunan yang dijalankan mesin
+> (`identity.boleh_dipakai_untuk`): **tiap tujuan pemakaian wajib punya
+> persetujuan TERAKHIR untuk tujuan itu yang `granted`, belum kedaluwarsa, dan
+> `data_scopes`-nya mencakup data yang dipakai** — tanpa itu, ditolak.
+> `purpose` berbentuk `snake_case` bebas (`fitness_recommendation` di naskah);
+> kosakata finalnya keputusan pemilik (#59 butir 2), bukan `CHECK` di sini.
+> Menolak `model_training` **tidak mengurangi layanan** (#59).
 
 ```sql
 -- @retention   : until-account-deleted
