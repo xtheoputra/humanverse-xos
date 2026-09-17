@@ -53,6 +53,11 @@ class Settings(BaseSettings):
     access_token_ttl_s: int = Field(default=900, ge=60, le=86_400)
     refresh_token_ttl_s: int = Field(default=2_592_000, ge=3_600, le=7_776_000)
 
+    # Umur MAKSIMAL cache keputusan izin (spec/07 1.5). Pencabutan tidak
+    # menunggu angka ini — generasi cache diganti saat izin berubah; angka ini
+    # hanya membatasi berapa lama perubahan di LUAR mesin izin tak terlihat.
+    permission_cache_ttl_s: int = Field(default=300, ge=1, le=3_600)
+
     # Kunci HMAC untuk `audit_logs.ip_hash` (spec/01: "hash, bukan IP mentah")
     # dan kunci batas laju per IP. WAJIB, tanpa bawaan: sha256 polos atas IPv4
     # bisa dibalik dengan mencoba keempat miliar alamat, dan kunci acak per

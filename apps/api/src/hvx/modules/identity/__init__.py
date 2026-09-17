@@ -11,6 +11,7 @@ Berkas ini satu-satunya pintu keluar modul (spec/06 aturan 1).
 
 from .audit import AktorTipe, AuditTidakSah, audit
 from .dependensi import PenggunaDiperlukan, PenggunaMasuk, pengguna_saat_ini, penyimpan_sesi
+from .izin import Aksi, IzinTidakSah, Keputusan, MesinIzin, Subjek, SubjekTipe, mesin_izin
 from .persetujuan import (
     TUJUAN_LAYANAN,
     TUJUAN_PELATIHAN_MODEL,
@@ -29,9 +30,13 @@ from .sesi import HasilPenyegaran, PenyimpanSesi, SesiAktif, Token
 __all__ = [
     "TUJUAN_LAYANAN",
     "TUJUAN_PELATIHAN_MODEL",
+    "Aksi",
     "AktorTipe",
     "AuditTidakSah",
     "HasilPenyegaran",
+    "IzinTidakSah",
+    "Keputusan",
+    "MesinIzin",
     "PendengarPendaftaran",
     "PenggunaBaru",
     "PenggunaDiperlukan",
@@ -41,12 +46,15 @@ __all__ = [
     "Persetujuan",
     "PersetujuanTidakSah",
     "SesiAktif",
+    "Subjek",
+    "SubjekTipe",
     "Token",
     "ambil_pengguna",
     "audit",
     "boleh_dipakai_untuk",
     "cabut_persetujuan",
     "catat_persetujuan",
+    "mesin_izin",
     "pengguna_saat_ini",
     "penyimpan_sesi",
     "router",

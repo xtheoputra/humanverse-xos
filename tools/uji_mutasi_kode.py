@@ -131,6 +131,7 @@ TRIGGER_HABITS = (
     "            FOR EACH ROW EXECUTE FUNCTION set_updated_at();"
 )
 UJI_KEPEMILIKAN = "tests/integration/test_kepemilikan_data.py"
+UJI_IZIN = "tests/integration/test_izin.py"
 FK_MILESTONE = (
     "  FOREIGN KEY (goal_id, user_id) REFERENCES goals (id, user_id) ON DELETE CASCADE" + NL + ");"
 )
@@ -278,6 +279,73 @@ MUTASI: list[Mutasi] = [
             "::test_tujuan_dan_cakupan_harus_tercakup_persetujuan_terakhir"
         ),
         harus_memuat="assert not True",
+        kelompok="db",
+    ),
+    # ── mesin izin (spec/07 1.5): default ask · kedaluwarsa · cache yang jujur ─
+    Mutasi(
+        "1.5",
+        "tanpa keputusan tersimpan dijawab allow — agent lolos tanpa pernah ditanya",
+        [
+            Sunting(
+                f"{MODUL}/identity/izin.py",
+                "        if baris is None:" + NL + '            return "ask", self._ttl_ms' + NL,
+                "        if baris is None:" + NL + '            return "allow", self._ttl_ms' + NL,
+            )
+        ],
+        _pytest(f"{UJI_IZIN}::test_tanpa_keputusan_tersimpan_jawabannya_ask"),
+        harus_memuat="assert 'allow' == 'ask'",
+        kelompok="db",
+    ),
+    Mutasi(
+        "1.5",
+        "izin kedaluwarsa tetap berlaku — 'izinkan sekali' menjadi izin permanen",
+        [Sunting(f"{MODUL}/identity/izin.py", "        if sisa_ms <= 0:", "        if False:")],
+        _pytest(f"{UJI_IZIN}::test_izin_kedaluwarsa_kembali_ke_ask"),
+        harus_memuat="assert 'allow' == 'ask'",
+        kelompok="db",
+    ),
+    Mutasi(
+        "1.5",
+        "cache izin sementara berumur penuh — hidup melewati expires_at izinnya",
+        [
+            Sunting(
+                f"{MODUL}/identity/izin.py",
+                "min(self._ttl_ms, sisa_ms)",
+                "self._ttl_ms",
+            )
+        ],
+        _pytest(f"{UJI_IZIN}::test_cache_izin_sementara_tidak_hidup_lebih_lama_dari_izinnya"),
+        harus_memuat="cache hidup lebih lama dari izinnya",
+        kelompok="db",
+    ),
+    Mutasi(
+        "1.5",
+        "generasi tak diganti sesudah commit — pembaca lambat menghidupkan izin yang dicabut",
+        [
+            Sunting(
+                f"{MODUL}/identity/izin.py",
+                "ditinggalkan." + NL + "        await self._ganti_generasi(user_id)" + NL,
+                "ditinggalkan." + NL,
+            )
+        ],
+        _pytest(f"{UJI_IZIN}::test_pembaca_di_tengah_pencabutan_tidak_menghidupkan_kembali_izin"),
+        harus_memuat="pembaca lambat menghidupkan kembali izin yang dicabut",
+        kelompok="db",
+    ),
+    Mutasi(
+        "1.5",
+        "generasi tak diganti sebelum commit — Redis putus meninggalkan izin lama di cache",
+        [
+            Sunting(
+                f"{MODUL}/identity/izin.py",
+                "        await self._ganti_generasi(user_id)"
+                + NL
+                + "        async with platform.transaksi_pengguna(",
+                "        async with platform.transaksi_pengguna(",
+            )
+        ],
+        _pytest(f"{UJI_IZIN}::test_redis_putus_sesudah_commit_tidak_meninggalkan_izin_lama"),
+        harus_memuat="izin yang dicabut masih dijawab cache lama",
         kelompok="db",
     ),
     # ── identity (spec/07 1.1): argon2id · rotasi · fungsi SECURITY DEFINER ─
