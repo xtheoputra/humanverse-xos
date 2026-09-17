@@ -233,6 +233,20 @@ MUTASI: list[Mutasi] = [
         _pytest("tests/unit/test_batas_tabel.py"),
         harus_memuat="`identity` menyebut `goals`",
     ),
+    # ── sidik IP (spec/01 audit_logs.ip_hash): hash, bukan IP mentah ─────
+    Mutasi(
+        "1.1",
+        "sidik IP sha256 polos tanpa kunci — IPv4 bisa dibalik dengan mencoba 2³² alamat",
+        [
+            Sunting(
+                f"{MODUL}/platform/keadaan.py",
+                "hmac.new(kunci, request.client.host.encode(), hashlib.sha256).hexdigest()",
+                "hashlib.sha256(request.client.host.encode()).hexdigest()",
+            )
+        ],
+        _pytest("tests/unit/test_sidik_ip.py::test_sidik_ip_berkunci_bukan_sha256_polos"),
+        harus_memuat="sidik IP bisa dibalik tanpa kunci",
+    ),
     # ── sesi (spec/07 1.2): dicabut → 401 seketika ───────────────────────
     Mutasi(
         "1.2",
