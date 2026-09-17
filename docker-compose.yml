@@ -1,0 +1,53 @@
+# HumanVerse XOS — V0 lokal (arch/09 §1, tahap D0). spec/07 tugas 0.2.
+#
+#   docker compose up -d --wait          # keduanya, tunggu sampai sehat
+#   docker compose up -d --wait postgres redis   # hanya ketergantungan (untuk uji)
+#
+# Port — semuanya HANYA di 127.0.0.1, tidak terbuka ke jaringan lokal:
+#
+#   | Layanan  | Port hos (bawaan) | Ganti lewat          |
+#   |----------|-------------------|----------------------|
+#   | postgres | 5432              | HVX_POSTGRES_PORT    |
+#   | redis    | 6379              | HVX_REDIS_PORT       |
+#
+# ⚠️ Kredensial bawaan di bawah KHUSUS pengembangan lokal (`*-dev-only`) dan
+#    tidak pernah dipakai di lingkungan lain. Tahap D1+ membaca rahasia dari
+#    lingkungan, bukan dari berkas ini (arch/09 §5 aturan 3). Salin
+#    `.env.example` → `.env` untuk menggantinya.
+
+name: humanverse-xos
+
+services:
+  postgres:
+    image: postgres:16-alpine@sha256:cf78e76683b9ca8c5733cbbdce6c9262b45b6767934dd0a95e671f9a0fc20685
+    environment:
+      POSTGRES_USER: ${HVX_POSTGRES_USER:-hvx}
+      POSTGRES_PASSWORD: ${HVX_POSTGRES_PASSWORD:-hvx-dev-only}
+      POSTGRES_DB: ${HVX_POSTGRES_DB:-hvx}
+    ports:
+      - "127.0.0.1:${HVX_POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
+
+  redis:
+    image: redis:7-alpine@sha256:ff02b58f971e7d7d156a1267e283fcbbeee91773b6aa36c49dac28ecfe28eadf
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "127.0.0.1:${HVX_REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  postgres-data:
+  redis-data:
