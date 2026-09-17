@@ -71,6 +71,9 @@ def create_app(settings: platform.Settings | None = None) -> FastAPI:
     # mengumumkan pendaftaran, profile membuat profil — di transaksi yang sama.
     app.state.pendengar_pendaftaran = (profile.buat_profil_awal,)
     platform.pasang_penangan_galat(app)
+    # Yang ditambahkan TERAKHIR paling luar: 429 batas laju tetap membawa
+    # X-Request-ID dan tercatat di baris `request.completed`.
+    app.add_middleware(platform.BatasLajuIpMiddleware)
     app.add_middleware(platform.RequestContextMiddleware)
     app.include_router(platform.router)
     app.include_router(identity.router)

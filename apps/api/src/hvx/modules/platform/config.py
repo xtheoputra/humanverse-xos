@@ -22,6 +22,9 @@ from .db import url_async
 
 Lingkungan = Literal["local", "test", "ci", "production"]
 
+# "jumlah/detik" — lihat batas_laju.py
+POLA_BATAS = r"^[1-9][0-9]{0,5}/[1-9][0-9]{0,5}$"
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="HVX_", extra="ignore", frozen=True)
@@ -57,6 +60,15 @@ class Settings(BaseSettings):
     # menunggu angka ini — generasi cache diganti saat izin berubah; angka ini
     # hanya membatasi berapa lama perubahan di LUAR mesin izin tak terlihat.
     permission_cache_ttl_s: int = Field(default=300, ge=1, le=3_600)
+
+    # Batas laju (spec/07 1.7), "jumlah/detik": boleh meledak sampai `jumlah`,
+    # lalu terisi satu tiap `detik/jumlah`. Satuan kuncinya di sebelah kanan.
+    rate_limit_ip: str = Field(default="600/60", pattern=POLA_BATAS)  # seluruh /v1/*, per IP (/64)
+    rate_limit_user: str = Field(default="300/60", pattern=POLA_BATAS)  # rute bersesi, per pengguna
+    rate_limit_auth_ip: str = Field(default="30/600", pattern=POLA_BATAS)  # daftar & masuk, per IP
+    # Login GAGAL beruntun per akun — NIST SP 800-63B-4: tidak lebih dari 100.
+    # Berhasil masuk menghapus hitungannya.
+    rate_limit_login_failures: str = Field(default="100/86400", pattern=POLA_BATAS)
 
     # Kunci HMAC untuk `audit_logs.ip_hash` (spec/01: "hash, bukan IP mentah")
     # dan kunci batas laju per IP. WAJIB, tanpa bawaan: sha256 polos atas IPv4

@@ -132,6 +132,7 @@ TRIGGER_HABITS = (
 )
 UJI_KEPEMILIKAN = "tests/integration/test_kepemilikan_data.py"
 UJI_IZIN = "tests/integration/test_izin.py"
+UJI_LAJU = "tests/integration/test_batas_laju.py"
 FK_MILESTONE = (
     "  FOREIGN KEY (goal_id, user_id) REFERENCES goals (id, user_id) ON DELETE CASCADE" + NL + ");"
 )
@@ -346,6 +347,103 @@ MUTASI: list[Mutasi] = [
         ],
         _pytest(f"{UJI_IZIN}::test_redis_putus_sesudah_commit_tidak_meninggalkan_izin_lama"),
         harus_memuat="izin yang dicabut masih dijawab cache lama",
+        kelompok="db",
+    ),
+    # ── batas laju (spec/07 1.7): per IP · per pengguna · per akun, 429 + Retry-After ─
+    Mutasi(
+        "1.7",
+        "middleware batas laju IP tidak dipasang — /v1/* tanpa batas per IP",
+        [
+            Sunting(
+                "apps/api/src/hvx/main.py",
+                "    app.add_middleware(platform.BatasLajuIpMiddleware)" + NL,
+                "",
+            )
+        ],
+        _pytest(f"{UJI_LAJU}::test_batas_ip_menjawab_429_dengan_retry_after_di_seluruh_v1"),
+        harus_memuat="assert 401 == 429",
+        kelompok="db",
+    ),
+    Mutasi(
+        "1.7",
+        "429 tanpa Retry-After — klien tidak tahu kapan boleh mencoba lagi",
+        [
+            Sunting(
+                f"{MODUL}/platform/batas_laju.py",
+                'header={"Retry-After": str(hasil.retry_after_s)}',
+                "header={}",
+            )
+        ],
+        _pytest(f"{UJI_LAJU}::test_batas_ip_menjawab_429_dengan_retry_after_di_seluruh_v1"),
+        harus_memuat="429 tanpa Retry-After",
+        kelompok="db",
+    ),
+    Mutasi(
+        "1.7",
+        "skrip GCRA tidak pernah mencatat — jatah tidak pernah habis",
+        [Sunting(f"{MODUL}/platform/batas_laju.py", "if ARGV[3] == '1' then", "if false then")],
+        _pytest(f"{UJI_LAJU}::test_mekanisme_meledak_sampai_batas_lalu_terisi_satu_per_interval"),
+        harus_memuat="assert [4, 4, 4, 4, 4] == [4, 3, 2, 1, 0]",
+        kelompok="db",
+    ),
+    Mutasi(
+        "1.7",
+        "IPv6 dihitung per alamat — berganti alamat di /64 sendiri melewati batas",
+        [
+            Sunting(
+                f"{MODUL}/platform/batas_laju.py",
+                "return str(ipaddress.IPv6Network((alamat, 64), strict=False))",
+                "return str(alamat)",
+            )
+        ],
+        _pytest("tests/unit/test_batas_laju_bentuk.py::test_ipv6_dihitung_per_jaringan_64"),
+        harus_memuat="dua alamat dalam satu /64 dihitung terpisah",
+    ),
+    Mutasi(
+        "1.7",
+        "dependensi autentikasi lupa batas per pengguna",
+        [
+            Sunting(
+                f"{MODUL}/identity/dependensi.py",
+                "    await batasi_pengguna(request, sesi.user_id)  # spec/07 1.7" + NL,
+                "",
+            )
+        ],
+        _pytest(
+            f"{UJI_LAJU}::test_batas_per_pengguna_tidak_mengenai_pengguna_lain_di_ip_yang_sama"
+        ),
+        harus_memuat="assert 200 == 429",
+        kelompok="db",
+    ),
+    Mutasi(
+        "1.7",
+        "login tanpa batas kredensial per IP — hanya batas umum /v1",
+        [
+            Sunting(
+                f"{MODUL}/identity/routes.py",
+                '@router.post("/login", response_model=JawabanAkun, dependencies=_KREDENSIAL)',
+                '@router.post("/login", response_model=JawabanAkun)',
+            )
+        ],
+        _pytest(f"{UJI_LAJU}::test_daftar_dan_masuk_berbagi_batas_per_ip_yang_lebih_ketat"),
+        harus_memuat="assert 200 == 429",
+        kelompok="db",
+    ),
+    Mutasi(
+        "1.7",
+        "berhasil masuk tidak menghapus hitungan gagal — akun terkunci oleh salah ketik lama",
+        [
+            Sunting(
+                f"{MODUL}/identity/service.py",
+                "    await penjaga.berhasil()  # kegagalan dihitung BERUNTUN, bukan seumur akun"
+                + NL,
+                "",
+            )
+        ],
+        _pytest(
+            f"{UJI_LAJU}::test_login_gagal_dibatasi_per_akun_dan_berhasil_menghapus_hitungannya"
+        ),
+        harus_memuat="assert 429 == 401",
         kelompok="db",
     ),
     # ── identity (spec/07 1.1): argon2id · rotasi · fungsi SECURITY DEFINER ─

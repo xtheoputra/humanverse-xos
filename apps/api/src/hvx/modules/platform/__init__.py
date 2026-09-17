@@ -10,6 +10,17 @@ Ini satu-satunya pintu keluar modul (spec/06 aturan 1); modul lain dan
 `hvx.main` hanya boleh mengimpor nama di `__all__`.
 """
 
+from .batas_laju import (
+    BatasLaju,
+    BatasLajuIpMiddleware,
+    HasilLaju,
+    PembatasLaju,
+    galat_terlalu_sering,
+    jaringan_klien,
+    pembatas_laju,
+    sidik,
+    sidik_jaringan,
+)
 from .config import Lingkungan, Settings
 from .db import (
     PeranTidakAman,
@@ -29,8 +40,12 @@ from .routes import router
 from .zona_waktu import ZonaWaktuIANA, zona_waktu_sah
 
 __all__ = [
+    "BatasLaju",
+    "BatasLajuIpMiddleware",
     "GalatApi",
+    "HasilLaju",
     "Lingkungan",
+    "PembatasLaju",
     "Pemeriksaan",
     "PeranTidakAman",
     "RequestContextMiddleware",
@@ -39,18 +54,23 @@ __all__ = [
     "buat_engine",
     "buat_redis",
     "engine_dari",
+    "galat_terlalu_sering",
     "ikat_pengguna",
+    "jaringan_klien",
     "jawaban_galat",
     "konfigurasi_log",
     "laporan_kesehatan",
     "pasang_penangan_galat",
     "pastikan_peran_aplikasi",
+    "pembatas_laju",
     "ping_db",
     "ping_redis",
     "redis_dari",
     "router",
     "settings_dari",
+    "sidik",
     "sidik_ip",
+    "sidik_jaringan",
     "transaksi_pengguna",
     "url_async",
     "url_sync",

@@ -24,6 +24,7 @@ from hvx.modules import platform
 from . import repository, sandi
 from .audit import audit
 from .dependensi import PenggunaMasuk
+from .laju import PenjagaGagalMasuk
 from .persetujuan import TUJUAN_LAYANAN, TUJUAN_PELATIHAN_MODEL, Persetujuan, catat_persetujuan
 from .schemas import PenggunaRingkas, PermintaanDaftar
 from .sesi import PenyimpanSesi, Token
@@ -114,13 +115,16 @@ async def masuk(
     kata_sandi: str,
     *,
     ip_hash: str | None,
+    penjaga: PenjagaGagalMasuk,
 ) -> tuple[PenggunaRingkas, Token]:
+    await penjaga.periksa()  # sebelum argon2: tebakan yang ditolak tidak membakar CPU
     async with engine.begin() as conn:
         akun = await repository.cari_untuk_masuk(conn, email)
     # Satu verifikasi argon2 SELALU dijalankan — juga untuk email tak dikenal.
     cocok = await sandi.cocokkan_async(akun.password_hash if akun else None, kata_sandi)
 
     if akun is None or not cocok:
+        await penjaga.gagal()
         await _catat_gagal(engine, akun.id if akun else None, "kredensial", ip_hash)
         raise _galat(401, "invalid_credentials", "Email atau sandi salah.")
     if akun.status != "active":
@@ -144,6 +148,7 @@ async def masuk(
         ringkas = await repository.ambil_pengguna(conn, akun.id)
     if ringkas is None:  # pragma: no cover - akun yang baru saja lolos verifikasi
         raise RuntimeError("akun yang baru masuk tidak terbaca kembali")
+    await penjaga.berhasil()  # kegagalan dihitung BERUNTUN, bukan seumur akun
     return ringkas, await sesi.buat(akun.id)
 
 

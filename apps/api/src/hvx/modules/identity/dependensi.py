@@ -21,6 +21,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from hvx.modules import platform
 
+from .laju import batasi_pengguna
 from .sesi import PenyimpanSesi
 
 _bearer = HTTPBearer(auto_error=False)
@@ -62,6 +63,7 @@ async def pengguna_saat_ini(
         # yang terakhir itulah yang membuat pencabutan berlaku seketika.
         raise _tolak("invalid_token")
     platform.ikat_pengguna(str(sesi.user_id))
+    await batasi_pengguna(request, sesi.user_id)  # spec/07 1.7
     return PenggunaMasuk(sesi.user_id, sesi.sesi_id)
 
 

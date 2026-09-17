@@ -11,6 +11,7 @@ from hvx.modules import platform
 
 from . import service
 from .dependensi import PenggunaDiperlukan, penyimpan_sesi
+from .laju import batasi_kredensial_ip, penjaga_gagal_masuk
 from .schemas import (
     JawabanAkun,
     JawabanSegarkan,
@@ -24,6 +25,8 @@ from .sesi import PenyimpanSesi, Token
 router = APIRouter(prefix="/v1/auth", tags=["identity"])
 
 Sesi = Annotated[PenyimpanSesi, Depends(penyimpan_sesi)]
+# Daftar & masuk: batas per IP yang lebih ketat daripada permukaan umum (spec/07 1.7).
+_KREDENSIAL = [Depends(batasi_kredensial_ip)]
 
 
 def _pendengar(request: Request) -> Sequence[service.PendengarPendaftaran]:
@@ -40,7 +43,7 @@ def _token(t: Token) -> JawabanToken:
     )
 
 
-@router.post("/register", status_code=201, response_model=JawabanAkun)
+@router.post("/register", status_code=201, response_model=JawabanAkun, dependencies=_KREDENSIAL)
 async def daftar(request: Request, badan: PermintaanDaftar, sesi: Sesi) -> JawabanAkun:
     akun, token = await service.daftar(
         platform.engine_dari(request),
@@ -52,7 +55,7 @@ async def daftar(request: Request, badan: PermintaanDaftar, sesi: Sesi) -> Jawab
     return JawabanAkun(user=akun, tokens=_token(token))
 
 
-@router.post("/login", response_model=JawabanAkun)
+@router.post("/login", response_model=JawabanAkun, dependencies=_KREDENSIAL)
 async def masuk(request: Request, badan: PermintaanMasuk, sesi: Sesi) -> JawabanAkun:
     akun, token = await service.masuk(
         platform.engine_dari(request),
@@ -60,6 +63,7 @@ async def masuk(request: Request, badan: PermintaanMasuk, sesi: Sesi) -> Jawaban
         badan.email,
         badan.password.get_secret_value(),
         ip_hash=platform.sidik_ip(request),
+        penjaga=penjaga_gagal_masuk(request, badan.email),
     )
     return JawabanAkun(user=akun, tokens=_token(token))
 
