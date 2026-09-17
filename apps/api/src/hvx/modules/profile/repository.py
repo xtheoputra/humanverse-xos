@@ -12,29 +12,34 @@ from sqlalchemy.ext.asyncio import AsyncConnection
 
 from .schemas import Profil
 
-_KOLOM_PROFIL = "display_name, timezone, locale, birth_year, avatar_url, preferences, updated_at"
+# SQL STATIS seluruhnya — tidak ada nama kolom yang dirakit dari string. Versi
+# pertama merakit `SET` dari daftar izin dengan f-string: aman, tetapi `bandit`
+# (tahap scan) tidak bisa membedakannya dari injeksi, dan pembungkaman yang
+# dibiarkan menjadi kebiasaan adalah pembungkaman yang suatu hari salah.
+_AMBIL = text(
+    "SELECT display_name, timezone, locale, birth_year, avatar_url, preferences, updated_at "
+    "FROM profiles WHERE user_id = :user_id"
+)
 
-# Satu-satunya kolom yang boleh diubah lewat PATCH — nama kolom SQL berasal
-# dari daftar ini, tidak pernah dari masukan klien.
-_BISA_DIUBAH: dict[str, str] = {
-    "display_name": ":display_name",
-    "timezone": ":timezone",
-    "locale": ":locale",
-    "preferences": "CAST(:preferences AS jsonb)",
-}
+# Tiap kolom yang boleh diubah PATCH punya bendera `ubah_*`; yang tidak dikirim
+# tetap nilainya sendiri. Kolom di luar daftar ini tidak bisa disentuh.
+_UBAH = text(
+    """
+    UPDATE profiles SET
+      display_name = CASE WHEN :ubah_display_name THEN :display_name ELSE display_name END,
+      timezone     = CASE WHEN :ubah_timezone THEN :timezone ELSE timezone END,
+      locale       = CASE WHEN :ubah_locale THEN :locale ELSE locale END,
+      preferences  = CASE WHEN :ubah_preferences THEN CAST(:preferences AS jsonb)
+                          ELSE preferences END
+    WHERE user_id = :user_id
+    RETURNING display_name, timezone, locale, birth_year, avatar_url, preferences, updated_at
+    """
+)
+_BISA_DIUBAH = ("display_name", "timezone", "locale", "preferences")
 
 
 async def ambil_profil(conn: AsyncConnection, user_id: UUID) -> Profil | None:
-    baris = (
-        (
-            await conn.execute(
-                text(f"SELECT {_KOLOM_PROFIL} FROM profiles WHERE user_id = :user_id"),  # noqa: S608
-                {"user_id": user_id},
-            )
-        )
-        .mappings()
-        .first()
-    )
+    baris = (await conn.execute(_AMBIL, {"user_id": user_id})).mappings().first()
     return Profil.model_validate(dict(baris)) if baris else None
 
 
@@ -61,13 +66,9 @@ async def ubah_profil(
     if not kolom:
         return await ambil_profil(conn, user_id)
     nilai: dict[str, Any] = {"user_id": user_id}
-    for k in kolom:
-        nilai[k] = json.dumps(perubahan[k]) if k == "preferences" else perubahan[k]
-    set_ = ", ".join(f"{k} = {_BISA_DIUBAH[k]}" for k in kolom)
-    # Nama kolom berasal dari _BISA_DIUBAH, nilainya parameter — bukan masukan klien.
-    kueri = text(
-        f"UPDATE profiles SET {set_} "  # noqa: S608
-        f"WHERE user_id = :user_id RETURNING {_KOLOM_PROFIL}"
-    )
-    baris = (await conn.execute(kueri, nilai)).mappings().first()
+    for k in _BISA_DIUBAH:
+        nilai[f"ubah_{k}"] = k in perubahan
+        v = perubahan.get(k)
+        nilai[k] = json.dumps(v) if k == "preferences" and k in perubahan else v
+    baris = (await conn.execute(_UBAH, nilai)).mappings().first()
     return Profil.model_validate(dict(baris)) if baris else None
