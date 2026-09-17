@@ -26,6 +26,7 @@ async def test_health_200_terhadap_postgres_dan_redis_sungguhan(
 
     assert r.status_code == 200, r.text
     assert r.json() == {"status": "ok", "version": __version__, "db": "ok", "redis": "ok"}
+    assert r.headers["x-request-id"]
 
 
 async def test_health_503_saat_redis_tidak_bisa_dihubungi(dsn_admin_uji: str) -> None:

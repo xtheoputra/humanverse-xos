@@ -26,6 +26,7 @@ DOKUMENTASI_TERBUKA: frozenset[str] = frozenset({"local", "test", "ci"})
 
 def create_app(settings: platform.Settings | None = None) -> FastAPI:
     settings = settings or platform.Settings()  # dari lingkungan (HVX_*)
+    platform.konfigurasi_log(level=settings.log_level, json=settings.log_json)
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
@@ -58,5 +59,6 @@ def create_app(settings: platform.Settings | None = None) -> FastAPI:
     )
     app.state.settings = settings
     app.state.versi = __version__
+    app.add_middleware(platform.RequestContextMiddleware)
     app.include_router(platform.router)
     return app

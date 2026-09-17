@@ -16,7 +16,7 @@ import os
 from alembic import context
 from sqlalchemy import create_engine, pool
 
-from hvx.modules.platform import url_sync
+from hvx.modules.platform import konfigurasi_log, url_sync
 
 
 def _url() -> str:
@@ -36,6 +36,12 @@ def _jalankan_online() -> None:
     finally:
         engine.dispose()
 
+
+# Dari CLI (kontainer `migrate`), log migrasi keluar sebagai JSON yang sama
+# dengan api. Pemanggil dalam-proses (uji) mematikannya lewat atribut, supaya
+# migrasi tidak mengganti handler log milik pemanggil.
+if context.config.attributes.get("konfigurasi_log", True):
+    konfigurasi_log(level=os.environ.get("HVX_LOG_LEVEL", "INFO"))
 
 if context.is_offline_mode():
     # Revisi menjalankan berkas SQL lewat koneksi driver sungguhan (banyak

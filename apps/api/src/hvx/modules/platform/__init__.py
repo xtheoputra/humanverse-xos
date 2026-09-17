@@ -13,15 +13,19 @@ Ini satu-satunya pintu keluar modul (spec/06 aturan 1); modul lain dan
 from .config import Lingkungan, Settings
 from .db import buat_engine, ping_db, url_async, url_sync
 from .health import Pemeriksaan, laporan_kesehatan
+from .log import RequestContextMiddleware, ikat_pengguna, konfigurasi_log
 from .redis_store import buat_redis, ping_redis
 from .routes import router
 
 __all__ = [
     "Lingkungan",
     "Pemeriksaan",
+    "RequestContextMiddleware",
     "Settings",
     "buat_engine",
     "buat_redis",
+    "ikat_pengguna",
+    "konfigurasi_log",
     "laporan_kesehatan",
     "ping_db",
     "ping_redis",
