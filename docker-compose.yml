@@ -1,6 +1,6 @@
 # HumanVerse XOS — V0 lokal (arch/09 §1, tahap D0). spec/07 tugas 0.2.
 #
-#   docker compose up -d --wait          # ketiganya, tunggu sampai sehat
+#   docker compose up -d --wait          # keempatnya, tunggu sampai sehat
 #   docker compose up -d --wait postgres redis   # hanya ketergantungan (untuk uji)
 #
 # Port — semuanya HANYA di 127.0.0.1, tidak terbuka ke jaringan lokal:
@@ -62,6 +62,16 @@ services:
       timeout: 3s
       retries: 20
 
+  # Sekali jalan: skema dimigrasikan SEBELUM api menerima permintaan pertama.
+  migrate:
+    <<: *api-image
+    command: ["alembic", "-c", "data/migrations/alembic.ini", "upgrade", "head"]
+    environment: *api-env
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
   api:
     <<: *api-image
     environment: *api-env
@@ -72,6 +82,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     healthcheck:
       test:
         - CMD

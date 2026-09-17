@@ -1,60 +1,16 @@
-# 01 — Database Schema (PostgreSQL, V0)
+-- ════════════════════════════════════════════════════════════════════
+-- Migrasi 0001 — V0: 23 tabel · spec/01-DATABASE-SCHEMA.md
+--
+-- Isinya SELURUH blok ```sql di spec/01, berurutan, tanpa diubah. Kesamaannya
+-- tidak dijaga ingatan melainkan uji: tests/integration/test_migrasi.py
+-- menjalankan berkas ini dan DDL spec/01 ke dua basis data terpisah, lalu
+-- membandingkan katalognya bagian per bagian (KUERI_KATALOG di uji itu — yang
+-- dibandingkan DAN yang sengaja tidak, tertulis di docstring-nya).
+--
+-- Tiap CREATE TABLE membawa `data_subject` + tiga anotasi retensi (K-16);
+-- tools/periksa_dokumen.py P-1 · P-2 · P-3 membaca berkas ini juga.
+-- ════════════════════════════════════════════════════════════════════
 
-> ⚠️ **Bukan kata pemilik** — lihat [`README.md`](README.md).
-> Diturunkan dari naskah 5 §31 (19 tabel) + naskah 6 (`events`, `agents`,
-> `agent_tools`) + 1 usulan (`human_states`). Total **23 tabel**.
-
-Target: **PostgreSQL 16**. Ekstensi: `citext` (email tanpa peduli huruf
-besar-kecil).
-
-> 🔧 **`pgcrypto` dicabut 16 Sep 2026.** Berkas ini semula memasangnya *“untuk
-> `gen_random_uuid()`”* — fungsi itu sudah bawaan PostgreSQL sejak versi 13.
-> Diperiksa di PostgreSQL 16 sungguhan: tidak satu pun bawaan kolom bergantung
-> pada `pgcrypto`, dan ekstensinya bisa dilepas dengan 23 tabel tetap bekerja.
-> Ketergantungan yang tidak dipakai hanya menambah hal yang bisa gagal saat
-> dipasang dan dilepas.
-
----
-
-## 🔧 Presedensi ketika sebuah tabel didefinisikan lebih dari sekali (K-4)
-
-> Ditambahkan 9 September 2026 — **keputusan didelegasikan K-4**, menutup
-> **E-156** / [#151](../../issues/151).
-
-Sensus menemukan **19 nama tabel yang didefinisikan lebih dari sekali** lintas
-fase — `agent_capabilities` dan `agent_trust_scores` masing-masing **empat
-kali** ([`../docs/SENSUS-TABEL.md`](../docs/SENSUS-TABEL.md)). Aturannya:
-
-1. **Kalau namanya ada di berkas ini, definisi berkas ini yang berlaku.**
-2. Kalau tidak, **definisi fase paling awal** yang kanonik.
-3. Fase berikutnya boleh **menambah kolom**; tidak boleh **mendefinisikan
-   ulang** bentuk yang sudah ada.
-
-⚠️ Ini **tidak menambah atau mengubah satu tabel pun di V0** — jumlahnya tetap
-**23**. Ia hanya menetapkan siapa yang menang kalau nama yang sama muncul lagi
-di fase berikutnya.
-
----
-
-
-## Konvensi
-
-| Hal | Aturan |
-|---|---|
-| Nama tabel | `snake_case`, **jamak** |
-| Kunci utama | `id uuid PRIMARY KEY DEFAULT gen_random_uuid()` |
-| Waktu | `timestamptz`, disimpan UTC. Kolom tanggal lokal pengguna pakai `date` + `profiles.timezone` |
-| Jejak baris | setiap tabel punya `created_at`, dan `updated_at` bila barisnya bisa berubah |
-| Hapus | `deleted_at timestamptz` pada tabel berisi tulisan pengguna; sisanya hapus keras |
-| Uang | `numeric(12,6)` — jangan `float` |
-| Skor 0–1 | `numeric(4,3)` + `CHECK (x >= 0 AND x <= 1)` |
-| Enum | `text` + `CHECK (... IN (...))`, **bukan** tipe `ENUM` PostgreSQL — supaya nilai baru tidak butuh migrasi tipe |
-
----
-
-## Awalan
-
-```sql
 CREATE EXTENSION IF NOT EXISTS citext;
 
 -- dipakai semua tabel yang punya updated_at
@@ -63,13 +19,7 @@ BEGIN
   NEW.updated_at = now();
   RETURN NEW;
 END $$ LANGUAGE plpgsql;
-```
 
----
-
-## 1 · Identity
-
-```sql
 -- @retention   : until-account-deleted
 -- @who-can-set : system
 -- @on-delete   : hard
@@ -105,13 +55,7 @@ CREATE TABLE profiles (
   created_at   timestamptz NOT NULL DEFAULT now(),
   updated_at   timestamptz NOT NULL DEFAULT now()
 );
-```
 
-> 🔧 **`preferences jsonb`, bukan kolom tetap.** Naskah 1–5 belum sepakat isi
-> profil (issue #2); jsonb menahan keputusan itu tanpa memblokir V0. Begitu
-> #2 dijawab, kolom yang sering dibaca dipromosikan jadi kolom nyata.
-
-```sql
 -- @retention   : until-account-deleted
 -- @who-can-set : system
 -- @on-delete   : hard
@@ -130,13 +74,7 @@ CREATE TABLE consents (
   created_at     timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX consents_user_kind_idx ON consents (user_id, kind, created_at DESC);
-```
 
-> Riwayat persetujuan **append-only** — baris lama tidak diubah, pencabutan
-> ditulis sebagai baris baru. Itu yang membuat *"kapan dia setuju apa"* bisa
-> dijawab setahun kemudian (naskah 5 §25 *Consent management*).
-
-```sql
 -- @retention   : until-account-deleted
 -- @who-can-set : system
 -- @on-delete   : hard
@@ -159,18 +97,7 @@ CREATE TABLE permissions (
 );
 CREATE INDEX permissions_lookup_idx
   ON permissions (user_id, subject_id, scope, action);
-```
 
-> Lima `action` diambil persis dari naskah 4 §15 (Read/Write/Execute/Share/
-> Delete). `decision='ask'` sebagai default adalah penerapan janji *"Act selalu
-> di bawah kontrol pengguna"* — issue #5 tinggal menetapkan risk level mana
-> yang boleh `allow` otomatis.
-
----
-
-## 2 · Goals & Habits
-
-```sql
 -- @retention   : until-account-deleted
 -- @who-can-set : user
 -- @on-delete   : hard
@@ -214,13 +141,7 @@ CREATE TABLE goal_milestones (
   updated_at   timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX goal_milestones_goal_idx ON goal_milestones (goal_id, position);
-```
 
-> `parent_id` yang menunjuk ke tabelnya sendiri adalah **Goal Graph** naskah 4
-> §9 (`LIFE GOAL → Career → Skills → Learning → Habit`) — cukup dengan satu
-> kolom, tanpa Neo4j.
-
-```sql
 -- @retention   : until-account-deleted
 -- @who-can-set : user
 -- @on-delete   : hard
@@ -266,23 +187,7 @@ CREATE TABLE habit_completions (
 );
 CREATE INDEX habit_completions_user_date_idx
   ON habit_completions (user_id, for_date DESC);
-```
 
-> `UNIQUE (habit_id, for_date)` mencegah pencatatan ganda saat aplikasi luring
-> menyinkronkan ulang. `for_date` adalah **tanggal lokal**, bukan UTC —
-> "workout hari Senin" harus tetap Senin bagi pengguna yang sedang di luar
-> negeri.
->
-> `adaptive_tiers` menyimpan **Adaptive Habit Engine** naskah 4 §34
-> (`60 menit → 30 menit → mobility 10 menit`), dan `tier_used` mencatat tingkat
-> mana yang benar-benar dijalankan. Tanpa kolom ini, "berhasil" jadi tidak
-> punya arti yang sama antar hari.
-
----
-
-## 3 · Catatan harian pengguna
-
-```sql
 -- @retention   : until-account-deleted
 -- @who-can-set : user
 -- @on-delete   : hard
@@ -318,13 +223,7 @@ CREATE TABLE mood_entries (
 );
 CREATE INDEX mood_entries_user_time_idx
   ON mood_entries (user_id, occurred_at DESC) WHERE deleted_at IS NULL;
-```
 
-> **`mood` sengaja TIDAK ikut di `human_states`.** Naskah 5 §9 membuangnya dari
-> HumanState, dan itu benar: mood **dilaporkan pengguna** (tabel ini), bukan
-> **ditaksir sistem**. Butir **E-34**.
-
-```sql
 -- @retention   : until-account-deleted
 -- @who-can-set : user
 -- @on-delete   : hard
@@ -345,15 +244,7 @@ CREATE TABLE journal_entries (
 );
 CREATE INDEX journal_entries_user_time_idx
   ON journal_entries (user_id, occurred_at DESC) WHERE deleted_at IS NULL;
-```
 
-> 🔧 **`safety_flag` saya tambahkan sendiri.** Journal masuk V0 sementara
-> SafetyAgent tidak (issue #21). Kolom ini tidak menyelesaikan masalahnya —
-> ia hanya memastikan **tempatnya sudah ada** ketika jalur eskalasi diputuskan,
-> supaya tidak perlu migrasi tabel berisi tulisan paling sensitif pengguna.
-> Selama #21 belum dijawab, nilainya tetap `NULL`.
-
-```sql
 -- @retention   : until-account-deleted
 -- @who-can-set : user
 -- @on-delete   : hard
@@ -375,17 +266,7 @@ CREATE TABLE activities (
 );
 CREATE INDEX activities_user_time_idx  ON activities (user_id, occurred_at DESC);
 CREATE INDEX activities_user_kind_idx  ON activities (user_id, kind, occurred_at DESC);
-```
 
-> `source='inferred'` penting: begitu Behavior Engine mulai menyimpulkan
-> aktivitas, harus bisa dibedakan mana yang **dicatat manusia** dan mana yang
-> **ditebak sistem**. Tanpa itu, mesin akan belajar dari tebakannya sendiri.
-
----
-
-## 4 · Event — tulang punggung
-
-```sql
 -- @retention   : until-account-deleted
 -- @who-can-set : system
 -- @on-delete   : hard
@@ -411,23 +292,7 @@ CREATE INDEX events_user_time_idx    ON events (user_id, occurred_at DESC);
 CREATE INDEX events_type_time_idx    ON events (event_type, occurred_at DESC);
 CREATE INDEX events_subject_idx      ON events (subject_type, subject_id);
 CREATE INDEX events_payload_gin      ON events USING gin (payload jsonb_path_ops);
-```
 
-> ⚠️ **Tabel ini tidak ada di 19 tabel V0 naskah 5 §31** — padahal §30
-> menggambar *Event System* sebagai lapisan wajib V0 dan §7 berkata *"setiap
-> aktivitas menjadi event"*. Butir **E-42**. Saya masukkan karena tanpa ini
-> Behavior Engine di Sprint 5 tidak punya bahan.
->
-> Tiga kolom yang menutup celah lama di bagian **D** audit:
-> `schema_version` (versi), `occurred_at` vs `recorded_at` (urutan — kejadian
-> luring bisa masuk belakangan), dan `idempotency_key` (event sama masuk dua
-> kali tidak menggandakan apa pun).
-
----
-
-## 5 · Memory
-
-```sql
 -- @retention   : until-account-deleted
 -- @who-can-set : user
 -- @on-delete   : hard
@@ -464,27 +329,7 @@ CREATE INDEX memories_user_kind_idx  ON memories (user_id, kind)  WHERE deleted_
 CREATE INDEX memories_user_scope_idx ON memories (user_id, scope) WHERE deleted_at IS NULL;
 CREATE INDEX memories_active_idx     ON memories (user_id, last_reinforced_at DESC)
                                      WHERE deleted_at IS NULL AND valid_until IS NULL;
-```
 
-> 🔧 **Ini jawaban untuk issue #33 — dan jawabannya "keduanya".**
->
-> `kind` menjawab **bagaimana** memori diambil: enam jenis naskah 5 §17.
-> `scope` menjawab **siapa** boleh membacanya: nama scope di manifest §14,
-> yang dipakai `permissions.scope`. Keduanya tidak bersaing; mereka menjawab
-> pertanyaan berbeda dan sama-sama dibutuhkan.
->
-> `confidence` + `evidence_count` adalah **Confidence Layer** §19 — bukan
-> hiasan: `evidence_count = 0` berarti sistem **bertanya**, bukan menebak, dan
-> itu sekaligus jawaban *cold start* (**B-1**).
->
-> `valid_until` membuat memori bisa **kedaluwarsa tanpa dihapus** — *"dulu
-> suka warna gelap"* tetap benar sebagai sejarah meski tidak berlaku lagi.
-
----
-
-## 6 · Human State
-
-```sql
 -- @retention   : until-account-deleted
 -- @who-can-set : system
 -- @on-delete   : hard
@@ -500,32 +345,7 @@ CREATE TABLE human_states (
   UNIQUE (user_id, for_date, model_version)
 );
 CREATE INDEX human_states_user_date_idx ON human_states (user_id, for_date DESC);
-```
 
-Bentuk `metrics`:
-
-```json
-{
-  "energy":    { "value": 0.62, "confidence": 0.71, "evidence_count": 18 },
-  "focus":     { "value": 0.48, "confidence": 0.44, "evidence_count":  6 },
-  "stress":    { "value": 0.34, "confidence": 0.22, "evidence_count":  2 }
-}
-```
-
-> 🔧 **Ini jawaban untuk issue #2 — dengan cara menundanya tanpa biaya.**
-> Lima model angka pengguna beredar (Behavior Genome 6 · Profile Engine 5 ·
-> HumanState 7 · Dashboard 7 · DigitalTwin 8). `metrics jsonb` menampung
-> semuanya; begitu pemilik memilih, metrik yang menetap dipromosikan jadi kolom
-> nyata **tanpa membuang data lama**.
->
-> `model_version` di kunci unik memungkinkan dua versi model dihitung
-> berdampingan untuk hari yang sama — itu prasyarat evaluasi & rollback (§23).
-
----
-
-## 7 · AI & rekomendasi
-
-```sql
 -- @retention   : until-account-deleted
 -- @who-can-set : user
 -- @on-delete   : hard
@@ -566,13 +386,7 @@ CREATE TABLE ai_messages (
 );
 CREATE INDEX ai_messages_conversation_idx
   ON ai_messages (conversation_id, created_at);
-```
 
-> `cost_usd` per pesan sejak V0 adalah penerapan **AI Cost Engine** (naskah 4
-> §48). Tanpa dicatat sejak awal, biaya baru terlihat di tagihan bulanan —
-> saat sudah terlambat.
-
-```sql
 -- @retention   : until-account-deleted
 -- @who-can-set : system
 -- @on-delete   : hard
@@ -624,31 +438,7 @@ CREATE TABLE recommendation_feedback (
 );
 CREATE INDEX recommendation_feedback_user_idx
   ON recommendation_feedback (user_id, created_at DESC);
-```
 
-> 🔧 **Ini jawaban untuk issue #32.** `score` disimpan **0–1**; skala 100-poin
-> (naskah 3) dan persen (naskah 2) keduanya bisa dikonversi ke sini tanpa
-> kehilangan apa pun, sebaliknya tidak. `scoring_version` membuat rumus boleh
-> berganti tanpa migrasi, dan `score_breakdown` menyimpan tiap komponen:
->
-> ```json
-> { "trend": 0.80, "preference": 0.95, "context": 0.92,
->   "weather": 0.90, "history": 0.87, "weights": "equal" }
-> ```
->
-> `rationale` adalah **Explainable AI** naskah 4 §29 — daftar alasan yang bisa
-> ditampilkan apa adanya. `context_snapshot` membekukan konteks saat
-> rekomendasi dibuat, supaya *"kenapa dulu kamu menyarankan ini"* masih bisa
-> dijawab setelah cuacanya berubah.
->
-> `action='modified'` dan `'snoozed'` melengkapi naskah 4 §24: memilih B
-> setelah disarankan A **bukan** penolakan, dan menunda **bukan** mengabaikan.
-
----
-
-## 8 · Agent registry & audit
-
-```sql
 -- @retention   : forever
 -- @who-can-set : system
 -- @on-delete   : not-applicable
@@ -671,38 +461,7 @@ CREATE TABLE agents (
 );
 CREATE UNIQUE INDEX agents_one_active_idx
   ON agents (name) WHERE status = 'active';
-```
 
-> 🔧 **`risk_level` → `max_risk`, dan `requires_confirmation` dihapus
-> (10 Sep 2026).** Bukan keputusan baru — penerapan dua keputusan yang sudah
-> diambil dan tidak pernah sampai ke DDL:
-> **[#52](../../issues/52)** memindahkan `requires_confirmation` ke Policy
-> Engine, dan **H-21**/[#67](../../issues/67) memisahkan `R` (risiko **aksi**)
-> dari `L` (otonomi **agent**) — sehingga satu angka pada baris agent tidak bisa
-> berarti keduanya (**E-119** / [#97](../../issues/97)). Konfirmasi kini turunan
-> dari `R` lewat tabel gerbang
-> [`../arch/04`](../arch/04-DEPENDENCY-GRAPH.md) §3.
->
-> ⚠️ **Bawaannya `0`, dan arahnya kebalikan dari [K-12](../docs/KEPUTUSAN-DIDELEGASIKAN.md).**
-> K-12 menolak bawaan `risk_level: 0` untuk **tool**, sebab tool yang lupa diisi
-> menjadi yang **paling tidak dijaga**. Di sini `max_risk` adalah **pagu**, jadi
-> `0` berarti agent yang lupa diisi **tidak bisa memanggil tool apa pun di atas
-> R0** — gagal dengan keras, bukan diam-diam.
-> 💡 Prinsipnya sama, angkanya berlawanan: yang ditanyakan bukan *“berapa
-> bawaannya”* melainkan ***“kalau seseorang lupa mengisinya, ke sisi mana ia
-> jatuh?”***
->
-> `autonomy.max_level`, `kill_condition`, dan `deploy` tetap di `manifest jsonb`
-> sampai Phase 11 — belum ada gerbang V0 yang membacanya.
->
-> 🔧 **Pagar blok kode di atas baru ditutup 16 Sep 2026.** Sampai hari itu
-> catatan ini — 21 baris markdown — tertulis **di dalam** blok ` ```sql `
-> tabel `agents`, sehingga DDL berkas ini tidak bisa dijalankan apa adanya.
-> Ditemukan saat migrasi 0001 dibandingkan dengan berkas ini secara mesin
-> (`tests/integration/test_migrasi.py`), yang kini menolak baris markdown di
-> dalam blok SQL.
-
-```sql
 -- @retention   : forever
 -- @who-can-set : system
 -- @on-delete   : not-applicable
@@ -718,17 +477,7 @@ CREATE TABLE agent_tools (
   created_at  timestamptz NOT NULL DEFAULT now(),
   UNIQUE (agent_id, tool_name)
 );
-```
 
-> `agents_one_active_idx` menegakkan **satu versi aktif per agent** — itu yang
-> membuat *automatic rollback* (§23) punya arti: aktifkan versi lama, versi
-> baru turun status.
->
-> ⚠️ `agents` dan `agent_tools` **tidak ada di 19 tabel V0** §31, padahal
-> `agent_runs` di daftar itu jelas menunjuk sebuah agent. Naskah 6 memintanya.
-> Butir **E-42**.
-
-```sql
 -- @retention   : until-account-deleted
 -- @who-can-set : system
 -- @on-delete   : hard
@@ -776,17 +525,7 @@ ALTER TABLE recommendations
   FOREIGN KEY (agent_id) REFERENCES agents(id),
   ADD CONSTRAINT recommendations_run_fk
   FOREIGN KEY (agent_run_id) REFERENCES agent_runs(id) ON DELETE SET NULL;
-```
 
-> **`agent_runs` ADALAH AI Audit Trail** naskah 5 §24 — `tools_used`,
-> `memory_scopes`, `decision`, `confidence` persis seperti contoh JSON di sana.
-> Yang **tidak** disimpan: chain-of-thought mentah. Itu keputusan pemilik, dan
-> skema ini menegakkannya dengan tidak menyediakan kolomnya.
->
-> `parent_run_id` merekam Orchestrator yang memanggil agent lain (§13) —
-> satu permintaan pengguna bisa jadi pohon eksekusi yang bisa ditelusuri.
-
-```sql
 -- @retention   : forever
 -- @who-can-set : system
 -- @on-delete   : anonymise
@@ -816,23 +555,7 @@ CREATE INDEX audit_logs_user_time_idx   ON audit_logs (user_id, occurred_at DESC
 CREATE INDEX audit_logs_action_time_idx ON audit_logs (action, occurred_at DESC);
 
 REVOKE UPDATE, DELETE ON audit_logs FROM PUBLIC;
-```
 
-> **`user_id` di sini sengaja TANPA foreign key.** Kalau ada `ON DELETE
-> CASCADE`, menghapus akun akan menghapus jejak auditnya — dan jejak itulah
-> yang membuktikan penghapusan benar dilakukan. Kalau ada FK tanpa cascade,
-> penghapusan akun jadi mustahil.
->
-> Ini titik temu **C-9** (hak hapus vs jejak audit). Aturannya:
-> **audit menyimpan bahwa sesuatu terjadi, bukan isi dari yang terjadi.**
-> `bigint identity` dipakai, bukan uuid, karena tabel ini hanya pernah
-> ditambah dan dibaca berurutan waktu.
-
----
-
-## 9 · Pemicu `updated_at`
-
-```sql
 CREATE TRIGGER users_set_updated_at             BEFORE UPDATE ON users             FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 CREATE TRIGGER profiles_set_updated_at          BEFORE UPDATE ON profiles          FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 CREATE TRIGGER permissions_set_updated_at       BEFORE UPDATE ON permissions       FOR EACH ROW EXECUTE FUNCTION set_updated_at();
@@ -844,74 +567,3 @@ CREATE TRIGGER journal_entries_set_updated_at   BEFORE UPDATE ON journal_entries
 CREATE TRIGGER memories_set_updated_at          BEFORE UPDATE ON memories          FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 CREATE TRIGGER recommendations_set_updated_at   BEFORE UPDATE ON recommendations   FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 CREATE TRIGGER agents_set_updated_at            BEFORE UPDATE ON agents            FOR EACH ROW EXECUTE FUNCTION set_updated_at();
-```
-
-> 🔴 **Ditambahkan 16 Sep 2026 — dan ketiadaannya bukan kerapian.** Bagian
-> *Awalan* mendefinisikan `set_updated_at()` dengan komentar *“dipakai semua
-> tabel yang punya `updated_at`”* — tetapi sampai hari itu **tidak ada satu
-> pun `CREATE TRIGGER`** di berkas ini. Sebelas tabel punya kolom
-> `updated_at`; tanpa pemicu, kolom itu **tetap berisi waktu pembuatan
-> selamanya**, dan setiap penulis `repository.py` harus *ingat* mengisinya
-> sendiri. Itu aturan tanpa penjaga dalam bentuk yang paling kecil.
->
-> Ditemukan dengan menulis migrasi 0001 — bukan dengan membaca berkas ini
-> (pola **E-42**). `tests/integration/test_migrasi.py` kini menuntut
-> **tiap tabel ber-`updated_at` punya pemicunya**, jadi tabel ke-24 tidak
-> bisa lupa.
-
----
-
-## Prosedur hapus akun
-
-Menutup janji *Delete* di Privacy Center (naskah 5 §26) tanpa merusak audit:
-
-| Tahap | Tindakan |
-|---|---|
-| 1 | `users.status = 'pending_deletion'`, sesi dicabut, agent berhenti melayani |
-| 2 | Tenggang **30 hari** — pengguna masih bisa membatalkan |
-| 3 | `DELETE FROM users` → cascade menghapus profil, goal, habit, jurnal, mood, memori, percakapan, rekomendasi, event, human_states |
-| 4 | Titik embedding di Qdrant dihapus berdasarkan `memories.embedding_id` yang dikumpulkan **sebelum** tahap 3 |
-| 5 | `audit_logs` **tetap**, dengan `user_id` diacak jadi id semu satu arah; isinya sudah metadata saja |
-| 6 | Satu baris audit terakhir: `action='account.deleted'` |
-
-> ⚠️ Tahap 4 adalah jebakan paling mudah terlewat: **Qdrant tidak ikut
-> cascade.** Kumpulkan `embedding_id` lebih dulu, atau titik memori pengguna
-> akan tertinggal di sana selamanya.
-
----
-
-## Ringkasan 23 tabel
-
-| # | Tabel | Sumber | V0 |
-|---|---|---|---|
-| 1 | `users` | §31 | ✅ Sprint 1 |
-| 2 | `profiles` | §31 | ✅ Sprint 1 |
-| 3 | `consents` | §31 | ✅ Sprint 1 |
-| 4 | `permissions` | §31 | ✅ Sprint 1 |
-| 5 | `goals` | §31 | ✅ Sprint 2 |
-| 6 | `goal_milestones` | §31 | ✅ Sprint 2 |
-| 7 | `habits` | §31 | ✅ Sprint 2 |
-| 8 | `habit_completions` | §31 | ✅ Sprint 2 |
-| 9 | `daily_checkins` | §31 | ✅ Sprint 2 |
-| 10 | `mood_entries` | §31 | ✅ Sprint 2 |
-| 11 | `journal_entries` | §31 | ✅ Sprint 3 |
-| 12 | `activities` | §31 | ✅ Sprint 3 |
-| 13 | `memories` | §31 | ✅ Sprint 3 |
-| 14 | `events` | ⚠️ naskah 6 — **tidak ada di §31** | ✅ Sprint 3 |
-| 15 | `agents` | ⚠️ naskah 6 — **tidak ada di §31** | ✅ Sprint 4 |
-| 16 | `agent_tools` | ⚠️ naskah 6 — **tidak ada di §31** | ✅ Sprint 4 |
-| 17 | `agent_runs` | §31 | ✅ Sprint 4 |
-| 18 | `ai_conversations` | §31 | ✅ Sprint 4 |
-| 19 | `ai_messages` | §31 | ✅ Sprint 4 |
-| 20 | `human_states` | 🔧 usulan — §9 butuh tempat | ✅ Sprint 5 |
-| 21 | `recommendations` | §31 | ✅ Sprint 5 |
-| 22 | `recommendation_feedback` | §31 | ✅ Sprint 5 |
-| 23 | `audit_logs` | §31 | ✅ Sprint 1 |
-
-**19** tabel dari daftar pemilik §31 + **3** dari naskah 6 + **1** usulan
-(`human_states`) = **23 tabel**.
-
-Tidak ada tabel untuk fitur di luar V0. `wardrobe_items`, `outfits`,
-`sleep_records`, `workouts`, `skills`, `projects`, dan `notifications` disebut
-di naskah 5 §5 tetapi tidak ada di V0 — menulis skemanya sekarang berarti
-mengunci tebakan.

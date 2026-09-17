@@ -50,6 +50,7 @@ RUN apt-get update \
  && useradd --system --uid 10001 --gid hvx --home-dir /app --shell /usr/sbin/nologin hvx
 
 COPY --from=bangun /opt/venv /opt/venv
+COPY --chown=root:root data/migrations /app/data/migrations
 
 ENV PATH=/opt/venv/bin:$PATH \
     PYTHONDONTWRITEBYTECODE=1 \
