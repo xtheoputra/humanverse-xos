@@ -44,6 +44,15 @@ class Settings(BaseSettings):
     redis_socket_timeout_s: float = Field(default=5.0, gt=0, le=60)
     redis_connect_timeout_s: float = Field(default=2.0, gt=0, le=30)
 
+    # Awalan semua kunci Redis milik proses ini — uji memakai awalan acak supaya
+    # sesi dan penghitung batas laju tidak bertabrakan antaruji.
+    redis_prefix: str = Field(default="hvx", pattern=r"^[a-z0-9][a-z0-9-]{0,39}$")
+
+    # Sesi (spec/07 1.2). Token akses berumur pendek karena ia yang dibawa tiap
+    # permintaan; token segar berumur panjang dan BEROTASI tiap dipakai.
+    access_token_ttl_s: int = Field(default=900, ge=60, le=86_400)
+    refresh_token_ttl_s: int = Field(default=2_592_000, ge=3_600, le=7_776_000)
+
     @field_validator("database_url")
     @classmethod
     def _dsn_bisa_dipakai_kedua_driver(cls, nilai: str) -> str:

@@ -42,6 +42,8 @@ def create_app(settings: platform.Settings | None = None) -> FastAPI:
             socket_timeout_s=settings.redis_socket_timeout_s,
             connect_timeout_s=settings.redis_connect_timeout_s,
         )
+        app.state.engine = engine
+        app.state.redis = redis
         app.state.pemeriksaan_kesehatan = {
             "db": partial(platform.ping_db, engine),
             "redis": partial(platform.ping_redis, redis),
@@ -65,6 +67,7 @@ def create_app(settings: platform.Settings | None = None) -> FastAPI:
     )
     app.state.settings = settings
     app.state.versi = __version__
+    platform.pasang_penangan_galat(app)
     app.add_middleware(platform.RequestContextMiddleware)
     app.include_router(platform.router)
     return app

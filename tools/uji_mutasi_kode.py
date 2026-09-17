@@ -231,6 +231,24 @@ MUTASI: list[Mutasi] = [
         _pytest("tests/unit/test_batas_tabel.py"),
         harus_memuat="`identity` menyebut `goals`",
     ),
+    # ── sesi (spec/07 1.2): dicabut → 401 seketika ───────────────────────
+    Mutasi(
+        "1.2",
+        "cabut sesi lupa menghapus token akses — hidup sampai kedaluwarsa",
+        [
+            Sunting(
+                f"{MODUL}/identity/sesi.py",
+                "            p.delete("
+                + NL
+                + '                self._k_akses(catatan["akses"]),'
+                + NL,
+                "            p.delete(" + NL,
+            )
+        ],
+        _pytest("tests/integration/test_sesi.py::test_sesi_dicabut_401_seketika"),
+        harus_memuat="assert 200 == 401",
+        kelompok="db",
+    ),
     # ── peta penegak arch/11 §6 ──────────────────────────────────────────
     Mutasi(
         "§6",
