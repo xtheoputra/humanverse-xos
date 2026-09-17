@@ -1,12 +1,13 @@
 # HumanVerse XOS — V0 lokal (arch/09 §1, tahap D0). spec/07 tugas 0.2.
 #
-#   docker compose up -d --wait          # keduanya, tunggu sampai sehat
+#   docker compose up -d --wait          # ketiganya, tunggu sampai sehat
 #   docker compose up -d --wait postgres redis   # hanya ketergantungan (untuk uji)
 #
 # Port — semuanya HANYA di 127.0.0.1, tidak terbuka ke jaringan lokal:
 #
 #   | Layanan  | Port hos (bawaan) | Ganti lewat          |
 #   |----------|-------------------|----------------------|
+#   | api      | 8000              | HVX_API_PORT         |
 #   | postgres | 5432              | HVX_POSTGRES_PORT    |
 #   | redis    | 6379              | HVX_REDIS_PORT       |
 #
@@ -16,6 +17,19 @@
 #    `.env.example` → `.env` untuk menggantinya.
 
 name: humanverse-xos
+
+x-api-image: &api-image
+  build:
+    context: .
+    dockerfile: infrastructure/docker/api.Dockerfile
+  # CI memakai tag sendiri (hvx-api:ci) supaya pindai tidak menilai citra dev.
+  image: ${HVX_API_IMAGE:-hvx-api:local}
+
+x-api-env: &api-env
+  HVX_ENV: ${HVX_ENV:-local}
+  HVX_DATABASE_URL: postgresql://${HVX_POSTGRES_USER:-hvx}:${HVX_POSTGRES_PASSWORD:-hvx-dev-only}@postgres:5432/${HVX_POSTGRES_DB:-hvx}
+  HVX_REDIS_URL: redis://redis:6379/0
+  HVX_LOG_LEVEL: ${HVX_LOG_LEVEL:-INFO}
 
 services:
   postgres:
@@ -47,6 +61,27 @@ services:
       interval: 5s
       timeout: 3s
       retries: 20
+
+  api:
+    <<: *api-image
+    environment: *api-env
+    ports:
+      - "127.0.0.1:${HVX_API_PORT:-8000}:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import sys, urllib.request; sys.exit(urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3).status != 200)"
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 5s
 
 volumes:
   postgres-data:

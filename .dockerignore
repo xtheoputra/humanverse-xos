@@ -1,0 +1,9 @@
+# Konteks bangun = akar repo; hanya yang dibutuhkan citra api yang ikut.
+**
+!pyproject.toml
+!uv.lock
+!apps/api/pyproject.toml
+!apps/api/README.md
+!apps/api/src/**
+**/__pycache__
+**/*.pyc
