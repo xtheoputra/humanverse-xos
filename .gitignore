@@ -7,3 +7,19 @@ desktop.ini
 # perkakas dokumen (tools/)
 __pycache__/
 *.pyc
+
+# lingkungan Python (uv) — spec/07 Sprint 0
+.venv/
+.coverage
+.coverage.*
+htmlcov/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.import_linter_cache/
+.ci-requirements.txt
+
+# rahasia lokal — arch/09 §5 aturan 3: rahasia tidak pernah di repo
+.env
+.env.*
+!.env.example
