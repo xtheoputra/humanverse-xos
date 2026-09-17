@@ -30,15 +30,27 @@
 
 ## §2 Kapan tiap pemeriksaan dipasang
 
-| Kelompok | Dipasang di | Butuh kode **produksi**? |
+> 🔨 **Diperbarui 16 September 2026 — Sprint 0 dikodekan** (branch
+> `v0/sprint-0-foundation`, menunggu HUMAN REVIEW). Kolom ketiga kini menulis
+> keadaan, bukan rencana; rinciannya per pemeriksaan di blok ` ```penegak `
+> §6, yang dibaca `tests/unit/test_penegak.py`.
+
+| Kelompok | Dipasang di | Keadaan |
 |---|---|---|
-| **B** batas keras (6) | Sprint 0 tugas **0.8** | ya — kecuali **B-6 SUDAH JALAN** atas pohon [`03`](03-MONOREPO-FINAL.md) |
-| **M** modul & nama (4) | Sprint 0 **0.7 · 0.8** | ya |
-| **P** penyimpanan & migrasi (6) | Sprint 0 **0.4** | ❌ untuk **P-1 · P-2 · P-3** — DDL-nya sudah ada di [`../spec/01`](../spec/01-DATABASE-SCHEMA.md) |
-| **E** event (5) | Sprint 3 **3.1** | ❌ untuk **E-1 · E-2 · E-4 · E-5** |
-| **A** agent & tool (3) | Sprint 4 **4.2** | ❌ untuk **A-2 · A-3** — manifestnya sudah ada di [`../spec/05`](../spec/05-AGENT-CONTRACTS.md) |
-| **G** governance (1) | **SUDAH JALAN** atas tabel [`08`](08-AGENT-CONTRACTS.md) §4 | ❌ |
-| **R** roadmap (1) | **SUDAH JALAN** atas tiap roadmap di `docs/` & `arch/` | ❌ |
+| **B** batas keras (6) | Sprint 0 tugas **0.8** | ✅ **B-2** kontrak `import-linter` · ✅ **B-6** pohon `03` **dan repo nyata** · ⏳ B-1 (tugas 4.5) · B-3 (T5) · B-4 (T10) · B-5 (T2) |
+| **M** modul & nama (4) | Sprint 0 **0.7 · 0.8** | ✅ **4 dari 4** — M-1 · M-2 · M-3 `import-linter`; M-4 atas repo nyata |
+| **P** penyimpanan & migrasi (6) | Sprint 0 **0.4** | ✅ P-1 · P-2 · P-3 atas [`../spec/01`](../spec/01-DATABASE-SCHEMA.md) **dan berkas migrasi** · ⏳ P-4 (T2) · P-5 (D5) · P-6 (T9) |
+| **E** event (5) | Sprint 3 **3.1** | ✅ E-1 · E-2 · E-4 · E-5 · ✅ **E-3 separuh DDL** — uji admisinya menunggu 3.1 |
+| **A** agent & tool (3) | Sprint 4 **4.2** | ✅ A-1 · A-2 · A-3 atas [`../spec/05`](../spec/05-AGENT-CONTRACTS.md) + DDL — validator manifest sungguhan menunggu 4.2 |
+| **G** governance (1) | **SUDAH JALAN** atas tabel [`08`](08-AGENT-CONTRACTS.md) §4 | ✅ |
+| **R** roadmap (1) | **SUDAH JALAN** atas tiap roadmap di `docs/` & `arch/` | ✅ — merah: keputusan cakupan pemilik |
+
+> 💡 **Pertanyaan sesi 28 ditanyakan sekali lagi pada keempat belas sisanya —
+> *apakah yang diperiksanya sudah ada dalam bentuk lain?* — dan memindahkan dua
+> lagi tanpa menunggu tugasnya:** **E-3** membaca `CHECK` kolom
+> `events.source` di DDL, dan **A-1** membaca skema manifest `spec/05` yang
+> sudah memisahkan `max_risk` (R) dari `autonomy.max_level` (L). Keempat
+> sisanya (M-1 · M-2 · M-3 · B-2) memang menunggu kode — dan kodenya kini ada.
 
 ### 🔴🔴 Kolom ketiga pernah salah untuk DELAPAN pemeriksaan
 
@@ -64,27 +76,49 @@ dengan kode **1** kalau ada yang gagal, jadi ia bisa dipasang sebagai gerbang CI
 sebelum berkas kode pertama ditulis.
 
 ```
-$ python tools/periksa_dokumen.py
-B-6  28 direktori         ✅ LULUS
-P-1  23 tabel             ✅ LULUS
-P-2  23 tabel             ✅ LULUS
-P-3  20 kolom user_id     ✅ LULUS
-E-1  154 nama             ✅ LULUS
-E-2  154 nama             ✅ LULUS
-E-4  6 pasangan wajib     ✅ LULUS
-E-5  130 kandidat         ✅ LULUS
-A-2  15 pasangan tool     ✅ LULUS
-A-3  3 entri kind:agent   ✅ LULUS
-G-1  10 pasal             ✅ LULUS
+$ python tools/periksa_dokumen.py                      # 16 Sep 2026
+B-6  28 direktori arch/03 + 24 repo nyata    ✅ LULUS
+M-4  33 direktori repo nyata                 ✅ LULUS
+P-1  46 tabel (spec/01 23 · migrasi 23)      ✅ LULUS
+P-2  46 tabel                                ✅ LULUS
+P-3  40 kolom user_id                        ✅ LULUS
+E-1 · E-2 · E-4 · E-5                        ✅ LULUS
+E-3  2 tabel events (spec/01 · migrasi)      ✅ LULUS
+A-1  manifest + 2 tabel agents               ✅ LULUS
+A-2 · A-3 · G-1                              ✅ LULUS
 R-1  10 pasangan          🛑 GAGAL — 7 temuan (keputusan cakupan pemilik)
+
+$ uv run lint-imports                                  # pyproject.toml
+M-1 · M-3 lapisan modul · M-1 siklus · M-2 ×12 · B-2   15 kept, 0 broken
 ```
 
 ### ✅ Dan MERAHnya dibuktikan, bukan diandaikan
 
 ```
 $ python tools/uji_mutasi.py
-12 mutasi · 12 terbukti BERBUNYI
+25 mutasi · 25 terbukti BERBUNYI — tiap mutasi wajib melahirkan temuan BARU
+
+$ uv run python tools/uji_mutasi_kode.py
+35 mutasi · 35 terbukti BERBUNYI — dengan ALASAN yang dimaksud
+   19 import-linter (satu per id kontrak + modul baru, siklus, stdlib, berkas baru)
+    1 ruff banned-api · 3 peta penegak §6 · 3 rantai pasok · 8 uji migrasi · 1 pemindai rahasia
 ```
+
+> 🔴 **Dua hal yang uji mutasi ajarkan di Sprint 0 — keduanya tentang alat
+> ukurnya sendiri.** (1) Versi pertama `uji_mutasi.py` membaca dan menulis
+> berkas lewat `read_text`/`write_text`; di Windows keduanya menerjemahkan
+> akhir baris, sehingga **berkas ber-LF yang "dikembalikan" diam-diam menjadi
+> CRLF**. Kini dibaca dan dikembalikan sebagai byte. (2) Kode keluar `1` saja
+> tidak membuktikan penegak menangkap hal yang dimaksud — uji yang gagal karena
+> galat lingkungan juga keluar `1`. `uji_mutasi_kode.py` menuntut **keluarannya
+> memuat alasan yang dimaksud**, bukan hanya kodenya.
+>
+> 🔴 **Dan P-3 ternyata bisa dibohongi komentar.** Penjaganya dicari sebagai
+> *baris yang memuat `CHECK`, `data_subject`, dan `user_id`* — dan sebuah
+> komentar SQL yang menyebut ketiganya lolos sebagai penjaga. Migrasi 0001
+> memang punya komentar semacam itu tepat di atas CHECK-nya. Komentar kini
+> dibuang sebelum diperiksa, dan mutasi *“penjaga tinggal KOMENTAR”*
+> membuktikannya.
 
 > 🔑 **Dua belas LULUS tidak berarti apa pun sampai bisa ditunjukkan bahwa
 > kedua belasnya SANGGUP GAGAL.** Regex yang tidak pernah cocok dan tabel yang
@@ -195,9 +229,9 @@ A14 10 · R16 10 · H17 12 · G18 10 · S19 10 · C20 12 · `spec/07` **51 tugas
 
 | # | Memeriksa | Caranya |
 |---|---|---|
-| **E-1** | segmen pertama `event_type` ada di registry domain | daftar 39 domain [`07`](07-EVENT-CONTRACTS.md) §2; **bisa jalan sekarang atas `docs/`** |
-| **E-2** | format dua segmen, huruf kecil, kata kerja lampau | regex; **bisa jalan sekarang** |
-| **E-3** | tidak ada `source='sensor'` di `events` | grep DDL + uji admisi |
+| **E-1** | segmen pertama `event_type` ada di registry domain | registry [`07`](07-EVENT-CONTRACTS.md) §2, dibaca dari dokumennya; **jalan** atas `spec/03` & `arch/07` |
+| **E-2** | format dua segmen, huruf kecil, kata kerja lampau | regex; **jalan** |
+| **E-3** | tidak ada `source='sensor'` di `events` | `CHECK` kolom `source` di DDL (`spec/01` + migrasi) — **jalan**; uji admisi saat terbit — tugas 3.1 |
 | **E-4** | tiap kata kerja pengubah keadaan punya kembaran kegagalan/pemulihan | daftar pasangan wajib [`07`](07-EVENT-CONTRACTS.md) §6; **jalan sekarang** — namanya dicari di [`../spec/03`](../spec/03-EVENT-CONTRACTS.md) SAJA, sebab mencarinya di `07` berarti pemeriksa membaca daftar tuntutannya sendiri |
 | **E-5** 🆕 | tiap nama event di naskah punya baris di tabel padanan [`../spec/03`](../spec/03-EVENT-CONTRACTS.md) | panen PascalCase seluruh `docs/`, disaring kata kerja penutup yang tabel itu sendiri pakai; **jalan sekarang** |
 
@@ -299,18 +333,57 @@ sebenarnya.
 | | Hasil |
 |---|---|
 | Jumlah pemeriksaan | **26** |
-| Batas keras tanpa penegak | **NIHIL** — 6 dari 6 |
+| Batas keras tanpa penegak **yang dinyatakan** | **NIHIL** — 6 dari 6 punya baris di blok `penegak` di bawah: 2 jalan, 4 menunggu pemicu yang disebut namanya |
 | Aturan 🔧 di `arch/` tanpa baris di §3 | **NIHIL** |
-| Pemeriksaan yang bisa jalan tanpa kode produksi | **12** — B-6 · P-1 · P-2 · P-3 · E-1 · E-2 · E-4 · E-5 · A-2 · A-3 · G-1 · R-1 |
-| Pemeriksaan yang **benar-benar sudah dijalankan** | **12 dari 12** |
-| Pemeriksaan yang **terbukti sanggup GAGAL** | **12 dari 12** — [`../tools/uji_mutasi.py`](../tools/README.md) |
-| Pemeriksaan yang masih menunggu kode | **14 dari 26** |
-| Perkakas yang dibutuhkan | **1** — `import-linter` menangani B-1·B-2·B-3, M-1·M-2·M-3 |
+| Pemeriksaan yang **benar-benar dijalankan** | **19 dari 26** — di **branch Sprint 0**; di `master` tetap 12 sampai branch itu digabung, sebab ketujuh tambahannya (B-2 · M-1 · M-2 · M-3 · M-4 · E-3 · A-1) lahir di sana |
+| Pemeriksaan yang **terbukti sanggup GAGAL** | **19 dari 19** — [`../tools/uji_mutasi.py`](../tools/README.md) (25 mutasi) · `uji_mutasi_kode.py` (35 mutasi) |
+| Pemeriksaan yang menunggu | **7** — B-1 · B-3 · B-4 · B-5 · P-4 · P-5 · P-6; tiap baris menyebut pemicunya |
+| Perkakas yang dibutuhkan | **1** — `import-linter` menangani B-2 · M-1 · M-2 · M-3 hari ini, dan B-1 · B-3 begitu modulnya ada |
 | Roadmap yang lulus R-1 | **2 dari 8** — dan keduanya ditulis untuk dikerjakan |
 
-> 🛑 **Baris keempat dan kelima sengaja dipisah.** Sampai 10 September 2026
-> berkas ini menulis *“4 pemeriksaan bisa jalan tanpa kode”* — dan **nol** di
-> antaranya pernah dijalankan. Itu bentuk yang sama dengan seluruh §1: aturan
+### Blok `penegak` — dibaca mesin, bukan dibaca orang
+
+Satu baris per pemeriksaan §3. `tests/unit/test_penegak.py` menuntut:
+himpunan kodenya **sama persis** dengan §3; tiap `import-linter:<id>` ada di
+`pyproject.toml`; tiap `periksa_dokumen:<kode>` ada di
+`tools/periksa_dokumen.py` **dan** dijalankan `tools/ci_lokal.py`; tiap baris
+`MENUNGGU` menyebut pemicunya; dan **tidak ada kontrak `import-linter` yang
+tidak disebut di sini**.
+
+```penegak
+# kode  status      penegak                                          pemicu / catatan
+B-1     MENUNGGU    —                                                tugas 4.5 — V0 belum punya `security`; risk gate menentukan letaknya
+B-2     JALAN       import-linter:b2-jalur-keluar
+B-3     MENUNGGU    —                                                T5 — V0 tidak punya modul `simulation`
+B-4     MENUNGGU    —                                                T10 — menempel pada artefak `embodiment/drivers/`
+B-5     MENUNGGU    —                                                T2 — belum ada berkas kebijakan untuk diuji terhadap Konstitusi
+B-6     JALAN       periksa_dokumen:B-6
+M-1     JALAN       import-linter:m1-m3-lapisan import-linter:m1-siklus-dalam
+M-2     JALAN       import-linter:m2-identity import-linter:m2-profile import-linter:m2-goals import-linter:m2-habits import-linter:m2-checkins import-linter:m2-journal import-linter:m2-activities import-linter:m2-events import-linter:m2-memory import-linter:m2-intelligence import-linter:m2-agents import-linter:m2-platform
+M-3     JALAN       import-linter:m1-m3-lapisan
+M-4     JALAN       periksa_dokumen:M-4
+P-1     JALAN       periksa_dokumen:P-1
+P-2     JALAN       periksa_dokumen:P-2
+P-3     JALAN       periksa_dokumen:P-3
+P-4     MENUNGGU    —                                                T2 — `security/vault/` & anotasi `sensitivity` belum ada
+P-5     MENUNGGU    —                                                D5 — modul belum punya manifest `deploy`
+P-6     MENUNGGU    —                                                T9 — V0 tidak punya data K3
+E-1     JALAN       periksa_dokumen:E-1
+E-2     JALAN       periksa_dokumen:E-2
+E-3     JALAN       periksa_dokumen:E-3                              separuh DDL; uji admisi saat terbit — tugas 3.1
+E-4     JALAN       periksa_dokumen:E-4
+E-5     JALAN       periksa_dokumen:E-5
+A-1     JALAN       periksa_dokumen:A-1                              skema manifest + DDL; manifest sungguhan — tugas 4.2
+A-2     JALAN       periksa_dokumen:A-2                              manifest sungguhan — tugas 4.2
+A-3     JALAN       periksa_dokumen:A-3                              registry sungguhan — tugas 4.3
+G-1     JALAN       periksa_dokumen:G-1
+R-1     JALAN       periksa_dokumen:R-1                              merah — keputusan cakupan pemilik; dilaporkan, tidak menggagalkan
+```
+
+> 🛑 **Tabel di atas sengaja tidak punya baris *“bisa jalan”* — hanya
+> *“dijalankan”* dan *“terbukti sanggup gagal”*, dua baris terpisah.** Sampai
+> 10 September 2026 berkas ini menulis *“4 pemeriksaan bisa jalan tanpa kode”* —
+> dan **nol** di antaranya pernah dijalankan. Itu bentuk yang sama dengan seluruh §1: aturan
 > yang benar, ditulis serius, tanpa sesuatu yang berkata *tidak*. Sebuah berkas
 > penegakan adalah tempat paling tidak masuk akal untuk mengulanginya, dan ia
 > mengulanginya selama satu hari.

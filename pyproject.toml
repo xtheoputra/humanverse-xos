@@ -58,6 +58,7 @@ select = [
   "PT",           # gaya pytest
   "SIM",
   "RUF",
+  "TID",          # banned-api — lihat [tool.ruff.lint.flake8-tidy-imports]
 ]
 ignore = [
   "RUF001", "RUF002", "RUF003",  # teks Bahasa Indonesia memakai tanda baca Unicode dengan sengaja
@@ -65,7 +66,17 @@ ignore = [
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["S101", "S105", "S106", "S608"]  # assert & kredensial palsu di uji
-"tools/**" = ["S603", "S607", "E501"]  # perkakas memanggil subprocess; laporan berbaris panjang
+"tools/**" = ["S603", "S607", "E501", "TID251"] # perkakas memanggil subprocess; laporan berbaris panjang
+"tests/**/*.py" = ["TID251"]
+"data/migrations/**" = ["TID251"]
+
+# B-2 lapis kedua: yang import-linter TIDAK bisa lihat. Kontrak impor hanya
+# melihat impor tingkat atas; submodul pustaka luar (`http.client`) tidak bisa
+# dinyatakan di sana, dan impor dinamis tidak terlihat oleh grafnya sama sekali.
+[tool.ruff.lint.flake8-tidy-imports.banned-api]
+"importlib.import_module".msg = "impor dinamis tidak terlihat oleh import-linter (B-2, M-1..M-3) — impor secara statis"
+"http.client".msg = "klien HTTP mentah — jalur keluar hanya lewat platform (B-2)"
+"asyncio.open_connection".msg = "koneksi jaringan mentah — jalur keluar hanya lewat platform (B-2)"
 
 # ───────────────────────────────────────────────────────────── mypy ──
 
@@ -102,6 +113,176 @@ branch = true
 fail_under = 70
 show_missing = true
 skip_covered = false
+
+# ──────────────────────────────────────────────────────── import-linter ──
+#
+# spec/07 tugas 0.8 — batas modul (spec/06 aturan 1–4) dan batas keras
+# (arch/04 §2, arch/11 §3) sebagai KONTRAK, bukan niat. `lint-imports` keluar
+# non-nol kalau satu saja dilanggar; tools/uji_mutasi_kode.py membuktikan
+# tiap kontrak SANGGUP gagal — satu mutasi per id kontrak, dituntut tests/unit/test_penegak.py.
+#
+# Nama kontrak diawali kode arch/11 supaya tiap baris bisa dilacak ke aturan
+# yang ditegakkannya.
+#
+# Batas keras yang BELUM bisa dinyatakan sebagai kontrak di V0 — dan sengaja
+# tidak dipura-purakan ada (arch/11 §6, blok ```penegak):
+#   B-1 agent ✗→ security  — V0 belum punya `security`; risk gate datang di 4.5
+#   B-3 simulasi ✗→ repository — V0 tidak punya `simulation` (T5)
+#   B-4 Code→Simulation→Safety Test→Hardware — menempel pada artefak (T10)
+#   B-5 kebijakan lokal ⊆ Konstitusi — belum ada berkas kebijakan (T2)
+
+[tool.importlinter]
+root_package = "hvx"
+include_external_packages = true
+
+[[tool.importlinter.contracts]]
+id = "m1-m3-lapisan"
+name = "M-1 · M-3 · spec/06 aturan 2–4 — lapisan modul asiklik; modul domain saling independen; tak ada yang mengimpor agents"
+type = "layers"
+containers = ["hvx.modules"]
+# 🔴 Tanpa `exhaustive`, modul ke-13 di bawah hvx.modules tidak terikat lapisan
+# mana pun — boleh mengimpor `agents` dan modul domain, dan kontrak tetap KEPT.
+# Diukur di tinjauan Sprint 0. Kini modul baru WAJIB diberi tempat di sini.
+exhaustive = true
+# Atas boleh mengimpor bawah; tidak pernah sebaliknya (termasuk tak langsung).
+#
+# 🔧 `events` di BAWAH modul domain, bukan di atasnya seperti gambar alir
+# spec/06: gambar itu arah DATA. Arah IMPOR ditentukan aturan 6 — tiap tulisan
+# domain wajib MENERBITKAN event, jadi modul domain mengimpor `events`.
+# `memory` di atas modul domain: ekstraksi memori membaca jurnal & mood (3.6).
+layers = [
+  "agents",
+  "intelligence",
+  "memory",
+  "goals | habits | checkins | journal | activities | profile",
+  "events",
+  "identity",
+  "platform",
+]
+
+[[tool.importlinter.contracts]]
+id = "m1-siklus-dalam"
+name = "M-1 — tidak ada impor melingkar di dalam modul mana pun"
+type = "acyclic_siblings"
+ancestors = ["hvx"]
+
+[[tool.importlinter.contracts]]
+id = "m2-identity"
+name = "M-2 · spec/06 aturan 1 — `identity` hanya dimasuki lewat __init__.py"
+type = "protected"
+protected_modules = ["hvx.modules.identity.*"]
+allowed_importers = ["hvx.modules.identity"]
+
+[[tool.importlinter.contracts]]
+id = "m2-profile"
+name = "M-2 · spec/06 aturan 1 — `profile` hanya dimasuki lewat __init__.py"
+type = "protected"
+protected_modules = ["hvx.modules.profile.*"]
+allowed_importers = ["hvx.modules.profile"]
+
+[[tool.importlinter.contracts]]
+id = "m2-goals"
+name = "M-2 · spec/06 aturan 1 — `goals` hanya dimasuki lewat __init__.py"
+type = "protected"
+protected_modules = ["hvx.modules.goals.*"]
+allowed_importers = ["hvx.modules.goals"]
+
+[[tool.importlinter.contracts]]
+id = "m2-habits"
+name = "M-2 · spec/06 aturan 1 — `habits` hanya dimasuki lewat __init__.py"
+type = "protected"
+protected_modules = ["hvx.modules.habits.*"]
+allowed_importers = ["hvx.modules.habits"]
+
+[[tool.importlinter.contracts]]
+id = "m2-checkins"
+name = "M-2 · spec/06 aturan 1 — `checkins` hanya dimasuki lewat __init__.py"
+type = "protected"
+protected_modules = ["hvx.modules.checkins.*"]
+allowed_importers = ["hvx.modules.checkins"]
+
+[[tool.importlinter.contracts]]
+id = "m2-journal"
+name = "M-2 · spec/06 aturan 1 — `journal` hanya dimasuki lewat __init__.py"
+type = "protected"
+protected_modules = ["hvx.modules.journal.*"]
+allowed_importers = ["hvx.modules.journal"]
+
+[[tool.importlinter.contracts]]
+id = "m2-activities"
+name = "M-2 · spec/06 aturan 1 — `activities` hanya dimasuki lewat __init__.py"
+type = "protected"
+protected_modules = ["hvx.modules.activities.*"]
+allowed_importers = ["hvx.modules.activities"]
+
+[[tool.importlinter.contracts]]
+id = "m2-events"
+name = "M-2 · spec/06 aturan 1 — `events` hanya dimasuki lewat __init__.py"
+type = "protected"
+protected_modules = ["hvx.modules.events.*"]
+allowed_importers = ["hvx.modules.events"]
+
+[[tool.importlinter.contracts]]
+id = "m2-memory"
+name = "M-2 · spec/06 aturan 1 — `memory` hanya dimasuki lewat __init__.py"
+type = "protected"
+protected_modules = ["hvx.modules.memory.*"]
+allowed_importers = ["hvx.modules.memory"]
+
+[[tool.importlinter.contracts]]
+id = "m2-intelligence"
+name = "M-2 · spec/06 aturan 1 — `intelligence` hanya dimasuki lewat __init__.py"
+type = "protected"
+protected_modules = ["hvx.modules.intelligence.*"]
+allowed_importers = ["hvx.modules.intelligence"]
+
+[[tool.importlinter.contracts]]
+id = "m2-agents"
+name = "M-2 · spec/06 aturan 1 — `agents` hanya dimasuki lewat __init__.py"
+type = "protected"
+protected_modules = ["hvx.modules.agents.*"]
+allowed_importers = ["hvx.modules.agents"]
+
+[[tool.importlinter.contracts]]
+id = "m2-platform"
+name = "M-2 · spec/06 aturan 1 — `platform` hanya dimasuki lewat __init__.py"
+type = "protected"
+protected_modules = ["hvx.modules.platform.*"]
+allowed_importers = ["hvx.modules.platform"]
+
+[[tool.importlinter.contracts]]
+id = "b2-jalur-keluar"
+name = "B-2 — tidak ada jalur keluar selain platform (klien jaringan & SDK model hanya di sana)"
+type = "forbidden"
+# 🔴 Semula daftar modul yang ditulis tangan (hvx.main + 11 modul) lawan tujuh
+# paket. Diukur: modul baru, berkas baru di bawah hvx, dan klien jaringan
+# bawaan Python (urllib, socket, smtplib) semuanya lolos. Kini SELURUH paket
+# `hvx`, dengan `platform` dikecualikan per paket terlarang.
+#
+# Batas yang tetap tidak bisa dinyatakan di sini, dan penjaganya:
+#   `http.client` · `asyncio.open_connection` · `importlib.import_module`
+#     → ruff banned-api (import-linter menolak submodul pustaka luar)
+#   `http` sendiri tidak dilarang: `http.HTTPStatus` sah dipakai rute.
+#   subprocess ke curl/wget → bandit & ruff S603/S607
+source_modules = ["hvx"]
+forbidden_modules = [
+  "httpx", "requests", "aiohttp", "urllib3", "httpcore", "websockets", "h11",
+  "openai", "anthropic",
+  "urllib", "socket", "ssl", "smtplib", "ftplib", "imaplib", "poplib", "xmlrpc",
+]
+ignore_imports = [
+  "hvx.modules.platform.** -> httpx", "hvx.modules.platform.** -> requests",
+  "hvx.modules.platform.** -> aiohttp", "hvx.modules.platform.** -> urllib3",
+  "hvx.modules.platform.** -> httpcore", "hvx.modules.platform.** -> websockets",
+  "hvx.modules.platform.** -> h11", "hvx.modules.platform.** -> openai",
+  "hvx.modules.platform.** -> anthropic", "hvx.modules.platform.** -> urllib",
+  "hvx.modules.platform.** -> socket", "hvx.modules.platform.** -> ssl",
+  "hvx.modules.platform.** -> smtplib", "hvx.modules.platform.** -> ftplib",
+  "hvx.modules.platform.** -> imaplib", "hvx.modules.platform.** -> poplib",
+  "hvx.modules.platform.** -> xmlrpc",
+]
+unmatched_ignore_imports_alerting = "none"
+allow_indirect_imports = true
 
 # ─────────────────────────────────────────────────────────── bandit ──
 

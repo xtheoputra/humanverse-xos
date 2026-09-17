@@ -86,13 +86,29 @@ Kalau ia menerima aliran sensor, ia berhenti bisa menjadi itu.
 |---|---|---|
 | 1 | pengguna bisa **mengenalinya** kalau ditunjukkan (*“Anda menyelesaikan lari 06.30”*) | ia pengukuran, bukan kejadian → K2/K3 |
 | 2 | ia punya **`idempotency_key` yang bermakna** — pengiriman ulang berarti hal yang sama | untuk aliran bingkai, `idempotency_key` kehilangan arti |
-| 3 | `source` termuat dalam `CHECK` yang ada (`manual · inferred · integration · agent`) | 🛑 `sensor` **tidak** ditambahkan — lihat bawah |
+| 3 | `source` termuat dalam `CHECK` yang ada — **`app · agent · integration · backfill`** ([`../spec/01`](../spec/01-DATABASE-SCHEMA.md)) | 🛑 `sensor` **tidak** ditambahkan — lihat bawah |
 
 🛑 **`source='sensor'` sengaja TIDAK ditambahkan ke `events`.** Menambahkannya
 akan membuat uji ini bisa dilewati dengan satu nilai enum. Aliran sensor masuk
 lewat `perception/summarizer/`, dan yang diterbitkannya adalah kejadian yang
-sudah **lulus syarat 1** — dengan `source='inferred'` dan
-`confidence` + `evidence_count`, sebab ia memang kesimpulan.
+sudah **lulus syarat 1**, dengan `confidence` + `evidence_count`, sebab ia
+memang kesimpulan. Ditegakkan **E-3** atas DDL sejak 16 Sep 2026.
+
+> 🔴 **E-162 — dikoreksi 16 Sep 2026, dan koreksinya membuka satu pertanyaan
+> yang sengaja tidak dijawab di sini.** Baris 3 semula menulis himpunan
+> `manual · inferred · integration · agent` — itu himpunan
+> **`activities.source`** (ditambah `agent`), bukan `events.source`. Paragraf
+> di atas juga semula menyuruh *summarizer* menerbitkan dengan
+> **`source='inferred'`** — nilai yang **`CHECK` `events` sungguhan akan
+> tolak**. Ditemukan saat E-3 membaca `CHECK` itu dari DDL untuk pertama
+> kalinya, bukan dari kalimat yang menggambarkannya.
+>
+> ⚠️ **Nilai `source` bagi kejadian hasil ringkasan sensor belum diputuskan.**
+> Dua jalan, keduanya murah dan keduanya bisa ditambahkan nanti (lulus uji
+> K-16 sebagai *bukan untuk V0*): menambah `inferred` ke `CHECK` `events`,
+> atau menerbitkan sebagai `agent`. Diputuskan di tugas pertama
+> `perception/summarizer/` (**T6**) — yang pemblokirnya
+> [#75](../../issues/75) milik pemilik.
 
 ---
 
