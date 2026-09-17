@@ -94,16 +94,27 @@ _SISIP_PERSETUJUAN = text(
     """
 )
 
-# Satu baris TERAKHIR per tujuan — riwayat hanya-tambah dibaca dari ujungnya.
+# Satu baris TERAKHIR per (tujuan, jenis) — riwayat hanya-tambah dibaca dari
+# ujungnya. 🔴 Versi pertama per tujuan saja: `terms` dan `privacy` sama-sama
+# bertujuan `service`, jadi menyetujui syarat baru sesudah mencabut privasi
+# menutupi pencabutannya (tinjauan Sprint 1).
 _PERSETUJUAN_TERAKHIR = text(
     """
-    SELECT DISTINCT ON (purpose) purpose, granted, data_scopes, expires_at,
+    SELECT DISTINCT ON (purpose, kind) purpose, kind, granted, data_scopes,
            (expires_at IS NULL OR expires_at > now()) AS masih_berlaku
     FROM consents
     WHERE user_id = :user_id AND purpose = ANY(:tujuan)
-    ORDER BY purpose, created_at DESC
+    ORDER BY purpose, kind, created_at DESC
     """
 )
+
+
+@dataclass(frozen=True)
+class PersetujuanTerakhir:
+    kind: str
+    granted: bool
+    data_scopes: frozenset[str]
+    masih_berlaku: bool
 
 
 async def tambah_persetujuan(
@@ -137,13 +148,20 @@ async def tambah_persetujuan(
 
 async def persetujuan_terakhir(
     conn: AsyncConnection, user_id: UUID, tujuan: list[str]
-) -> dict[str, tuple[bool, frozenset[str], bool]]:
-    """{purpose: (granted, data_scopes, masih_berlaku)}; tujuan tanpa riwayat tidak muncul."""
+) -> dict[str, list[PersetujuanTerakhir]]:
+    """{purpose: baris terakhir tiap jenisnya}; tujuan tanpa riwayat tidak muncul."""
     hasil = await conn.execute(_PERSETUJUAN_TERAKHIR, {"user_id": user_id, "tujuan": tujuan})
-    return {
-        b.purpose: (bool(b.granted), frozenset(b.data_scopes or ()), bool(b.masih_berlaku))
-        for b in hasil
-    }
+    terakhir: dict[str, list[PersetujuanTerakhir]] = {}
+    for b in hasil:
+        terakhir.setdefault(b.purpose, []).append(
+            PersetujuanTerakhir(
+                kind=b.kind,
+                granted=bool(b.granted),
+                data_scopes=frozenset(b.data_scopes or ()),
+                masih_berlaku=bool(b.masih_berlaku),
+            )
+        )
+    return terakhir
 
 
 # ── users (spec/07 1.1) ─────────────────────────────────────────────────────
@@ -154,6 +172,14 @@ class AkunUntukMasuk:
     id: UUID
     password_hash: str
     status: str
+
+
+@dataclass(frozen=True)
+class PencarianMasuk:
+    """`kunci` = email sebagaimana `citext` membandingkannya — terisi juga bila akun tak ada."""
+
+    kunci: str
+    akun: AkunUntukMasuk | None
 
 
 async def tambah_pengguna(
@@ -167,15 +193,24 @@ async def tambah_pengguna(
     )
 
 
-async def cari_untuk_masuk(conn: AsyncConnection, email: str) -> AkunUntukMasuk | None:
+# `lower(text)` dan pembanding `citext` sama-sama memakai collation bawaan basis
+# data — kunci batas laju per akun yang dibentuk DI SINI mengenali akun persis
+# seperti `auth_lookup_for_login` mengenalinya. Satu perjalanan untuk keduanya,
+# dan selalu satu baris: akun yang tidak ada tetap punya kunci.
+_CARI_UNTUK_MASUK = text(
+    """
+    SELECT k.kunci, a.id, a.password_hash, a.status
+    FROM (SELECT lower(CAST(:email AS text)) AS kunci) AS k
+    LEFT JOIN LATERAL auth_lookup_for_login(CAST(:email AS citext)) AS a ON true
+    """
+)
+
+
+async def cari_untuk_masuk(conn: AsyncConnection, email: str) -> PencarianMasuk:
     """Satu-satunya pencarian akun sebelum pengguna dikenali — lewat fungsi spec/01 §12."""
-    baris = (
-        await conn.execute(
-            text("SELECT id, password_hash, status FROM auth_lookup_for_login(:email)"),
-            {"email": email},
-        )
-    ).first()
-    return AkunUntukMasuk(baris.id, baris.password_hash, baris.status) if baris else None
+    b = (await conn.execute(_CARI_UNTUK_MASUK, {"email": email})).one()
+    akun = AkunUntukMasuk(b.id, b.password_hash, b.status) if b.id is not None else None
+    return PencarianMasuk(kunci=b.kunci, akun=akun)
 
 
 async def ganti_hash_sandi(conn: AsyncConnection, user_id: UUID, password_hash: str) -> None:

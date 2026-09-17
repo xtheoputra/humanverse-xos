@@ -8,11 +8,23 @@ Tiga kunci, dan kenapa masing-masing ada:
   sandi ditebak dan akun dibuat massal. `refresh` sengaja TIDAK di sini: ia
   butuh token acak 256 bit, dan semua klien di balik satu NAT operator
   menyegarkan dari IP yang sama.
-* **login gagal per akun** — NIST SP 800-63B-4 membatasi kegagalan beruntun
-  per akun (≤100). Kuncinya HMAC email, jadi berlaku sama bagi email yang
-  terdaftar maupun tidak: 429 tidak membocorkan keberadaan akun. Diperiksa
-  SEBELUM argon2 (serangan tidak membakar CPU), dihitung hanya bila sandinya
-  salah, dan dihapus begitu berhasil masuk — itu yang membuatnya "beruntun".
+* **login gagal per akun** — kuncinya HMAC email, jadi berlaku sama bagi email
+  yang terdaftar maupun tidak: 429 tidak membocorkan keberadaan akun. Jatahnya
+  DIPAKAI sebelum argon2 — satu perintah atomik, dan serangan yang ditolak
+  tidak membakar CPU — lalu dikosongkan begitu berhasil masuk. ⚠️ Ini batas
+  LAJU (≤ 100 sekaligus, lalu terisi kembali), **bukan** penguncian sesudah 100
+  kegagalan beruntun yang NIST SP 800-63B-4 §3.2.2 tuntut — dan penyerang yang
+  terus mencoba bisa menahan pemilik akun di 429 selama ia mau (B-42, K-22).
+
+🔴 Dua hal yang versi pertama salah, keduanya ditemukan tinjauan Sprint 1:
+
+1. **Diperiksa dulu, dihitung sesudah argon2.** Dua belas tebakan serentak
+   semuanya lolos pemeriksaan sebelum satu pun dihitung — batas 3 meloloskan 12.
+2. **Kuncinya `email.lower()` Python.** Basis data mengenali akun lewat
+   `citext`, yang memakai `lower()` PostgreSQL: `'İ'` menjadi `i` di sana dan
+   `i̇` di Python. `vİctim@…` masuk ke akun `victim@…` dengan hitungan baru —
+   tiap `i` menggandakan jatah. Kini kuncinya dibentuk basis data sendiri
+   (`repository.cari_untuk_masuk`).
 """
 
 from __future__ import annotations
@@ -46,26 +58,25 @@ async def batasi_kredensial_ip(request: Request) -> None:
 class PenjagaGagalMasuk:
     pembatas: platform.PembatasLaju
     batas: platform.BatasLaju
-    subjek: str
+    settings: platform.Settings
 
-    async def periksa(self) -> None:
-        """Tanpa memakai jatah: masih bolehkah satu tebakan lagi?"""
-        hasil = await self.pembatas.ambil(self.batas, self.subjek, catat=False)
+    def _subjek(self, kunci_akun: str) -> str:
+        return platform.sidik(self.settings, "akun-masuk", kunci_akun)
+
+    async def pakai(self, kunci_akun: str) -> None:
+        """Satu tebakan = satu jatah, dipakai SEBELUM sandinya dicocokkan."""
+        hasil = await self.pembatas.ambil(self.batas, self._subjek(kunci_akun))
         if not hasil.lolos:
             raise platform.galat_terlalu_sering(hasil)
 
-    async def gagal(self) -> None:
-        await self.pembatas.ambil(self.batas, self.subjek)
-
-    async def berhasil(self) -> None:
-        await self.pembatas.lupakan(self.batas, self.subjek)
+    async def berhasil(self, kunci_akun: str) -> None:
+        await self.pembatas.lupakan(self.batas, self._subjek(kunci_akun))
 
 
-def penjaga_gagal_masuk(request: Request, email: str) -> PenjagaGagalMasuk:
+def penjaga_gagal_masuk(request: Request) -> PenjagaGagalMasuk:
     settings = platform.settings_dari(request)
     return PenjagaGagalMasuk(
         platform.pembatas_laju(request),
         platform.BatasLaju.dari_teks("gagal-masuk", settings.rate_limit_login_failures),
-        # `users.email` bertipe citext: huruf besar-kecil satu akun yang sama
-        platform.sidik(settings, "akun-masuk", email.strip().lower()),
+        settings,
     )

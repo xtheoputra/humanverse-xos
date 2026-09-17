@@ -13,7 +13,10 @@
   simbol"; maksimal 128 supaya hashing tidak bisa dijadikan alat DoS.
 * **Daftar tolak** (§3.1.1.2 yang sama — *SHALL*): kata dari konteks (nama
   layanan, email, nama tampilan), pengulangan, dan urutan papan ketik/angka
-  ditolak. Panjang 15 saja meloloskan `passwordpassword`.
+  ditolak. Panjang 15 saja meloloskan `passwordpassword`. 🔴 Pengulangan dinilai
+  dari yang DIKETIK, bukan hanya kerangka huruf-angkanya: versi pertama
+  menolak `!@#$%^&*()_+{}|:<>?` dan sandi emoji sebagai "repetitive" — aturan
+  komposisi terselubung, yang pasal yang sama larang (tinjauan Sprint 1).
 * **NFKC sebelum hashing** (§3.1.1.2 — *SHOULD*): "é" yang diketik sebagai satu
   kode di satu perangkat dan dua kode di perangkat lain adalah sandi yang sama.
   Diterapkan sebelum baris akun pertama — mengubahnya sesudah itu mematahkan
@@ -46,9 +49,11 @@ _URUTAN = (
     "abcdefghijklmnopqrstuvwxyz",
     "qwertyuiopasdfghjklzxcvbnm",
     "1234567890qwertyuiop",
+    "!@#$%^&*()_+",  # baris angka dengan Shift
 )
 _BUKAN_ALNUM = re.compile(r"[\W_]+")
 _KATA_MIN = 4  # kata konteks yang lebih pendek terlalu umum untuk ditolak
+_URUTAN_MIN = 8
 
 
 def normalisasi(sandi: str) -> str:
@@ -59,20 +64,36 @@ def _inti(teks: str) -> str:
     return _BUKAN_ALNUM.sub("", normalisasi(teks).casefold())
 
 
+def _berulang(teks: str) -> bool:
+    """Sedikit karakter berbeda, atau satu potongan diulang utuh."""
+    return len(set(teks)) < 4 or (teks + teks).find(teks, 1) < len(teks)
+
+
+def _berurutan(teks: str) -> bool:
+    return len(teks) >= _URUTAN_MIN and any(
+        teks in arah * (len(teks) // len(arah) + 2) for u in _URUTAN for arah in (u, u[::-1])
+    )
+
+
 def alasan_ditolak(sandi: str, *, email: str, nama: str) -> AlasanTolak | None:
-    """Kenapa sandi ini terlalu mudah ditebak — atau `None`. Tidak pernah mengutip sandinya."""
+    """Kenapa sandi ini terlalu mudah ditebak — atau `None`. Tidak pernah mengutip sandinya.
+
+    Dua bacaan atas sandi yang sama: yang DIKETIK (`penuh`), dan kerangka
+    huruf-angkanya (`inti`) — `p.a.s.s.w.o.r.d` dan `password!!` berkerangka
+    sama. Keduanya hanya bisa MENOLAK: kerangka yang kosong (sandi simbol atau
+    emoji) tidak pernah menjadi alasan.
+    """
+    penuh = normalisasi(sandi).casefold()
     inti = _inti(sandi)
     lokal, _, domain = email.partition("@")
     kata = {*_KATA_LAYANAN, _inti(lokal), _inti(domain.split(".", 1)[0])}
     kata |= {_inti(k) for k in re.split(r"\s+", nama)}
     if any(len(k) >= _KATA_MIN and k in inti for k in kata):
         return "context"
-    if len(set(inti)) < 4 or (inti + inti).find(inti, 1) < len(inti):
-        return "repetitive"  # sedikit karakter berbeda, atau satu potongan diulang
-    for u in _URUTAN:
-        for arah in (u, u[::-1]):
-            if len(inti) >= 8 and inti in arah * (len(inti) // len(arah) + 2):
-                return "sequential"
+    if _berulang(penuh) or (len(inti) >= _URUTAN_MIN and _berulang(inti)):
+        return "repetitive"
+    if _berurutan(penuh) or _berurutan(inti):
+        return "sequential"
     return None
 
 

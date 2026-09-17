@@ -63,7 +63,7 @@ async def masuk(request: Request, badan: PermintaanMasuk, sesi: Sesi) -> Jawaban
         badan.email,
         badan.password.get_secret_value(),
         ip_hash=platform.sidik_ip(request),
-        penjaga=penjaga_gagal_masuk(request, badan.email),
+        penjaga=penjaga_gagal_masuk(request),
     )
     return JawabanAkun(user=akun, tokens=_token(token))
 

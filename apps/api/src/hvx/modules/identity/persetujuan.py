@@ -8,9 +8,12 @@ Selesai bila: riwayat append-only; pencabutan = baris baru; uji:
   MENAMBAH baris; mencabut = menambah baris `granted = false`.
 * **Pembatasan tujuan** (§8.10 — *“data boleh digunakan untuk tujuan yang
   diizinkan, bukan semua tujuan yang secara teknis memungkinkan”*) menjadi
-  `boleh_dipakai_untuk()`: tiap tujuan butuh persetujuan TERAKHIR untuk tujuan
-  itu yang diberikan, belum kedaluwarsa, dan mencakup data yang dipakai.
-  Tujuan tanpa riwayat sama sekali = DITOLAK, bukan "belum ditanya maka boleh".
+  `boleh_dipakai_untuk()`: tiap tujuan butuh persetujuan TERAKHIR dari TIAP
+  jenis yang pernah dicatat untuk tujuan itu — diberikan, belum kedaluwarsa,
+  dan mencakup data yang dipakai. Satu jenis dicabut = tujuannya tertutup,
+  seberapa pun baru jenis lain disetujui (`terms` dan `privacy` sama-sama
+  bertujuan `service`). Tujuan tanpa riwayat sama sekali = DITOLAK, bukan
+  "belum ditanya maka boleh".
 * **Kosakata tujuan tidak diputuskan di sini** (#59 butir 2 — milik pemilik):
   bentuknya `snake_case` (`CHECK` spec/01), isinya bebas.
 """
@@ -151,7 +154,7 @@ async def boleh_dipakai_untuk(
     for t in diminta:
         if t not in terakhir:
             return False
-        diberikan, cakupan_disetujui, masih_berlaku = terakhir[t]
-        if not (diberikan and masih_berlaku and cakupan <= cakupan_disetujui):
-            return False
+        for p in terakhir[t]:
+            if not (p.granted and p.masih_berlaku and cakupan <= p.data_scopes):
+                return False
     return True

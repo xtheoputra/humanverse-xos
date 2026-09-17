@@ -17,9 +17,11 @@ _PREFERENSI_MAKS_BYTE = 16_000
 
 def _preferensi_berukuran_wajar(nilai: dict[str, Any]) -> dict[str, Any]:
     # `preferences jsonb` sengaja lentur (spec/01, issue #2) — lentur tidak berarti
-    # tempat menyimpan apa saja sebesar apa saja lewat satu PATCH.
+    # tempat menyimpan apa saja sebesar apa saja lewat satu PATCH, atau yang ditolak
+    # `jsonb` sendiri (NUL → 500, tinjauan Sprint 1).
     if len(json.dumps(nilai, ensure_ascii=False).encode()) > _PREFERENSI_MAKS_BYTE:
         raise ValueError(f"preferences maksimal {_PREFERENSI_MAKS_BYTE} byte")
+    platform.tanpa_nul_bersarang(nilai)
     return nilai
 
 
@@ -47,7 +49,7 @@ class UbahProfil(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    display_name: str | None = Field(default=None, min_length=1, max_length=100)
+    display_name: platform.TeksTanpaNul | None = Field(default=None, min_length=1, max_length=100)
     timezone: platform.ZonaWaktuIANA | None = None
     locale: str | None = Field(default=None, pattern=_POLA_LOCALE)
     preferences: Preferensi | None = None

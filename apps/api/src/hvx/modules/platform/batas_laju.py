@@ -38,7 +38,7 @@ from .keadaan import redis_dari, settings_dari
 _POLA_NAMA = re.compile(r"^[a-z][a-z0-9-]{0,39}$")
 _PESAN = "Terlalu banyak permintaan. Coba lagi nanti."
 
-# KEYS[1] kunci · ARGV[1] interval emisi (ms) · ARGV[2] toleransi (ms) · ARGV[3] '1' = catat
+# KEYS[1] kunci · ARGV[1] interval emisi (ms) · ARGV[2] toleransi (ms)
 # → {lolos 0/1, coba lagi dalam ms, sisa}
 _GCRA = """
 local interval = tonumber(ARGV[1])
@@ -54,9 +54,7 @@ local boleh_pada = tat_baru - toleransi
 if sekarang < boleh_pada then
   return {0, boleh_pada - sekarang, 0}
 end
-if ARGV[3] == '1' then
-  redis.call('SET', KEYS[1], tat_baru, 'PX', tat_baru - sekarang)
-end
+redis.call('SET', KEYS[1], tat_baru, 'PX', tat_baru - sekarang)
 return {1, 0, math.floor((sekarang - boleh_pada) / interval)}
 """
 
@@ -110,12 +108,18 @@ class PembatasLaju:
     def _kunci(self, batas: BatasLaju, subjek: str) -> str:
         return f"{self._awalan}:laju:{batas.nama}:{subjek}"
 
-    async def ambil(self, batas: BatasLaju, subjek: str, *, catat: bool = True) -> HasilLaju:
-        """Pakai satu jatah. `catat=False` hanya bertanya "masih ada jatah?" tanpa memakainya."""
+    async def ambil(self, batas: BatasLaju, subjek: str) -> HasilLaju:
+        """Pakai satu jatah — bertanya dan memakai dalam SATU perintah atomik.
+
+        🔴 Sengaja tidak ada mode "tanya dulu, pakai nanti". Versi pertama punya
+        (`catat=False`) untuk login gagal per akun: dua belas tebakan serentak
+        semuanya lolos pertanyaan sebelum satu pun dihitung (tinjauan Sprint 1).
+        Yang perlu dikembalikan sesudah berhasil memakai `lupakan()`.
+        """
         interval = batas.interval_ms
         lolos, coba_lagi, sisa = await self._skrip(
             keys=[self._kunci(batas, subjek)],
-            args=[interval, interval * batas.jumlah, "1" if catat else "0"],
+            args=[interval, interval * batas.jumlah],
         )
         return HasilLaju(lolos=bool(lolos), sisa=int(sisa), coba_lagi_ms=int(coba_lagi))
 

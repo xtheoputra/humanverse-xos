@@ -82,6 +82,12 @@ async def test_patch_hanya_mengubah_medan_yang_dikirim(api_uji: ApiUji) -> None:
         {"display_name": None},
         {"locale": "Indonesia"},
         {"preferences": {"x": "y" * 17_000}},
+        # PostgreSQL menolak NUL di text dan jsonb — tanpa penjaga: 500, bukan 400
+        # (tinjauan Sprint 1)
+        {"display_name": "Te\u0000tap"},
+        {"preferences": {"catatan": "a\u0000b"}},
+        {"preferences": {"ku\u0000nci": "nilai"}},
+        {"preferences": {"daftar": [{"dalam": "\u0000"}]}},
     ],
 )
 async def test_patch_yang_tidak_sah_ditolak_400_dan_tidak_menyentuh_apa_pun(

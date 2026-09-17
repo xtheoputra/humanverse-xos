@@ -67,6 +67,10 @@ def buat_engine(dsn: str) -> AsyncEngine:
         pool_size=5,
         max_overflow=5,
         pool_timeout=5,
+        # 🔴 Tanpa ini SQLAlchemy menempelkan `[parameters: (email, hash sandi…)]`
+        # ke teks tiap galat basis data — dan teks itu sampai ke log
+        # `request.failed` (tinjauan Sprint 1, `test_galat_basis_data.py`).
+        hide_parameters=True,
     )
 
 
@@ -125,6 +129,9 @@ async def pastikan_peran_aplikasi(engine: AsyncEngine) -> None:
         )
 
 
+_SETEL_PENGGUNA = text("SELECT set_config('hvx.user_id', :user_id, true)")
+
+
 @asynccontextmanager
 async def transaksi_pengguna(engine: AsyncEngine, user_id: UUID) -> AsyncIterator[AsyncConnection]:
     """Satu transaksi atas nama SATU pengguna — RLS spec/01 §11 membatasi tiap kueri di dalamnya.
@@ -138,7 +145,20 @@ async def transaksi_pengguna(engine: AsyncEngine, user_id: UUID) -> AsyncIterato
         # ditolak lebih awal, dengan nama yang jelas.
         raise TypeError(f"user_id wajib uuid.UUID, bukan {type(user_id).__name__}")
     async with engine.begin() as conn:
-        await conn.execute(
-            text("SELECT set_config('hvx.user_id', :user_id, true)"), {"user_id": str(user_id)}
-        )
+        await conn.execute(_SETEL_PENGGUNA, {"user_id": str(user_id)})
+        yield conn
+
+
+@asynccontextmanager
+async def transaksi_sistem(engine: AsyncEngine) -> AsyncIterator[AsyncConnection]:
+    """Satu transaksi TANPA pengguna — hanya baris sistem (`user_id` NULL) yang terjangkau.
+
+    Bentuknya SENGAJA sama dengan `transaksi_pengguna` — pernyataan `set_config`
+    yang sama, lalu kueri: jalur yang membedakan "akun ada" dari "akun tidak ada"
+    (gagal masuk, tugas 1.1) menjalankan kerja basis data yang sama banyak,
+    supaya waktu jawaban tidak membocorkannya (tinjauan Sprint 1). `''` dibaca
+    `app_current_user_id()` sebagai NULL — RLS tetap gagal-tertutup.
+    """
+    async with engine.begin() as conn:
+        await conn.execute(_SETEL_PENGGUNA, {"user_id": ""})
         yield conn

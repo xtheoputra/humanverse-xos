@@ -10,6 +10,7 @@ from __future__ import annotations
 import uuid
 from collections.abc import AsyncIterator, Callable
 from datetime import UTC, datetime, timedelta
+from typing import Any
 
 import psycopg
 import pytest
@@ -25,6 +26,7 @@ from hvx.modules.identity import (
     cabut_persetujuan,
     catat_persetujuan,
 )
+from hvx.modules.identity import persetujuan as identity_persetujuan
 from hvx.modules.platform import buat_engine, transaksi_pengguna
 
 pytestmark = pytest.mark.integration
@@ -111,19 +113,87 @@ async def test_pencabutan_adalah_baris_baru_dan_riwayat_lama_utuh(
     assert aksi == ["consent.granted", "consent.revoked"]
 
 
-async def test_cabut_lalu_setujui_lagi_dalam_satu_transaksi_berurutan_benar(
+async def test_riwayat_dalam_satu_transaksi_tetap_berurutan(
     v0: tuple[BasisDataV0, AsyncEngine, uuid.UUID],
 ) -> None:
-    """now() membeku per transaksi; clock_timestamp() tidak — urutan riwayat tetap tentu."""
-    _db, engine, uid = v0
+    """now() membeku per transaksi; clock_timestamp() tidak — urutan riwayat tetap tentu.
+
+    🔴 Versi pertama uji ini tidak bisa merah (tinjauan Sprint 1): setuju → cabut →
+    setuju lagi berujung "setuju" di KEDUA ujung, jadi dengan `now()` pun baris
+    mana yang terpilih dari waktu yang sama tetap menjawab benar.
+    """
+    db, engine, uid = v0
     async with transaksi_pengguna(engine, uid) as conn:
         await catat_persetujuan(conn, uid, _latih(True, "habits"))
         await cabut_persetujuan(
             conn, uid, kind="model_training", purpose="model_training", policy_version=V
         )
-        await catat_persetujuan(conn, uid, _latih(True, "habits"))
 
-    assert await _boleh(engine, uid, {"model_training"}, {"habits"})
+    with psycopg.connect(psycopg_dsn(db.dsn_pemilik)) as k:
+        waktu = [
+            w
+            for (w,) in k.execute(
+                "SELECT created_at FROM consents WHERE user_id = %s ORDER BY created_at", (uid,)
+            )
+        ]
+    assert len(waktu) == len(set(waktu)) == 2, (
+        f"riwayat satu transaksi berwaktu sama — urutannya tak tentu: {waktu}"
+    )
+    assert not await _boleh(engine, uid, {"model_training"}, {"habits"})
+
+
+async def test_persetujuan_tidak_tersimpan_tanpa_jejak_audit(
+    v0: tuple[BasisDataV0, AsyncEngine, uuid.UUID], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Tugas 1.6 — jejak di transaksi yang SAMA; lihat uji padanannya di test_izin.py."""
+    db, engine, uid = v0
+
+    async def audit_gagal(*_args: Any, **_kwargs: Any) -> None:
+        raise RuntimeError("audit gagal ditulis")
+
+    monkeypatch.setattr(identity_persetujuan, "audit", audit_gagal)
+    with pytest.raises(RuntimeError, match="audit gagal ditulis"):
+        async with transaksi_pengguna(engine, uid) as conn:
+            await catat_persetujuan(conn, uid, _latih(True, "habits"))
+
+    with psycopg.connect(psycopg_dsn(db.dsn_pemilik)) as k:
+        (jumlah,) = k.execute(
+            "SELECT count(*) FROM consents WHERE user_id = %s", (uid,)
+        ).fetchone() or (0,)
+    assert jumlah == 0, "persetujuan tersimpan tanpa jejak audit"
+
+
+async def test_pencabutan_satu_jenis_tidak_ditutupi_jenis_lain_bertujuan_sama(
+    v0: tuple[BasisDataV0, AsyncEngine, uuid.UUID],
+) -> None:
+    """`terms` dan `privacy` sama-sama bertujuan `service` (tugas 1.1).
+
+    🔴 Versi pertama membaca baris TERAKHIR per tujuan tanpa melihat jenisnya:
+    privasi dicabut, lalu syarat versi baru disetujui — dan `service` kembali
+    diizinkan, sebab baris terbarunya milik `terms` (tinjauan Sprint 1).
+    """
+    _db, engine, uid = v0
+
+    def layanan(kind: str, versi: str = V) -> Persetujuan:
+        return Persetujuan(kind=kind, purpose="service", granted=True, policy_version=versi)
+
+    async with transaksi_pengguna(engine, uid) as conn:
+        await catat_persetujuan(conn, uid, layanan("terms"))
+        await catat_persetujuan(conn, uid, layanan("privacy"))
+    assert await _boleh(engine, uid, {"service"}, set())
+
+    async with transaksi_pengguna(engine, uid) as conn:
+        await cabut_persetujuan(conn, uid, kind="privacy", purpose="service", policy_version=V)
+    async with transaksi_pengguna(engine, uid) as conn:
+        await catat_persetujuan(conn, uid, layanan("terms", "2026-10-01"))
+
+    assert not await _boleh(engine, uid, {"service"}, set()), (
+        "persetujuan jenis lain menutupi pencabutan privacy"
+    )
+
+    async with transaksi_pengguna(engine, uid) as conn:
+        await catat_persetujuan(conn, uid, layanan("privacy", "2026-10-01"))
+    assert await _boleh(engine, uid, {"service"}, set())
 
 
 async def test_persetujuan_kedaluwarsa_atau_ditolak_tidak_meloloskan(

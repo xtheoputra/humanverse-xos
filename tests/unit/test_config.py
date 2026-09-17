@@ -47,6 +47,40 @@ def test_tanpa_nilai_wajib_proses_gagal_mulai(monkeypatch: pytest.MonkeyPatch, h
         Settings()
 
 
+def test_kunci_sidik_ip_pendek_ditolak(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Kunci HMAC pendek bisa ditebak — dan sidik IP-nya kembali bisa dibalik."""
+    _isi(monkeypatch)
+    monkeypatch.setenv("HVX_IP_HASH_KEY", "k" * 31)
+
+    with pytest.raises(ValidationError, match="ip_hash_key"):
+        Settings()
+
+
+def test_token_akses_tidak_boleh_hidup_lebih_lama_dari_sesinya(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """🔴 Tinjauan Sprint 1: akses 86400 dtk + segar 3600 dtk diterima — catatan sesi
+    kedaluwarsa lebih dulu, dan tanpa catatan itu `cabut` tidak menemukan token
+    akses yang masih hidup: "dicabut → 401 seketika" patah."""
+    _isi(monkeypatch)
+
+    with pytest.raises(ValidationError, match="access_token_ttl_s"):
+        Settings(access_token_ttl_s=7_200, refresh_token_ttl_s=3_600)
+
+    s = Settings(access_token_ttl_s=3_600, refresh_token_ttl_s=3_600)
+    assert s.access_token_ttl_s == s.refresh_token_ttl_s
+
+
+def test_bawaan_gagal_masuk_per_akun_tidak_meledak_lebih_dari_100(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """NIST SP 800-63B-4 §3.2.2 — ≤ 100 kegagalan. Bawaannya lapis pertama; lihat K-22."""
+    _isi(monkeypatch)
+    jumlah, _jendela = Settings().rate_limit_login_failures.split("/")
+
+    assert int(jumlah) <= 100, f"bawaan batas gagal masuk per akun: {jumlah} tebakan sekaligus"
+
+
 def test_lingkungan_tak_dikenal_ditolak() -> None:
     with pytest.raises(ValidationError):
         Settings(database_url="postgresql://x", redis_url="redis://x", env="staging")  # type: ignore[arg-type]

@@ -27,7 +27,7 @@ from .dependensi import PenggunaMasuk
 from .laju import PenjagaGagalMasuk
 from .persetujuan import TUJUAN_LAYANAN, TUJUAN_PELATIHAN_MODEL, Persetujuan, catat_persetujuan
 from .schemas import PenggunaRingkas, PermintaanDaftar
-from .sesi import PenyimpanSesi, Token
+from .sesi import PenyimpanSesi, SesiAktif, Token
 
 
 @dataclass(frozen=True)
@@ -126,14 +126,14 @@ async def masuk(
     ip_hash: str | None,
     penjaga: PenjagaGagalMasuk,
 ) -> tuple[PenggunaRingkas, Token]:
-    await penjaga.periksa()  # sebelum argon2: tebakan yang ditolak tidak membakar CPU
-    async with engine.begin() as conn:
-        akun = await repository.cari_untuk_masuk(conn, email)
+    async with platform.transaksi_sistem(engine) as conn:  # pengguna belum dikenali
+        dicari = await repository.cari_untuk_masuk(conn, email)
+    akun, kunci = dicari.akun, dicari.kunci  # kunci: email sebagaimana citext mengenalinya
+    await penjaga.pakai(kunci)  # SEBELUM argon2 — tebakan serentak tidak lolos bersama-sama
     # Satu verifikasi argon2 SELALU dijalankan — juga untuk email tak dikenal.
     cocok = await sandi.cocokkan_async(akun.password_hash if akun else None, kata_sandi)
 
     if akun is None or not cocok:
-        await penjaga.gagal()
         await _catat_gagal(engine, akun.id if akun else None, "kredensial", ip_hash)
         raise _galat(401, "invalid_credentials", "Email atau sandi salah.")
     if akun.status != "active":
@@ -157,16 +157,21 @@ async def masuk(
         ringkas = await repository.ambil_pengguna(conn, akun.id)
     if ringkas is None:  # pragma: no cover - akun yang baru saja lolos verifikasi
         raise RuntimeError("akun yang baru masuk tidak terbaca kembali")
-    await penjaga.berhasil()  # kegagalan dihitung BERUNTUN, bukan seumur akun
+    await penjaga.berhasil(kunci)  # masuk yang berhasil mengosongkan hitungan gagal akun ini
     return ringkas, await sesi.buat(akun.id)
 
 
 async def _catat_gagal(
     engine: AsyncEngine, user_id: UUID | None, alasan: str, ip_hash: str | None
 ) -> None:
-    """Akun dikenal → baris milik akun itu; tak dikenal → baris sistem TANPA email."""
+    """Akun dikenal → baris milik akun itu; tak dikenal → baris sistem TANPA email.
+
+    Kedua cabang menjalankan kueri yang sama banyak (`transaksi_sistem` berbentuk
+    sama dengan `transaksi_pengguna`): waktu jawaban 401 tidak membedakan email
+    yang terdaftar dari yang tidak.
+    """
     if user_id is None:
-        async with engine.begin() as conn:
+        async with platform.transaksi_sistem(engine) as conn:
             await audit(
                 conn,
                 aksi="session.login_failed",
@@ -192,6 +197,18 @@ async def _catat_gagal(
 async def segarkan(
     engine: AsyncEngine, sesi: PenyimpanSesi, token_segar: str, *, ip_hash: str | None
 ) -> Token:
+    # Status akun dibaca di TIAP penyegaran, SEBELUM token diputar. 🔴 Dua versi
+    # yang salah (tinjauan Sprint 1): status hanya dibaca saat login — akun yang
+    # ditangguhkan memperpanjang sesinya sendiri tanpa batas; lalu status dibaca
+    # SESUDAH rotasi — galat basis data membakar token klien, dan ulangan klien
+    # dicatat sebagai pencurian.
+    pemilik = await sesi.pemilik_token_segar(token_segar)
+    if pemilik is not None and not await _masih_aktif(engine, pemilik, ip_hash=ip_hash):
+        # Semua sesi akun itu, bukan hanya yang sedang disegarkan — sesi lain
+        # tidak menunggu penyegarannya sendiri untuk berhenti.
+        await sesi.cabut_semua(pemilik.user_id)
+        raise _galat(401, "invalid_refresh_token", "Token segar tidak sah atau sudah dipakai.")
+
     hasil = await sesi.segarkan(token_segar)
     if hasil.dipakai_ulang is not None:
         curian = hasil.dipakai_ulang
@@ -209,6 +226,26 @@ async def segarkan(
     if hasil.token is None:
         raise _galat(401, "invalid_refresh_token", "Token segar tidak sah atau sudah dipakai.")
     return hasil.token
+
+
+async def _masih_aktif(engine: AsyncEngine, pemilik: SesiAktif, *, ip_hash: str | None) -> bool:
+    """Akun pemilik sesi masih `active` — kalau tidak, pencabutan sesinya dicatat di sini."""
+    async with platform.transaksi_pengguna(engine, pemilik.user_id) as conn:
+        akun = await repository.ambil_pengguna(conn, pemilik.user_id)
+        aktif = akun is not None and akun.status == "active"
+        if not aktif:
+            await audit(
+                conn,
+                aksi="session.revoked",
+                aktor_tipe="system",
+                aktor_id="auth",
+                user_id=pemilik.user_id,
+                subjek_tipe="session",
+                subjek_id=str(pemilik.sesi_id),
+                ip_hash=ip_hash,
+                metadata={"alasan": akun.status if akun else "akun_tidak_ada", "semua_sesi": True},
+            )
+    return aktif
 
 
 async def keluar(

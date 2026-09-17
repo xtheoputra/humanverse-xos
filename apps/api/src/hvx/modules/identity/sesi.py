@@ -20,6 +20,17 @@ Bentuk yang dipakai, dan kenapa:
 * **Token segar yang sudah dirotasi dan dipakai LAGI = dicuri**: seluruh sesi
   itu dicabut, termasuk pasangan token terbaru yang mungkin ada di tangan
   pencuri (RFC 9700 §4.14.2, refresh token rotation).
+* **Tiap operasi yang MEMBACA catatan sesi lalu MENULISNYA adalah satu skrip
+  Lua** — Redis tidak menjalankan perintah lain di tengahnya. 🔴 Versi pertama
+  membaca lalu menulis dalam MULTI terpisah: keluar yang jatuh di celah itu
+  dihidupkan kembali oleh penyegaran — token baru sah, catatan sesi tanpa
+  `user_id`, dan sesi itu tidak bisa dicabut lagi; pencabutan karena token
+  bekas melewatkan pasangan yang diputar pencuri di celah yang sama (tinjauan
+  Sprint 1 — `test_sesi.py` menyela tiap celah antarperintah).
+
+Skrip menyentuh kunci yang namanya baru diketahui di dalamnya (sidik token di
+catatan sesi): sah untuk satu Redis (arch/09), tidak untuk Redis Cluster — di
+sana kunci satu sesi wajib berbagi hash tag.
 
 Klien Redis wajib `decode_responses=True` (`platform.buat_redis`): semua nilai
 di sini teks.
@@ -37,6 +48,56 @@ from redis.asyncio import Redis
 
 AWALAN_AKSES = "hvxa_"
 AWALAN_SEGAR = "hvxr_"
+
+_DIPUTAR, _BEKAS = 1, 2
+
+# KEYS[1] segar:<sidik lama> · KEYS[2] bekas:<sidik lama>
+# ARGV[1] awalan sesi · ARGV[2] sidik akses baru · ARGV[3] sidik segar baru
+# ARGV[4] umur akses (dtk) · ARGV[5] umur segar (dtk)
+# → {1, isi} diputar · {2, isi} token BEKAS dipakai lagi · {0, ''} tak dikenal atau dicabut
+_PUTAR = """
+local isi = redis.call('GETDEL', KEYS[1])
+if not isi then
+  local bekas = redis.call('GET', KEYS[2])
+  if bekas then return {2, bekas} end
+  return {0, ''}
+end
+local pisah = string.find(isi, ':', 1, true)
+local user_id, sesi_id = string.sub(isi, 1, pisah - 1), string.sub(isi, pisah + 1)
+local k_sesi = ARGV[1] .. ':' .. sesi_id
+local c = redis.call('HMGET', k_sesi, 'user_id', 'akses')
+if not (c[1] and c[2]) then
+  -- dicabut, atau catatan rusak (tanpa user_id, bentuk yang dibuat versi pertama):
+  -- tidak diputar — dan token aksesnya ikut dimatikan
+  if c[2] then redis.call('DEL', ARGV[1] .. ':akses:' .. c[2]) end
+  redis.call('DEL', k_sesi)
+  redis.call('SREM', ARGV[1] .. ':pengguna:' .. user_id, sesi_id)
+  return {0, ''}
+end
+local k_pengguna = ARGV[1] .. ':pengguna:' .. user_id
+redis.call('DEL', ARGV[1] .. ':akses:' .. c[2])
+redis.call('SET', KEYS[2], isi, 'EX', ARGV[5])
+redis.call('SET', ARGV[1] .. ':akses:' .. ARGV[2], isi, 'EX', ARGV[4])
+redis.call('SET', ARGV[1] .. ':segar:' .. ARGV[3], isi, 'EX', ARGV[5])
+redis.call('HSET', k_sesi, 'akses', ARGV[2], 'segar', ARGV[3])
+redis.call('EXPIRE', k_sesi, ARGV[5])
+redis.call('SADD', k_pengguna, sesi_id)
+redis.call('EXPIRE', k_pengguna, ARGV[5])
+return {1, isi}
+"""
+
+# KEYS[1] catatan sesi · ARGV[1] awalan sesi · ARGV[2] sesi_id → 1 dicabut · 0 sudah tidak ada
+# Catatan tanpa `user_id` (rusak) tetap dicabut token-tokennya — hanya SREM yang dilewati.
+_CABUT = """
+local c = redis.call('HMGET', KEYS[1], 'user_id', 'akses', 'segar')
+if not (c[1] or c[2] or c[3]) then return 0 end
+local kunci = {KEYS[1]}
+if c[2] then table.insert(kunci, ARGV[1] .. ':akses:' .. c[2]) end
+if c[3] then table.insert(kunci, ARGV[1] .. ':segar:' .. c[3]) end
+redis.call('DEL', unpack(kunci))
+if c[1] then redis.call('SREM', ARGV[1] .. ':pengguna:' .. c[1], ARGV[2]) end
+return 1
+"""
 
 
 def sidik(token: str) -> str:
@@ -81,6 +142,8 @@ class PenyimpanSesi:
         self._p = f"{awalan}:sesi"
         self._ttl_akses = ttl_akses_s
         self._ttl_segar = ttl_segar_s
+        self._putar = redis.register_script(_PUTAR)
+        self._cabut = redis.register_script(_CABUT)
 
     # ── kunci ────────────────────────────────────────────────────────────
     def _k_akses(self, sidik_token: str) -> str:
@@ -125,54 +188,46 @@ class PenyimpanSesi:
         nilai = await self._r.get(self._k_akses(sidik(token)))
         return _pisah(nilai) if nilai else None
 
+    async def pemilik_token_segar(self, token_segar: str) -> SesiAktif | None:
+        """Sesi pemilik token segar yang masih sah — TANPA memakainya.
+
+        Hanya untuk keputusan yang bukan soal sah-tidaknya token (status akun
+        sebelum rotasi, tugas 1.1); sahnya token tetap diputuskan `segarkan`,
+        atomik — pembacaan ini boleh basi sedetik kemudian.
+        """
+        if not token_segar.startswith(AWALAN_SEGAR):
+            return None
+        nilai = await self._r.get(self._k_segar(sidik(token_segar)))
+        return _pisah(nilai) if nilai else None
+
     async def segarkan(self, token_segar: str) -> HasilPenyegaran:
         if not token_segar.startswith(AWALAN_SEGAR):
             return HasilPenyegaran(None)
         lama = sidik(token_segar)
-        nilai = await self._r.getdel(self._k_segar(lama))
-        if nilai is None:
-            sesi_bekas = await self._r.get(self._k_bekas(lama))
-            if sesi_bekas is None:
-                return HasilPenyegaran(None)
-            curian = _pisah(sesi_bekas)
+        akses, segar = self._pasangan_baru()
+        hasil, isi = await self._putar(
+            keys=[self._k_segar(lama), self._k_bekas(lama)],
+            args=[self._p, sidik(akses), sidik(segar), self._ttl_akses, self._ttl_segar],
+        )
+        if hasil == _BEKAS:
+            curian = _pisah(isi)
+            # Skrip terpisah, tetap aman: `_CABUT` membaca catatan sesi saat itu
+            # juga, jadi pasangan yang diputar pencuri sesudah deteksi ikut mati.
             await self.cabut(curian.sesi_id)
             return HasilPenyegaran(None, dipakai_ulang=curian)
-
-        sesi = _pisah(nilai)
-        catatan = cast(dict[str, str], await self._r.hgetall(self._k_sesi(sesi.sesi_id)))
-        if not catatan:
-            return HasilPenyegaran(None)  # sesi sudah dicabut di antara dua langkah
-        akses, segar = self._pasangan_baru()
-        isi = _gabung(sesi.user_id, sesi.sesi_id)
-        async with self._r.pipeline(transaction=True) as p:
-            p.delete(self._k_akses(catatan["akses"]))
-            p.set(self._k_bekas(lama), isi, ex=self._ttl_segar)
-            p.set(self._k_akses(sidik(akses)), isi, ex=self._ttl_akses)
-            p.set(self._k_segar(sidik(segar)), isi, ex=self._ttl_segar)
-            p.hset(
-                self._k_sesi(sesi.sesi_id), mapping={"akses": sidik(akses), "segar": sidik(segar)}
-            )
-            p.expire(self._k_sesi(sesi.sesi_id), self._ttl_segar)
-            p.expire(self._k_pengguna(sesi.user_id), self._ttl_segar)
-            await p.execute()
+        if hasil != _DIPUTAR:
+            return HasilPenyegaran(None)
         return HasilPenyegaran(Token(akses, segar, self._ttl_akses))
 
     async def cabut(self, sesi_id: UUID) -> None:
-        catatan = cast(dict[str, str], await self._r.hgetall(self._k_sesi(sesi_id)))
-        if not catatan:
-            return
-        async with self._r.pipeline(transaction=True) as p:
-            p.delete(
-                self._k_akses(catatan["akses"]),
-                self._k_segar(catatan["segar"]),
-                self._k_sesi(sesi_id),
-            )
-            p.srem(self._k_pengguna(UUID(catatan["user_id"])), str(sesi_id))
-            await p.execute()
+        await self._cabut(keys=[self._k_sesi(sesi_id)], args=[self._p, str(sesi_id)])
 
     async def cabut_semua(self, user_id: UUID) -> int:
         anggota = cast(set[str], await self._r.smembers(self._k_pengguna(user_id)))
         for sesi in anggota:
             await self.cabut(UUID(sesi))
-        await self._r.delete(self._k_pengguna(user_id))
+        if anggota:
+            # Hanya anggota yang sudah dicabut — BUKAN `DEL` seluruh himpunan: sesi
+            # yang lahir di sela SMEMBERS tetap tercatat untuk "cabut semua" berikutnya.
+            await self._r.srem(self._k_pengguna(user_id), *anggota)
         return len(anggota)

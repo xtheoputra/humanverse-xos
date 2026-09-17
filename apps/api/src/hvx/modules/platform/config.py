@@ -13,9 +13,9 @@ dibuat wajib — jadi keduanya kini diperlakukan sama.
 
 from __future__ import annotations
 
-from typing import Literal
+from typing import Literal, Self
 
-from pydantic import Field, SecretStr, field_validator
+from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from .db import url_async
@@ -66,8 +66,10 @@ class Settings(BaseSettings):
     rate_limit_ip: str = Field(default="600/60", pattern=POLA_BATAS)  # seluruh /v1/*, per IP (/64)
     rate_limit_user: str = Field(default="300/60", pattern=POLA_BATAS)  # rute bersesi, per pengguna
     rate_limit_auth_ip: str = Field(default="30/600", pattern=POLA_BATAS)  # daftar & masuk, per IP
-    # Login GAGAL beruntun per akun — NIST SP 800-63B-4: tidak lebih dari 100.
-    # Berhasil masuk menghapus hitungannya.
+    # Login GAGAL per akun: `jumlah` tebakan sekaligus (NIST SP 800-63B-4 §3.2.2:
+    # ≤ 100), lalu satu tiap `detik/jumlah`. Ini batas LAJU, bukan penguncian
+    # sesudah 100 kegagalan beruntun — penguncian butuh jalur pemulihan akun yang
+    # V0 belum punya (K-22, tinjauan Sprint 1). Berhasil masuk menghapus hitungannya.
     rate_limit_login_failures: str = Field(default="100/86400", pattern=POLA_BATAS)
 
     # Kunci HMAC untuk `audit_logs.ip_hash` (spec/01: "hash, bukan IP mentah")
@@ -81,3 +83,15 @@ class Settings(BaseSettings):
     def _dsn_bisa_dipakai_kedua_driver(cls, nilai: str) -> str:
         url_async(nilai)  # melempar ValueError untuk skema asing atau parameter kueri
         return nilai
+
+    @model_validator(mode="after")
+    def _token_akses_tidak_hidup_lebih_lama_dari_sesinya(self) -> Self:
+        # Catatan sesi di Redis berumur token SEGAR; pencabutan membaca sidik token
+        # akses dari catatan itu. Token akses yang hidup lebih lama dari catatannya
+        # tidak bisa dicabut lagi — "dicabut → 401 seketika" patah (tinjauan Sprint 1).
+        if self.access_token_ttl_s > self.refresh_token_ttl_s:
+            raise ValueError(
+                "access_token_ttl_s tidak boleh melebihi refresh_token_ttl_s: token akses "
+                "yang hidup lebih lama dari catatan sesinya tidak bisa dicabut"
+            )
+        return self

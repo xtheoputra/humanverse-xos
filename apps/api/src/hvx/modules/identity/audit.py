@@ -72,6 +72,9 @@ async def audit(
 
     Ditulis di transaksi yang SAMA dengan perubahan yang dicatatnya: perubahan
     tanpa jejak, atau jejak tanpa perubahan, sama-sama tidak boleh terjadi.
+    Itu hanya bisa dijamin untuk perubahan BASIS DATA — sesi hidup di Redis, di
+    luar transaksi mana pun, jadi jejak sesi bisa mendahului atau menyusul
+    perubahannya bila Redis gagal di antara keduanya (SECURITY.md).
     """
     isi = dict(metadata or {})
     _periksa(aksi, isi)

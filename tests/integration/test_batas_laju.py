@@ -20,7 +20,7 @@ from asgi_lifespan import LifespanManager
 from fastapi import FastAPI
 
 from hvx.main import create_app
-from hvx.modules.identity import PenyimpanSesi
+from hvx.modules.identity import PenyimpanSesi, sandi
 from hvx.modules.platform import BatasLaju, PembatasLaju, Settings, buat_redis
 
 pytestmark = pytest.mark.integration
@@ -99,10 +99,6 @@ async def test_mekanisme_meledak_sampai_batas_lalu_terisi_satu_per_interval(
     pembatas = PembatasLaju(redis, f"uji-{uuid.uuid4().hex[:12]}")
     batas = BatasLaju("uji", 5, 1)  # satu jatah tiap 200 ms
     try:
-        # bertanya tanpa mencatat tidak memakai jatah
-        for _ in range(10):
-            assert (await pembatas.ambil(batas, "s", catat=False)).lolos
-
         sisa = [(await pembatas.ambil(batas, "s")).sisa for _ in range(5)]
         ditolak = await pembatas.ambil(batas, "s")
 
@@ -111,7 +107,17 @@ async def test_mekanisme_meledak_sampai_batas_lalu_terisi_satu_per_interval(
         assert 0 < ditolak.coba_lagi_ms <= 200
         assert (await pembatas.ambil(batas, "subjek-lain")).lolos
 
-        await asyncio.sleep(0.25)
+        # Jatah terisi menurut jam REDIS (`TIME` di skrip) — tidur 0,25 dtk jam hos
+        # tidak menjamin 250 ms di VM Docker Desktop yang sedang tertinggal.
+        async def jam_redis_ms() -> int:
+            detik, mikro = await redis.time()
+            return int(detik) * 1000 + int(mikro) // 1000
+
+        mulai = await jam_redis_ms()
+        batas_tunggu = asyncio.get_running_loop().time() + 30
+        while await jam_redis_ms() - mulai < 250:
+            assert asyncio.get_running_loop().time() < batas_tunggu, "jam Redis tidak bergerak"
+            await asyncio.sleep(0.05)
         assert (await pembatas.ambil(batas, "s")).lolos
 
         await pembatas.lupakan(batas, "s")
@@ -223,3 +229,73 @@ async def test_login_gagal_dibatasi_per_akun_dan_berhasil_menghapus_hitungannya(
             401,
             429,
         ]
+
+
+async def test_tebakan_serentak_tidak_dicocokkan_melewati_batas_per_akun(
+    buat_api: PembuatApi, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Jatah dipakai SEBELUM argon2 dalam satu perintah atomik.
+
+    🔴 Versi pertama bertanya "masih ada jatah?" sebelum argon2 dan baru
+    menghitung sesudahnya: dua belas tebakan serentak dari dua belas IP
+    semuanya lolos pertanyaan sebelum satu pun dihitung (tinjauan Sprint 1).
+    Yang diukur jumlah sandi yang benar-benar DICOCOKKAN — 429 yang dijawab
+    sesudah mencocokkan tetap memberi penebak kesempatan benar.
+    """
+    app = await buat_api(rate_limit_login_failures="3/86400")
+    email = f"{uuid.uuid4().hex[:12]}@uji.id"
+    async with _klien(app) as klien:
+        assert (await klien.post("/v1/auth/register", json=_daftar(email))).status_code == 201
+
+    dicocokkan = 0
+    cocokkan_asli = sandi.cocokkan_async
+
+    async def cocokkan_dihitung(hash_tersimpan: str | None, kata_sandi: str) -> bool:
+        nonlocal dicocokkan
+        dicocokkan += 1
+        return await cocokkan_asli(hash_tersimpan, kata_sandi)
+
+    monkeypatch.setattr(sandi, "cocokkan_async", cocokkan_dihitung)
+
+    async def tebak(i: int) -> int:
+        async with _klien(app, f"198.51.100.{i + 1}") as k:
+            salah = {"email": email, "password": f"tebakan-yang-keliru-{i:03d}"}
+            return (await k.post("/v1/auth/login", json=salah)).status_code
+
+    kode = await asyncio.gather(*(tebak(i) for i in range(12)))
+
+    assert dicocokkan <= 3, (
+        f"tebakan serentak dicocokkan melewati batas per akun: {dicocokkan} dari 12"
+    )
+    assert sorted(kode) == [401] * 3 + [429] * 9
+
+
+async def test_varian_huruf_unicode_satu_email_berbagi_hitungan_gagal(buat_api: PembuatApi) -> None:
+    """Kunci per akun = cara basis data mengenali akun (citext), bukan `lower()` Python.
+
+    🔴 `'İ'.lower()` di Python menjadi `i̇` (dua kode), di PostgreSQL menjadi `i`
+    — `vİctim@…` masuk ke akun `victim@…` dengan hitungan gagal baru, dan tiap
+    `i` di email menggandakan jatah tebakan (tinjauan Sprint 1).
+    """
+    app = await buat_api(rate_limit_login_failures="2/86400")
+    lokal = f"victim{uuid.uuid4().hex[:8]}"
+    email = f"{lokal}@uji.id"
+    varian = lokal.replace("i", "\u0130", 1) + "@uji.id"
+    asing = f"tiada{uuid.uuid4().hex[:8]}@uji.id"
+    asing_varian = asing.replace("i", "\u0130", 1)
+    salah = "sandi-yang-keliru-sekali"
+    async with _klien(app) as klien:
+        assert (await klien.post("/v1/auth/register", json=_daftar(email))).status_code == 201
+        for alamat in (email, email, asing, asing):
+            r = await klien.post("/v1/auth/login", json={"email": alamat, "password": salah})
+            assert r.status_code == 401, r.text
+
+        terdaftar = await klien.post("/v1/auth/login", json={"email": varian, "password": SANDI})
+        tak_terdaftar = await klien.post(
+            "/v1/auth/login", json={"email": asing_varian, "password": salah}
+        )
+
+    assert (terdaftar.status_code, tak_terdaftar.status_code) == (429, 429), (
+        "varian huruf Unicode satu email mendapat hitungan gagal sendiri: "
+        f"{terdaftar.status_code}, {tak_terdaftar.status_code}"
+    )

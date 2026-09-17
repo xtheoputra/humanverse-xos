@@ -9,10 +9,20 @@ allow/deny/ask/expired. Dipakai gerbang risiko spec/05 (`deny` → tolak & catat
   pengguna”*). Izin yang **kedaluwarsa juga kembali ke `ask`**: "izinkan sekali"
   yang habis tidak diam-diam berubah menjadi izin permanen, dan larangan
   sementara yang habis tidak berubah menjadi larangan permanen.
+* **`bawaan` pemanggil** menggantikan `ask` itu — HANYA untuk yang tanpa
+  keputusan tersimpan atau kedaluwarsa. Gerbang risiko spec/05 butuh risk 0·1 →
+  `allow` tanpa menimpa *“tanya aku”* yang disetel pengguna; versi pertama
+  menjawab `ask` untuk keduanya, jadi keduanya tak bisa dibedakan (E-167). Cache
+  menyimpan *“tanpa keputusan”*, bukan bawaan satu pemanggil.
 * **Kedaluwarsa diukur jam basis data**, bukan jam proses api — satu sumber
   waktu untuk semua instans.
-* **Cache tidak pernah hidup lebih lama dari izinnya**: umurnya
-  `min(HVX_PERMISSION_CACHE_TTL_S, sisa umur izin)` dalam milidetik.
+* **Cache tidak hidup lebih lama dari izinnya**: umurnya
+  `min(HVX_PERMISSION_CACHE_TTL_S, sisa umur izin saat dibaca − 1 dtk)`. 🔴 Versi
+  pertama tanpa margin: cache ditulis sesudah commit dan satu perjalanan ke
+  Redis — jadi ia hidup beberapa milidetik MELEWATI izinnya (tinjauan Sprint 1).
+  Margin menyerap jeda itu (normalnya milidetik); jeda di atas sedetik — basis
+  data atau Redis tersendat — tetap bisa melewatinya. Izin yang tinggal kurang
+  dari sedetik tidak di-cache sama sekali.
 * **Pencabutan berlaku seketika, bukan setelah cache habis** — sama dengan
   sesi (tugas 1.2). Menghapus kunci cache saja TIDAK cukup: pembaca yang
   membaca basis data sebelum commit lalu menulis cache sesudahnya menghidupkan
@@ -65,6 +75,12 @@ _POLA_SCOPE = re.compile(r"^[a-z][a-z0-9_]{0,62}$")
 # Umur kunci generasi. Bila habis, generasi baru dibuat — cache pengguna itu
 # kosong sekali, tidak pernah basi.
 _UMUR_GENERASI_S = 86_400
+
+# Umur cache izin sementara = sisa umurnya saat dibaca − margin ini (lihat docstring).
+_MARGIN_KEDALUWARSA_MS = 1_000
+
+# Nilai cache untuk "tidak ada keputusan tersimpan" — jawabannya bawaan pemanggil.
+_TANPA_KEPUTUSAN = "-"
 
 _AKSI_AUDIT: dict[str, str] = {
     "allow": "permission.granted",
@@ -149,8 +165,8 @@ class MesinIzin:
 
     async def _baca_basis_data(
         self, user_id: UUID, subjek: Subjek, scope: str, aksi: str
-    ) -> tuple[Keputusan, int]:
-        """(keputusan, umur cache dalam ms) — umur 0 berarti jangan di-cache."""
+    ) -> tuple[Keputusan | None, int]:
+        """(keputusan tersimpan atau None, umur cache dalam ms) — umur ≤ 0: jangan di-cache."""
         async with platform.transaksi_pengguna(self._engine, user_id) as conn:
             baris = (
                 await conn.execute(
@@ -165,27 +181,43 @@ class MesinIzin:
                 )
             ).first()
         if baris is None:
-            return "ask", self._ttl_ms
+            return None, self._ttl_ms
         if baris.sisa_detik is None:
             return cast(Keputusan, baris.decision), self._ttl_ms
         sisa_ms = math.floor(float(baris.sisa_detik) * 1000)
         if sisa_ms <= 0:
-            return "ask", self._ttl_ms  # kedaluwarsa → kembali bertanya
-        return cast(Keputusan, baris.decision), min(self._ttl_ms, sisa_ms)
+            return None, self._ttl_ms  # kedaluwarsa → kembali ke bawaan
+        return cast(Keputusan, baris.decision), min(self._ttl_ms, sisa_ms - _MARGIN_KEDALUWARSA_MS)
 
-    async def cek(self, user_id: UUID, subjek: Subjek, scope: str, aksi: Aksi) -> Keputusan:
-        """`allow` · `deny` · `ask` untuk `subjek` yang ingin `aksi` atas `scope` milik pengguna."""
+    async def cek(
+        self,
+        user_id: UUID,
+        subjek: Subjek,
+        scope: str,
+        aksi: Aksi,
+        *,
+        bawaan: Keputusan = "ask",
+    ) -> Keputusan:
+        """`allow` · `deny` · `ask` untuk `subjek` yang ingin `aksi` atas `scope` milik pengguna.
+
+        `bawaan` hanya untuk yang tanpa keputusan tersimpan (atau kedaluwarsa) —
+        keputusan pengguna, termasuk `ask` eksplisit, selalu menang.
+        """
         _periksa(user_id, scope, aksi)
+        if bawaan not in _KEPUTUSAN:
+            raise IzinTidakSah(f"bawaan tak dikenal: {bawaan!r}")
         generasi = await self._generasi(user_id)
         kunci = self._k_keputusan(user_id, generasi, subjek, scope, aksi)
         tersimpan = await self._r.get(kunci)
         if tersimpan in _KEPUTUSAN:
             return cast(Keputusan, tersimpan)
+        if tersimpan == _TANPA_KEPUTUSAN:
+            return bawaan
 
         keputusan, umur_ms = await self._baca_basis_data(user_id, subjek, scope, aksi)
         if umur_ms > 0:
-            await self._r.set(kunci, keputusan, px=umur_ms)
-        return keputusan
+            await self._r.set(kunci, keputusan or _TANPA_KEPUTUSAN, px=umur_ms)
+        return keputusan or bawaan
 
     async def tetapkan(
         self,

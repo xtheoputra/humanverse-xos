@@ -20,6 +20,7 @@ from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from hvx.modules.identity import Keputusan, MesinIzin, Subjek
+from hvx.modules.identity import izin as identity_izin
 from hvx.modules.platform import buat_engine, buat_redis
 
 pytestmark = pytest.mark.integration
@@ -75,6 +76,54 @@ async def test_tanpa_keputusan_tersimpan_jawabannya_ask(izin: Izin) -> None:
     assert await izin.mesin.cek(uid, COACH, "habits", "read") == "ask"
 
 
+async def test_bawaan_pemanggil_hanya_untuk_yang_tanpa_keputusan_tersimpan(izin: Izin) -> None:
+    """E-167: gerbang risiko spec/05 — risk 0·1 bawaannya `allow`, 2·3 `ask`.
+
+    Mesin izin versi pertama menjawab `ask` untuk tanpa baris DAN untuk `ask` yang
+    disetel pengguna: gerbang tidak bisa menerapkan bawaan risiko tanpa menimpa
+    pilihan *“tanya aku”* (tinjauan Sprint 1).
+    """
+    uid = izin.pengguna_baru()
+
+    assert await izin.mesin.cek(uid, COACH, "habits", "read", bawaan="allow") == "allow"
+    assert await izin.mesin.cek(uid, COACH, "habits", "read") == "ask", (
+        "bawaan satu pemanggil tercache untuk pemanggil lain"
+    )
+
+    await izin.mesin.tetapkan(uid, COACH, "habits", "read", "ask")
+    assert await izin.mesin.cek(uid, COACH, "habits", "read", bawaan="allow") == "ask", (
+        "bawaan pemanggil menimpa pilihan eksplisit pengguna"
+    )
+
+    lewat = izin.jam_basis_data() - timedelta(seconds=1)
+    await izin.mesin.tetapkan(uid, COACH, "mood", "read", "deny", expires_at=lewat)
+    assert await izin.mesin.cek(uid, COACH, "mood", "read", bawaan="allow") == "allow"
+
+
+async def test_perubahan_izin_tidak_tersimpan_tanpa_jejak_audit(
+    izin: Izin, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Tugas 1.6: jejak di transaksi yang SAMA — perubahan tanpa jejak tidak boleh ada.
+
+    🔴 Tinjauan Sprint 1: tidak ada uji yang menggagalkan audit. Izin yang
+    di-commit lebih dulu lalu dicatat di transaksi kedua lulus semua uji.
+    """
+    uid = izin.pengguna_baru()
+
+    async def audit_gagal(*_args: Any, **_kwargs: Any) -> None:
+        raise RuntimeError("audit gagal ditulis")
+
+    monkeypatch.setattr(identity_izin, "audit", audit_gagal)
+    with pytest.raises(RuntimeError, match="audit gagal ditulis"):
+        await izin.mesin.tetapkan(uid, COACH, "habits", "read", "allow")
+
+    with izin.pemilik() as k:
+        (jumlah,) = k.execute(
+            "SELECT count(*) FROM permissions WHERE user_id = %s", (uid,)
+        ).fetchone() or (0,)
+    assert jumlah == 0, "izin tersimpan tanpa jejak audit"
+
+
 async def test_allow_dan_deny_berlaku_tepat_untuk_subjek_scope_dan_aksinya(izin: Izin) -> None:
     uid = izin.pengguna_baru()
     await izin.mesin.tetapkan(uid, COACH, "habits", "read", "allow")
@@ -100,8 +149,14 @@ async def test_izin_kedaluwarsa_kembali_ke_ask(izin: Izin) -> None:
 
 
 async def test_cache_izin_sementara_tidak_hidup_lebih_lama_dari_izinnya(izin: Izin) -> None:
+    """Umur cache = sisa umur izin saat dibaca − 1 dtk.
+
+    🔴 Versi pertama memberi cache tepat sisa umur izin saat basis data dibaca —
+    lalu menulisnya ke Redis sesudah commit dan satu perjalanan pulang-pergi,
+    jadi cache hidup beberapa milidetik MELEWATI izinnya (tinjauan Sprint 1).
+    """
     uid = izin.pengguna_baru()
-    sampai = izin.jam_basis_data() + timedelta(seconds=2)
+    sampai = izin.jam_basis_data() + timedelta(seconds=3)
     await izin.mesin.tetapkan(uid, COACH, "habits", "read", "allow", expires_at=sampai)
 
     assert await izin.mesin.cek(uid, COACH, "habits", "read") == "allow"
@@ -110,7 +165,13 @@ async def test_cache_izin_sementara_tidak_hidup_lebih_lama_dari_izinnya(izin: Iz
     assert umur, "keputusan tidak di-cache"
     assert all(0 < u <= 2_000 for u in umur), f"cache hidup lebih lama dari izinnya: {umur} ms"
 
-    await asyncio.sleep(2.3)
+    # Menunggu menurut jam BASIS DATA, bukan tidur 3,3 dtk jam hos: di bawah beban,
+    # jam VM Docker Desktop tertinggal dan izinnya belum kedaluwarsa di sana — uji
+    # ini sempat merah sekali di gerbang penuh karena itu.
+    batas_tunggu = asyncio.get_running_loop().time() + 30
+    while izin.jam_basis_data() <= sampai:
+        assert asyncio.get_running_loop().time() < batas_tunggu, "jam basis data tidak bergerak"
+        await asyncio.sleep(0.1)
     assert await izin.mesin.cek(uid, COACH, "habits", "read") == "ask"
 
 

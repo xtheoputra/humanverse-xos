@@ -54,7 +54,7 @@ class PersetujuanPelatihan(BaseModel):
 class PersetujuanPendaftaran(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    policy_version: str = Field(min_length=1, max_length=64)
+    policy_version: platform.TeksTanpaNul = Field(min_length=1, max_length=64)
     terms: bool
     privacy: bool
     model_training: PersetujuanPelatihan = Field(default_factory=PersetujuanPelatihan)
@@ -65,7 +65,7 @@ class PermintaanDaftar(BaseModel):
 
     email: EmailStr = Field(max_length=254)
     password: SecretStr = Field(min_length=PANJANG_MIN, max_length=PANJANG_MAKS)
-    display_name: str = Field(min_length=1, max_length=100)
+    display_name: platform.TeksTanpaNul = Field(min_length=1, max_length=100)
     timezone: platform.ZonaWaktuIANA
     consents: PersetujuanPendaftaran
 

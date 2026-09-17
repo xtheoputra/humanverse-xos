@@ -11,18 +11,49 @@ sebab SQL yang pindah ke `service.py` tetap SQL.
 from __future__ import annotations
 
 import re
+from collections.abc import Iterator
 from pathlib import Path
+
+import pytest
 
 AKAR = Path(__file__).resolve().parents[2]
 MODUL = AKAR / "apps/api/src/hvx/modules"
 SPEC06 = AKAR / "spec" / "06-MODULE-BOUNDARIES.md"
 
 # Kata SQL yang diikuti nama tabel. `ON` sengaja tidak dihitung: ia juga dipakai
-# `ON CONFLICT (kolom)` dan `ON DELETE`, yang bukan nama tabel.
+# `ON CONFLICT (kolom)` dan `ON DELETE`, yang bukan nama tabel. `USING` dihitung:
+# `DELETE … USING tabel` — `USING (ungkapan)` tidak diawali nama, jadi tidak cocok.
+#
+# 🔴 Tinjauan Sprint 1: versi pertama hanya membaca SATU tabel sesudah kata kunci —
+# `FROM users u, goals g` dan `DELETE … USING goals` lolos tanpa terbaca.
+_NAMA = r"(?:ONLY\s+)?(?:public\.)?\"?([a-z_]+)\"?(?:\s+(?:AS\s+)?[a-z_]+)?"
 _RUJUKAN = re.compile(
-    r"\b(?:FROM|JOIN|INTO|UPDATE|TABLE|REFERENCES)\s+(?:ONLY\s+)?(?:public\.)?\"?([a-z_]+)\"?",
+    rf"\b(?:FROM|JOIN|INTO|UPDATE|TABLE|REFERENCES|USING)\s+{_NAMA}((?:\s*,\s*{_NAMA})*)",
     re.IGNORECASE,
 )
+_SESUDAH_KOMA = re.compile(rf"\s*,\s*{_NAMA}", re.IGNORECASE)
+
+
+def tabel_disebut(teks: str) -> Iterator[tuple[int, str]]:
+    """(posisi, nama) tiap calon nama tabel di teks — kata SQL biasa ikut, disaring pemanggil."""
+    for cocok in _RUJUKAN.finditer(teks):
+        yield cocok.start(), cocok.group(1).lower()
+        for lanjutan in _SESUDAH_KOMA.finditer(cocok.group(2)):
+            yield cocok.start(), lanjutan.group(1).lower()
+
+
+@pytest.mark.parametrize(
+    "sql",
+    [
+        "SELECT g.id FROM goals g",
+        "SELECT 1 FROM users u, goals g WHERE g.user_id = u.id",
+        "SELECT 1 FROM users AS u, public.goals AS g",
+        "DELETE FROM consents c USING goals g WHERE c.user_id = g.user_id",
+        "SELECT 1 FROM users u JOIN goals g ON g.user_id = u.id",
+    ],
+)
+def test_pemindai_membaca_tiap_tabel_di_klausa(sql: str) -> None:
+    assert "goals" in {nama for _, nama in tabel_disebut(sql)}, f"`goals` tidak terbaca di: {sql}"
 
 
 def _kepemilikan() -> dict[str, set[str]]:
@@ -51,13 +82,13 @@ def test_sql_tiap_modul_hanya_menyebut_tabel_miliknya() -> None:
 
     for berkas in sorted(MODUL.glob("*/**/*.py")):
         modul = berkas.relative_to(MODUL).parts[0]
-        for cocok in _RUJUKAN.finditer(berkas.read_text(encoding="utf-8")):
-            tabel = cocok.group(1).lower()
+        teks = berkas.read_text(encoding="utf-8")
+        for posisi, tabel in tabel_disebut(teks):
             if tabel not in semua_tabel:
                 continue  # kata SQL biasa, alias, atau fungsi — bukan tabel V0
             rujukan_terbaca += 1
             if tabel not in milik.get(modul, set()):
-                baris = berkas.read_text(encoding="utf-8")[: cocok.start()].count("\n") + 1
+                baris = teks[:posisi].count("\n") + 1
                 pelanggaran.append(
                     f"{berkas.relative_to(AKAR)}:{baris} — `{modul}` menyebut `{tabel}`"
                 )
