@@ -20,17 +20,17 @@ manusia + agent + data + knowledge + simulation + automation**.
 
 | Hal | Keadaan |
 |---|---|
-| Tahap | 🔨 **Sprint 0 dikodekan** (16 Sep 2026) — branch `v0/sprint-0-foundation`, **menunggu HUMAN REVIEW pemilik** |
-| Berkas **kode produksi** | **0 di `master`** · **Sprint 0 (8 dari 51 tugas `spec/07`) di branch** — [#3](../../issues/3) dijawab pemilik untuk memulai (**H-25**): AI coding agent di branch + PR, pemilik yang menggabungkan |
+| Tahap | 🔨 **Sprint 0 + Sprint 1 dikodekan** (16–17 Sep 2026) — branch `v0/sprint-0-foundation` dan, di atasnya, `v0/sprint-1-identity` — **menunggu HUMAN REVIEW pemilik** |
+| Berkas **kode produksi** | **0 di `master`** · **Sprint 0 + 1 (15 dari 51 tugas `spec/07`) di branch** — [#3](../../issues/3) dijawab pemilik untuk memulai (**H-25**): AI coding agent di branch + PR, pemilik yang menggabungkan |
 | Berkas **perkakas** | **4** — [`tools/`](tools/README.md): `periksa_dokumen.py` · `uji_mutasi.py` · 🆕 `uji_mutasi_kode.py` · 🆕 `ci_lokal.py`. Di branch Sprint 0: **19 dari 26** pemeriksaan [`arch/11`](arch/11-PENEGAKAN.md) jalan (di `master`: 12) |
 | Repo git | privat `xtheoputra/humanverse-xos`, branch `master` |
 | Dokumen | **272 berkas** di `docs/` + **8 berkas** di `spec/` + **12 berkas** di [`arch/`](arch/README.md) |
 | Gerbang yang **sudah dijalankan** | **14 ✅ · R-1 🛑 7 temuan** (keputusan cakupan pemilik) · **15 kontrak `import-linter`** · CI lokal **lint → typecheck → test → build → scan hijau** — `uv run python tools/ci_lokal.py`, **manual** |
-| Merahnya **terbukti bisa terjadi** | **19 dari 19** — 25 mutasi dokumen (tiap mutasi wajib melahirkan temuan **baru**) + 42 mutasi kode (tiap mutasi wajib gagal dengan **alasan yang dimaksud**) · **tiap kontrak `import-linter` punya mutasinya sendiri** |
+| Merahnya **terbukti bisa terjadi** | **19 dari 19** — 25 mutasi dokumen (tiap mutasi wajib melahirkan temuan **baru**) + 108 mutasi kode (tiap mutasi wajib gagal dengan **alasan yang dimaksud**, dibaca dari baris galatnya — bukan dari mana pun di keluaran) · **tiap kontrak `import-linter` punya mutasinya sendiri** |
 | Gerbang di PR | ✅ **gratis** — `tools/ci_lokal.py --lapor-github` menempelkan status **`ci-lokal`** ke commit PR; GitHub Actions **dimatikan** atas keputusan pemilik (**H-26** — tanpa tagihan, [#160](../../issues/160)) |
 | Naskah pemilik | **24** — terakhir: **Phase 20 Civilization Platform** (39 bagian) — **fase TERAKHIR** |
 | Keputusan tertutup | **27 butir H** — 🆕 **H-27 data tiap pengguna milik pribadinya** · 🆕 **H-26 CI tanpa tagihan** · **H-25 siapa mengerjakan V0** · nama · MVP · struktur repo · ambang konfirmasi · model memory · memory meluruh · gerbang policy · context package · dua tangga R/L · manifest dipulihkan · **model transisi belajar dari galat sendiri** · **monetisasi punya fase (Phase 14)**. ✅ **H-20 (peta fase) DIPULIHKAN sebagai [`arch/01`](arch/01-PETA-20-FASE.md) — peta versi 3, 20 baris TERTUTUP, dan peta kini BERNOMOR VERSI** sehingga *“roadmap yang sudah kita tetapkan”* selalu punya rujukan yang bisa dibuka ([#101](../../issues/101) · [#108](../../issues/108) · [#132](../../issues/132) · [#133](../../issues/133) · [#142](../../issues/142)). ✅ **H-13 ([#72](../../issues/72)) DISELESAIKAN:** `Phase` dan `V0–V6` bukan dua rencana yang bersaing melainkan **dua sumbu** — `Phase` menghitung dokumen, `V` menghitung rilis. ⚠️ **H-11** ([#78](../../issues/78)) masih perlu ditinjau ulang |
-| Keputusan terbuka | **26 pertanyaan A** · **39 risiko B** · **158 ketidakcocokan E** · **20 lubang G** — dan **20 butir K** sudah saya putuskan sendiri |
+| Keputusan terbuka | **26 pertanyaan A** · **39 risiko B** · **158 ketidakcocokan E** · **20 lubang G** — dan **22 butir K** sudah saya putuskan sendiri |
 | Tanggal dokumen | 17 September 2026 |
 
 > ⚠️ **Nol baris kode di `master` itu disengaja sampai 16 Sep 2026 — dan kini
@@ -130,6 +130,72 @@ alternatif versi gratis, jangan ada tagihan”* (**H-26**).
 | **CI gratis** — H-26 | gerbang lokal menempelkan status `ci-lokal` ke PR; alur Actions hanya bisa dijalankan manual | `test_rantai_pasok.py` · `test_ci_lokal.py` |
 
 Tiap penjaga baru terbukti sanggup gagal — **42 mutasi kode** (7 baru).
+
+---
+
+## 🔨 Sprint 1 — identitas (17 Sep 2026)
+
+Pemilik: *“lanjutkan tugas yang belum selesai lainnya”*. Sprint 1
+[`spec/07`](spec/07-BACKLOG-V0.md) dikerjakan penuh di branch
+`v0/sprint-1-identity`, di atas Sprint 0 — satu commit per tugas (**K-18**) — 1.1 dan 1.3 dengan commit susulan (daftar tolak & NFKC · uji sidik IP · SQL statis), lalu satu commit untuk seluruh perbaikan tinjauan — dan **setiap
+kueri berjalan sebagai peran aplikasi di bawah RLS** (H-27).
+
+| | Yang dibangun | Bukti mesin |
+|---|---|---|
+| 1.1 | `POST /v1/auth/register · login · refresh · logout` — argon2id; sandi 15–128 karakter + daftar tolak + NFKC (NIST SP 800-63B-4); email tak terdaftar dijawab **sama persis** dengan sandi salah | `test_auth.py` · `test_sandi.py` |
+| 1.2 | sesi: token opak di Redis, bukan JWT (**K-21**); token segar berotasi, pemakaian ulang mencabut seluruh sesi | dicabut → **401 seketika** — `test_sesi.py` |
+| 1.3 | `GET /v1/me` · `PATCH /v1/me/profile` | timezone IANA divalidasi — `test_profil.py` |
+| 1.4 | persetujuan hanya-tambah dengan `purpose` · `data_scopes` · `expires_at` (migrasi 0002, **B-22**); `model_training` tersendiri, tidak dikirim = ditolak | `data.purpose ⊆ consent.purpose` **dan** cakupan data — `test_persetujuan.py` |
+| 1.5 | mesin izin `allow · deny · ask`, di-cache Redis | tanpa baris & kedaluwarsa → `ask`; **pencabutan seketika** — `test_izin.py` |
+| 1.6 | `audit()` di transaksi yang sama dengan perubahannya | `UPDATE`/`DELETE` ditolak basis data — `test_identity_audit.py` |
+| 1.7 | batas laju GCRA — per IP (IPv6 per /64), per pengguna, daftar & masuk, login gagal per akun (**K-22** · batas laju, **B-42**) | `429` + `Retry-After` — `test_batas_laju.py` |
+
+🔴 **Menulisnya menemukan dua ketidakcocokan antar-`spec`** —
+[`docs/99-CATATAN-AUDIT.md`](docs/99-CATATAN-AUDIT.md): **E-163**
+`PUT /privacy/permissions` tidak bisa menunjuk satu baris izin · **E-164** badan
+`register` tanpa tempat untuk persetujuan yang dituntut 1.4 — keduanya
+dibetulkan di [`spec/04`](spec/04-API-CONTRACTS.md). Pertanyaan terbuka **K-17**
+(di mana pendaftaran membuat profil) terjawab tanpa melanggar arah impor.
+
+🔴 **Dan tiga hal yang “cukup” di kepala tetapi tidak di mesin** — cache izin yang
+dihapus sebelum & sesudah commit masih bisa **menghidupkan kembali izin yang
+baru dicabut**; NIST dikutip untuk panjang sandi sambil melewatkan **daftar
+tolak** di pasal yang sama; dan klaim *“IP tidak disimpan mentah”* belum punya
+uji yang akan merah. Ketiganya ditutup — dengan uji **dan** mutasi.
+
+🔍 **Sebelum PR dibuka: tinjauan AI adversarial** — dan aturannya lebih keras
+dari Sprint 0: **temuan tidak dipercaya dari laporannya**, tiap temuan ditulis
+dulu sebagai uji yang **merah pada kode lama**, baru dibetulkan. **11 temuan,
+ke-11-nya dibetulkan** — 8 dari peninjau (1 high · 2 medium · 5 low), 3 baru
+ditemukan saat menulis uji untuk yang lain. Yang paling mahal kalau lolos:
+**keluar di tengah penyegaran menghidupkan sesi kembali**, dan sesi itu tidak
+bisa dicabut lagi — kini tiap operasi yang membaca lalu menulis satu catatan
+sesi (putar · cabut) satu skrip Lua, dan ujinya
+menyela **tiap celah antarperintah**. Yang paling tidak terduga: **pesan galat
+PostgreSQL sendiri membawa email pengguna ke log** (`DETAIL: Key (email)=…`) —
+kini galat basis data dicatat tanpa pesannya. Rinciannya:
+[`docs/99-CATATAN-AUDIT.md`](docs/99-CATATAN-AUDIT.md).
+
+🔍 **Lalu lensa kedua: tiga peninjau serentak** — verifikator yang berusaha
+membantah perbaikan tadi, pembanding kontrak `spec/`, dan pemburu penegak buta.
+Perbaikan pertama tidak bobol; tetapi **satu perbaikannya sendiri membuat
+regresi** (status akun dibaca sesudah token diputar — galat basis data
+membakar token klien), batas *“≤ 100 gagal beruntun, NIST”* ternyata **batas
+laju** yang tidak memenuhi pasal itu (kini dinyatakan jujur: **B-42**), tiga
+ketidakcocokan antar-`spec` lagi (**E-165** · **E-166** · **E-167**), dan
+sepuluh penegak yang lulus tanpa melihat — termasuk **alat mutasi itu sendiri**,
+yang bisa menghitung galat lingkungan sebagai *“berbunyi dengan alasan yang
+dimaksud”*. Cacat kode dan penegak buta dibetulkan dengan uji **dan** mutasi;
+ketidakcocokan `spec` dibetulkan di teksnya; B-42 diterima dan dinyatakan.
+
+🔍 **Lensa terakhir memeriksa DOKUMENNYA** — tiap angka benar, tetapi **dua
+belas kalimat** tidak: klaim NIST *“beruntun”* masih tersisa di empat tempat
+sesudah ditulis *“dicabut di mana pun”*, penguncian per akun ditulis *“±14
+menit”* padahal penyerang yang terus mencoba menahannya selama ia mau, dan
+*“tiap kueri lewat transaksi pengguna”* padahal pencarian akun saat masuk
+tidak — yang terakhir dibetulkan di **kode**.
+
+Tiap penjaga baru terbukti sanggup gagal — **108 mutasi kode** (66 baru), **277 uji**.
 
 ---
 

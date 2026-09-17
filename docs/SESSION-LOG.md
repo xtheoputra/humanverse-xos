@@ -12,10 +12,13 @@
 |---|---|
 | Naskah baru | **tidak ada** |
 | Keputusan pemilik | **H-26** CI tanpa tagihan · **H-27** data tiap pengguna milik pribadinya · aturan kerja: kesalahan spec yang ketemu saat coding **dibetulkan** |
-| Keputusan sendiri | **K-19** kepemilikan data dijaga basis data · **K-20** status commit dari gerbang lokal |
-| Temuan ditutup | **B-40** ✅ · **B-41** ✅ |
-| `spec/` diubah | `01` (§10 hak akses · §11 RLS · FK komposit · peran `hvx_app`) · `02` (aturan G · H · I) · `07` |
-| Penjaga baru | `test_kepemilikan_data.py` (20 uji) · penjaga peran api saat mulai · uji tanpa-tagihan — **7 mutasi baru, semuanya berbunyi** (kode: 35 → 42) |
+| Keputusan sendiri | **K-19** kepemilikan data dijaga basis data · **K-20** status commit dari gerbang lokal · **K-21** sesi token opak, bukan JWT · **K-22** angka sandi & batas laju, penguncian per akun — keduanya dikoreksi sesudah tinjauan · pertanyaan terbuka **K-17** dijawab |
+| Temuan ditutup | **B-40** ✅ · **B-41** ✅ · 🆕 **E-163** ✅ · 🆕 **E-164** ✅ · 🆕 **E-165** ✅ · 🆕 **E-166** ✅ · 🆕 **E-167** ✅ |
+| Temuan dicatat | 🆕 **B-42** batas login gagal per akun bukan batas *beruntun* NIST — dinyatakan, bukan lagi diklaim |
+| `spec/` diubah | `01` (§10 hak akses · §11 RLS · FK komposit · peran `hvx_app` · `consents.purpose` · §12 fungsi login) · `02` (aturan G · H · I) · `04` (`consents` saat daftar · galat `/auth` · batas laju · `subject_type` di jalur izin · `Idempotency-Key` · `DELETE /me` ⏳ 6.5) · `05` (bawaan gerbang risiko) · `06` (aturan 5 kini ditegakkan · aturan 6 dicakupkan) · `07` (status Sprint 1 · 6.5) · `01` (persetujuan per jenis) |
+| Penjaga baru | `test_kepemilikan_data.py` (20 uji) · penjaga peran api saat mulai · uji tanpa-tagihan — **7 mutasi baru** (kode: 35 → 42) |
+| Kode | 🔨 **Sprint 1 — 1.1–1.7 seluruhnya**, branch `v0/sprint-1-identity`: 12 commit, **277 uji** — **66 mutasi baru, semuanya berbunyi** (kode: 42 → 108) |
+| Tinjauan sebelum PR | 🔍 **dua lensa** — keamanan: **11 temuan** (8 dari peninjau + 3 ditemukan saat mengujinya), 1 high: keluar di tengah penyegaran menghidupkan sesi kembali · lensa kedua (verifikator · kontrak · penegak buta): **7 cacat kode · 3 E · 1 B · 10 penegak buta** · lensa dokumen: **12 kalimat** yang tidak tepat. Cacat kode **dibuktikan merah dulu**, celah penegak dengan mutasi |
 
 ---
 
@@ -36,6 +39,50 @@ Actions dimatikan — tetapi gerbang yang hanya berjalan di mesin pengembang tid
 | **peran aplikasi** + penjaga mulai | superuser dan pemilik tabel **melewati RLS** — dua lapis di atas hanya berlaku bagi yang mau mematuhinya |
 
 > 💡 **B-41 semula “sengaja tidak dibetulkan” dengan alasan yang jujur — dua jalan, dua harga.** Jawabannya ternyata sudah ada di kalimat pemilik: kalau data milik pribadi pengguna, maka itu sifat yang dijaga **basis data**, bukan disiplin penulis `repository.py`.
+
+---
+
+### 🔨 Sprint 1 — tujuh tugas, dan yang ditemukan dengan menuliskannya
+
+| | Hasil |
+|---|---|
+| 1.1–1.7 | register · login · refresh · logout · sesi · `/me` · persetujuan bertujuan · mesin izin · audit · batas laju — seluruhnya sebagai peran aplikasi di bawah RLS |
+| Ketidakcocokan antar-`spec` | **E-163** `PUT /privacy/permissions` tanpa `subject_type` · **E-164** `register` tanpa tempat untuk persetujuan — dibetulkan di `spec/04` |
+| Yang tetap milik pemilik | kosakata `purpose` & teks kebijakan (#59 butir 2) · persetujuan sebagai atap izin (#59 butir 3) · seluruh butir C |
+
+> 💡 **Tiga hal yang “cukup” di kepala, dan tidak cukup di mesin.** Cache izin yang dihapus sebelum & sesudah commit tetap bisa **menghidupkan kembali izin yang baru dicabut** — pembaca yang membaca sebelum commit menulis cache sesudahnya; kini kuncinya bergenerasi, diuji dengan pembaca yang ditahan di tengah pencabutan. NIST SP 800-63B-4 dikutip untuk panjang sandi sambil melewatkan **daftar tolak** di pasal yang sama — `passwordpassword` lolos. Dan `SECURITY.md` hampir mengklaim *“IP tidak disimpan mentah”* dengan penegak yang tidak memeriksanya.
+>
+> 🔴 **`bandit` tahap scan akan merah** — dua kueri `profile` dirakit dengan f-string. Tertangkap karena tahap scan dijalankan sebelum PR, bukan sesudahnya; diganti SQL statis, **tanpa** `# nosec`.
+
+---
+
+### 🔍 Tinjauan adversarial — dan sesi yang terputus di tengahnya
+
+Sebelum PR: peninjau keamanan terpisah dengan probe ke PostgreSQL & Redis sungguhan — **8 temuan**. Sesi terputus tepat saat laporannya tiba, sebelum satu pun ditindaklanjuti; pemilik: *“lanjutkan tugas yang belum selesai”*. Laporannya ternyata tersimpan utuh di transkrip peninjau — dilanjutkan dari sana, bukan diulang.
+
+Aturannya: **temuan tidak dipercaya dari laporannya.** Tiap temuan ditulis dulu sebagai uji yang merah pada kode lama dengan alasan yang dimaksud; baru kodenya dibetulkan; lalu mutasi membuktikan ujinya sanggup merah lagi.
+
+| | Yang paling mahal kalau lolos |
+|---|---|
+| 🔴 high | **keluar di tengah penyegaran menghidupkan sesi kembali** — token baru sah, catatan sesi tanpa `user_id`, dan sesi itu tidak bisa dicabut lagi (logout 500). Kini tiap operasi yang membaca lalu menulis satu catatan sesi satu skrip Lua; ujinya menyela **tiap celah antarperintah** |
+| medium | batas 3 login gagal per akun meloloskan **12 dari 12** tebakan serentak · `vİctim@…` masuk ke akun `victim@…` yang sedang terkunci |
+| 🆕 × 3 | pencabutan karena token bekas melewatkan pasangan yang diputar pencuri · `cabut_semua` melupakan sesi yang lahir di sela · **pesan PostgreSQL sendiri membawa email ke log** (`DETAIL: Key (email)=…`) |
+
+> 💡 **Tiga temuan baru lahir dari menulis uji untuk temuan lama.** Yang paling tajam: perbaikan `hide_parameters` untuk temuan 5 lulus — sampai ujinya memakai galat UNIQUE sungguhan, dan email itu tetap muncul, kali ini dari PostgreSQL. Perbaikan yang diuji hanya terhadap kasus yang dibayangkan penulisnya adalah pola §1 `arch/11` lagi.
+
+**Lensa kedua — tiga peninjau serentak, dan perbaikan yang ikut ditinjau.**
+
+| | Yang paling tajam |
+|---|---|
+| verifikator | perbaikan pertama **tidak bobol** — tetapi perbaikan temuan 6 sendiri membuat regresi (status dibaca sesudah token diputar: galat basis data membakar token klien), dan *“≤ 100 gagal beruntun, NIST”* ternyata **batas laju** — B-42; klaimnya dicabut, dan lensa dokumen masih menemukannya di empat tempat lagi |
+| kontrak | **E-165** `Idempotency-Key` dijanjikan juga di rute yang mengeluarkan token · **E-166** aturan 6 `spec/06` dilanggar `profiles` sejak tulisan pertama · **E-167** gerbang risiko `spec/05` butuh bawaan yang tak bisa dijawab mesin izin · sandi emoji ditolak sebagai *“repetitive”* |
+| penegak buta | token akses 30 hari, IP mentah di audit, `now()` untuk riwayat, hash tanpa NFKC — **semuanya lulus uji** · dan `uji_mutasi_kode.py` membaca alasan dari **sumber uji** yang dicetak pytest, bukan dari galatnya |
+
+> 💡💡 **Pertanyaan yang dua putaran ini ajarkan: *“diukur di mana?”*** Uji sesi benar, tetapi tidak pernah menanyakan pencabutan yang serentak dengan penyegaran. Perbaikan log benar untuk galat yang dibayangkan, tetapi pesan PostgreSQL sendiri membawa email. Dan tuntutan *“gagal dengan alasan yang dimaksud”* benar — sampai terlihat bahwa alasannya bisa dibaca dari baris sumber yang lulus.
+
+**Lensa dokumen — tiap angka benar, dua belas kalimat tidak.** Yang paling tajam: *“klaim NIST dibetulkan di mana pun ia tertulis”* — ditulis tanpa `grep`, dan salah di empat tempat; penguncian per akun ditulis *“±14 menit”*, padahal penyerang yang terus mencoba menahan pemilik akun di `429` selama ia mau; dan *“tiap kueri lewat transaksi pengguna”* — pencarian akun saat masuk tidak, dan itu dibetulkan di kode.
+
+⚠️ **Yang diakui tidak dikerjakan:** hitungan ringkasan butir **B/E/G** di README (39 · 158 · 20) dan di header `docs/99` (41→42 · 153 · 21) sudah tidak cocok satu sama lain sejak **sebelum** Sprint 0, dan id E sudah mencapai E-167. Butir baru dinomori berurutan; hitungan lamanya **tidak** disensus ulang di sesi ini.
 
 ---
 

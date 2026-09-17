@@ -276,6 +276,16 @@ jalankan · catat agent_runs · catat audit_logs
 | 3 · aksi berdampak | **`ask` setiap kali** |
 | 4 · high-impact | **tidak ada di V0** — tidak ada tool yang bisa mencapainya |
 
+> 🔧 **“Default” di tabel ini = bawaan untuk yang BELUM diputuskan pengguna**
+> (E-167, tinjauan Sprint 1). Mesin izin 1.5 semula menjawab `ask` untuk *tanpa
+> baris* dan untuk *`ask` yang disetel pengguna* — gerbang tidak bisa menerapkan
+> risk 0 · 1 → `allow` tanpa menimpa pilihan *“tanya aku”*. Mesin izin kini
+> menerima `MesinIzin.cek(…, bawaan=…)`; gerbang risiko (tugas 4.5, **belum
+> ada**) memanggilnya dengan bawaan per risk. Keputusan tersimpan yang **belum
+> kedaluwarsa** — termasuk `ask` — menang atas bawaan itu. **R ≥ 3 tidak
+> terpengaruh**: konfirmasi manusia diminta sebelum mesin izin ditanya, jadi
+> `allow` yang tersimpan tidak pernah melewatinya.
+
 > V0 tidak punya satu pun tool level 3 atau 4. Itu disengaja: janji *"Act
 > selalu di bawah kontrol pengguna"* paling mudah ditepati dengan tidak
 > memberi agent kemampuan yang belum perlu.

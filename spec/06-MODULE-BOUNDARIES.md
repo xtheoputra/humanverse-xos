@@ -111,8 +111,18 @@ dengan SQL — harus lewat `__init__.py` pemiliknya.
 | 2 | Tidak ada impor melingkar | `import-linter` kontrak `layers` (`m1-m3-lapisan`, antarmodul) + `acyclic_siblings` (`m1-siklus-dalam`, di dalam modul) |
 | 3 | Modul domain (`goals`…`activities`, `profile`) **tidak boleh** saling mengimpor — komunikasinya lewat event | `import-linter` lapisan independen di `m1-m3-lapisan` |
 | 4 | `agents` boleh membaca modul lain; **tidak ada** modul yang mengimpor `agents` | `import-linter` — `agents` lapisan teratas `m1-m3-lapisan`, `exhaustive = true` |
-| 5 | `repository.py` hanya boleh menyebut tabel milik modulnya | uji: grep nama tabel per modul — ⏳ belum ada `repository.py` (Sprint 1) |
-| 6 | Setiap tulisan ke tabel domain **wajib** menerbitkan event | uji integrasi per modul — ⏳ belum ada tulisan domain (Sprint 2–3) |
+| 5 | `repository.py` hanya boleh menyebut tabel milik modulnya | `tests/unit/test_batas_tabel.py` — tabel kepemilikan dibaca **dari berkas ini**; SQL **tiap berkas `.py`** modul dipindai, bukan hanya `repository.py` · mutasi `06.5` |
+| 6 | Setiap tulisan ke tabel domain **yang punya event padanan** di [`03`](03-EVENT-CONTRACTS.md) **wajib** menerbitkan event | uji integrasi per modul — ⏳ belum ada tulisan tabel ber-event (Sprint 2–3) |
+
+> 🔧 **Aturan 6 semula: *“setiap tulisan ke tabel domain”* — dan `profile` modul
+> domain (aturan 3).** Sprint 1 menulis `profiles` (pendaftaran · `PATCH
+> /me/profile`) tanpa event, sebab ke-22 event V0 di [`03`](03-EVENT-CONTRACTS.md)
+> tidak memuat satu pun `profile.*`: domainnya **terdaftar** di
+> [`../arch/07`](../arch/07-EVENT-CONTRACTS.md) §2 dan sengaja **belum dipakai**.
+> Kalimat lama dilanggar sejak tulisan pertama tanpa ada yang tahu — dan
+> penegaknya masih menulis *“belum ada tulisan domain”* (**E-166**, tinjauan
+> Sprint 1). Event profil yang dibutuhkan kelak masuk lewat `03` dulu, baru
+> aturan ini mengikatnya.
 
 > Tiap kontrak di atas **terbukti sanggup gagal** — `tools/uji_mutasi_kode.py`
 > memiliki satu mutasi per id kontrak, dan `tests/unit/test_penegak.py`

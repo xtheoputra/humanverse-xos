@@ -55,8 +55,8 @@ Coding Agent → Implementation → Unit Test → Integration Test
 apps/api/src/hvx/
 ├── main.py            titik rakit — satu-satunya yang menyambung 12 modul
 └── modules/           spec/06 — satu tabel dimiliki tepat satu modul
-    ├── platform/      config · db · redis · log · /health (tanpa aturan domain)
-    ├── identity/      users · consents · permissions · audit_logs
+    ├── platform/      config · db · redis · log · galat · batas laju · /health (tanpa aturan domain)
+    ├── identity/      users · consents · permissions · audit_logs — sesi · sandi · izin · audit
     ├── profile/ goals/ habits/ checkins/ journal/ activities/
     ├── events/  memory/  intelligence/
     └── agents/        tidak ada yang boleh mengimpornya
@@ -80,14 +80,25 @@ tools/                 pemeriksa dokumen, uji mutasi, CI lokal
 | **data tiap pengguna milik pribadinya** (H-27) — RLS di tiap tabel milik pengguna, FK `(induk_id, user_id)`, hak akses `hvx_app` sesempit spec/01 §10 | `tests/integration/test_kepemilikan_data.py` | tabel baru: `user_id` + `ENABLE ROW LEVEL SECURITY` + kebijakan §11 + `GRANT` §10 + FK komposit ke induk ber-`user_id` — di `spec/01` **dan** migrasinya |
 | api tidak pernah tersambung sebagai superuser, pemilik tabel, atau `BYPASSRLS` (B-40) | `platform.pastikan_peran_aplikasi` + `test_aplikasi_hidup.py` | api memakai peran anggota `hvx_app`; migrasi memakai `HVX_MIGRATION_DATABASE_URL` |
 | CI **tanpa tagihan** (H-26) — alur Actions hanya `workflow_dispatch` | `test_rantai_pasok.py` | jangan tambah pemicu otomatis; gerbangnya `ci_lokal.py --lapor-github` |
+| SQL sebuah modul hanya menyebut tabel miliknya (`spec/06` aturan 5) — di berkas `.py` mana pun | `tests/unit/test_batas_tabel.py` | baca lewat pintu keluar modul pemilik (mis. `identity.ambil_pengguna`) di transaksi yang sama |
+| fungsi `SECURITY DEFINER` hanya dari daftar izin, `search_path` terpatok, tidak untuk `PUBLIC` | `test_kepemilikan_data.py` | tambahkan ke `DEFINER_DIIZINKAN` **dengan alasannya** + `REVOKE ALL … FROM PUBLIC` + `GRANT EXECUTE … TO hvx_app` |
+| IP klien dan email tidak pernah disimpan mentah — di audit maupun kunci Redis | `test_sidik_ip.py` · `test_auth.py` | pakai `platform.sidik_ip(request)` / `platform.sidik(settings, label, nilai)` — HMAC berkunci |
+| batas laju: `/v1/*` per IP, rute bersesi per pengguna, `429` + `Retry-After` | `test_batas_laju.py` | rute baru di bawah `/v1` sudah terbatasi; rute yang butuh pengguna memakai `identity.PenggunaDiperlukan`; `429` hanya lewat `platform.galat_terlalu_sering` |
+| jatah batas laju **dipakai**, tidak ditanya dulu lalu dihitung nanti | `test_batas_laju.py` (tebakan serentak) | `PembatasLaju.ambil` selalu memakai satu jatah; yang perlu dikembalikan sesudah berhasil memakai `lupakan()` |
+| operasi sesi yang membaca lalu menulis catatan sesi = **satu skrip Lua** | `test_sesi.py` (menyela tiap celah antarperintah) | jangan pecah menjadi `GET`/`HGETALL` lalu `MULTI` — keluar dan pencabutan kalah balapan |
+| perubahan basis data dan jejak auditnya satu transaksi | `test_izin.py` · `test_persetujuan.py` · `test_auth.py` | panggil `audit(conn, …)` dengan `conn` perubahannya; jangan `commit()` di antaranya |
+| galat basis data dicatat **tanpa pesan** (pesan PostgreSQL membawa isi baris) | `test_galat_basis_data.py` | jangan konfigurasi ulang log tanpa `_galat_basis_data_tanpa_isi`; baca SQLSTATE dan nama constraint, bukan pesannya |
+| teks bebas dari klien tidak memuat NUL | `test_auth.py` · `test_profil.py` | medan `str` yang disimpan: `platform.TeksTanpaNul`; `jsonb`: `platform.tanpa_nul_bersarang` |
 
 🔑 **Setiap penegak baru wajib dibuktikan sanggup gagal** — tambahkan
 mutasinya di `tools/uji_mutasi.py` (dokumen) atau `tools/uji_mutasi_kode.py`
 (kode). Pemeriksa yang tidak pernah merah tidak dihitung ada.
 
 🔒 **Tiap kueri aplikasi berjalan di dalam `platform.transaksi_pengguna(engine,
-user_id)`.** Tanpa itu RLS mengembalikan **nol baris** — gagal-tertutup, bukan
-bocor. Yang butuh melihat lintas pengguna (mencari akun per email saat login,
+user_id)`** — atau `platform.transaksi_sistem(engine)` untuk baris sistem
+(`user_id` NULL), yang sengaja berbentuk sama supaya jalur *“akun ada”* dan
+*“akun tidak ada”* tidak berbeda waktu. Tanpa itu RLS mengembalikan **nol
+baris** — gagal-tertutup, bukan bocor. Yang butuh melihat lintas pengguna (mencari akun per email saat login,
 sapuan hapus akun) memakai fungsi `SECURITY DEFINER` yang sempit, satu per
 kebutuhan, di migrasi — **bukan** kebijakan RLS yang dilonggarkan.
 
@@ -115,6 +126,12 @@ pemilik memutuskan CI tanpa tagihan (**H-26**, [#160](../../issues/160)).
   Indonesia, istilah teknis apa adanya. Docstring menjelaskan **kenapa**,
   terutama kalau jawabannya pernah salah.
 - `ikat_pengguna()` dan dependensi autentikasi: **`async def`**, selalu.
+- Galat ke klien: `platform.GalatApi(status, kode, pesan)` — `kode` `snake_case`
+  berbahasa Inggris (`email_taken`), pesan **tidak pernah mengutip masukan**.
+  Pesan galat yang hanya ke log pun tidak mengutip nilai milik pengguna: galat
+  basis data disaring `platform`, galat kode sendiri **tidak** (`SECURITY.md`).
+- Perubahan yang harus berjejak: `identity.audit(conn, …)` di **transaksi yang
+  sama** dengan perubahannya — metadata hanya skalar pendek, bukan isi.
 - Nama tabel `snake_case` jamak; nama event `domain.kata_kerja_lampau`
   (hanya dari tabel padanan [`spec/03`](spec/03-EVENT-CONTRACTS.md)); rute
   `/v1/…`.

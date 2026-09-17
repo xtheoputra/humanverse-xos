@@ -83,6 +83,35 @@ Tidak ada tugas yang boleh masuk `main` tanpa baris **HUMAN REVIEW**.
 > melonggarkan kebijakannya; **(3)** uji 1.6 *“`UPDATE`/`DELETE` ditolak”*
 > tersambung sebagai peran aplikasi (`basis_data_termigrasi` di
 > `tests/integration/conftest.py`), bukan sebagai pemilik.
+>
+> 🔨 **Sprint 1 dikodekan 17 Sep 2026** — branch `v0/sprint-1-identity` (di atas
+> `v0/sprint-0-foundation`), satu commit per tugas (**K-18**) — 1.1 dan 1.3 dengan commit susulan (daftar tolak & NFKC · uji sidik IP · SQL statis), lalu satu commit untuk seluruh perbaikan tinjauan, **menunggu HUMAN REVIEW**.
+> Keadaan tiap "Selesai bila", tanpa dibulatkan:
+>
+> | | Dibuktikan | Yang BELUM |
+> |---|---|---|
+> | 1.1 | argon2id **di thread**; hash berparameter lama diperbarui saat masuk; token segar berotasi (`GETDEL`) dan token bekas **mencabut seluruh sesi**; sandi 15–128 karakter + **daftar tolak** tanpa aturan komposisi + NFKC di kedua sisi (NIST SP 800-63B-4); email tak terdaftar: satu verifikasi argon2 dan kueri yang sama banyak; pendengar pendaftaran yang gagal menggagalkan seluruh pendaftaran; NUL di teks bebas → 400; uji integrasi lewat HTTP sebagai peran aplikasi | — |
+> | 1.2 | token dicabut → 401 pada permintaan berikutnya — **juga bila keluar atau token bekas jatuh di tengah penyegaran, dan bila masuk baru jatuh di tengah cabut-semua** (tiap celah antarperintah diuji); umur token akses & segar diukur; status akun dibaca sebelum tiap penyegaran, tidak aktif → semua sesi dicabut; Redis hanya menyimpan **sidik** token | token akses akun yang ditangguhkan hidup sampai kedaluwarsa — alur yang mengubah status wajib `cabut_semua` (6.5) |
+> | 1.3 | timezone dari paket `tzdata`, peka huruf: `asia/jakarta` · `WIB` · `GMT+7` → 400 | — |
+> | 1.4 | riwayat hanya-tambah (peran aplikasi tanpa `UPDATE`/`DELETE`), urutannya tentu di dalam satu transaksi; pencabutan = baris baru; `data.purpose ⊆ consent.purpose` **dan** cakupan data — per **jenis** persetujuan | kosakata `purpose` & teks kebijakan — pemilik ([#59](../../issues/59) butir 2); persetujuan `service` dicatat tanpa cakupan, jadi pertanyaan `service` bercakupan selalu ditolak sampai kosakata itu ada |
+> | 1.5 | tanpa baris → `ask` (atau bawaan pemanggil — E-167); `allow` · `deny`; kedaluwarsa → `ask`; di-cache Redis ≤ sisa umur izin − 1 dtk, dan **pencabutan berlaku seketika** — juga terhadap pembaca yang sedang membaca | `condition.consent` naskah 12 §8.7 — pemilik (#59 butir 3); rute `PUT /privacy/permissions` datang bersama layar 6.4 |
+> | 1.6 | `UPDATE`/`DELETE` ditolak (SQLSTATE 42501, sebagai peran aplikasi); **login ✅ · izin ✅** tercatat — dan audit yang gagal menggagalkan perubahannya | **ekspor · hapus** belum tercatat — fiturnya belum ada (6.4 · 6.5) |
+> | 1.7 | `429` + `Retry-After` per IP (`/v1/*`, IPv6 per /64) · per pengguna · daftar & masuk per IP · login gagal per akun — dipakai sebelum argon2, kunci = pembanding `citext` | angka batasnya keputusan teknis (**K-22**), belum diukur terhadap lalu lintas nyata; per IP bergantung proksi tepercaya di D1+; batas per akun **bukan** batas 100 *beruntun* NIST (**B-42**) |
+>
+> Dua hal yang menulisnya temukan di [`04`](04-API-CONTRACTS.md): badan
+> `register` **tanpa tempat untuk persetujuan** yang dituntut 1.4 (E-164), dan
+> `PUT /privacy/permissions` yang **tidak bisa menunjuk satu baris** izin
+> (E-163) — keduanya kini dibetulkan.
+>
+> 🔍 **Tinjauan adversarial sebelum PR** (dua lensa, rinciannya
+> [`../docs/99-CATATAN-AUDIT.md`](../docs/99-CATATAN-AUDIT.md)): tiap temuan kode
+> dibuktikan **merah dulu**, tiap celah penegak dibuktikan dengan mutasi. Tiga
+> ketidakcocokan antar-`spec` lagi — **E-165** `Idempotency-Key` di rute yang
+> mengeluarkan token ([`04`](04-API-CONTRACTS.md)) · **E-166** aturan 6
+> [`06`](06-MODULE-BOUNDARIES.md) dilanggar `profiles` · **E-167** bawaan risiko
+> [`05`](05-AGENT-CONTRACTS.md) yang tak bisa dijawab mesin izin — dibetulkan. Rute
+> `DELETE /me` · `POST /me/restore` di [`04`](04-API-CONTRACTS.md) kini ditandai
+> datang bersama 6.5.
 
 ---
 
@@ -168,7 +197,7 @@ Tidak ada tugas yang boleh masuk `main` tanpa baris **HUMAN REVIEW**.
 | 6.2 | Weekly review | menjawab 5 pertanyaan naskah 4 §31 |
 | 6.3 | Notifikasi | bisa dimatikan per jenis |
 | 6.4 | Layar Privacy Center | `summary`, izin per agent, ekspor, hapus |
-| 6.5 | Alur hapus akun (6 tahap [`01`](01-DATABASE-SCHEMA.md)) | uji: titik Qdrant ikut terhapus |
+| 6.5 | Alur hapus akun (6 tahap [`01`](01-DATABASE-SCHEMA.md)) + `DELETE /me` · `POST /me/restore` | uji: titik Qdrant ikut terhapus; **semua sesi pengguna dicabut seketika** (`cabut_semua` — status hanya dibaca saat masuk & penyegaran) |
 | 6.6 | Rapikan UX + luring dasar | catat habit tanpa jaringan → sinkron tanpa duplikat |
 
 ---

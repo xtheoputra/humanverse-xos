@@ -172,8 +172,16 @@ CREATE INDEX consents_user_purpose_idx ON consents (user_id, purpose, created_at
 > **What/Scope**, **Duration** — kini punya. Aturan pembatasan tujuan §8.10
 > menjadi satu operasi himpunan yang dijalankan mesin
 > (`identity.boleh_dipakai_untuk`): **tiap tujuan pemakaian wajib punya
-> persetujuan TERAKHIR untuk tujuan itu yang `granted`, belum kedaluwarsa, dan
-> `data_scopes`-nya mencakup data yang dipakai** — tanpa itu, ditolak.
+> persetujuan, dan persetujuan TERAKHIR dari TIAP jenis (`kind`) yang pernah
+> dicatat untuk tujuan itu wajib `granted`, belum kedaluwarsa, dan
+> `data_scopes`-nya mencakup data yang dipakai** — tanpa itu, ditolak. Satu
+> jenis dicabut = tujuannya tertutup: `terms` dan `privacy` sama-sama bertujuan
+> `service`, dan versi pertama (*“terakhir per tujuan”*) membiarkan persetujuan
+> `terms` yang lebih baru menutupi pencabutan `privacy` (tinjauan Sprint 1).
+> ⚠️ `terms` dan `privacy` dicatat **tanpa** `data_scopes` — badan `register`
+> [`04`](04-API-CONTRACTS.md) tidak memberinya — jadi pertanyaan `service`
+> **dengan** cakupan data selalu ditolak: gagal-tertutup sampai kosakata cakupan
+> diputuskan (#59 butir 2).
 > `purpose` berbentuk `snake_case` bebas (`fitness_recommendation` di naskah);
 > kosakata finalnya keputusan pemilik (#59 butir 2), bukan `CHECK` di sini.
 > Menolak `model_training` **tidak mengurangi layanan** (#59).
