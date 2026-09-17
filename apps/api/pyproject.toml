@@ -18,6 +18,10 @@ dependencies = [
   "psycopg[binary]>=3.2",
   "redis>=5.0",
   "structlog>=24.4",
+  # Sprint 1 — identity (spec/07 1.1–1.3)
+  "argon2-cffi>=23.1",       # argon2id untuk sandi
+  "email-validator>=2.2",    # EmailStr pydantic; pemeriksaan DNS tidak dipakai
+  "tzdata>=2024.1",          # zona waktu IANA yang sama di Windows dan di citra Linux
 ]
 
 [build-system]

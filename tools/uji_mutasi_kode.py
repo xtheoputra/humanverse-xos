@@ -218,6 +218,19 @@ MUTASI: list[Mutasi] = [
         _ruff(f"{MODUL}/journal/_dinamis.py"),
         harus_memuat="TID251",
     ),
+    # ── spec/06 aturan 5: SQL modul hanya menyebut tabel miliknya ────────
+    Mutasi(
+        "06.5",
+        "repository identity menyebut tabel milik modul goals",
+        [
+            _sisip(
+                f"{MODUL}/identity/repository.py",
+                '_KUERI_LIAR = "SELECT id FROM goals WHERE user_id = :u"',
+            )
+        ],
+        _pytest("tests/unit/test_batas_tabel.py"),
+        harus_memuat="`identity` menyebut `goals`",
+    ),
     # ── peta penegak arch/11 §6 ──────────────────────────────────────────
     Mutasi(
         "§6",
