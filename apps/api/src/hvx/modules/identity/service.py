@@ -59,8 +59,17 @@ async def daftar(
         raise _galat(
             422, "consent_required", "Syarat layanan dan kebijakan privasi wajib disetujui."
         )
+    kata_sandi = permintaan.password.get_secret_value()
+    alasan = sandi.alasan_ditolak(kata_sandi, email=permintaan.email, nama=permintaan.display_name)
+    if alasan is not None:  # NIST SP 800-63B-4 §3.1.1.2 — daftar tolak
+        raise platform.GalatApi(
+            422,
+            "password_rejected",
+            "Sandi terlalu mudah ditebak. Pilih sandi lain.",
+            rincian={"reason": alasan},
+        )
     user_id = uuid4()
-    hash_ = await sandi.hash_sandi_async(permintaan.password.get_secret_value())
+    hash_ = await sandi.hash_sandi_async(kata_sandi)
     versi = persetujuan.policy_version
     try:
         async with platform.transaksi_pengguna(engine, user_id) as conn:

@@ -11,13 +11,23 @@
 * **Panjang, bukan aturan komposisi** (NIST SP 800-63B-4 §3.1.1.2): minimal 15
   karakter untuk sandi sebagai faktor tunggal, tanpa aturan "wajib angka &
   simbol"; maksimal 128 supaya hashing tidak bisa dijadikan alat DoS.
+* **Daftar tolak** (§3.1.1.2 yang sama — *SHALL*): kata dari konteks (nama
+  layanan, email, nama tampilan), pengulangan, dan urutan papan ketik/angka
+  ditolak. Panjang 15 saja meloloskan `passwordpassword`.
+* **NFKC sebelum hashing** (§3.1.1.2 — *SHOULD*): "é" yang diketik sebagai satu
+  kode di satu perangkat dan dua kode di perangkat lain adalah sandi yang sama.
+  Diterapkan sebelum baris akun pertama — mengubahnya sesudah itu mematahkan
+  hash yang sudah ada.
 """
 
 from __future__ import annotations
 
 import asyncio
+import re
 import secrets
+import unicodedata
 from functools import cache
+from typing import Literal
 
 from argon2 import PasswordHasher
 from argon2.exceptions import InvalidHashError, VerificationError
@@ -27,6 +37,44 @@ PANJANG_MAKS = 128
 
 _hasher = PasswordHasher()
 
+AlasanTolak = Literal["context", "repetitive", "sequential"]
+
+# Kata konteks yang selalu ditolak, di luar email & nama pengguna itu sendiri.
+_KATA_LAYANAN = ("humanverse", "humanversexos")
+_URUTAN = (
+    "0123456789",
+    "abcdefghijklmnopqrstuvwxyz",
+    "qwertyuiopasdfghjklzxcvbnm",
+    "1234567890qwertyuiop",
+)
+_BUKAN_ALNUM = re.compile(r"[\W_]+")
+_KATA_MIN = 4  # kata konteks yang lebih pendek terlalu umum untuk ditolak
+
+
+def normalisasi(sandi: str) -> str:
+    return unicodedata.normalize("NFKC", sandi)
+
+
+def _inti(teks: str) -> str:
+    return _BUKAN_ALNUM.sub("", normalisasi(teks).casefold())
+
+
+def alasan_ditolak(sandi: str, *, email: str, nama: str) -> AlasanTolak | None:
+    """Kenapa sandi ini terlalu mudah ditebak — atau `None`. Tidak pernah mengutip sandinya."""
+    inti = _inti(sandi)
+    lokal, _, domain = email.partition("@")
+    kata = {*_KATA_LAYANAN, _inti(lokal), _inti(domain.split(".", 1)[0])}
+    kata |= {_inti(k) for k in re.split(r"\s+", nama)}
+    if any(len(k) >= _KATA_MIN and k in inti for k in kata):
+        return "context"
+    if len(set(inti)) < 4 or (inti + inti).find(inti, 1) < len(inti):
+        return "repetitive"  # sedikit karakter berbeda, atau satu potongan diulang
+    for u in _URUTAN:
+        for arah in (u, u[::-1]):
+            if len(inti) >= 8 and inti in arah * (len(inti) // len(arah) + 2):
+                return "sequential"
+    return None
+
 
 @cache
 def _hash_pengalih() -> str:
@@ -34,14 +82,15 @@ def _hash_pengalih() -> str:
 
 
 def hash_sandi(sandi: str) -> str:
-    return _hasher.hash(sandi)
+    return _hasher.hash(normalisasi(sandi))
 
 
 def cocokkan(hash_tersimpan: str | None, sandi: str) -> bool:
     """Selalu menjalankan satu verifikasi argon2 — juga untuk akun yang tidak ada."""
     try:
         return (
-            _hasher.verify(hash_tersimpan or _hash_pengalih(), sandi) and hash_tersimpan is not None
+            _hasher.verify(hash_tersimpan or _hash_pengalih(), normalisasi(sandi))
+            and hash_tersimpan is not None
         )
     except (VerificationError, InvalidHashError):
         return False

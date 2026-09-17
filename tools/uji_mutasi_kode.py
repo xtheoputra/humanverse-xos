@@ -462,6 +462,36 @@ MUTASI: list[Mutasi] = [
     ),
     Mutasi(
         "1.1",
+        "daftar tolak sandi tidak ditegakkan saat daftar — 'passwordpassword' diterima",
+        [
+            Sunting(
+                f"{MODUL}/identity/service.py",
+                "    if alasan is not None:  # NIST SP 800-63B-4 §3.1.1.2 — daftar tolak",
+                "    if False:",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_auth.py"
+            "::test_sandi_yang_mudah_ditebak_422_dengan_alasan_tanpa_mengutipnya"
+        ),
+        harus_memuat="assert 201 == 422",
+        kelompok="db",
+    ),
+    Mutasi(
+        "1.1",
+        "sandi tidak dinormalisasi NFKC — 'é' dari perangkat lain ditolak",
+        [
+            Sunting(
+                f"{MODUL}/identity/sandi.py",
+                'return unicodedata.normalize("NFKC", sandi)',
+                "return sandi",
+            )
+        ],
+        _pytest("tests/unit/test_sandi.py::test_sandi_dinormalisasi_nfkc_sebelum_hashing"),
+        harus_memuat="NFKC tidak diterapkan",
+    ),
+    Mutasi(
+        "1.1",
         "token segar dibaca GET, bukan GETDEL — token lama tetap hidup sesudah rotasi",
         [
             Sunting(

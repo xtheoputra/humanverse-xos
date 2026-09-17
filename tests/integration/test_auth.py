@@ -136,6 +136,23 @@ async def test_daftar_yang_ditolak_tidak_menulis_apa_pun(
         assert k.execute("SELECT count(*) FROM users WHERE email = %s", (email,)).fetchone() == (0,)
 
 
+async def test_sandi_yang_mudah_ditebak_422_dengan_alasan_tanpa_mengutipnya(
+    api_uji: ApiUji,
+) -> None:
+    email = _email()
+
+    r = await api_uji.klien.post(
+        "/v1/auth/register", json=_daftar_badan(email, password="passwordpassword")
+    )
+
+    assert r.status_code == 422, r.text
+    assert r.json()["error"]["code"] == "password_rejected"
+    assert r.json()["error"]["details"] == {"reason": "repetitive"}
+    assert "passwordpassword" not in r.text
+    with _pemilik(api_uji) as k:
+        assert k.execute("SELECT count(*) FROM users WHERE email = %s", (email,)).fetchone() == (0,)
+
+
 async def test_email_yang_sama_tanpa_peduli_huruf_besar_409(api_uji: ApiUji) -> None:
     email = _email()
     assert (
