@@ -5,15 +5,18 @@ spec/07 tugas 0.7: `lint → typecheck → test → build → scan`, dan PR gaga
 kalau salah satunya merah.
 
 Kenapa urutannya hidup di sini dan bukan di `.github/workflows/ci.yml`:
-GitHub Actions repo ini terhalang tagihan akun (#160), jadi gerbang yang
-sungguh berjalan hari ini adalah mesin pengembang. Kalau daftar perintahnya
-ditulis dua kali — sekali di YAML, sekali untuk lokal — keduanya akan
-menyimpang tanpa ada yang tahu, persis pola yang arch/11 §1 daftar enam kali.
-Karena itu `ci.yml` hanya memanggil berkas ini.
+pemilik memutuskan CI **tanpa tagihan** (H-26, 17 Sep 2026) — GitHub Actions
+untuk repo privat memakai menit berbayar, dan akun ini sudah terhalang
+tagihan (#160). Gerbang yang sungguh berjalan adalah mesin pengembang, dan
+hasilnya ditempel ke commit sebagai status `ci-lokal` (`--lapor-github`).
+Kalau daftar perintahnya ditulis dua kali — sekali di YAML, sekali untuk
+lokal — keduanya akan menyimpang tanpa ada yang tahu, persis pola yang
+arch/11 §1 daftar enam kali. Karena itu `ci.yml` hanya memanggil berkas ini.
 
     uv run --locked python tools/ci_lokal.py                 # kelima tahap
     uv run --locked python tools/ci_lokal.py lint typecheck  # sebagian
     uv run --locked python tools/ci_lokal.py --daftar        # cetak perintahnya saja
+    uv run --locked python tools/ci_lokal.py --lapor-github  # kelima tahap + status di PR
 
 `--locked` di perintah di atas bukan hiasan: `uv run` biasa MENULIS ULANG
 `uv.lock` yang basi sebelum berkas ini sempat memeriksanya.
@@ -238,24 +241,91 @@ def _jalankan(perintah: list[str] | Callable[[], int]) -> int:
     return subprocess.run(perintah, cwd=AKAR, env=env).returncode
 
 
-def main() -> int:
-    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawTextHelpFormatter)
-    ap.add_argument("tahap", nargs="*", help=" · ".join(TAHAP) + " (kosong = semua, berurutan)")
-    ap.add_argument("--daftar", action="store_true", help="cetak langkah tanpa menjalankan")
-    a = ap.parse_args()
-    tak_dikenal = [t for t in a.tahap if t not in TAHAP]
-    if tak_dikenal:
-        ap.error(f"tahap tak dikenal: {' '.join(tak_dikenal)}")
-    pilih = [t for t in TAHAP if t in a.tahap] or list(TAHAP)
-    if "scan" in pilih and "build" not in pilih:
-        pilih.insert(pilih.index("scan"), "build")
-        print("ℹ️  `scan` didahului `build` — yang dipindai wajib citra yang baru dibangun.")
+# ──────────────────────────────────────────── laporan status ke GitHub ──
+#
+# 🔑 Pengganti GitHub Actions yang TIDAK PERNAH menagih (H-26). Gerbangnya
+#    berjalan di mesin ini; hasilnya ditempel ke commit sebagai *commit status*
+#    `ci-lokal` lewat API GitHub — fitur dasar repo, bukan Actions, jadi tidak
+#    memakai menit dan tidak bergantung pada tagihan akun. PR menampilkan
+#    hijau/merahnya di samping commit, seperti cek CI biasa.
+#
+# 🛑 Status hanya bermakna kalau ia menempel pada pohon yang BENAR-BENAR diuji.
+#    Maka laporan ditolak untuk gerbang sebagian, pohon kerja yang kotor, dan
+#    commit yang belum ada di remote — dan keadaan repo diperiksa ULANG sesudah
+#    gerbang selesai, sebab uji mutasi merusak lalu memulihkan berkas di tempat.
 
+KONTEKS_STATUS = "ci-lokal"
+
+
+def _git(*argumen: str) -> str:
+    return subprocess.run(
+        ["git", *argumen], cwd=AKAR, capture_output=True, text=True, encoding="utf-8", check=True
+    ).stdout.strip()
+
+
+def keadaan_repo() -> tuple[str, str]:
+    """(sha HEAD, keluaran `git status --porcelain`) — berkas yang diabaikan git tidak dihitung."""
+    return _git("rev-parse", "HEAD"), _git("status", "--porcelain")
+
+
+def alasan_menolak_lapor(sha: str, kotor: str, sha_remote: str | None, cabang: str) -> str | None:
+    """Kenapa hasil gerbang TIDAK boleh ditempel ke `sha` — atau None kalau boleh."""
+    if kotor:
+        return "pohon kerja kotor — yang diuji bukan isi commit mana pun:\n" + kotor
+    if sha_remote != sha:
+        return (
+            f"{sha[:7]} belum menjadi ujung origin/{cabang} — push dulu, supaya status "
+            "menempel pada commit yang dilihat PR"
+        )
+    return None
+
+
+def prasyarat_lapor() -> tuple[str, str]:
+    """(slug repo `pemilik/nama`, sha HEAD) — atau SystemExit dengan alasannya."""
+    sha, kotor = keadaan_repo()
+    cabang = _git("rev-parse", "--abbrev-ref", "HEAD")
+    remote = _git("ls-remote", "origin", f"refs/heads/{cabang}").split()
+    alasan = alasan_menolak_lapor(sha, kotor, remote[0] if remote else None, cabang)
+    if alasan:
+        raise SystemExit(f"🛑 --lapor-github ditolak: {alasan}")
+    slug = subprocess.run(
+        ["gh", "repo", "view", "--json", "nameWithOwner", "--jq", ".nameWithOwner"],
+        cwd=AKAR, capture_output=True, text=True, encoding="utf-8", check=True,
+    ).stdout.strip()  # fmt: skip
+    return slug, sha
+
+
+def perintah_lapor_status(slug: str, sha: str, keadaan: str, uraian: str) -> list[str]:
+    """Batas GitHub untuk `description` 140 karakter — dipotong di sini, bukan ditolak di sana."""
+    if keadaan not in {"pending", "success", "failure", "error"}:
+        raise ValueError(f"keadaan status tak dikenal: {keadaan}")
+    return [
+        "gh", "api", "--method", "POST", f"repos/{slug}/statuses/{sha}",
+        "-f", f"state={keadaan}",
+        "-f", f"context={KONTEKS_STATUS}",
+        "-f", f"description={uraian[:140]}",
+    ]  # fmt: skip
+
+
+def lapor_status(slug: str, sha: str, keadaan: str, uraian: str) -> None:
+    subprocess.run(
+        perintah_lapor_status(slug, sha, keadaan, uraian),
+        cwd=AKAR, capture_output=True, text=True, encoding="utf-8", check=True,
+    )  # fmt: skip
+    print(f"📮 status `{KONTEKS_STATUS}` → {sha[:7]}: {keadaan} — {uraian[:140]}", flush=True)
+
+
+# ──────────────────────────────────────────────────────────── gerbang ──
+
+
+def _jalankan_gerbang(pilih: list[str], daftar: bool) -> tuple[int, str | None, int]:
+    """(kode keluar, langkah wajib pertama yang merah, jumlah langkah wajib yang hijau)."""
     ringkas: list[tuple[str, str, str]] = []
+    hijau = 0
     for tahap in pilih:
         for nama, perintah, wajib in TAHAP[tahap]:
             teks = perintah.__name__ if callable(perintah) else " ".join(perintah)
-            if a.daftar:
+            if daftar:
                 print(f"{tahap:10s} {'wajib ' if wajib else 'lapor '} {nama:52s} {teks}")
                 continue
             print(f"\n━━━ {tahap} · {nama}\n    $ {teks}", flush=True)
@@ -263,16 +333,70 @@ def main() -> int:
             kembali = _jalankan(perintah)
             lama = f"{time.monotonic() - mulai:5.1f} dtk"
             if kembali == 0:
+                if wajib:
+                    hijau += 1
                 ringkas.append((tahap, nama, f"✅ {lama}"))
             elif wajib:
                 ringkas.append((tahap, nama, f"🛑 keluar {kembali} · {lama}"))
                 _cetak(ringkas)
-                return 1
+                return 1, f"{tahap} · {nama}", hijau
             else:
                 ringkas.append((tahap, nama, f"⚠️ keluar {kembali} (dilaporkan) · {lama}"))
-    if not a.daftar:
+    if not daftar:
         _cetak(ringkas)
-    return 0
+    return 0, None, hijau
+
+
+def main(argv: list[str] | None = None) -> int:
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawTextHelpFormatter)
+    ap.add_argument("tahap", nargs="*", help=" · ".join(TAHAP) + " (kosong = semua, berurutan)")
+    ap.add_argument("--daftar", action="store_true", help="cetak langkah tanpa menjalankan")
+    ap.add_argument(
+        "--lapor-github",
+        action="store_true",
+        help=f"tempel hasil gerbang PENUH ke commit HEAD sebagai status `{KONTEKS_STATUS}` "
+        "(gratis — API status commit, bukan Actions)",
+    )
+    a = ap.parse_args(argv)
+    tak_dikenal = [t for t in a.tahap if t not in TAHAP]
+    if tak_dikenal:
+        ap.error(f"tahap tak dikenal: {' '.join(tak_dikenal)}")
+    pilih = [t for t in TAHAP if t in a.tahap] or list(TAHAP)
+    if a.lapor_github and (a.daftar or pilih != list(TAHAP)):
+        ap.error(
+            "--lapor-github hanya untuk gerbang PENUH (kelima tahap, tanpa --daftar): "
+            "status hijau dari gerbang sebagian akan terbaca sebagai lulus penuh"
+        )
+    if "scan" in pilih and "build" not in pilih:
+        pilih.insert(pilih.index("scan"), "build")
+        print("ℹ️  `scan` didahului `build` — yang dipindai wajib citra yang baru dibangun.")
+
+    lapor = prasyarat_lapor() if a.lapor_github else None
+    if lapor:
+        lapor_status(*lapor, "pending", "gerbang lint → typecheck → test → build → scan berjalan")
+    mulai = time.monotonic()
+    selesai = False
+    try:
+        kembali, merah, hijau = _jalankan_gerbang(pilih, a.daftar)
+        selesai = True
+    finally:
+        if lapor and not selesai:
+            lapor_status(*lapor, "error", "gerbang terhenti sebelum selesai — tidak ada hasil")
+    if not lapor:
+        return kembali
+
+    slug, sha = lapor
+    sha_kini, kotor = keadaan_repo()
+    if sha_kini != sha or kotor:
+        lapor_status(slug, sha, "error", "repo berubah selama gerbang berjalan — hasil tidak sah")
+        print("🛑 repo berubah selama gerbang berjalan:\n" + (kotor or f"HEAD kini {sha_kini}"))
+        return 1
+    menit, detik = divmod(round(time.monotonic() - mulai), 60)
+    if kembali == 0:
+        lapor_status(slug, sha, "success", f"{hijau} langkah wajib hijau · {menit} mnt {detik} dtk")
+    else:
+        lapor_status(slug, sha, "failure", f"merah di {merah}")
+    return kembali
 
 
 def _cetak(ringkas: list[tuple[str, str, str]]) -> None:

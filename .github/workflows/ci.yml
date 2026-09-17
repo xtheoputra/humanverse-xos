@@ -7,21 +7,24 @@ name: ci
 #    `tools/ci_lokal.py <tahap>` — satu sumber urutan perintah untuk Actions dan
 #    mesin lokal. Dua daftar perintah akan menyimpang tanpa ada yang tahu.
 #
-# 🛑 Selama #160 belum dibuka pemilik (Actions terhalang tagihan akun), berkas
-#    ini TIDAK BERJALAN. Gerbang yang sungguh berjalan:
-#      uv run --locked python tools/ci_lokal.py
-#    dijalankan manual sebelum PR dibuka, dan hasilnya ditempel di PR.
-# ⚠️ Dan PR yang merah pun TIDAK terhalang digabung: perlindungan branch &
-#    ruleset tidak tersedia untuk repo privat pada paket akun ini (HTTP 403).
-#    Gerbang penggabungan adalah HUMAN REVIEW pemilik (H-25), bukan cek status.
+# 🛑 PEMICU OTOMATIS DIMATIKAN — keputusan pemilik H-26 (17 Sep 2026):
+#    *“gunakan alternatif versi gratis, jangan ada tagihan.”* Actions untuk
+#    repo privat memakai menit berbayar, dan akun ini sudah terhalang tagihan
+#    (#160): tiap PR menampilkan job merah 0 langkah yang tidak pernah dimulai.
+#    Gerbang yang berjalan — gratis — adalah mesin pengembang:
+#      uv run --locked python tools/ci_lokal.py --lapor-github
+#    yang menempelkan hasilnya ke commit sebagai status `ci-lokal` (API status
+#    commit, bukan Actions). Berkas ini disimpan untuk dijalankan MANUAL kalau
+#    repo kelak publik (Actions gratis) atau tagihannya dibereskan pemilik.
+#    Dijaga tests/unit/test_rantai_pasok.py: pemicu selain workflow_dispatch = merah.
+# ⚠️ PR yang merah pun TIDAK terhalang digabung: perlindungan branch & ruleset
+#    tidak tersedia untuk repo privat pada paket akun ini (HTTP 403). Gerbang
+#    penggabungan adalah HUMAN REVIEW pemilik (H-25), bukan cek status.
 #
 # Aksi pihak ketiga dipatok ke SHA commit dan citra ke digest: tag bisa
 # dipindahkan. Dijaga tests/unit/test_rantai_pasok.py.
 
 on:
-  pull_request:
-  push:
-    branches: [master]
   workflow_dispatch:
 
 permissions:

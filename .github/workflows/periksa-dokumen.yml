@@ -20,12 +20,12 @@ name: periksa-dokumen
 # 🔑 Langkah uji mutasi ada supaya "empat belas hijau" tidak bisa berarti
 #    "pemeriksaan yang tidak melihat apa pun": ia merusak satu
 #    hal yang tiap pemeriksaan KLAIM deteksi dan menuntut merahnya.
+#
+# 🛑 PEMICU OTOMATIS DIMATIKAN — H-26, CI tanpa tagihan (lihat ci.yml). Semua
+#    pemeriksaan di bawah juga dijalankan tahap `lint` tools/ci_lokal.py, yang
+#    melapor ke PR sebagai status `ci-lokal`.
 
 on:
-  push:
-    paths: ['docs/**', 'spec/**', 'arch/**', 'tools/**', '.github/workflows/**']
-  pull_request:
-    paths: ['docs/**', 'spec/**', 'arch/**', 'tools/**']
   workflow_dispatch:
 
 permissions:

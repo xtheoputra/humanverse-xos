@@ -276,6 +276,19 @@ MUTASI: list[Mutasi] = [
     ),
     Mutasi(
         "RP",
+        "pemicu otomatis Actions dinyalakan lagi — tiap PR menagih (H-26)",
+        [
+            Sunting(
+                ".github/workflows/ci.yml",
+                "on:" + NL + "  workflow_dispatch:" + NL,
+                "on:" + NL + "  pull_request:" + NL + "  workflow_dispatch:" + NL,
+            )
+        ],
+        _pytest("tests/unit/test_rantai_pasok.py"),
+        harus_memuat="pemicu otomatis ['pull_request', 'workflow_dispatch']",
+    ),
+    Mutasi(
+        "RP",
         "dependensi diubah tanpa mengunci ulang uv.lock",
         [
             Sunting(

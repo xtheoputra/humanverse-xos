@@ -94,3 +94,24 @@ def test_checkout_tidak_meninggalkan_token_dan_izin_dibatasi() -> None:
         assert re.search(r"^permissions:\s*\n\s+contents:\s*read", teks, re.M), (
             f"{alur.name}: tanpa `permissions: contents: read` di tingkat alur"
         )
+
+
+def test_alur_actions_tanpa_pemicu_otomatis_supaya_tidak_ada_tagihan() -> None:
+    """H-26 — pemilik: *“gunakan alternatif versi gratis, jangan ada tagihan.”*
+
+    Actions pada repo privat memakai menit berbayar. Satu `pull_request:` yang
+    ditambahkan kembali membuat tiap PR menagih (atau, selama akun terhalang
+    tagihan, menampilkan job merah yang tidak pernah dimulai). Gerbang yang
+    gratis adalah `tools/ci_lokal.py --lapor-github`.
+    """
+    assert len(ALUR) >= 2, f"alur yang terbaca: {[a.name for a in ALUR]}"
+    for alur in ALUR:
+        teks = alur.read_text(encoding="utf-8")
+        # Bentuk blok saja: `on: [push]` sebaris tidak cocok, dan itu disengaja.
+        blok = re.search(r"^on:[ \t]*\n((?:[ \t]+\S.*\n|[ \t]*\n)*)", teks, re.M)
+        assert blok, f"{alur.name}: blok `on:` tidak terbaca sebagai pemetaan"
+        pemicu = re.findall(r"^[ \t]{2}([A-Za-z_]+):", blok.group(1), re.M)
+        assert pemicu == ["workflow_dispatch"], (
+            f"{alur.name}: pemicu otomatis {pemicu} — Actions di repo privat menagih; "
+            "hanya workflow_dispatch yang boleh (H-26)"
+        )
