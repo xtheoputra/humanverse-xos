@@ -249,6 +249,20 @@ MUTASI: list[Mutasi] = [
         harus_memuat="assert 200 == 401",
         kelompok="db",
     ),
+    Mutasi(
+        "1.3",
+        "timezone profil diterima sebagai teks bebas — 'Mars/Olympus_Mons' tersimpan",
+        [
+            Sunting(
+                f"{MODUL}/profile/schemas.py",
+                "    timezone: platform.ZonaWaktuIANA | None = None",
+                "    timezone: str | None = None",
+            )
+        ],
+        _pytest("tests/integration/test_profil.py::test_timezone_bukan_iana_ditolak_400"),
+        harus_memuat="assert 200 == 400",
+        kelompok="db",
+    ),
     # ── peta penegak arch/11 §6 ──────────────────────────────────────────
     Mutasi(
         "§6",

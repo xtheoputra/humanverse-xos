@@ -26,6 +26,7 @@ from .keadaan import engine_dari, redis_dari, settings_dari
 from .log import RequestContextMiddleware, ikat_pengguna, konfigurasi_log
 from .redis_store import buat_redis, ping_redis
 from .routes import router
+from .zona_waktu import ZonaWaktuIANA, zona_waktu_sah
 
 __all__ = [
     "GalatApi",
@@ -34,6 +35,7 @@ __all__ = [
     "PeranTidakAman",
     "RequestContextMiddleware",
     "Settings",
+    "ZonaWaktuIANA",
     "buat_engine",
     "buat_redis",
     "engine_dari",
@@ -51,4 +53,5 @@ __all__ = [
     "transaksi_pengguna",
     "url_async",
     "url_sync",
+    "zona_waktu_sah",
 ]

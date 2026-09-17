@@ -3,8 +3,11 @@
 Memiliki tabel: profiles · human_states (spec/06).
 Dikerjakan: Sprint 1 (1.3) · Sprint 5 (5.3) — spec/07.
 
-Berkas ini satu-satunya pintu keluar modul (spec/06 aturan 1). Masih kosong:
-belum ada yang diekspor.
+Berkas ini satu-satunya pintu keluar modul (spec/06 aturan 1).
 """
 
-__all__: list[str] = []
+from .repository import buat_profil
+from .routes import router
+from .schemas import Profil, UbahProfil
+
+__all__ = ["Profil", "UbahProfil", "buat_profil", "router"]

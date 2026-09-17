@@ -19,7 +19,7 @@ from functools import partial
 from fastapi import FastAPI
 
 from hvx import __version__
-from hvx.modules import platform
+from hvx.modules import platform, profile
 
 DOKUMENTASI_TERBUKA: frozenset[str] = frozenset({"local", "test", "ci"})
 
@@ -70,4 +70,5 @@ def create_app(settings: platform.Settings | None = None) -> FastAPI:
     platform.pasang_penangan_galat(app)
     app.add_middleware(platform.RequestContextMiddleware)
     app.include_router(platform.router)
+    app.include_router(profile.router)
     return app

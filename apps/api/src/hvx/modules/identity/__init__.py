@@ -11,6 +11,8 @@ Berkas ini satu-satunya pintu keluar modul (spec/06 aturan 1).
 
 from .audit import AktorTipe, AuditTidakSah, audit
 from .dependensi import PenggunaDiperlukan, PenggunaMasuk, pengguna_saat_ini, penyimpan_sesi
+from .repository import ambil_pengguna
+from .schemas import PenggunaRingkas
 from .sesi import HasilPenyegaran, PenyimpanSesi, SesiAktif, Token
 
 __all__ = [
@@ -19,9 +21,11 @@ __all__ = [
     "HasilPenyegaran",
     "PenggunaDiperlukan",
     "PenggunaMasuk",
+    "PenggunaRingkas",
     "PenyimpanSesi",
     "SesiAktif",
     "Token",
+    "ambil_pengguna",
     "audit",
     "pengguna_saat_ini",
     "penyimpan_sesi",

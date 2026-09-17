@@ -17,6 +17,8 @@ from uuid import UUID
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncConnection
 
+from .schemas import PenggunaRingkas
+
 _SISIP_AUDIT = text(
     """
     INSERT INTO audit_logs
@@ -58,3 +60,17 @@ async def tambah_audit(
             "metadata": json.dumps(dict(metadata)),
         },
     )
+
+
+_PENGGUNA = text(
+    """
+    SELECT id, email::text AS email, status, email_verified_at, created_at
+    FROM users
+    WHERE id = :user_id AND deleted_at IS NULL
+    """
+)
+
+
+async def ambil_pengguna(conn: AsyncConnection, user_id: UUID) -> PenggunaRingkas | None:
+    baris = (await conn.execute(_PENGGUNA, {"user_id": user_id})).mappings().first()
+    return PenggunaRingkas.model_validate(dict(baris)) if baris else None

@@ -4,14 +4,16 @@ from __future__ import annotations
 
 import secrets
 import uuid
-from collections.abc import Callable, Iterator
+from collections.abc import AsyncIterator, Callable, Iterator
 from contextlib import ExitStack, contextmanager
 
+import httpx
 import psycopg
 import pytest
 from _bantuan_db import (
     BUAT_HVX_APP,
     PERAN_APLIKASI_UJI,
+    ApiUji,
     BasisDataV0,
     alembic,
     dsn_ke,
@@ -19,7 +21,11 @@ from _bantuan_db import (
     psycopg_dsn,
 )
 from alembic import command
+from asgi_lifespan import LifespanManager
 from psycopg import sql
+
+from hvx.main import create_app
+from hvx.modules.platform import Settings
 
 
 @contextmanager
@@ -94,3 +100,25 @@ def v0_bersama(dsn_admin_uji: str, sandi_peran_aplikasi_uji: str) -> Iterator[Ba
                 dsn_admin_uji, nama_db(dsn_pemilik), PERAN_APLIKASI_UJI, sandi_peran_aplikasi_uji
             ),
         )
+
+
+@pytest.fixture
+async def api_uji(
+    basis_data_termigrasi: Callable[[str], BasisDataV0], url_redis_uji: str
+) -> AsyncIterator[ApiUji]:
+    """create_app + lifespan terhadap basis data termigrasi, sebagai peran aplikasi."""
+    db = basis_data_termigrasi("api")
+    awalan = f"uji-{uuid.uuid4().hex[:12]}"
+    app = create_app(
+        Settings(
+            env="test",
+            database_url=db.dsn_aplikasi,
+            redis_url=url_redis_uji,
+            redis_prefix=awalan,
+        )
+    )
+    async with (
+        LifespanManager(app),
+        httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://uji") as klien,
+    ):
+        yield ApiUji(app=app, klien=klien, db=db, awalan_redis=awalan)
