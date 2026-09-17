@@ -26,11 +26,11 @@ manusia + agent + data + knowledge + simulation + automation**.
 | Repo git | privat `xtheoputra/humanverse-xos`, branch `master` |
 | Dokumen | **272 berkas** di `docs/` + **8 berkas** di `spec/` + **12 berkas** di [`arch/`](arch/README.md) |
 | Gerbang yang **sudah dijalankan** | **14 ✅ · R-1 🛑 7 temuan** (keputusan cakupan pemilik) · **15 kontrak `import-linter`** · CI lokal **lint → typecheck → test → build → scan hijau** — `uv run python tools/ci_lokal.py`, **manual** |
-| Merahnya **terbukti bisa terjadi** | **19 dari 19** — 25 mutasi dokumen (tiap mutasi wajib melahirkan temuan **baru**) + 35 mutasi kode (tiap mutasi wajib gagal dengan **alasan yang dimaksud**) · **tiap kontrak `import-linter` punya mutasinya sendiri** |
-| ⚠️ Gerbang **otomatis** | 🛑 **belum pernah jalan** — GitHub Actions terhalang tagihan akun ([#160](../../issues/160)) |
+| Merahnya **terbukti bisa terjadi** | **19 dari 19** — 25 mutasi dokumen (tiap mutasi wajib melahirkan temuan **baru**) + 42 mutasi kode (tiap mutasi wajib gagal dengan **alasan yang dimaksud**) · **tiap kontrak `import-linter` punya mutasinya sendiri** |
+| Gerbang di PR | ✅ **gratis** — `tools/ci_lokal.py --lapor-github` menempelkan status **`ci-lokal`** ke commit PR; GitHub Actions **dimatikan** atas keputusan pemilik (**H-26** — tanpa tagihan, [#160](../../issues/160)) |
 | Naskah pemilik | **24** — terakhir: **Phase 20 Civilization Platform** (39 bagian) — **fase TERAKHIR** |
-| Keputusan tertutup | **25 butir H** — 🆕 **H-25 siapa mengerjakan V0** · nama · MVP · struktur repo · ambang konfirmasi · model memory · memory meluruh · gerbang policy · context package · dua tangga R/L · manifest dipulihkan · **model transisi belajar dari galat sendiri** · **monetisasi punya fase (Phase 14)**. ✅ **H-20 (peta fase) DIPULIHKAN sebagai [`arch/01`](arch/01-PETA-20-FASE.md) — peta versi 3, 20 baris TERTUTUP, dan peta kini BERNOMOR VERSI** sehingga *“roadmap yang sudah kita tetapkan”* selalu punya rujukan yang bisa dibuka ([#101](../../issues/101) · [#108](../../issues/108) · [#132](../../issues/132) · [#133](../../issues/133) · [#142](../../issues/142)). ✅ **H-13 ([#72](../../issues/72)) DISELESAIKAN:** `Phase` dan `V0–V6` bukan dua rencana yang bersaing melainkan **dua sumbu** — `Phase` menghitung dokumen, `V` menghitung rilis. ⚠️ **H-11** ([#78](../../issues/78)) masih perlu ditinjau ulang |
-| Keputusan terbuka | **26 pertanyaan A** · **41 risiko B** · **158 ketidakcocokan E** · **20 lubang G** — dan **18 butir K** sudah saya putuskan sendiri |
+| Keputusan tertutup | **27 butir H** — 🆕 **H-27 data tiap pengguna milik pribadinya** · 🆕 **H-26 CI tanpa tagihan** · **H-25 siapa mengerjakan V0** · nama · MVP · struktur repo · ambang konfirmasi · model memory · memory meluruh · gerbang policy · context package · dua tangga R/L · manifest dipulihkan · **model transisi belajar dari galat sendiri** · **monetisasi punya fase (Phase 14)**. ✅ **H-20 (peta fase) DIPULIHKAN sebagai [`arch/01`](arch/01-PETA-20-FASE.md) — peta versi 3, 20 baris TERTUTUP, dan peta kini BERNOMOR VERSI** sehingga *“roadmap yang sudah kita tetapkan”* selalu punya rujukan yang bisa dibuka ([#101](../../issues/101) · [#108](../../issues/108) · [#132](../../issues/132) · [#133](../../issues/133) · [#142](../../issues/142)). ✅ **H-13 ([#72](../../issues/72)) DISELESAIKAN:** `Phase` dan `V0–V6` bukan dua rencana yang bersaing melainkan **dua sumbu** — `Phase` menghitung dokumen, `V` menghitung rilis. ⚠️ **H-11** ([#78](../../issues/78)) masih perlu ditinjau ulang |
+| Keputusan terbuka | **26 pertanyaan A** · **39 risiko B** · **158 ketidakcocokan E** · **20 lubang G** — dan **20 butir K** sudah saya putuskan sendiri |
 | Tanggal dokumen | 17 September 2026 |
 
 > ⚠️ **Nol baris kode di `master` itu disengaja sampai 16 Sep 2026 — dan kini
@@ -96,8 +96,8 @@ temukan** — [`docs/99-CATATAN-AUDIT.md`](docs/99-CATATAN-AUDIT.md):
 **G-24** 21 baris markdown **di dalam** blok SQL `spec/01` — DDL-nya tidak bisa
 dijalankan · **E-162** `arch/06` §3 menyebut `CHECK` milik tabel lain ·
 🛑 **B-40** `REVOKE` di `audit_logs` **tidak menghalangi** role yang dipakai api —
-`UPDATE` & `DELETE` lolos, dan superuser melewati RLS. Yang terakhir dicatat di
-`spec/07` tepat sebelum tugas 1.5–1.6 yang bergantung padanya.
+`UPDATE` & `DELETE` lolos, dan superuser melewati RLS. Yang terakhir
+✅ **ditutup 17 Sep 2026** — lihat bagian berikut.
 
 🚨 **Dan pindai citra merah di percobaan pertama**: 2 CVE HIGH (libpcre2) di
 citra dasar Debian — gerbangnya berbunyi, citranya kini menambal paket saat
@@ -106,13 +106,30 @@ dibangun.
 🔍 **Sebelum PR dibuka: tinjauan AI adversarial** — enam lensa, dan tiap temuan
 diserahkan ke verifikator yang berusaha **membantahnya**. **35 temuan, 33
 bertahan** (16 medium · 17 low · 0 high): **32 dibetulkan** di branch yang sama,
-**1 dicatat** — 🛑 **B-41** `user_id` baris anak tidak diikat ke induknya
-(11 FK), dicatat di `spec/07` sebelum tugas 2.1. Separuh temuan medium adalah
+**1 dicatat** — **B-41** `user_id` baris anak tidak diikat ke induknya
+(11 FK) — lalu ✅ **dibetulkan 17 Sep 2026** atas kata pemilik. Separuh temuan medium adalah
 **penegak yang lulus tanpa melihat**: modul ke-13 lolos semua kontrak, 10 dari
 12 kontrak M-2 tak pernah dibuktikan sanggup gagal, pembanding katalog buta
 terhadap sepuluh perbedaan skema, dan satu mutasi R-1 dihitung berbunyi tanpa
 menguji apa pun. Rinciannya:
 [`docs/99-CATATAN-AUDIT.md`](docs/99-CATATAN-AUDIT.md).
+
+---
+
+## 🔒 Data tiap pengguna milik pribadinya (17 Sep 2026)
+
+Pemilik: *“data milik satu pengguna harus milik pengguna tersebut, data
+masing-masing pengguna milik pribadi user”* (**H-27**) — dan *“gunakan
+alternatif versi gratis, jangan ada tagihan”* (**H-26**).
+
+| Lapis | Menjaga | Bukti mesin |
+|---|---|---|
+| **RLS** di 21 tabel | aplikasi yang melayani pengguna A **tidak bisa** membaca, mengubah, atau menulis baris pengguna B — bahkan kalau `WHERE user_id` terlupa; tanpa pengguna → nol baris | `test_kepemilikan_data.py` |
+| **FK komposit** — B-41 ✅ | baris anak milik B tidak bisa menunjuk induk milik A (11 relasi); menghapus induk tidak menyentuh baris orang lain | idem |
+| **peran aplikasi** — B-40 ✅ | api bukan superuser, bukan pemilik tabel, tanpa `BYPASSRLS`; audit & event hanya-tambah; api **menolak mulai** kalau perannya salah | idem + `test_aplikasi_hidup.py` |
+| **CI gratis** — H-26 | gerbang lokal menempelkan status `ci-lokal` ke PR; alur Actions hanya bisa dijalankan manual | `test_rantai_pasok.py` · `test_ci_lokal.py` |
+
+Tiap penjaga baru terbukti sanggup gagal — **42 mutasi kode** (7 baru).
 
 ---
 
@@ -250,10 +267,10 @@ di antaranya*), §16.5 (*tujuan manusia langsung ke kendali sendi*), §16.7
 (*punya `Collision Check`, tetapi itu menjawab "aman secara fisik", bukan
 "boleh dilakukan"*).
 
-## 🔧 Delapan belas keputusan yang diambil sendiri — [`docs/KEPUTUSAN-DIDELEGASIKAN.md`](docs/KEPUTUSAN-DIDELEGASIKAN.md)
+## 🔧 Dua puluh keputusan yang diambil sendiri — [`docs/KEPUTUSAN-DIDELEGASIKAN.md`](docs/KEPUTUSAN-DIDELEGASIKAN.md)
 
 Atas permintaan pemilik (*"beri keputusan sendiri sesuai aturan"*, 9 Sep 2026),
-**delapan belas** pertanyaan **engineering** diputuskan dan ditegakkan di `spec/`
+**dua puluh** pertanyaan **engineering** diputuskan dan ditegakkan di `spec/`
 dan `arch/` — tiap butir dengan **bacaan yang ditolak** dan **cara
 membalikkannya**:
 
@@ -276,7 +293,9 @@ membalikkannya**:
 | **K-15** | **Domain event diambil dari registry, bukan dari kata pertama nama** — K-3 benar sebagai transkripsi, tidak pernah jadi aturan kepemilikan | `spec/03` (64 nama) · `arch/07` §2 §4 §6 |
 | **K-16** | **`data_subject` + tiga anotasi retensi masuk 23 tabel V0 sekarang** — uji yang dipakai: *yang boleh masuk V0 hanyalah yang TIDAK BISA ditambahkan nanti* | `spec/01` · `spec/07` 0.4 · `arch/06` §5 §6 |
 | **K-17** | **Arah IMPOR modul V0: `events` di bawah modul domain** — gambar `spec/06` arah data; aturan 6 (tiap tulisan domain menerbitkan event) menentukan arah impor | `pyproject.toml` kontrak `m1-m3-lapisan` |
-| **K-18** 🆕 | **Satu commit per tugas; PR boleh satu per sprint** — harga yang diakui: hanya commit terakhir yang dijamin lulus gerbang penuh | `spec/07` · `CONTRIBUTING.md` |
+| **K-18** | **Satu commit per tugas; PR boleh satu per sprint** — harga yang diakui: hanya commit terakhir yang dijamin lulus gerbang penuh | `spec/07` · `CONTRIBUTING.md` |
+| **K-19** 🆕 | **Kepemilikan data dijaga basis data** — RLS berbasis pengguna-transaksi · FK komposit · api menolak mulai sebagai pemilik tabel | `spec/01` §10–§11 · `test_kepemilikan_data.py` |
+| **K-20** 🆕 | **CI tanpa tagihan** — gerbang lokal menempelkan status `ci-lokal`; alur Actions hanya manual | `tools/ci_lokal.py` · `test_rantai_pasok.py` |
 
 🛑 **Yang sengaja TIDAK saya putuskan:** [#139](../../issues/139) (waktu pemilik) ·
 [#3](../../issues/3) (orang) · [#20](../../issues/20) (merek) · **seluruh butir C**

@@ -249,6 +249,13 @@ data_subject : 'user' | 'bystander' | 'world' | 'system'
 | baris `bystander` akan tampak seperti baris pengguna yang datanya kurang | ⇒ suatu hari seseorang akan “melengkapinya” |
 | Row-Level Security tidak bisa dibedakan | policy `user_id = current_user` **meloloskan `NULL`** pada sebagian konfigurasi |
 
+> 🔧 **RLS V0 kini nyata, bukan rencana** (17 Sep 2026, keputusan pemilik
+> **H-27**). Kebijakannya membandingkan `user_id` dengan
+> `app_current_user_id()` — pengguna yang dilayani **transaksi**, bukan
+> `current_user` basis data — dan fungsi itu memulangkan `NULL` kalau tidak
+> diisi, sehingga kebijakan tidak meloloskan satu baris pun. Bentuk lengkap:
+> [`../spec/01`](../spec/01-DATABASE-SCHEMA.md) §10–§11.
+
 > 💡 **Ini bentuk lain dari pertanyaan yang menghasilkan K-10 dan K-12:**
 > *apa yang dipulangkan medan ini ketika ia tidak berlaku — dan apakah nilai itu
 > SUDAH PUNYA ARTI LAIN?* `NULL` sudah punya arti lain. Kolom yang absen tidak.

@@ -16,7 +16,7 @@
 ```bash
 uv sync --locked                          # lingkungan penuh dari uv.lock
 cp .env.example .env                      # isi kata sandi lokal; ganti port kalau bentrok
-docker compose up -d --wait               # postgres · redis · migrate · api
+docker compose up -d --wait               # postgres · redis · migrate · db-roles · api
 curl http://127.0.0.1:8000/health         # {"status":"ok",...}
 ```
 
@@ -31,6 +31,8 @@ spec/07 tugas N.M
   → branch  v0/sprint-N-<ringkas>
   → kode + uji + (kalau ada aturan baru) penegak + mutasinya
   → uv run --locked python tools/ci_lokal.py   ← WAJIB hijau
+  → git push
+  → uv run --locked python tools/ci_lokal.py --lapor-github   ← status `ci-lokal` di PR
   → PR: tempel ringkasan ci_lokal + centang "Selesai bila"
   → HUMAN REVIEW oleh pemilik → merge
 ```
@@ -43,9 +45,10 @@ spec/07 tugas N.M
   lulus gerbang penuh — katakan itu di deskripsi PR.
 - `--locked` di perintah gerbang bukan hiasan: `uv run` biasa menulis ulang
   `uv.lock` yang basi sebelum gerbang sempat memeriksanya.
-- GitHub Actions belum berjalan ([#160](../../issues/160)): `ci_lokal.py`
-  adalah gerbangnya. Menempelkan hasilnya di PR bukan formalitas — itu
-  satu-satunya bukti bahwa gerbang dijalankan.
+- **CI tanpa tagihan** (**H-26**, [#160](../../issues/160)): GitHub Actions
+  dimatikan, `ci_lokal.py` adalah gerbangnya. `--lapor-github` menolak
+  melapor untuk gerbang sebagian, pohon kerja kotor, atau commit yang belum
+  di-push — status hijau hanya menempel pada pohon yang benar-benar diuji.
 
 ## 3 · Menjalankan uji
 
@@ -58,8 +61,10 @@ uv run pytest --cov                       # penuh + gerbang cakupan 70 %
 ```
 
 Uji integrasi **gagal** — tidak dilewati — kalau dua variabel di atas kosong.
-Ia membuat basis data sekali pakai (`hvx_uji_*`) dan menghapusnya lagi, jadi
-role-nya butuh hak `CREATE DATABASE`.
+Ia membuat basis data sekali pakai (`hvx_uji_*`) dan menghapusnya lagi, dan
+membuat peran login `hvx_api_uji` (anggota `hvx_app`) supaya api diuji sebagai
+peran aplikasi, bukan sebagai pemilik tabel — jadi role DSN uji butuh hak
+`CREATE DATABASE` dan `CREATEROLE` (superuser compose lokal punya keduanya).
 
 ## 4 · Mengubah skema
 
@@ -69,8 +74,15 @@ role-nya butuh hak `CREATE DATABASE`.
    `NNNN_<slug>.up.sql` + `NNNN_<slug>.down.sql`.
 3. Tiap `CREATE TABLE` baru membawa `data_subject` dan tiga anotasi
    (`@retention` · `@who-can-set` · `@on-delete`) — P-1/P-2 menolak yang lupa.
-4. `uv run pytest tests/integration/test_migrasi.py` — migrasi harus sama
-   persis dengan `spec/01`, dan turun harus bersih.
+4. **Data tiap pengguna milik pribadinya** (H-27): tabel milik pengguna
+   membawa `user_id`, `ENABLE ROW LEVEL SECURITY` + kebijakan `<tabel>_own_rows`
+   (`spec/01` §11), `GRANT` sesempit mungkin ke `hvx_app` (§10), dan FK ke
+   induk ber-`user_id` sebagai **pasangan** `(induk_id, user_id)`.
+   `test_kepemilikan_data.py` menolak tabel yang lupa salah satunya.
+5. `uv run pytest tests/integration` — migrasi harus sama persis dengan
+   `spec/01`, turun harus bersih, dan kepemilikan data utuh. Migrasi dijalankan
+   dengan `HVX_MIGRATION_DATABASE_URL` (peran pemilik), **bukan**
+   `HVX_DATABASE_URL` milik api.
 
 ## 5 · Menambah aturan
 

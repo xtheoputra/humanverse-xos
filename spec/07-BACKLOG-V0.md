@@ -46,7 +46,7 @@ Tidak ada tugas yang boleh masuk `main` tanpa baris **HUMAN REVIEW**.
 > |---|---|---|
 > | 0.1–0.6 | mesin — `tools/ci_lokal.py` tahap lint · typecheck · test · build | — |
 > | 0.5 | tiap baris log punya `request_id` & `user_id`; **`latency_ms` di baris penutup permintaan** (baris lain belum punya latensi untuk dilaporkan) | tafsiran itu dinyatakan di `platform/log.py`, bukan diubah di baris tugasnya |
-> | 0.7 | `ci_lokal.py` kelima tahap hijau **di mesin lokal** | 🛑 *“PR gagal”* **belum pernah terlihat**: Actions terhalang tagihan ([#160](../../issues/160)), dan perlindungan branch tidak tersedia untuk repo privat pada paket akun ini — PR merah pun tidak terhalang digabung. Gerbangnya HUMAN REVIEW (H-25) |
+> | 0.7 | `ci_lokal.py` kelima tahap hijau **di mesin lokal**, dan merah-hijaunya **terlihat di PR** sebagai status `ci-lokal` (`--lapor-github`) — gratis, **H-26** | 🛑 PR merah **tidak terhalang digabung**: perlindungan branch tidak tersedia untuk repo privat pada paket akun ini. Gerbangnya HUMAN REVIEW (H-25). Actions dimatikan dengan sengaja ([#160](../../issues/160)) |
 > | 0.8 | batas modul `spec/06` aturan 1–4 + **B-2** kontrak `import-linter`, **B-6** pohon repo — semuanya terbukti sanggup gagal | **B-1 · B-3 · B-4 · B-5** belum bisa dinyatakan di V0; pemicunya di blok `penegak` [`../arch/11`](../arch/11-PENEGAKAN.md) §6 |
 >
 > Dua hal yang menulis migrasinya temukan di [`01`](01-DATABASE-SCHEMA.md):
@@ -68,16 +68,21 @@ Tidak ada tugas yang boleh masuk `main` tanpa baris **HUMAN REVIEW**.
 | 1.6 | `audit_logs` + helper `audit()` | `UPDATE`/`DELETE` ditolak; login, izin, ekspor, hapus tercatat |
 | 1.7 | Batas laju per pengguna & per IP | 429 dengan `Retry-After` |
 
-> 🛑 **B-40 — baca sebelum 1.5 dan 1.6 ditulis.** Di tahap D0, api tersambung
-> ke PostgreSQL sebagai **superuser yang juga pemilik tabel**. Diverifikasi 16
-> Sep 2026: dengan role itu `UPDATE` **dan** `DELETE` atas `audit_logs`
-> **lolos**, sebab `REVOKE … FROM PUBLIC` di [`01`](01-DATABASE-SCHEMA.md)
-> tidak berlaku bagi pemilik — dan superuser **melewati RLS** apa pun.
-> ⇒ uji *“`UPDATE`/`DELETE` ditolak”* yang dijalankan sebagai role itu akan
-> **gagal**, atau lebih buruk, ditulis ulang sampai hijau dengan cara lain.
-> Yang dibutuhkan: role aplikasi terpisah — **bukan superuser, bukan pemilik**,
-> hanya `INSERT`/`SELECT` pada `audit_logs` — dan migrasi tetap berjalan
-> sebagai pemilik. Ujinya wajib tersambung sebagai role aplikasi itu.
+> ✅ **B-40 — ditutup 17 Sep 2026, sebelum 1.5 dan 1.6 ditulis.** Sampai hari
+> itu api tersambung sebagai **superuser pemilik tabel**, dan `UPDATE` **dan**
+> `DELETE` atas `audit_logs` lolos. Kini api tersambung sebagai anggota
+> `hvx_app` — bukan superuser, bukan pemilik, tanpa `BYPASSRLS` — dan **menolak
+> mulai** kalau tidak; `audit_logs` dan `events` hanya-tambah bagi peran itu
+> ([`01`](01-DATABASE-SCHEMA.md) §10).
+>
+> 🔑 **Untuk 1.1–1.7, tiga hal yang kini mengikat** (RLS §11, **H-27**):
+> **(1)** tiap kueri di dalam `platform.transaksi_pengguna(engine, user_id)` —
+> di luarnya RLS memulangkan nol baris; **(2)** login butuh **fungsi
+> `SECURITY DEFINER` yang sempit** untuk mencari akun per email, sebab RLS di
+> `users` tidak meloloskan pencarian sebelum pengguna dikenali — jangan
+> melonggarkan kebijakannya; **(3)** uji 1.6 *“`UPDATE`/`DELETE` ditolak”*
+> tersambung sebagai peran aplikasi (`basis_data_termigrasi` di
+> `tests/integration/conftest.py`), bukan sebagai pemilik.
 
 ---
 
@@ -97,19 +102,14 @@ Tidak ada tugas yang boleh masuk `main` tanpa baris **HUMAN REVIEW**.
 > muncul di sprint terakhir, tidak ada yang tahu apakah yang dibangun enak
 > dipakai sampai waktunya habis.
 >
-> 🛑 **B-41 — baca sebelum 2.1 ditulis.** Sebelas FK satu kolom di
-> [`01`](01-DATABASE-SCHEMA.md) menunjuk ke induk yang membawa `user_id`
-> sendiri (`goal_milestones.goal_id`, `goals.parent_id`, `habits.goal_id`,
-> `ai_messages.conversation_id`, …), dan **tidak ada yang menuntut
-> `anak.user_id = induk.user_id`**. Diukur 17 Sep 2026 di basis data sekali
-> pakai: pengguna B menempelkan milestone ke goal milik A — **lolos** —
-> lalu A menghapus goal-nya dan milestone milik B **ikut terhapus** oleh
-> `CASCADE`. RLS tidak menolong: pemeriksaan FK PostgreSQL tidak menerapkan
-> RLS. ⇒ Sebelum tulisan baris anak pertama, pilih **satu** dan tegakkan:
-> FK komposit `(induk_id, user_id) → induk(id, user_id)` (dengan
-> `UNIQUE (id, user_id)` di induk; `ON DELETE SET NULL (induk_id)` supaya
-> `user_id` tidak ikut dikosongkan), **atau** aturan repository yang dijaga
-> uji. `spec/01` dan migrasinya diubah **bersama**.
+> ✅ **B-41 — dibetulkan 17 Sep 2026, sebelum 2.1 ditulis.** Sebelas FK satu
+> kolom di [`01`](01-DATABASE-SCHEMA.md) semula membiarkan baris anak milik
+> pengguna B menunjuk induk milik A — diukur: milestone B menempel ke goal A,
+> lalu **ikut terhapus** saat A menghapus goal-nya. Pemilik: *“data milik satu
+> pengguna harus milik pengguna tersebut”* (**H-27**). Kini tiap relasi
+> pasangan `(induk_id, user_id) → induk(id, user_id)` — basis data sendiri yang
+> menolak — dijaga `tests/integration/test_kepemilikan_data.py` di katalog dan
+> di ke-11 relasinya.
 
 ---
 

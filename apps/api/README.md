@@ -12,7 +12,7 @@ uv run --locked uvicorn hvx.main:create_app --factory --reload
 | Variabel | Wajib | Bawaan · catatan |
 |---|---|---|
 | `HVX_ENV` | ✅ | `local` · `test` · `ci` · `production` — **tanpa bawaan**; dokumentasi interaktif hanya terbuka di tiga yang pertama |
-| `HVX_DATABASE_URL` | ✅ | `postgresql://…` — **tanpa parameter kueri**; opsi koneksi lewat `PGSSLMODE`, `PGSSLROOTCERT`, `PGCONNECT_TIMEOUT`, `PGAPPNAME` |
+| `HVX_DATABASE_URL` | ✅ | `postgresql://…` peran login **anggota `hvx_app`** — api **menolak mulai** sebagai superuser, `BYPASSRLS`, atau pemilik tabel (B-40). **Tanpa parameter kueri**; opsi koneksi lewat `PGSSLMODE`, `PGSSLROOTCERT`, `PGCONNECT_TIMEOUT`, `PGAPPNAME` |
 | `HVX_REDIS_URL` | ✅ | `redis://…` |
 | `HVX_LOG_LEVEL` | | `INFO` — berlaku juga bagi pencatat uvicorn |
 | `HVX_LOG_JSON` | | `true` |
@@ -24,3 +24,7 @@ Rute yang ada: `GET /health` → `200 {status, version, db, redis}`, atau `503`
 dengan bentuk yang sama kalau satu ketergantungan mati. Galat yang tak
 tertangani dijawab `500 {"error": {"code": "internal_error", "message": …}}`
 dengan `X-Request-ID`.
+
+🔒 **Tiap kueri basis data berjalan di dalam `platform.transaksi_pengguna`**
+(`spec/01` §11, H-27): RLS hanya meloloskan baris pengguna yang sedang
+dilayani, dan kueri di luarnya melihat nol baris.

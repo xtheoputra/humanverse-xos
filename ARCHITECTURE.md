@@ -15,8 +15,9 @@ Keadaan: **Sprint 0 (Foundation)** — 8 dari 51 tugas `spec/07`.
 docker compose                                   arch/09 §1
 ├── postgres   PostgreSQL 16         K1 · 23 tabel spec/01
 ├── redis      Redis 7               sesi · cache · Streams
-├── migrate    alembic upgrade head  sekali jalan, SEBELUM api
-└── api        uvicorn hvx.main:create_app --factory
+├── migrate    alembic upgrade head  sekali jalan, SEBELUM api — sebagai PEMILIK skema
+├── db-roles   psql peran-lokal.sql  sekali jalan: peran login api, anggota hvx_app (D0 saja)
+└── api        uvicorn hvx.main:create_app --factory — sebagai anggota hvx_app
 ```
 
 V0 punya satu pengguna nyata. Yang dijaga sejak awal bukan proses terpisah,
@@ -62,13 +63,18 @@ HTTP/SDK model hanya di `platform`.
 | parser P-1..P-3 melihat semua tabel | — | `test_migrasi.py`: nama tabel yang parser baca **==** tabel di katalog basis data sungguhan |
 | anotasi retensi + `data_subject` (K-16) | komentar SQL di atas tiap `CREATE TABLE` | `periksa_dokumen.py` P-1 · P-2 · P-3 atas `spec/01` **dan** migrasi |
 | `updated_at` diperbarui | 11 pemicu `set_updated_at()` | `test_migrasi.py`: tiap tabel ber-`updated_at` punya pemicu BEFORE · ROW · UPDATE · menyala · tanpa `WHEN` · tanpa `UPDATE OF` |
+| **data tiap pengguna milik pribadinya** (H-27) | RLS di 21 tabel (`spec/01` §11): peran aplikasi hanya melihat & menulis baris `app_current_user_id()` | `test_kepemilikan_data.py`: tiap tabel milik pengguna ber-RLS, **isi** kebijakannya tepat, A tidak membaca/mengubah/menulis baris B, tanpa pengguna → nol baris |
+| anak & induk satu pemilik (B-41) | FK komposit `(induk_id, user_id) → induk(id, user_id)`, 11 relasi | idem: katalog (tiap FK antar tabel milik pengguna berpasangan) + perilaku (11 relasi, anak B → induk A ditolak) |
+| peran aplikasi sempit (B-40) | `hvx_app` NOLOGIN — bukan superuser, bukan pemilik, tanpa `BYPASSRLS`; hanya-tambah untuk `consents`, `events`, `ai_messages`, `recommendation_feedback`, `audit_logs` | idem: matriks hak akses; `UPDATE`/`DELETE` audit & event ditolak |
 
 SQL migrasi hidup di berkas `.sql`, bukan `op.create_table`: anotasi P-1 adalah
 **komentar SQL**, dan komentar tidak bertahan lewat DSL Python.
 
 Aplikasi memakai **asyncpg**; migrasi memakai **psycopg 3** sinkron — satu
 berkas SQL berisi banyak pernyataan hanya bisa dikirim lewat protokol kueri
-sederhana. Satu DSN (`HVX_DATABASE_URL`), driver diturunkan di
+sederhana. **Dua DSN, dua peran** (B-40): `HVX_DATABASE_URL` untuk api
+(anggota `hvx_app`) dan `HVX_MIGRATION_DATABASE_URL` untuk migrasi (pemilik
+skema) — tanpa jatuh-balik dari satu ke yang lain. Driver diturunkan di
 `platform.db` — dan karena itu **DSN tidak boleh membawa parameter kueri**
 (`?sslmode=…`): kedua driver menafsirkannya berbeda, dan yang semula terjadi
 adalah migrasi berhasil lalu setiap kueri api gagal. Ditolak saat mulai; opsi
@@ -83,6 +89,8 @@ tersedia apa adanya di berkas `.up.sql`/`.down.sql`.
 
 | | Bentuk | Kenapa |
 |---|---|---|
+| peran basis data api | **menolak mulai** sebagai superuser, `BYPASSRLS`, atau pemilik (termasuk pewaris pemilik) tabel | `pastikan_peran_aplikasi` di lifespan — keduanya melewati RLS; konfigurasi keliru harus gagal saat mulai, bukan diam-diam lolos (B-40) |
+| kueri atas nama pengguna | `platform.transaksi_pengguna(engine, user_id)`: `set_config('hvx.user_id', …, true)` lokal-transaksi | koneksi yang kembali ke pool tidak membawa pengguna sebelumnya; kueri di luarnya melihat nol baris |
 | `GET /health` | `200 {status, version, db, redis}`; **503** dengan bentuk sama kalau satu ketergantungan mati | pemeriksa kesehatan hanya membaca kode status — `200` untuk basis data mati berarti tak ada yang pernah tahu |
 | batas waktu pemeriksaan | `HVX_HEALTH_TIMEOUT_S` (bawaan 1 dtk), **serentak**; pemeriksaan yang lewat waktu **dibatalkan di belakang**, laporan tidak menunggu pembatalannya | diukur: `asyncio.wait_for` menunggu pembatalan ping asyncpg yang tersangkut — `/health` menjawab sesudah **60 dtk** dengan batas 1 dtk |
 | galat ketergantungan | hanya **jenis** galat ke log; tidak pernah ke jawaban HTTP | pesan galat bisa memuat DSN atau host internal |
@@ -98,6 +106,9 @@ tersedia apa adanya di berkas `.up.sql`/`.down.sql`.
 
 `tools/ci_lokal.py` — `lint → typecheck → test → build → scan`, satu sumber
 untuk mesin lokal dan [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
+**Tanpa tagihan** (H-26): alur Actions hanya bisa dijalankan manual, dan
+`--lapor-github` menempelkan hasil gerbang ke commit sebagai status
+`ci-lokal` — API status commit, bukan Actions.
 Peta lengkap 26 pemeriksaan `arch/11`, mana yang jalan dan mana yang menunggu
 apa: [`arch/11`](arch/11-PENEGAKAN.md) §6.
 

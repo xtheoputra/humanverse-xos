@@ -4,6 +4,48 @@
 
 ---
 
+## Sesi 30 — 17 September 2026
+
+**Pemilik membaca ringkasan PR #163 dan menjawab tiga hal sekaligus: *“gunakan alternatif versi gratis jangan ada tagihan”* · *“menulis kode dan menemukan kesalahan, betulkan saja menurut anda benarnya dimana. kerjakan b-40, b-41”* · *“data milik satu pengguna harus milik pengguna tersebut, data masing-masing pengguna milik pribadi user”* — lalu *“lanjutkan tugas yang belum selesai lainnya”*.**
+
+| Hal | Hasil |
+|---|---|
+| Naskah baru | **tidak ada** |
+| Keputusan pemilik | **H-26** CI tanpa tagihan · **H-27** data tiap pengguna milik pribadinya · aturan kerja: kesalahan spec yang ketemu saat coding **dibetulkan** |
+| Keputusan sendiri | **K-19** kepemilikan data dijaga basis data · **K-20** status commit dari gerbang lokal |
+| Temuan ditutup | **B-40** ✅ · **B-41** ✅ |
+| `spec/` diubah | `01` (§10 hak akses · §11 RLS · FK komposit · peran `hvx_app`) · `02` (aturan G · H · I) · `07` |
+| Penjaga baru | `test_kepemilikan_data.py` (20 uji) · penjaga peran api saat mulai · uji tanpa-tagihan — **7 mutasi baru, semuanya berbunyi** (kode: 35 → 42) |
+
+---
+
+### 🔑 “Gratis” tanpa berhenti menjadi gerbang
+
+Actions dimatikan — tetapi gerbang yang hanya berjalan di mesin pengembang tidak terlihat oleh peninjau. Jalan tengahnya fitur dasar repo yang tidak pernah ditagih: **API status commit**. `ci_lokal.py --lapor-github` menempelkan hasil gerbang penuh ke commit PR sebagai `ci-lokal` — dan **menolak** menempel pada gerbang sebagian, pohon kerja kotor, atau commit yang belum di-push, sebab status hijau pada pohon yang tidak diuji lebih buruk daripada tidak ada status.
+
+⚠️ **Yang diakui:** status itu bukti kejujuran, bukan penghalang — siapa pun yang punya akses tulis bisa menempelkannya, dan PR merah tetap tidak terhalang digabung.
+
+---
+
+### 🔒 Tiga lapis, sebab masing-masing menutup lubang yang lain biarkan
+
+| Lapis | Tanpa lapis ini |
+|---|---|
+| **RLS** — aplikasi hanya melihat baris pengguna yang dilayani transaksi | satu kueri yang lupa `WHERE user_id` membocorkan semua pengguna |
+| **FK komposit** `(induk_id, user_id)` | RLS tidak menolong: **pemeriksaan FK PostgreSQL tidak menerapkan RLS** — anak B tetap bisa menunjuk induk A |
+| **peran aplikasi** + penjaga mulai | superuser dan pemilik tabel **melewati RLS** — dua lapis di atas hanya berlaku bagi yang mau mematuhinya |
+
+> 💡 **B-41 semula “sengaja tidak dibetulkan” dengan alasan yang jujur — dua jalan, dua harga.** Jawabannya ternyata sudah ada di kalimat pemilik: kalau data milik pribadi pengguna, maka itu sifat yang dijaga **basis data**, bukan disiplin penulis `repository.py`.
+
+---
+
+### 🔴 Dua penjaga baru hampir lahir buta — keduanya tertangkap sebelum commit
+
+1. **Uji keberadaan RLS** lulus untuk kebijakan `USING (true)` — ada, tetapi membuka semuanya. Ditambah uji **isi** kebijakan, dengan mutasinya.
+2. **Mutasi “FK kembali satu kolom”** versi pertama mengganti kolom anak tanpa kolom induk; migrasinya gagal `InvalidForeignKey`, dan `uji_mutasi_kode.py` **menolak** menghitungnya berbunyi — tuntutan *“gagal dengan alasan yang dimaksud”* dari Sprint 0 menangkap cacat mutasinya sendiri.
+
+---
+
 ## Sesi 29 — 16–17 September 2026
 
 **Pemilik: *“lanjutkan semua tugas dan fase yang belum selesai sesuai dokumen yang tertulis”* — dan, sesudah sesi pertama terputus di tengah sapuan dokumen, *“lanjutkan tugas yang belum selesai”*. Menurut [`arch/10`](../arch/10-URUTAN-IMPLEMENTASI.md), tahap berikutnya adalah T0 — kode V0 — dan satu-satunya penahannya [#3](../../issues/3): siapa yang mengerjakan. Itu ditanyakan, bukan ditebak. Pemilik memilih **AI coding agent di branch + PR, pemilik yang menggabungkan** (**H-25**). Sprint 0 dikodekan penuh.**

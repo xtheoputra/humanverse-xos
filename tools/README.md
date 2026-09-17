@@ -9,7 +9,7 @@
 |---|---|---|
 | [`periksa_dokumen.py`](periksa_dokumen.py) | **15** pemeriksaan [`../arch/11`](../arch/11-PENEGAKAN.md) yang membaca dokumen, DDL, dan pohon repo | nol — Python 3.10+ |
 | [`uji_mutasi.py`](uji_mutasi.py) | membuktikan pemeriksaan di atas **sanggup gagal** — 25 mutasi, tiap mutasi wajib melahirkan temuan **baru** | nol |
-| [`uji_mutasi_kode.py`](uji_mutasi_kode.py) | membuktikan kontrak `import-linter` (satu mutasi per id kontrak), larangan ruff, peta penegak, rantai pasok, uji migrasi, dan pemindai rahasia **sanggup gagal** — 35 mutasi, tiap mutasi wajib gagal dengan **alasan yang dimaksud** | lingkungan `uv` (+ basis data untuk 8 mutasi migrasi, Docker untuk 1 mutasi pemindai) |
+| [`uji_mutasi_kode.py`](uji_mutasi_kode.py) | membuktikan kontrak `import-linter` (satu mutasi per id kontrak), larangan ruff, peta penegak, rantai pasok, uji migrasi, dan pemindai rahasia **sanggup gagal** — 42 mutasi, tiap mutasi wajib gagal dengan **alasan yang dimaksud** | lingkungan `uv` (+ basis data untuk 14 mutasi migrasi & kepemilikan data, Docker untuk 1 mutasi pemindai) |
 | [`ci_lokal.py`](ci_lokal.py) | **gerbang penuh** `lint → typecheck → test → build → scan` — satu sumber untuk mesin lokal dan [`ci.yml`](../.github/workflows/ci.yml) | `uv`, Docker |
 
 ---
@@ -52,15 +52,22 @@ dijaga `tests/unit/test_penegak.py`.
 ## `ci_lokal.py` — gerbang yang sungguh berjalan
 
 ```bash
-uv run python tools/ci_lokal.py            # kelima tahap
-uv run python tools/ci_lokal.py --daftar   # cetak langkahnya saja
+uv run python tools/ci_lokal.py                  # kelima tahap
+uv run python tools/ci_lokal.py --daftar         # cetak langkahnya saja
+uv run python tools/ci_lokal.py --lapor-github   # kelima tahap + status `ci-lokal` di commit
 ```
 
-> 🛑 **GitHub Actions repo ini belum pernah berjalan** — terhalang tagihan akun
-> ([#160](../../issues/160)), dan hanya pemilik yang bisa membukanya. Sampai
-> itu terjadi, `ci_lokal.py` dijalankan **manual** sebelum PR dibuka dan
-> ringkasannya ditempel di PR. `ci.yml` sengaja hanya memanggil berkas ini,
-> supaya kedua gerbang tidak bisa menyimpang.
+> 🔑 **CI tanpa tagihan — keputusan pemilik H-26** (17 Sep 2026, menjawab
+> [#160](../../issues/160)): *“gunakan alternatif versi gratis, jangan ada
+> tagihan.”* Alur Actions hanya `workflow_dispatch` (dijaga
+> `test_rantai_pasok.py`); gerbangnya berjalan di mesin pengembang, dan
+> `--lapor-github` menempelkan hasilnya ke commit HEAD sebagai status
+> **`ci-lokal`** lewat API status commit — fitur dasar repo, bukan Actions.
+>
+> 🛑 Status itu hanya menempel pada pohon yang **benar-benar diuji**: laporan
+> ditolak untuk gerbang sebagian, pohon kerja kotor, dan commit yang belum
+> menjadi ujung cabang di `origin` — dan keadaan repo diperiksa **ulang** sesudah
+> gerbang selesai, sebab uji mutasi merusak lalu memulihkan berkas di tempat.
 
 ---
 

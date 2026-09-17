@@ -17,6 +17,12 @@
 > satunya salah — putuskan yang mana, lalu betulkan **keduanya dalam PR yang
 > sama**. Kode yang diam-diam menyimpang dari spesifikasi adalah pola yang
 > repo ini catat puluhan kali.
+>
+> 🔧 **Kesalahan `spec/`/`arch/` yang ketemu saat menulis kode: BETULKAN, jangan
+> hanya dicatat** — pemilik, 17 Sep 2026: *“betulkan saja menurut anda benarnya
+> dimana.”* Temuannya tetap ditulis di `docs/99-CATATAN-AUDIT.md`, lengkap
+> dengan apa yang dibetulkan. Batas yang tidak berubah: `docs/01`–`275` tidak
+> disunting, dan butir **C** tetap milik pemilik.
 
 ## 2 · Apa yang dikerjakan, dan urutannya
 
@@ -71,10 +77,19 @@ tools/                 pemeriksa dokumen, uji mutasi, CI lokal
 | tiap `CREATE TABLE` membawa `@retention` · `@who-can-set` · `@on-delete` + kolom `data_subject` | `periksa_dokumen.py` P-1 · P-2 | lihat [`arch/06`](arch/06-DATA-ARCHITECTURE.md) §5 §6 |
 | migrasi == `spec/01` | `tests/integration/test_migrasi.py` | ubah `spec/01` dan migrasinya **bersama** |
 | cakupan uji ≥ 70 % | `pytest --cov` | tulis ujinya, jangan turunkan ambangnya |
+| **data tiap pengguna milik pribadinya** (H-27) — RLS di tiap tabel milik pengguna, FK `(induk_id, user_id)`, hak akses `hvx_app` sesempit spec/01 §10 | `tests/integration/test_kepemilikan_data.py` | tabel baru: `user_id` + `ENABLE ROW LEVEL SECURITY` + kebijakan §11 + `GRANT` §10 + FK komposit ke induk ber-`user_id` — di `spec/01` **dan** migrasinya |
+| api tidak pernah tersambung sebagai superuser, pemilik tabel, atau `BYPASSRLS` (B-40) | `platform.pastikan_peran_aplikasi` + `test_aplikasi_hidup.py` | api memakai peran anggota `hvx_app`; migrasi memakai `HVX_MIGRATION_DATABASE_URL` |
+| CI **tanpa tagihan** (H-26) — alur Actions hanya `workflow_dispatch` | `test_rantai_pasok.py` | jangan tambah pemicu otomatis; gerbangnya `ci_lokal.py --lapor-github` |
 
 🔑 **Setiap penegak baru wajib dibuktikan sanggup gagal** — tambahkan
 mutasinya di `tools/uji_mutasi.py` (dokumen) atau `tools/uji_mutasi_kode.py`
 (kode). Pemeriksa yang tidak pernah merah tidak dihitung ada.
+
+🔒 **Tiap kueri aplikasi berjalan di dalam `platform.transaksi_pengguna(engine,
+user_id)`.** Tanpa itu RLS mengembalikan **nol baris** — gagal-tertutup, bukan
+bocor. Yang butuh melihat lintas pengguna (mencari akun per email saat login,
+sapuan hapus akun) memakai fungsi `SECURITY DEFINER` yang sempit, satu per
+kebutuhan, di migrasi — **bukan** kebijakan RLS yang dilonggarkan.
 
 ## 6 · Perintah
 
@@ -84,10 +99,13 @@ uv sync                           # seluruh lingkungan dari uv.lock
 uv run pytest -m "not integration"                  # putaran cepat
 docker compose up -d --wait postgres redis          # layanan untuk uji integrasi
 uv run --locked python tools/ci_lokal.py            # GERBANG PENUH sebelum PR
+git push && uv run --locked python tools/ci_lokal.py --lapor-github   # + status di PR
 ```
 
-Gerbang penuh wajib hijau sebelum PR dibuka, dan ringkasannya ditempel di
-deskripsi PR — GitHub Actions repo ini belum berjalan ([#160](../../issues/160)).
+Gerbang penuh wajib hijau sebelum PR dibuka. Sesudah `push`, jalankan dengan
+`--lapor-github`: hasilnya menempel ke commit sebagai status **`ci-lokal`** di
+PR — gratis, lewat API status commit. GitHub Actions **sengaja dimatikan**:
+pemilik memutuskan CI tanpa tagihan (**H-26**, [#160](../../issues/160)).
 
 ## 7 · Gaya
 

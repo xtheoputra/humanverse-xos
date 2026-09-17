@@ -435,6 +435,36 @@ sesudahnya.
 
 ---
 
+## K-19 · Kepemilikan data dijaga basis data: RLS berbasis pengguna-transaksi, FK komposit, peran aplikasi
+
+> Diputuskan 17 September 2026, menerapkan kata pemilik **H-27** — *“data
+> masing-masing pengguna milik pribadi user”* — dan menutup **B-40** · **B-41**.
+
+| | |
+|---|---|
+| **Keputusan** | **(1)** RLS di tiap tabel milik pengguna: `user_id = app_current_user_id()`, dengan `app_current_user_id()` membaca `hvx.user_id` yang diisi aplikasi **per transaksi** (`set_config(…, true)`, `platform.transaksi_pengguna`) — tidak diisi ⇒ `NULL` ⇒ nol baris. **(2)** FK antara dua tabel milik pengguna selalu pasangan `(induk_id, user_id) → induk(id, user_id)`. **(3)** api tersambung sebagai anggota `hvx_app` — hak akses tabel demi tabel, `audit_logs`/`events` hanya-tambah — dan **menolak mulai** sebagai superuser, `BYPASSRLS`, atau pemilik (termasuk pewaris pemilik) tabel. |
+| **Bukti** | H-27. **B-40**: sebagai superuser pemilik tabel, `REVOKE` tidak berlaku dan RLS dilewati — diverifikasi. **B-41**: diukur, anak B menempel ke goal A lalu ikut terhapus. PostgreSQL: pemeriksaan FK **tidak menerapkan RLS** ⇒ RLS saja tidak menutup B-41; FK komposit saja tidak mencegah **membaca** baris orang lain ⇒ keduanya dibutuhkan, dan keduanya tak berarti tanpa (3). |
+| **Bacaan yang DITOLAK** | **(a)** *“Satu peran PostgreSQL per pengguna, RLS pada `current_user`”* — ditolak: ribuan peran login yang berlaku sekluster, dan pool koneksi tidak bisa dipakai bersama antarpengguna. **(b)** *“Cukup aturan repository `WHERE user_id = :me`, dijaga uji”* — ditolak: satu kueri yang lupa membocorkan data pengguna lain; dengan RLS, kelupaan yang sama memulangkan nol baris. **(c)** *“`FORCE ROW LEVEL SECURITY` supaya pemilik tabel pun terkena”* — ditolak untuk V0: migrasi dan pemeliharaan (sapuan hapus akun) butuh melihat semua baris, dan api tidak pernah memakai peran pemilik — dijaga penjaga mulai. |
+| **Harga yang diakui** | Tiap kueri wajib di dalam `transaksi_pengguna`. Pencarian **sebelum** pengguna dikenali (login per email) dan sapuan **lintas akun** (hapus akun 6.5) butuh fungsi `SECURITY DEFINER` yang sempit, satu per kebutuhan — bukan kebijakan yang dilonggarkan. |
+| **Cara membalikkan** | Migrasi baru yang `DROP POLICY` + `DISABLE ROW LEVEL SECURITY`; FK komposit boleh dibiarkan (tidak merugikan apa pun). `test_kepemilikan_data.py` akan merah — ubah bersamanya, dengan catatan kenapa. |
+
+---
+
+## K-20 · CI tanpa tagihan: status commit dari gerbang lokal
+
+> Diputuskan 17 September 2026, menerapkan kata pemilik **H-26** — *“gunakan
+> alternatif versi gratis jangan ada tagihan”* — untuk [#160](../../issues/160).
+
+| | |
+|---|---|
+| **Keputusan** | `tools/ci_lokal.py --lapor-github` menjalankan gerbang PENUH lalu menempelkan hasilnya ke commit HEAD sebagai status **`ci-lokal`** lewat API status commit. Laporan ditolak untuk gerbang sebagian, pohon kerja kotor, atau commit yang belum menjadi ujung cabang di `origin`. Alur GitHub Actions hanya `workflow_dispatch`, dijaga `test_rantai_pasok.py`. |
+| **Bukti** | H-26. Actions pada repo privat memakai menit berbayar, dan akun ini terhalang tagihan: tiap PR menampilkan job merah **0 langkah** yang tidak pernah dimulai (PR #163). API status commit adalah fitur dasar repo — tidak memakai menit Actions. |
+| **Bacaan yang DITOLAK** | **(a)** *“Runner self-hosted di mesin pemilik”* — ditolak untuk sekarang: layanan yang berjalan terus di mesin pribadi dan menjalankan kode alur kerja, sementara apakah ia lolos dari blokir tagihan akun **belum diverifikasi**. **(b)** *“Jadikan repo publik — Actions dan perlindungan branch gratis”* — bukan milik saya: membuka seluruh naskah pemilik. **(c)** *“Layanan CI pihak ketiga paket gratis”* — butuh akun baru dan akses ke repo privat: keputusan pemilik. |
+| **Harga yang diakui** | Status `ci-lokal` **bisa ditempelkan siapa pun** yang punya akses tulis — ia bukti kejujuran pengembang, bukan penghalang. PR merah tetap tidak terhalang digabung; penghalangnya HUMAN REVIEW. |
+| **Cara membalikkan** | Kembalikan pemicu `pull_request`/`push` di `ci.yml` dan uji `test_alur_actions_tanpa_pemicu_otomatis_supaya_tidak_ada_tagihan` — sesudah pemilik membereskan tagihan atau membuat repo publik. |
+
+---
+
 ## Yang sengaja **tidak** saya putuskan
 
 | Butir | Kenapa |

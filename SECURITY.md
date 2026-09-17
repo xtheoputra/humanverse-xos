@@ -36,14 +36,17 @@ hanya sebagian ditulis dengan batasnya.
 | citra | `trivy image` — HIGH/CRITICAL yang sudah ada perbaikannya = gagal; citra diberikan sebagai **tar hanya-baca**, pemindai **tidak** mendapat soket Docker | `ci_lokal.py scan` |
 | citra luar dipatok **digest** | `python`, `uv`, `postgres`, `redis`, `trivy` — tag bisa dipindahkan (trivy sendiri pernah: GHSA-69fq-xp46-6x23) | `tests/unit/test_rantai_pasok.py` |
 | aksi CI dipatok **SHA commit** | + `persist-credentials: false` + `permissions: contents: read` | `tests/unit/test_rantai_pasok.py` |
+| **data tiap pengguna milik pribadinya** (H-27) | RLS di 21 tabel: peran aplikasi hanya membaca, mengubah, dan menulis baris pengguna yang dilayani transaksi (`app_current_user_id()`); tanpa pengguna → **nol baris** | `test_kepemilikan_data.py` · mutasi *RLS dicabut*, *kebijakan `USING (true)`*, *pengguna bocor ke koneksi pool* |
+| baris anak tidak menunjuk induk milik pengguna lain (B-41) | FK komposit `(induk_id, user_id)` di 11 relasi — menghapus induk tidak pernah menyentuh baris pengguna lain | idem · mutasi *FK kembali satu kolom* |
+| api bukan superuser, pemilik, atau `BYPASSRLS` (B-40) | peran `hvx_app` sesempit `spec/01` §10; `audit_logs` & `events` **hanya-tambah**; api **menolak mulai** dengan peran yang melewati RLS | `test_kepemilikan_data.py` · `test_aplikasi_hidup.py` · mutasi *`GRANT UPDATE audit_logs`*, *penjaga peran dicabut* |
 
 ## 🛑 Yang BELUM dijaga — dan diketahui
 
 | Celah | Akibat | Ditutup di |
 |---|---|---|
-| **api tersambung ke PostgreSQL sebagai superuser pemilik tabel** (D0) | `REVOKE UPDATE, DELETE ON audit_logs FROM PUBLIC` di `spec/01` **tidak menghalangi apa pun** bagi role itu — diverifikasi: `UPDATE` & `DELETE` lolos. Superuser juga **melewati RLS**. | Sprint 1 — **B-40**: role aplikasi terpisah, bukan superuser dan bukan pemilik, sebelum 1.5–1.6 |
-| **`user_id` baris anak tidak diikat ke `user_id` induknya** (`goal_milestones.goal_id`, `ai_messages.conversation_id`, … 11 FK satu kolom) | seorang pengguna bisa menempelkan baris ke goal atau percakapan pengguna lain — dan saat pemilik induk menghapusnya, baris orang lain itu **ikut terhapus** (`CASCADE`). FK tidak melihat RLS | **B-41** — sebelum tugas 2.1 (tulisan baris anak pertama): FK komposit `(induk_id, user_id)` atau aturan repository yang dijaga uji |
-| **PR merah tidak terhalang digabung** | Actions terhalang tagihan ([#160](../../issues/160)); perlindungan branch & ruleset tidak tersedia untuk repo privat pada paket akun ini (HTTP 403) | pemilik — tagihan/paket akun. Sampai itu: gerbangnya HUMAN REVIEW (H-25) + `ci_lokal.py` manual |
+| **pencarian akun sebelum login** belum ada | RLS di `users` tidak meloloskan pencarian per email sebelum pengguna dikenali — login belum bisa ditulis tanpa jalur tersendiri | Sprint 1 tugas 1.1 — fungsi `SECURITY DEFINER` yang sempit, bukan kebijakan yang dilonggarkan |
+| **sandi peran login api di D0** tertulis di `.env` / bawaan compose | kredensial lokal `*-dev-only` | D1+: peran dibuat infrastruktur dengan sandi dari pengelola rahasia (arch/09 §5 aturan 3) |
+| **PR merah tidak terhalang digabung** | merah-hijaunya kini **terlihat** sebagai status `ci-lokal` (gerbang lokal, **H-26** tanpa tagihan — Actions dimatikan, [#160](../../issues/160)), tetapi perlindungan branch & ruleset tidak tersedia untuk repo privat pada paket akun ini (HTTP 403). Status `ci-lokal` bukti kejujuran, bukan penghalang: siapa pun yang punya akses tulis bisa menempelkannya | pemilik — paket akun. Sampai itu: gerbangnya HUMAN REVIEW (H-25) |
 | belum ada autentikasi, izin, batas laju | semua rute selain `/health` belum ada | Sprint 1 (1.1–1.7) |
 | B-1 *kode agent tidak mengimpor `security/`* | belum bisa dinyatakan: V0 belum punya `security/` | tugas 4.5 |
 | eskalasi krisis untuk jurnal | `journal_entries.safety_flag` ada, jalurnya tidak | [#21](../../issues/21) — pemilik |

@@ -27,7 +27,7 @@ Diperbarui: 17 September 2026 · Mencakup **dua puluh empat naskah**:
 
 | Bagian | Isi | Jumlah |
 |---|---|---|
-| [H](#h-sudah-diputuskan--ditutup) | **Sudah diputuskan / ditutup** | 25 |
+| [H](#h-sudah-diputuskan--ditutup) | **Sudah diputuskan / ditutup** | 27 |
 | [A](#a-perlu-jawaban-pemilik) | Pertanyaan yang memblokir | 26 |
 | [B](#b-risiko-teknis) | Risiko teknis | 41 |
 | [C](#c-risiko-hukum--kepatuhan) | Risiko hukum & kepatuhan | 30 |
@@ -35,6 +35,36 @@ Diperbarui: 17 September 2026 · Mencakup **dua puluh empat naskah**:
 | [E](#e-ketidakcocokan-antar-naskah) | **Ketidakcocokan antar-naskah** | 153 |
 | [F](#f-yang-sudah-saya-periksa-dan-ternyata-benar) | Sudah diperiksa, ternyata benar | 136 |
 | [G](#g-lubang-di-dalam-naskah-sendiri) | Lubang di dalam naskah sendiri | 21 |
+
+---
+
+## 🔒 17 Sep 2026 — tiga jawaban pemilik, dan yang berubah karenanya
+
+| | Kata pemilik | Diterapkan |
+|---|---|---|
+| **H-26** | *“gunakan alternatif versi gratis jangan ada tagihan”* | pemicu otomatis Actions dimatikan (dijaga `test_rantai_pasok.py`); `tools/ci_lokal.py --lapor-github` menempelkan hasil gerbang penuh ke commit PR sebagai status `ci-lokal` — API status commit, bukan Actions |
+| **H-27** | *“data milik satu pengguna harus milik pengguna tersebut, data masing-masing pengguna milik pribadi user”* | RLS di 21 tabel · FK komposit di 11 relasi (**B-41** ✅) · peran aplikasi `hvx_app` dan api yang menolak mulai sebagai superuser/pemilik (**B-40** ✅) — `spec/01` §10–§11 |
+| — | *“menulis kode dan menemukan kesalahan, betulkan saja menurut anda benarnya dimana”* | aturan kerja `AGENTS.md` §1: kesalahan `spec/`/`arch/` yang ditemukan saat menulis kode **dibetulkan**, lalu dicatat di sini |
+
+> 🔑 **B-41 semula “sengaja tidak dibetulkan”** — alasannya jujur (dua jalan,
+> dua harga), tetapi jawabannya ternyata sudah ada di kata pemilik: data milik
+> pengguna **milik pengguna itu**, dan itu sifat yang dijaga **basis data**,
+> bukan ingatan penulis `repository.py`. Dipilih FK komposit + RLS + peran
+> aplikasi — ketiganya, sebab masing-masing menutup lubang yang lain biarkan
+> (**K-19**).
+>
+> 🔴 **Satu mutasi baru menuduh penegaknya sendiri buta — dan yang salah
+> mutasinya.** Mutasi *“FK kembali satu kolom”* versi pertama mengganti kolom
+> anak tetapi tidak kolom induk; migrasinya gagal dengan `InvalidForeignKey`,
+> dan `uji_mutasi_kode.py` **menolak** menghitungnya berbunyi karena alasannya
+> bukan alasan yang dimaksud. Tuntutan *“gagal dengan alasan yang dimaksud”*
+> dari Sprint 0 menangkap cacat di mutasinya sendiri, sebelum ia sempat
+> mengaku membuktikan apa pun.
+>
+> 🔴 **Dan uji keberadaan kebijakan RLS ternyata belum cukup.** Uji pertama
+> memeriksa *tiap tabel punya RLS dan kebijakan*; kebijakan `USING (true)` lolos
+> uji itu sambil membuka semuanya. Ditambahkan uji **isi** kebijakan — dengan
+> mutasinya — sebelum commit.
 
 ---
 
@@ -94,6 +124,9 @@ ditulis.
 💡 **Bentuknya sama dengan A-38:** penjaganya ada dan ditulis benar — ia hanya
 tidak pernah dijalankan terhadap pelaku yang sebenarnya.
 
+✅ **Ditutup 17 Sep 2026** — api kini anggota `hvx_app` dan menolak mulai
+sebagai superuser, pemilik tabel, atau `BYPASSRLS` (lihat bagian 17 Sep di atas).
+
 ### 🛑 B-41 — `user_id` baris anak tidak diikat ke `user_id` induknya
 
 Ditemukan tinjauan adversarial (bawah), bukan oleh menulis kode — dan diukur
@@ -115,14 +148,12 @@ menuntut `anak.user_id = induk.user_id`.
 RLS yang ditulis kemudian **tidak menolong**: pemeriksaan FK PostgreSQL tidak
 menerapkan RLS, dan `WITH CHECK` hanya melihat `user_id` baris anak.
 
-⇒ **Tidak dibetulkan di Sprint 0, dengan sengaja.** Belum ada satu pun tulisan
-baris anak, dan dua jalan yang sah punya harga berbeda: **FK komposit**
-`(induk_id, user_id) → induk(id, user_id)` — menuntut `UNIQUE (id, user_id)` di
-sebelas induk dan `ON DELETE SET NULL (induk_id)` supaya `user_id` tidak ikut
-dikosongkan — **atau aturan repository yang dijaga uji**. Yang pertama dijaga
-basis data; yang kedua lebih murah tetapi hanya sekuat ujinya. Dicatat di
-`spec/07` tepat sebelum tugas **2.1** — tulisan baris anak pertama — dan di
-`SECURITY.md`.
+⇒ Semula dicatat tanpa dibetulkan — dua jalan sah, dua harga: **FK komposit**
+`(induk_id, user_id) → induk(id, user_id)`, atau aturan repository yang dijaga
+uji. ✅ **Dibetulkan 17 Sep 2026** atas kata pemilik (**H-27**) dengan jalan
+yang dijaga **basis data**: `UNIQUE (id, user_id)` di enam induk, sebelas FK
+komposit, dan `ON DELETE SET NULL (induk_id)` supaya `user_id` tidak ikut
+dikosongkan. Dijaga `test_kepemilikan_data.py` di katalog dan di ke-11 relasi.
 
 ### 🔍 Tinjauan adversarial sebelum PR — 35 temuan, 33 bertahan
 
@@ -131,7 +162,7 @@ perilaku berjalan · migrasi · penegakan · keamanan & CI · kebenaran dokumen)
 dan **tiap temuan diserahkan ke verifikator terpisah yang berusaha
 membantahnya** — 41 agen. **35 temuan; 2 terbantah; 33 bertahan: 16 medium ·
 17 low · 0 high** (tujuh yang peninjau nilai *high* diturunkan verifikator).
-**32 dibetulkan di branch yang sama; 1 dicatat — B-41.**
+**32 dibetulkan di branch yang sama; 1 dicatat — B-41, lalu dibetulkan 17 Sep 2026.**
 
 | Yang ditemukan | Sekarang |
 |---|---|
@@ -456,6 +487,8 @@ butir-butir ini. ⚠️ **H-8 dibatalkan** — lihat barisnya.
 | **H-22** | **E-68 — manifest agent kelima meruntuhkan `memory.read`/`write`** | ✅ **Manifest keenam §11.5 memulihkan keduanya, plus `purpose`.** `memory: {read: [...], write: [...]}` kembali jadi dua field — sehingga dua batas paling halus [`../spec/05`](../spec/05-AGENT-CONTRACTS.md) bisa dinyatakan lagi (`coach-agent` hanya menulis `coaching_notes`; `memory-agent` membaca semua **kecuali** `journal_raw`). `purpose` kembali setelah hilang sejak naskah 10. ⭐ Ditambah field baru `autonomy.max_level` (→ **H-21**), dan §11.37 memberi `require_confirmation` bentuk policy yang konkret. ⚠️ Yang belum ada di manifest ini: `kind`, `status`, dan **`evaluation.gates`** — yang ketiga adalah gerbang registrasi aturan 4 spec/05; §11.32/§11.55 memberi pengukuran **setelah** jalan, bukan gerbang **sebelum**. Lihat [`177`](177-HIERARKI-REGISTRY-IDENTITAS.md). |
 | **H-23** | **B-24 — Counterfactual menjanjikan jawaban yang causal reasoning melarang** | ✅ **Model transisi punya sumber: galat prediksinya sendiri.** §12.20 memberi loop `Simulation → Prediction → Real World → Actual Outcome → **Prediction Error** → Evaluation → Model Update`, dan §12.19 memberi bentuk konkretnya (`Expected 75 → Actual 61 → Error Analysis`). Itu **jalan keempat** — di luar tiga yang saya usulkan (eksperimen pengguna / pengetahuan umum / perbandingan relatif) — dan prinsipnya sama dengan `Prediction Calibration` §9.34 yang menutup **B-10**: kebenaran acuan **dihasilkan sistem sendiri** dari hasil teramati, tanpa penilai manusia dan tanpa model menilai model. ⭐⭐ Ditambah **§12.14 Assumption Engine** (*“simulation without assumptions is misleading”*) yang membuat yang dipinjam jadi **terlihat dan bisa dibantah**, dan §12.7 yang membandingkan **delapan dimensi antar-skenario** alih-alih meramal hasil — termasuk `Sustainability`, kata yang belum pernah ada. ⚠️ Sisa: loop ini butuh **titik mulai** (lihat **B-27**), dan model tidak boleh memperbarui diri dari satu galat. Lihat [`194`](194-VERSIONING-REPLAY-LEARNING-LOOP.md). |
 | **H-25** | **A-17 — siapa yang mengerjakan V0** ([#3](../../issues/3)) | ✅ **Diputuskan pemilik 16 Sep 2026, untuk MEMULAI:** AI coding agent mengerjakan tugas `spec/07` **di branch dan lewat PR**; **pemilik yang menggabungkan** — baris HUMAN REVIEW §27 tetap milik manusia. Pilihan lain yang ditawarkan dan **tidak** dipilih: *“belum, dokumen saja”* dan *“langsung ke master”* (yang kedua melewati HUMAN REVIEW). ⭐ Sprint 0 dikerjakan hari itu juga. ⚠️ **Yang tetap terbuka di #3 — dan kini lebih nyata, sebab ada PR yang menunggu ditinjau:** 4–6 minggu itu taksiran atau tenggat · berapa jam per minggu tersedia untuk **meninjau** · gerbang mana yang boleh dilewati kalau waktunya mepet. |
+| **H-26** | **A-38 — gerbang CI terhalang tagihan akun** ([#160](../../issues/160)) | ✅ **Diputuskan pemilik 17 Sep 2026:** *“gunakan alternatif versi gratis jangan ada tagihan.”* Bukan membuka tagihan, melainkan **tidak memakai jalur berbayar sama sekali**: pemicu otomatis GitHub Actions dimatikan dan dijaga uji; gerbang penuh berjalan di mesin pengembang dan menempelkan status `ci-lokal` ke commit PR lewat API status commit (**K-20**). ⚠️ Yang tetap tidak ada: **penghalang** penggabungan PR merah — perlindungan branch tidak tersedia untuk repo privat pada paket akun ini. |
+| **H-27** | **Kepemilikan data pengguna** — B-40 · B-41 | ✅ **Diputuskan pemilik 17 Sep 2026:** *“data milik satu pengguna harus milik pengguna tersebut, data masing-masing pengguna milik pribadi user.”* Diterapkan sebagai sifat **basis data**, bukan disiplin kode: RLS di 21 tabel (aplikasi hanya melihat & menulis baris pengguna yang dilayani transaksi), FK komposit `(induk_id, user_id)` di 11 relasi, dan peran aplikasi `hvx_app` yang bukan superuser, bukan pemilik, tanpa `BYPASSRLS` — api menolak mulai kalau tidak (**K-19**, `spec/01` §10–§11). ⚠️ Harga yang diakui: tiap kueri wajib di dalam `transaksi_pengguna`, dan login butuh fungsi `SECURITY DEFINER` sempit (Sprint 1). |
 | **H-24** | **A-27 — proyek dengan model biaya yang diakui dan nol fase pendapatan** | ✅ **Phase 14 adalah rumahnya, dan §14.23 memberi tujuh model sekaligus:** *Agent subscription · Usage-based pricing · Marketplace commission · Enterprise licensing · API usage · Agent team subscription · Developer platform*. Butir **E-86** mencatat peta 15 fase §10.41 membuang *Subscription* dan *Revenue Platform* tanpa rumah baru, sementara **H-6** mengakui biaya inferensi berlipat, **B-2** menuntut paket Free nyaris tidak memanggil model besar, dan **E-41** mencatat `Billing` muncul entah dari mana — kini semuanya berlabuh di satu tempat. ⭐ §14.17–§14.18 sekaligus mengembalikan **Enterprise** yang hilang dari peta yang sama, dan §14.24 memberi biaya **per komponen per agent** (`LLM $0.14 · Search $0.08 · Database $0.02`) sehingga pilihan *cheap vs premium* bisa dibuat mesin. ⚠️ Yang tetap terbuka dari **A-6** ([#18](../../issues/18)): **angkanya** — tangga harga dan bagi hasil dengan developer. Tujuh model adalah bentuk, bukan tarif. ⚠️ Dan §14.24 mendaftarkan `risk` sebagai kriteria memilih agent murah vs mahal **tanpa arah**: untuk aksi di atas R2 yang benar adalah agent yang lebih mahal dan lebih terverifikasi (§11.54), bukan sebaliknya. Lihat [`213`](213-EKONOMI-BILLING-ATENSI.md). |
 
 ---

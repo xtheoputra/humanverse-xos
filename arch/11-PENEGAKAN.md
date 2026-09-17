@@ -99,9 +99,10 @@ $ python tools/uji_mutasi.py
 25 mutasi · 25 terbukti BERBUNYI — tiap mutasi wajib melahirkan temuan BARU
 
 $ uv run python tools/uji_mutasi_kode.py
-35 mutasi · 35 terbukti BERBUNYI — dengan ALASAN yang dimaksud
+42 mutasi · 42 terbukti BERBUNYI — dengan ALASAN yang dimaksud
    19 import-linter (satu per id kontrak + modul baru, siklus, stdlib, berkas baru)
-    1 ruff banned-api · 3 peta penegak §6 · 3 rantai pasok · 8 uji migrasi · 1 pemindai rahasia
+    1 ruff banned-api · 3 peta penegak §6 · 4 rantai pasok & tanpa-tagihan · 1 pemindai rahasia
+   14 basis data — 8 migrasi · 6 kepemilikan data (FK komposit · RLS · isi kebijakan · GRANT · peran api · kebocoran pool)
 ```
 
 > 🔴 **Dua hal yang uji mutasi ajarkan di Sprint 0 — keduanya tentang alat
@@ -144,6 +145,14 @@ $ uv run python tools/uji_mutasi_kode.py
 > yang sama yang hari ini sudah menemukan tiga hal lain.
 > **Sampai [#160](../../issues/160) dibuka pemilik, pemeriksaannya MANUAL:**
 > `python tools/periksa_dokumen.py` sebelum tiap commit.
+>
+> 🔧 **17 Sep 2026 — pemilik menjawab #160 dengan cara lain (H-26):** *“gunakan
+> alternatif versi gratis, jangan ada tagihan.”* Pemicu otomatis Actions
+> dimatikan (dijaga `test_rantai_pasok.py`); gerbang penuh
+> `tools/ci_lokal.py --lapor-github` berjalan di mesin pengembang dan
+> menempelkan status `ci-lokal` ke commit — gratis, lewat API status commit.
+> Yang tetap tidak ada: **penghalang** penggabungan PR merah (perlindungan branch
+> tidak tersedia untuk repo privat pada paket akun ini).
 
 > 🔑 **Tiga aturan rancangan yang membuatnya tidak menjadi salinan kedua dari
 > dokumen:**
@@ -336,7 +345,7 @@ sebenarnya.
 | Batas keras tanpa penegak **yang dinyatakan** | **NIHIL** — 6 dari 6 punya baris di blok `penegak` di bawah: 2 jalan, 4 menunggu pemicu yang disebut namanya |
 | Aturan 🔧 di `arch/` tanpa baris di §3 | **NIHIL** |
 | Pemeriksaan yang **benar-benar dijalankan** | **19 dari 26** — di **branch Sprint 0**; di `master` tetap 12 sampai branch itu digabung, sebab ketujuh tambahannya (B-2 · M-1 · M-2 · M-3 · M-4 · E-3 · A-1) lahir di sana |
-| Pemeriksaan yang **terbukti sanggup GAGAL** | **19 dari 19** — [`../tools/uji_mutasi.py`](../tools/README.md) (25 mutasi) · `uji_mutasi_kode.py` (35 mutasi) |
+| Pemeriksaan yang **terbukti sanggup GAGAL** | **19 dari 19** — [`../tools/uji_mutasi.py`](../tools/README.md) (25 mutasi) · `uji_mutasi_kode.py` (42 mutasi) |
 | Pemeriksaan yang menunggu | **7** — B-1 · B-3 · B-4 · B-5 · P-4 · P-5 · P-6; tiap baris menyebut pemicunya |
 | Perkakas yang dibutuhkan | **1** — `import-linter` menangani B-2 · M-1 · M-2 · M-3 hari ini, dan B-1 · B-3 begitu modulnya ada |
 | Roadmap yang lulus R-1 | **2 dari 8** — dan keduanya ditulis untuk dikerjakan |
