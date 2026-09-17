@@ -9,6 +9,7 @@ LENGKAP = {
     "HVX_DATABASE_URL": "postgresql://u:p@db:5432/hvx",
     "HVX_REDIS_URL": "redis://r:6379/0",
     "HVX_ENV": "ci",
+    "HVX_IP_HASH_KEY": "k" * 32,
 }
 
 
@@ -31,7 +32,9 @@ def test_settings_dibaca_dari_lingkungan_berawalan_hvx(monkeypatch: pytest.Monke
     assert s.health_timeout_s == 1.0
 
 
-@pytest.mark.parametrize("hilang", ["HVX_DATABASE_URL", "HVX_REDIS_URL", "HVX_ENV"])
+@pytest.mark.parametrize(
+    "hilang", ["HVX_DATABASE_URL", "HVX_REDIS_URL", "HVX_ENV", "HVX_IP_HASH_KEY"]
+)
 def test_tanpa_nilai_wajib_proses_gagal_mulai(monkeypatch: pytest.MonkeyPatch, hilang: str) -> None:
     """Tidak ada DSN bawaan dan tidak ada lingkungan bawaan — lupa mengisinya gagal keras.
 

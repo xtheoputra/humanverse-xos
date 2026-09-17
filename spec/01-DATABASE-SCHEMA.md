@@ -1064,6 +1064,41 @@ CREATE POLICY audit_logs_append ON audit_logs FOR INSERT
 
 ---
 
+## 12 · Fungsi `SECURITY DEFINER` — satu per kebutuhan lintas RLS
+
+```sql
+-- Login (spec/07 1.1): mencari akun per email SEBELUM pengguna dikenali — RLS
+-- `users` (§11) tidak meloloskannya, dan memang tidak boleh dilonggarkan.
+-- Sempit: satu email persis, tiga kolom, tanpa akun terhapus. search_path
+-- dipatok supaya objek dengan nama sama di skema lain tidak bisa dibajak.
+CREATE FUNCTION auth_lookup_for_login(p_email citext)
+  RETURNS TABLE (id uuid, password_hash text, status text)
+  LANGUAGE sql STABLE SECURITY DEFINER
+  SET search_path = pg_catalog, public, pg_temp
+  AS $$
+    SELECT u.id, u.password_hash, u.status
+    FROM public.users u
+    WHERE u.email = p_email AND u.deleted_at IS NULL
+  $$;
+REVOKE ALL ON FUNCTION auth_lookup_for_login(citext) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION auth_lookup_for_login(citext) TO hvx_app;
+```
+
+> 🔑 **Kenapa fungsi, bukan kebijakan RLS yang lebih longgar** (17 Sep 2026,
+> spec/07 1.1, **K-19**). Login harus membaca `password_hash` akun yang
+> belum dikenali — kebijakan `users` yang meloloskan itu akan meloloskannya
+> untuk SEMUA kueri aplikasi, termasuk kueri yang lupa. Fungsi ini hanya
+> menjawab satu pertanyaan, untuk satu email, dan hanya `hvx_app` yang boleh
+> memanggilnya (`EXECUTE` dicabut dari `PUBLIC` — bawaan PostgreSQL
+> memberikannya ke semua orang).
+>
+> `tests/integration/test_kepemilikan_data.py` menuntut: tiap fungsi
+> `SECURITY DEFINER` di skema `public` ada di **daftar izin** uji itu, punya
+> `search_path` terpatok, dan **tidak** bisa dieksekusi `PUBLIC`. Fungsi ke-2
+> berarti baris baru di daftar itu — dan alasan di bagian ini.
+
+---
+
 ## Prosedur hapus akun
 
 Menutup janji *Delete* di Privacy Center (naskah 5 §26) tanpa merusak audit:

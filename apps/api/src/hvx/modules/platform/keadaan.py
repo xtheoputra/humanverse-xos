@@ -6,6 +6,9 @@ dan supaya rute yang dipanggil tanpa lifespan gagal dengan pesan yang jelas.
 
 from __future__ import annotations
 
+import hashlib
+import hmac
+
 from fastapi import Request
 from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncEngine
@@ -41,3 +44,16 @@ def settings_dari(request: Request) -> Settings:
     if not isinstance(settings, Settings):
         raise TypeError(f"app.state.settings: {type(settings).__name__}")
     return settings
+
+
+def sidik_ip(request: Request) -> str | None:
+    """HMAC-SHA256 atas IP klien dengan `HVX_IP_HASH_KEY` — untuk audit & batas laju.
+
+    IP mentah tidak pernah disimpan (spec/01 `audit_logs.ip_hash`). IP di balik
+    proksi dibaca uvicorn `--proxy-headers` hanya dari proksi tepercaya
+    (`FORWARDED_ALLOW_IPS`), bukan dari header yang bisa dikarang klien.
+    """
+    if request.client is None or not request.client.host:
+        return None
+    kunci = settings_dari(request).ip_hash_key.get_secret_value().encode()
+    return hmac.new(kunci, request.client.host.encode(), hashlib.sha256).hexdigest()

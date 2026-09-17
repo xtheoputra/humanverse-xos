@@ -15,7 +15,7 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import Field, field_validator
+from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from .db import url_async
@@ -52,6 +52,12 @@ class Settings(BaseSettings):
     # permintaan; token segar berumur panjang dan BEROTASI tiap dipakai.
     access_token_ttl_s: int = Field(default=900, ge=60, le=86_400)
     refresh_token_ttl_s: int = Field(default=2_592_000, ge=3_600, le=7_776_000)
+
+    # Kunci HMAC untuk `audit_logs.ip_hash` (spec/01: "hash, bukan IP mentah")
+    # dan kunci batas laju per IP. WAJIB, tanpa bawaan: sha256 polos atas IPv4
+    # bisa dibalik dengan mencoba keempat miliar alamat, dan kunci acak per
+    # proses membuat jejak satu IP tidak bisa dipertemukan antarinstans.
+    ip_hash_key: SecretStr = Field(min_length=32)
 
     @field_validator("database_url")
     @classmethod

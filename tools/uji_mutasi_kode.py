@@ -280,6 +280,52 @@ MUTASI: list[Mutasi] = [
         harus_memuat="assert not True",
         kelompok="db",
     ),
+    # ── identity (spec/07 1.1): argon2id · rotasi · fungsi SECURITY DEFINER ─
+    Mutasi(
+        "1.1",
+        "sandi di-hash argon2i, bukan argon2id",
+        [
+            Sunting(
+                f"{MODUL}/identity/sandi.py",
+                "_hasher = PasswordHasher()",
+                "_hasher = PasswordHasher(type=__import__('argon2').Type.I)",
+            )
+        ],
+        _pytest("tests/unit/test_sandi.py::test_hash_adalah_argon2id_dan_bisa_diverifikasi"),
+        harus_memuat="startswith",
+    ),
+    Mutasi(
+        "1.1",
+        "token segar dibaca GET, bukan GETDEL — token lama tetap hidup sesudah rotasi",
+        [
+            Sunting(
+                f"{MODUL}/identity/sesi.py",
+                "nilai = await self._r.getdel(self._k_segar(lama))",
+                "nilai = await self._r.get(self._k_segar(lama))",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_auth.py::test_segarkan_merotasi_dan_token_bekas_mencabut_sesi"
+        ),
+        harus_memuat="assert 200 == 401",
+        kelompok="db",
+    ),
+    Mutasi(
+        "1.1",
+        "EXECUTE fungsi login tidak dicabut dari PUBLIC (spec/01 DAN migrasi)",
+        [
+            Sunting(
+                berkas, "REVOKE ALL ON FUNCTION auth_lookup_for_login(citext) FROM PUBLIC;" + NL, ""
+            )
+            for berkas in ("spec/01-DATABASE-SCHEMA.md", f"{MIGRASI}/0003_pencarian_masuk.up.sql")
+        ],
+        _pytest(
+            f"{UJI_KEPEMILIKAN}"
+            "::test_fungsi_security_definer_hanya_daftar_izin_terpatok_dan_bukan_untuk_public"
+        ),
+        harus_memuat="public_boleh=True",
+        kelompok="db",
+    ),
     # ── peta penegak arch/11 §6 ──────────────────────────────────────────
     Mutasi(
         "§6",

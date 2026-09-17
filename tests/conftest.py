@@ -18,6 +18,11 @@ import pytest
 
 AKAR = Path(__file__).resolve().parent.parent
 
+# HVX_IP_HASH_KEY wajib bagi Settings (tanpa bawaan, sengaja). Uji yang TIDAK
+# sedang menguji kunci itu memakai kunci uji ini; test_config menguji bahwa
+# ketiadaannya menggagalkan proses.
+os.environ.setdefault("HVX_IP_HASH_KEY", "uji-kunci-hmac-ip-bukan-rahasia-" + "0" * 16)
+
 
 def _wajib(nama: str) -> str:
     nilai = os.environ.get(nama)

@@ -21,7 +21,9 @@ from .persetujuan import (
     catat_persetujuan,
 )
 from .repository import ambil_pengguna
+from .routes import router
 from .schemas import PenggunaRingkas
+from .service import PendengarPendaftaran, PenggunaBaru
 from .sesi import HasilPenyegaran, PenyimpanSesi, SesiAktif, Token
 
 __all__ = [
@@ -30,6 +32,8 @@ __all__ = [
     "AktorTipe",
     "AuditTidakSah",
     "HasilPenyegaran",
+    "PendengarPendaftaran",
+    "PenggunaBaru",
     "PenggunaDiperlukan",
     "PenggunaMasuk",
     "PenggunaRingkas",
@@ -45,4 +49,5 @@ __all__ = [
     "catat_persetujuan",
     "pengguna_saat_ini",
     "penyimpan_sesi",
+    "router",
 ]

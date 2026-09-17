@@ -9,5 +9,6 @@ Berkas ini satu-satunya pintu keluar modul (spec/06 aturan 1).
 from .repository import buat_profil
 from .routes import router
 from .schemas import Profil, UbahProfil
+from .service import buat_profil_awal
 
-__all__ = ["Profil", "UbahProfil", "buat_profil", "router"]
+__all__ = ["Profil", "UbahProfil", "buat_profil", "buat_profil_awal", "router"]

@@ -22,7 +22,7 @@ from .db import (
 )
 from .galat import GalatApi, jawaban_galat, pasang_penangan_galat
 from .health import Pemeriksaan, laporan_kesehatan
-from .keadaan import engine_dari, redis_dari, settings_dari
+from .keadaan import engine_dari, redis_dari, settings_dari, sidik_ip
 from .log import RequestContextMiddleware, ikat_pengguna, konfigurasi_log
 from .redis_store import buat_redis, ping_redis
 from .routes import router
@@ -50,6 +50,7 @@ __all__ = [
     "redis_dari",
     "router",
     "settings_dari",
+    "sidik_ip",
     "transaksi_pengguna",
     "url_async",
     "url_sync",

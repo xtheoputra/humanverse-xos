@@ -19,7 +19,7 @@ from functools import partial
 from fastapi import FastAPI
 
 from hvx import __version__
-from hvx.modules import platform, profile
+from hvx.modules import identity, platform, profile
 
 DOKUMENTASI_TERBUKA: frozenset[str] = frozenset({"local", "test", "ci"})
 
@@ -67,8 +67,12 @@ def create_app(settings: platform.Settings | None = None) -> FastAPI:
     )
     app.state.settings = settings
     app.state.versi = __version__
+    # Titik rakit menyambung modul yang tidak boleh saling impor (K-17): identity
+    # mengumumkan pendaftaran, profile membuat profil — di transaksi yang sama.
+    app.state.pendengar_pendaftaran = (profile.buat_profil_awal,)
     platform.pasang_penangan_galat(app)
     app.add_middleware(platform.RequestContextMiddleware)
     app.include_router(platform.router)
+    app.include_router(identity.router)
     app.include_router(profile.router)
     return app

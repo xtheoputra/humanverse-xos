@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Mapping
+from dataclasses import dataclass
 from uuid import UUID
 
 from sqlalchemy import text
@@ -143,3 +144,48 @@ async def persetujuan_terakhir(
         b.purpose: (bool(b.granted), frozenset(b.data_scopes or ()), bool(b.masih_berlaku))
         for b in hasil
     }
+
+
+# ── users (spec/07 1.1) ─────────────────────────────────────────────────────
+
+
+@dataclass(frozen=True)
+class AkunUntukMasuk:
+    id: UUID
+    password_hash: str
+    status: str
+
+
+async def tambah_pengguna(
+    conn: AsyncConnection, user_id: UUID, email: str, password_hash: str
+) -> None:
+    # `id` dari aplikasi, bukan bawaan basis data: RLS (spec/01 §11) hanya
+    # meloloskan baris `users` yang id-nya sama dengan pengguna transaksi ini.
+    await conn.execute(
+        text("INSERT INTO users (id, email, password_hash) VALUES (:id, :email, :hash)"),
+        {"id": user_id, "email": email, "hash": password_hash},
+    )
+
+
+async def cari_untuk_masuk(conn: AsyncConnection, email: str) -> AkunUntukMasuk | None:
+    """Satu-satunya pencarian akun sebelum pengguna dikenali — lewat fungsi spec/01 §12."""
+    baris = (
+        await conn.execute(
+            text("SELECT id, password_hash, status FROM auth_lookup_for_login(:email)"),
+            {"email": email},
+        )
+    ).first()
+    return AkunUntukMasuk(baris.id, baris.password_hash, baris.status) if baris else None
+
+
+async def ganti_hash_sandi(conn: AsyncConnection, user_id: UUID, password_hash: str) -> None:
+    await conn.execute(
+        text("UPDATE users SET password_hash = :hash WHERE id = :id"),
+        {"hash": password_hash, "id": user_id},
+    )
+
+
+async def catat_masuk(conn: AsyncConnection, user_id: UUID) -> None:
+    await conn.execute(
+        text("UPDATE users SET last_login_at = now() WHERE id = :id"), {"id": user_id}
+    )
