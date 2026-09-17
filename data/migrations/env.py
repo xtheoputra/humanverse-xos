@@ -1,8 +1,13 @@
 """Lingkungan Alembic.
 
 Urutan sumber URL: opsi `sqlalchemy.url` yang diset pemanggil (uji) →
-`HVX_DATABASE_URL`. Kalau keduanya kosong, migrasi GAGAL — tidak ada basis
-data bawaan untuk "kebetulan" dimigrasikan.
+`HVX_MIGRATION_DATABASE_URL`. Kalau keduanya kosong, migrasi GAGAL — tidak ada
+basis data bawaan untuk "kebetulan" dimigrasikan.
+
+🔑 **Bukan `HVX_DATABASE_URL`** (B-40). Migrasi berjalan sebagai PEMILIK
+skema; api berjalan sebagai anggota `hvx_app` dan menolak mulai kalau
+perannya pemilik tabel. Dua nama variabel membuat keduanya tidak bisa
+tertukar diam-diam — dan tidak ada jatuh-balik dari satu ke yang lain.
 
 Tiap revisi berjalan di transaksinya sendiri (`transaction_per_migration`):
 PostgreSQL mendukung DDL transaksional, jadi migrasi yang gagal di tengah
@@ -20,9 +25,14 @@ from hvx.modules.platform import konfigurasi_log, url_sync
 
 
 def _url() -> str:
-    dsn = context.config.get_main_option("sqlalchemy.url") or os.environ.get("HVX_DATABASE_URL")
+    dsn = context.config.get_main_option("sqlalchemy.url") or os.environ.get(
+        "HVX_MIGRATION_DATABASE_URL"
+    )
     if not dsn:
-        raise RuntimeError("HVX_DATABASE_URL tidak diisi — migrasi tidak punya basis data tujuan")
+        raise RuntimeError(
+            "HVX_MIGRATION_DATABASE_URL tidak diisi — migrasi tidak punya basis data tujuan. "
+            "Isinya DSN peran PEMILIK skema, bukan peran api (B-40)."
+        )
     return url_sync(dsn)
 
 

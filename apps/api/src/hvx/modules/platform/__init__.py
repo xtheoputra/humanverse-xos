@@ -11,7 +11,15 @@ Ini satu-satunya pintu keluar modul (spec/06 aturan 1); modul lain dan
 """
 
 from .config import Lingkungan, Settings
-from .db import buat_engine, ping_db, url_async, url_sync
+from .db import (
+    PeranTidakAman,
+    buat_engine,
+    pastikan_peran_aplikasi,
+    ping_db,
+    transaksi_pengguna,
+    url_async,
+    url_sync,
+)
 from .health import Pemeriksaan, laporan_kesehatan
 from .log import RequestContextMiddleware, ikat_pengguna, konfigurasi_log
 from .redis_store import buat_redis, ping_redis
@@ -20,6 +28,7 @@ from .routes import router
 __all__ = [
     "Lingkungan",
     "Pemeriksaan",
+    "PeranTidakAman",
     "RequestContextMiddleware",
     "Settings",
     "buat_engine",
@@ -27,9 +36,11 @@ __all__ = [
     "ikat_pengguna",
     "konfigurasi_log",
     "laporan_kesehatan",
+    "pastikan_peran_aplikasi",
     "ping_db",
     "ping_redis",
     "router",
+    "transaksi_pengguna",
     "url_async",
     "url_sync",
 ]

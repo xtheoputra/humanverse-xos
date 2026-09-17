@@ -60,8 +60,8 @@ MUTASI: list[tuple[str, str, str, str, str]] = [
         "  data_subject text NOT NULL DEFAULT 'user'\n"
         "                 CHECK (data_subject IN "
         "('user','bystander','world','system')),\n"
-        "  goal_id          uuid REFERENCES goals(id) ON DELETE SET NULL,",
-        "  goal_id          uuid REFERENCES goals(id) ON DELETE SET NULL,",
+        "  goal_id          uuid,",
+        "  goal_id          uuid,",
         "tabel tanpa kolom data_subject",
     ),
     (
@@ -140,8 +140,8 @@ MUTASI: list[tuple[str, str, str, str, str]] = [
         "  data_subject text NOT NULL DEFAULT 'user'\n"
         "                 CHECK (data_subject IN "
         "('user','bystander','world','system')),\n"
-        "  goal_id          uuid REFERENCES goals(id) ON DELETE SET NULL,",
-        "  goal_id          uuid REFERENCES goals(id) ON DELETE SET NULL,",
+        "  goal_id          uuid,",
+        "  goal_id          uuid,",
         "tabel di MIGRASI tanpa kolom data_subject",
     ),
     (
@@ -186,7 +186,7 @@ MUTASI: list[tuple[str, str, str, str, str]] = [
     ),
     (
         "P-2", MIGRASI_0001,
-        "  deleted_at       timestamptz\n"
+        "    ON DELETE SET NULL (goal_id)\n"
         ");\n"
         "CREATE INDEX habits_user_status_idx ON habits (user_id, status) WHERE deleted_at IS NULL;\n"
         "\n"
@@ -197,7 +197,7 @@ MUTASI: list[tuple[str, str, str, str, str]] = [
         "  id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),\n"
         "  data_subject text NOT NULL DEFAULT 'user'\n"
         "                 CHECK (data_subject IN ('user','bystander','world','system')),\n",
-        "  deleted_at       timestamptz\n"
+        "    ON DELETE SET NULL (goal_id)\n"
         ") WITH (fillfactor = 90);\n"
         "CREATE INDEX habits_user_status_idx ON habits (user_id, status) WHERE deleted_at IS NULL;\n"
         "\n"

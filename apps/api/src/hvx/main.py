@@ -31,6 +31,12 @@ def create_app(settings: platform.Settings | None = None) -> FastAPI:
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         engine = platform.buat_engine(settings.database_url)
+        try:
+            # B-40: api tidak pernah melayani sebagai peran yang melewati RLS.
+            await platform.pastikan_peran_aplikasi(engine)
+        except BaseException:
+            await engine.dispose()
+            raise
         redis = platform.buat_redis(
             settings.redis_url,
             socket_timeout_s=settings.redis_socket_timeout_s,

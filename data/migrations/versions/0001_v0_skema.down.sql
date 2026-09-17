@@ -31,9 +31,16 @@ DROP TABLE
   users;
 
 DROP FUNCTION set_updated_at();
+DROP FUNCTION app_current_user_id();
 
 -- `citext` SENGAJA tidak dilepas. 0001 memasangnya dengan IF NOT EXISTS, jadi
 -- ia tidak bisa tahu apakah ekstensinya ADA sebelum 0001. Versi pertama
 -- melepasnya — dan diukur: pada basis data yang sudah memakai citext, turun
 -- GAGAL; pada yang sudah memasangnya tanpa memakai, turun diam-diam
 -- mencabutnya. Ekstensi milik basis data, bukan milik migrasi ini.
+--
+-- Peran `hvx_app` juga SENGAJA tidak dilepas, dengan alasan yang lebih kuat:
+-- peran berlaku untuk seluruh KLASTER, bukan satu basis data. Basis data lain
+-- di klaster yang sama (uji sekali pakai, lingkungan lain) bisa sedang
+-- memakainya. Hak aksesnya di basis data ini ikut hilang bersama tabelnya, dan
+-- kebijakan RLS ikut hilang bersama tabel yang memilikinya.

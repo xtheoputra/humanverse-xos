@@ -25,26 +25,19 @@ from __future__ import annotations
 import importlib.util
 import re
 import sys
-import uuid
-from collections.abc import Callable, Iterator
-from pathlib import Path
+from collections.abc import Callable
 from types import ModuleType
 from typing import Any
 
 import psycopg
 import pytest
+from _bantuan_db import AKAR, ALEMBIC_INI, alembic, psycopg_dsn
 from alembic import command
 from alembic.config import Config
-from psycopg import sql
-from sqlalchemy.engine import make_url
-
-from hvx.modules.platform import url_sync
 
 pytestmark = pytest.mark.integration
 
-AKAR = Path(__file__).resolve().parents[2]
 SPEC01 = AKAR / "spec" / "01-DATABASE-SCHEMA.md"
-ALEMBIC_INI = AKAR / "data" / "migrations" / "alembic.ini"
 
 _PUBLIK = "relnamespace = 'public'::regnamespace"
 
@@ -140,43 +133,8 @@ def ddl_spec01() -> str:
     return ddl
 
 
-def _dsn_ke(dsn_admin: str, nama_db: str) -> str:
-    return make_url(dsn_admin).set(database=nama_db).render_as_string(hide_password=False)
-
-
-def _psycopg_dsn(dsn: str) -> str:
-    return url_sync(dsn).replace("postgresql+psycopg://", "postgresql://", 1)
-
-
-@pytest.fixture
-def basis_data_sekali_pakai(dsn_admin_uji: str) -> Iterator[Callable[[str], str]]:
-    dibuat: list[str] = []
-
-    def _buat(awalan: str) -> str:
-        nama = f"hvx_uji_{awalan}_{uuid.uuid4().hex[:10]}"
-        with psycopg.connect(_psycopg_dsn(dsn_admin_uji), autocommit=True) as k:
-            k.execute(sql.SQL("CREATE DATABASE {}").format(sql.Identifier(nama)))
-        dibuat.append(nama)
-        return _dsn_ke(dsn_admin_uji, nama)
-
-    yield _buat
-
-    with psycopg.connect(_psycopg_dsn(dsn_admin_uji), autocommit=True) as k:
-        for nama in dibuat:
-            k.execute(
-                sql.SQL("DROP DATABASE IF EXISTS {} WITH (FORCE)").format(sql.Identifier(nama))
-            )
-
-
-def _alembic(dsn: str) -> Config:
-    cfg = Config(str(ALEMBIC_INI))
-    cfg.set_main_option("sqlalchemy.url", dsn)
-    cfg.attributes["konfigurasi_log"] = False
-    return cfg
-
-
 def katalog(dsn: str) -> dict[str, set[tuple[Any, ...]]]:
-    with psycopg.connect(_psycopg_dsn(dsn)) as k:
+    with psycopg.connect(psycopg_dsn(dsn)) as k:
         return {nama: set(k.execute(q).fetchall()) for nama, q in KUERI_KATALOG.items()}
 
 
@@ -195,7 +153,7 @@ def selisih(a: dict[str, set[tuple[Any, ...]]], b: dict[str, set[tuple[Any, ...]
 
 
 def tabel_publik(dsn: str) -> set[str]:
-    with psycopg.connect(_psycopg_dsn(dsn)) as k:
+    with psycopg.connect(psycopg_dsn(dsn)) as k:
         return {
             r[0]
             for r in k.execute(
@@ -226,9 +184,9 @@ def test_migrasi_menghasilkan_skema_yang_sama_persis_dengan_spec01(
     dsn_spec = basis_data_sekali_pakai("spec")
     dsn_mig = basis_data_sekali_pakai("mig")
 
-    with psycopg.connect(_psycopg_dsn(dsn_spec), autocommit=True) as k:
+    with psycopg.connect(psycopg_dsn(dsn_spec), autocommit=True) as k:
         k.execute(ddl_spec01())
-    command.upgrade(_alembic(dsn_mig), "head")
+    command.upgrade(alembic(dsn_mig), "head")
 
     k_spec, k_mig = katalog(dsn_spec), katalog(dsn_mig)
 
@@ -246,7 +204,7 @@ def test_parser_ddl_membaca_tepat_tabel_yang_ada_di_katalog(
     basis data sungguhan adalah populasi yang tidak bisa dibohongi ejaan.
     """
     dsn = basis_data_sekali_pakai("parser")
-    command.upgrade(_alembic(dsn), "head")
+    command.upgrade(alembic(dsn), "head")
     di_katalog = tabel_publik(dsn) - {"alembic_version"}
 
     terbaca = _alat("periksa_dokumen")._tabel_ddl()
@@ -267,7 +225,7 @@ def test_migrasi_turun_kembali_ke_basis_data_kosong_lalu_naik_lagi_identik(
     basis_data_sekali_pakai: Callable[[str], str],
 ) -> None:
     dsn = basis_data_sekali_pakai("naikturun")
-    cfg = _alembic(dsn)
+    cfg = alembic(dsn)
     ekstensi_awal = {r[0] for r in katalog(dsn)["ekstensi"]}
 
     command.upgrade(cfg, "head")
@@ -292,10 +250,10 @@ def test_turun_tidak_mencabut_ekstensi_yang_sudah_ada_sebelum_0001(
     basis_data_sekali_pakai: Callable[[str], str],
 ) -> None:
     dsn = basis_data_sekali_pakai("ekstensi")
-    with psycopg.connect(_psycopg_dsn(dsn), autocommit=True) as k:
+    with psycopg.connect(psycopg_dsn(dsn), autocommit=True) as k:
         k.execute("CREATE EXTENSION citext")
         k.execute("CREATE TABLE sudah_ada (e citext)")
-    cfg = _alembic(dsn)
+    cfg = alembic(dsn)
 
     command.upgrade(cfg, "head")
     command.downgrade(cfg, "base")
@@ -326,10 +284,10 @@ def test_tiap_tabel_ber_updated_at_punya_pemicunya(
     berubah.
     """
     dsn = basis_data_sekali_pakai("pemicu")
-    command.upgrade(_alembic(dsn), "head")
+    command.upgrade(alembic(dsn), "head")
     ber_updated_at = {r[0] for r in katalog(dsn)["kolom"] if r[2] == "updated_at"}
 
-    with psycopg.connect(_psycopg_dsn(dsn)) as k:
+    with psycopg.connect(psycopg_dsn(dsn)) as k:
         benar = {
             tabel
             for tabel, nyala, tipe, tanpa_when, kolom_update_of, fungsi in k.execute(
@@ -350,9 +308,9 @@ def test_pemicu_updated_at_benar_benar_memperbarui_kolomnya(
     basis_data_sekali_pakai: Callable[[str], str],
 ) -> None:
     dsn = basis_data_sekali_pakai("fungsi")
-    command.upgrade(_alembic(dsn), "head")
+    command.upgrade(alembic(dsn), "head")
 
-    with psycopg.connect(_psycopg_dsn(dsn), autocommit=True) as k:
+    with psycopg.connect(psycopg_dsn(dsn), autocommit=True) as k:
         (uid,) = k.execute(
             "INSERT INTO users (email, password_hash, created_at, updated_at) "
             "VALUES ('a@contoh.id', 'x', now() - interval '1 day', now() - interval '1 day') "
@@ -371,9 +329,9 @@ def test_audit_logs_menolak_baris_pengguna_tanpa_user_id(
 ) -> None:
     """arch/06 §6 sebagai CHECK — penjaga yang P-3 terima."""
     dsn = basis_data_sekali_pakai("audit")
-    command.upgrade(_alembic(dsn), "head")
+    command.upgrade(alembic(dsn), "head")
 
-    with psycopg.connect(_psycopg_dsn(dsn), autocommit=True) as k:
+    with psycopg.connect(psycopg_dsn(dsn), autocommit=True) as k:
         k.execute(
             "INSERT INTO audit_logs (data_subject, actor_type, actor_id, action) "
             "VALUES ('system', 'system', 'migrasi', 'uji.sistem')"

@@ -130,6 +130,13 @@ TRIGGER_HABITS = (
     "CREATE TRIGGER habits_set_updated_at            BEFORE UPDATE ON habits"
     "            FOR EACH ROW EXECUTE FUNCTION set_updated_at();"
 )
+UJI_KEPEMILIKAN = "tests/integration/test_kepemilikan_data.py"
+FK_MILESTONE = (
+    "  FOREIGN KEY (goal_id, user_id) REFERENCES goals (id, user_id) ON DELETE CASCADE" + NL + ");"
+)
+RLS_JURNAL = "ALTER TABLE journal_entries         ENABLE ROW LEVEL SECURITY;" + NL
+KEBIJAKAN_MEMORI = "ON memories                USING (user_id = app_current_user_id())"
+GRANT_AGENT_RUNS = "GRANT SELECT, INSERT, UPDATE ON agent_runs TO hvx_app;"
 
 MUTASI: list[Mutasi] = [
     # ── import-linter: lapisan & siklus ──────────────────────────────────
@@ -440,6 +447,106 @@ MUTASI: list[Mutasi] = [
         ],
         _pytest(f"{UJI_MIGRASI}::test_migrasi_menghasilkan_skema_yang_sama_persis_dengan_spec01"),
         harus_memuat="baris markdown di DALAM blok",
+        kelompok="db",
+    ),
+    # ── H-27 · data tiap pengguna milik pribadinya (B-40 · B-41 · RLS) ───
+    # spec/01 DAN migrasi dirusak bersama: yang diuji penegak kepemilikan,
+    # bukan uji kesamaan spec/01 == migrasi.
+    Mutasi(
+        "B-41",
+        "FK goal_milestones kembali satu kolom — anak B boleh menunjuk goal A",
+        [
+            Sunting(
+                berkas,
+                FK_MILESTONE,
+                FK_MILESTONE.replace(
+                    "(goal_id, user_id) REFERENCES goals (id, user_id)",
+                    "(goal_id) REFERENCES goals (id)",
+                ),
+            )
+            for berkas in ("spec/01-DATABASE-SCHEMA.md", f"{MIGRASI}/0001_v0_skema.up.sql")
+        ],
+        _pytest(
+            f"{UJI_KEPEMILIKAN}::test_tiap_fk_antar_tabel_milik_pengguna_membawa_user_id_berpasangan"
+        ),
+        harus_memuat="goal_milestones.goal_milestones_goal_id_fkey",
+        kelompok="db",
+    ),
+    Mutasi(
+        "RLS",
+        "RLS journal_entries dimatikan — tulisan paling pribadi terbuka lintas pengguna",
+        [
+            Sunting(berkas, RLS_JURNAL, "")
+            for berkas in ("spec/01-DATABASE-SCHEMA.md", f"{MIGRASI}/0001_v0_skema.up.sql")
+        ],
+        _pytest(
+            f"{UJI_KEPEMILIKAN}::test_tiap_tabel_milik_pengguna_dilindungi_rls_dan_katalog_sistem_tidak"
+        ),
+        harus_memuat="['journal_entries']",
+        kelompok="db",
+    ),
+    Mutasi(
+        "RLS",
+        "kebijakan memories dilonggarkan jadi USING (true) — ada, tetapi membuka semuanya",
+        [
+            Sunting(
+                berkas,
+                KEBIJAKAN_MEMORI,
+                KEBIJAKAN_MEMORI.replace("USING (user_id = app_current_user_id())", "USING (true)"),
+            )
+            for berkas in ("spec/01-DATABASE-SCHEMA.md", f"{MIGRASI}/0001_v0_skema.up.sql")
+        ],
+        _pytest(
+            f"{UJI_KEPEMILIKAN}::test_isi_tiap_kebijakan_rls_membatasi_pada_pengguna_yang_dilayani"
+        ),
+        harus_memuat="memories: [('memories_own_rows'",
+        kelompok="db",
+    ),
+    Mutasi(
+        "B-40",
+        "peran aplikasi diberi UPDATE audit_logs — jejak audit bisa dipalsukan",
+        [
+            Sunting(
+                berkas,
+                GRANT_AGENT_RUNS,
+                GRANT_AGENT_RUNS + NL + "GRANT UPDATE ON audit_logs TO hvx_app;",
+            )
+            for berkas in ("spec/01-DATABASE-SCHEMA.md", f"{MIGRASI}/0001_v0_skema.up.sql")
+        ],
+        _pytest(f"{UJI_KEPEMILIKAN}::test_hak_akses_peran_aplikasi_sesempit_yang_dinyatakan"),
+        harus_memuat="audit_logs: hanya-tambah, tetapi UPDATE=True",
+        kelompok="db",
+    ),
+    Mutasi(
+        "B-40",
+        "api tidak lagi memeriksa perannya — mulai sebagai superuser pemilik tabel",
+        [
+            Sunting(
+                "apps/api/src/hvx/main.py",
+                "            await platform.pastikan_peran_aplikasi(engine)" + NL,
+                "            pass" + NL,
+            )
+        ],
+        _pytest(
+            "tests/integration/test_aplikasi_hidup.py::test_api_menolak_mulai_sebagai_superuser_pemilik"
+        ),
+        harus_memuat="DID NOT RAISE",
+        kelompok="db",
+    ),
+    Mutasi(
+        "RLS",
+        "pengguna transaksi disetel untuk seluruh SESI — bocor ke koneksi pool berikutnya",
+        [
+            Sunting(
+                f"{MODUL}/platform/db.py",
+                "text(\"SELECT set_config('hvx.user_id', :user_id, true)\")",
+                "text(\"SELECT set_config('hvx.user_id', :user_id, false)\")",
+            )
+        ],
+        _pytest(
+            f"{UJI_KEPEMILIKAN}::test_transaksi_pengguna_membatasi_kueri_dan_tidak_bocor_ke_koneksi_berikutnya"
+        ),
+        harus_memuat="bocor ke koneksi berikutnya dari pool",
         kelompok="db",
     ),
 ]
