@@ -48,7 +48,7 @@ ditulis) dan bukan `V` (urutan produk dirilis) — lihat
 
 | | Tahap | Isi | Gerbang yang WAJIB lebih dulu | 🛑 Pemblokir |
 |---|---|---|---|---|
-| **T0** | **V0 Foundation** | [`../spec/07`](../spec/07-BACKLOG-V0.md) Sprint 0–6 · 51 tugas · 23 tabel · 4 agent | 0.8 sebelum kode domain · **4.5 sebelum 4.6–4.7** | **[#3](../../issues/3)** siapa yang mengerjakan |
+| **T0** | **V0 Foundation** | [`../spec/07`](../spec/07-BACKLOG-V0.md) Sprint 0–6 · 51 tugas · 23 tabel · 4 agent | 0.8 sebelum kode domain · **4.5 sebelum 4.6–4.7** | ✅ **[#3](../../issues/3) terjawab untuk MEMULAI** (16 Sep 2026, **H-25**): AI coding agent mengerjakan di branch + PR, pemilik yang menggabungkan |
 | **T1** | **Behavior Intelligence** (V1) | event · pola · prediksi · weekly review | uji admisi `events` [`07`](07-EVENT-CONTRACTS.md) §3 | — |
 | **T2** | **PROTECT** (Phase 8) | policy engine · risk engine · permissions · audit · **vault** · kill-switch | — **ia sendiri gerbangnya** | — |
 | **T3** | **Lifestyle AI** (V2) | fashion · wardrobe · trend · grooming · fitness · nutrisi | T2 | — |
@@ -118,7 +118,8 @@ mesin tidak bisa.
 ### 🔑 Satu baris yang paling berguna dari seluruh tabel ini
 
 > **T0 sampai T5 tidak diblokir oleh satu pun keputusan yang belum diambil —
-> kecuali [#3](../../issues/3), yaitu siapa yang mengerjakannya.
+> [#3](../../issues/3) (siapa yang mengerjakannya) dijawab pemilik 16 Sep 2026,
+> **H-25**.
 > Mulai T6 ke atas, setiap tahap menunggu keputusan yang hanya bisa diambil
 > pemilik.**
 
@@ -248,11 +249,18 @@ kode**. Persen tidak bisa dipakai di repo ini.
 | Ukuran | Sekarang |
 |---|---|
 | Spesifikasi V0 | ✅ **selesai** — 23 tabel · 22 event · 51 tugas |
-| **Kode V0** | 🛑 **0 dari 51 tugas** |
+| **Kode V0 — di `master`** | 🛑 **0 dari 51 tugas** — sampai PR Sprint 0 digabung pemilik |
+| **Kode V0 — ditulis, menunggu HUMAN REVIEW** | ⏳ **8 dari 51** — Sprint 0 (0.1–0.8), branch `v0/sprint-0-foundation` |
 | Master Architecture v2.0 | ✅ **selesai** — [`README.md`](README.md) 11 butir |
 | Tahap yang tidak diblokir keputusan | **T0–T5** |
 | Tahap yang menunggu pemilik | **T6–T12** |
-| Penghambat T0 | **1** — [#3](../../issues/3) |
+| Penghambat untuk MEMULAI T0 | **0** — [#3](../../issues/3) terjawab (**H-25**); yang tersisa di #3 soal **waktu**: taksiran atau tenggat, jam per minggu, gerbang mana boleh dilewati |
+
+> ⚠️ **Dua baris kode V0 sengaja dipisah**, dengan alasan yang sama dengan
+> catatan 🛑 di bawah blok ` ```penegak ` [`11`](11-PENEGAKAN.md) §6 —
+> *“bisa jalan”* tidak pernah dihitung sebagai *“dijalankan”*: kode yang ditulis tetapi belum melewati HUMAN
+> REVIEW **belum** kode V0 — `spec/07` menaruh baris itu sebelum Merge, bukan
+> sesudahnya.
 
 ---
 

@@ -4,8 +4,15 @@
 > Diturunkan dari naskah 5 §31 (19 tabel) + naskah 6 (`events`, `agents`,
 > `agent_tools`) + 1 usulan (`human_states`). Total **23 tabel**.
 
-Target: **PostgreSQL 16**. Ekstensi: `pgcrypto` (untuk `gen_random_uuid()`),
-`citext` (email tanpa peduli huruf besar-kecil).
+Target: **PostgreSQL 16**. Ekstensi: `citext` (email tanpa peduli huruf
+besar-kecil).
+
+> 🔧 **`pgcrypto` dicabut 16 Sep 2026.** Berkas ini semula memasangnya *“untuk
+> `gen_random_uuid()`”* — fungsi itu sudah bawaan PostgreSQL sejak versi 13.
+> Diperiksa di PostgreSQL 16 sungguhan: tidak satu pun bawaan kolom bergantung
+> pada `pgcrypto`, dan ekstensinya bisa dilepas dengan 23 tabel tetap bekerja.
+> Ketergantungan yang tidak dipakai hanya menambah hal yang bisa gagal saat
+> dipasang dan dilepas.
 
 ---
 
@@ -48,7 +55,6 @@ di fase berikutnya.
 ## Awalan
 
 ```sql
-CREATE EXTENSION IF NOT EXISTS pgcrypto;
 CREATE EXTENSION IF NOT EXISTS citext;
 
 -- dipakai semua tabel yang punya updated_at
@@ -57,7 +63,32 @@ BEGIN
   NEW.updated_at = now();
   RETURN NEW;
 END $$ LANGUAGE plpgsql;
+
+-- B-40 · peran APLIKASI: bukan superuser, bukan pemilik tabel, tanpa BYPASSRLS.
+-- NOLOGIN — peran login api (mis. `hvx_api`) dibuat di luar migrasi dan
+-- dijadikan anggotanya. Peran berlaku sekluster, jadi turun TIDAK melepasnya.
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'hvx_app') THEN
+    CREATE ROLE hvx_app NOLOGIN;
+  END IF;
+EXCEPTION WHEN duplicate_object THEN
+  NULL;  -- dibuat migrasi lain di klaster yang sama, di antara cek dan CREATE
+END $$;
+
+-- RLS · pengguna yang sedang dilayani transaksi ini. Aplikasi mengisinya per
+-- transaksi: SELECT set_config('hvx.user_id', '<uuid>', true). Tidak diisi →
+-- NULL → kebijakan RLS tidak meloloskan satu baris pun (gagal-tertutup).
+CREATE OR REPLACE FUNCTION app_current_user_id() RETURNS uuid
+  LANGUAGE sql STABLE
+  AS $$ SELECT nullif(current_setting('hvx.user_id', true), '')::uuid $$;
 ```
+
+> 🔧 **Dua objek di atas ditambahkan 17 Sep 2026 — B-40 dan keputusan pemilik
+> H-27** (*“data masing-masing pengguna milik pribadi user”*). `hvx_app` adalah
+> peran yang dipakai api; hak aksesnya ditulis tabel demi tabel di §10, dan RLS
+> di §11 memakai `app_current_user_id()` untuk membatasinya pada baris
+> pengguna yang sedang dilayani.
 
 ---
 
@@ -173,7 +204,7 @@ CREATE TABLE goals (
   user_id     uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   data_subject text NOT NULL DEFAULT 'user'
                  CHECK (data_subject IN ('user','bystander','world','system')),
-  parent_id   uuid REFERENCES goals(id) ON DELETE SET NULL,  -- Goal Graph naskah 4 §9
+  parent_id   uuid,                                          -- Goal Graph naskah 4 §9
   title       text NOT NULL,
   description text,
   domain      text CHECK (domain IN
@@ -184,7 +215,11 @@ CREATE TABLE goals (
   achieved_at timestamptz,
   created_at  timestamptz NOT NULL DEFAULT now(),
   updated_at  timestamptz NOT NULL DEFAULT now(),
-  deleted_at  timestamptz
+  deleted_at  timestamptz,
+  -- B-41: baris anak hanya boleh menunjuk induk milik pengguna yang SAMA.
+  UNIQUE (id, user_id),
+  FOREIGN KEY (parent_id, user_id) REFERENCES goals (id, user_id)
+    ON DELETE SET NULL (parent_id)
 );
 CREATE INDEX goals_user_status_idx ON goals (user_id, status) WHERE deleted_at IS NULL;
 CREATE INDEX goals_parent_idx      ON goals (parent_id) WHERE parent_id IS NOT NULL;
@@ -196,7 +231,7 @@ CREATE TABLE goal_milestones (
   id           uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   data_subject text NOT NULL DEFAULT 'user'
                  CHECK (data_subject IN ('user','bystander','world','system')),
-  goal_id      uuid NOT NULL REFERENCES goals(id) ON DELETE CASCADE,
+  goal_id      uuid NOT NULL,
   user_id      uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   title        text NOT NULL,
   position     integer NOT NULL DEFAULT 0,
@@ -205,7 +240,8 @@ CREATE TABLE goal_milestones (
   due_date     date,
   completed_at timestamptz,
   created_at   timestamptz NOT NULL DEFAULT now(),
-  updated_at   timestamptz NOT NULL DEFAULT now()
+  updated_at   timestamptz NOT NULL DEFAULT now(),
+  FOREIGN KEY (goal_id, user_id) REFERENCES goals (id, user_id) ON DELETE CASCADE
 );
 CREATE INDEX goal_milestones_goal_idx ON goal_milestones (goal_id, position);
 ```
@@ -213,6 +249,16 @@ CREATE INDEX goal_milestones_goal_idx ON goal_milestones (goal_id, position);
 > `parent_id` yang menunjuk ke tabelnya sendiri adalah **Goal Graph** naskah 4
 > §9 (`LIFE GOAL → Career → Skills → Learning → Habit`) — cukup dengan satu
 > kolom, tanpa Neo4j.
+>
+> 🔧 **B-41 — FK komposit `(induk_id, user_id)`, 17 Sep 2026.** Sebelas FK
+> satu kolom (`goal_id`, `parent_id`, `habit_id`, `source_event_id`,
+> `conversation_id` ×2, `agent_run_id` ×2, `recommendation_id`,
+> `parent_run_id`) semula membiarkan baris anak milik pengguna B menunjuk
+> induk milik pengguna A. Diukur: milestone B menempel ke goal A — diterima —
+> lalu **ikut terhapus** saat A menghapus goal-nya. Kini tiap induk membawa
+> `UNIQUE (id, user_id)` dan tiap anak menunjuknya dengan **pasangan**
+> kolom, sehingga basis data sendiri yang menolak. `ON DELETE SET NULL
+> (kolom)` (PostgreSQL 15+) mengosongkan hanya kolom induk, bukan `user_id`.
 
 ```sql
 -- @retention   : until-account-deleted
@@ -223,7 +269,7 @@ CREATE TABLE habits (
   user_id          uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   data_subject text NOT NULL DEFAULT 'user'
                  CHECK (data_subject IN ('user','bystander','world','system')),
-  goal_id          uuid REFERENCES goals(id) ON DELETE SET NULL,
+  goal_id          uuid,
   title            text NOT NULL,
   period           text NOT NULL DEFAULT 'week'
                      CHECK (period IN ('day','week','month')),
@@ -234,7 +280,10 @@ CREATE TABLE habits (
                      CHECK (status IN ('active','paused','archived')),
   created_at       timestamptz NOT NULL DEFAULT now(),
   updated_at       timestamptz NOT NULL DEFAULT now(),
-  deleted_at       timestamptz
+  deleted_at       timestamptz,
+  UNIQUE (id, user_id),
+  FOREIGN KEY (goal_id, user_id) REFERENCES goals (id, user_id)
+    ON DELETE SET NULL (goal_id)
 );
 CREATE INDEX habits_user_status_idx ON habits (user_id, status) WHERE deleted_at IS NULL;
 
@@ -245,7 +294,7 @@ CREATE TABLE habit_completions (
   id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   data_subject text NOT NULL DEFAULT 'user'
                  CHECK (data_subject IN ('user','bystander','world','system')),
-  habit_id      uuid NOT NULL REFERENCES habits(id) ON DELETE CASCADE,
+  habit_id      uuid NOT NULL,
   user_id       uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   for_date      date NOT NULL,                  -- tanggal LOKAL pengguna
   status        text NOT NULL
@@ -256,7 +305,8 @@ CREATE TABLE habit_completions (
                   CHECK (source IN ('manual','auto','import')),
   completed_at  timestamptz NOT NULL DEFAULT now(),
   created_at    timestamptz NOT NULL DEFAULT now(),
-  UNIQUE (habit_id, for_date)
+  UNIQUE (habit_id, for_date),
+  FOREIGN KEY (habit_id, user_id) REFERENCES habits (id, user_id) ON DELETE CASCADE
 );
 CREATE INDEX habit_completions_user_date_idx
   ON habit_completions (user_id, for_date DESC);
@@ -399,7 +449,8 @@ CREATE TABLE events (
   subject_id      uuid,
   payload         jsonb NOT NULL DEFAULT '{}'::jsonb,
   created_at      timestamptz NOT NULL DEFAULT now(),
-  UNIQUE (user_id, idempotency_key)
+  UNIQUE (user_id, idempotency_key),
+  UNIQUE (id, user_id)
 );
 CREATE INDEX events_user_time_idx    ON events (user_id, occurred_at DESC);
 CREATE INDEX events_type_time_idx    ON events (event_type, occurred_at DESC);
@@ -445,14 +496,16 @@ CREATE TABLE memories (
   evidence_count    integer NOT NULL DEFAULT 1 CHECK (evidence_count >= 0),
   model_version     text,
 
-  source_event_id   uuid REFERENCES events(id) ON DELETE SET NULL,
+  source_event_id   uuid,
   valid_from        timestamptz NOT NULL DEFAULT now(),
   valid_until       timestamptz,                 -- NULL = masih berlaku
   last_reinforced_at timestamptz NOT NULL DEFAULT now(),
 
   created_at        timestamptz NOT NULL DEFAULT now(),
   updated_at        timestamptz NOT NULL DEFAULT now(),
-  deleted_at        timestamptz
+  deleted_at        timestamptz,
+  FOREIGN KEY (source_event_id, user_id) REFERENCES events (id, user_id)
+    ON DELETE SET NULL (source_event_id)
 );
 CREATE INDEX memories_user_kind_idx  ON memories (user_id, kind)  WHERE deleted_at IS NULL;
 CREATE INDEX memories_user_scope_idx ON memories (user_id, scope) WHERE deleted_at IS NULL;
@@ -533,7 +586,8 @@ CREATE TABLE ai_conversations (
   last_message_at timestamptz,
   message_count   integer NOT NULL DEFAULT 0,
   created_at      timestamptz NOT NULL DEFAULT now(),
-  deleted_at      timestamptz
+  deleted_at      timestamptz,
+  UNIQUE (id, user_id)
 );
 CREATE INDEX ai_conversations_user_idx
   ON ai_conversations (user_id, last_message_at DESC NULLS LAST)
@@ -546,7 +600,7 @@ CREATE TABLE ai_messages (
   id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   data_subject text NOT NULL DEFAULT 'user'
                  CHECK (data_subject IN ('user','bystander','world','system')),
-  conversation_id uuid NOT NULL REFERENCES ai_conversations(id) ON DELETE CASCADE,
+  conversation_id uuid NOT NULL,
   user_id         uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   role            text NOT NULL CHECK (role IN ('user','assistant','tool','system')),
   content         text NOT NULL,
@@ -556,7 +610,9 @@ CREATE TABLE ai_messages (
   tokens_out      integer,
   latency_ms      integer,
   cost_usd        numeric(12,6),
-  created_at      timestamptz NOT NULL DEFAULT now()
+  created_at      timestamptz NOT NULL DEFAULT now(),
+  FOREIGN KEY (conversation_id, user_id) REFERENCES ai_conversations (id, user_id)
+    ON DELETE CASCADE
 );
 CREATE INDEX ai_messages_conversation_idx
   ON ai_messages (conversation_id, created_at);
@@ -596,7 +652,8 @@ CREATE TABLE recommendations (
   shown_at         timestamptz,
   expires_at       timestamptz,
   created_at       timestamptz NOT NULL DEFAULT now(),
-  updated_at       timestamptz NOT NULL DEFAULT now()
+  updated_at       timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (id, user_id)
 );
 CREATE INDEX recommendations_user_status_idx
   ON recommendations (user_id, status, created_at DESC);
@@ -608,13 +665,15 @@ CREATE TABLE recommendation_feedback (
   id                uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   data_subject text NOT NULL DEFAULT 'user'
                  CHECK (data_subject IN ('user','bystander','world','system')),
-  recommendation_id uuid NOT NULL REFERENCES recommendations(id) ON DELETE CASCADE,
+  recommendation_id uuid NOT NULL,
   user_id           uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   action            text NOT NULL
                       CHECK (action IN ('accepted','rejected','ignored','modified','snoozed')),
   reason            text,
   outcome           jsonb NOT NULL DEFAULT '{}'::jsonb,
-  created_at        timestamptz NOT NULL DEFAULT now()
+  created_at        timestamptz NOT NULL DEFAULT now(),
+  FOREIGN KEY (recommendation_id, user_id) REFERENCES recommendations (id, user_id)
+    ON DELETE CASCADE
 );
 CREATE INDEX recommendation_feedback_user_idx
   ON recommendation_feedback (user_id, created_at DESC);
@@ -665,6 +724,7 @@ CREATE TABLE agents (
 );
 CREATE UNIQUE INDEX agents_one_active_idx
   ON agents (name) WHERE status = 'active';
+```
 
 > 🔧 **`risk_level` → `max_risk`, dan `requires_confirmation` dihapus
 > (10 Sep 2026).** Bukan keputusan baru — penerapan dua keputusan yang sudah
@@ -687,7 +747,15 @@ CREATE UNIQUE INDEX agents_one_active_idx
 >
 > `autonomy.max_level`, `kill_condition`, dan `deploy` tetap di `manifest jsonb`
 > sampai Phase 11 — belum ada gerbang V0 yang membacanya.
+>
+> 🔧 **Pagar blok kode di atas baru ditutup 16 Sep 2026.** Sampai hari itu
+> catatan ini — 21 baris markdown — tertulis **di dalam** blok ` ```sql `
+> tabel `agents`, sehingga DDL berkas ini tidak bisa dijalankan apa adanya.
+> Ditemukan saat migrasi 0001 dibandingkan dengan berkas ini secara mesin
+> (`tests/integration/test_migrasi.py`), yang kini menolak baris markdown di
+> dalam blok SQL.
 
+```sql
 -- @retention   : forever
 -- @who-can-set : system
 -- @on-delete   : not-applicable
@@ -724,8 +792,8 @@ CREATE TABLE agent_runs (
                  CHECK (data_subject IN ('user','bystander','world','system')),
   agent_id        uuid NOT NULL REFERENCES agents(id),
   agent_version   text NOT NULL,
-  conversation_id uuid REFERENCES ai_conversations(id) ON DELETE SET NULL,
-  parent_run_id   uuid REFERENCES agent_runs(id) ON DELETE SET NULL,
+  conversation_id uuid,
+  parent_run_id   uuid,
 
   trigger         text NOT NULL CHECK (trigger IN ('user','schedule','event','agent')),
   status          text NOT NULL DEFAULT 'running'
@@ -746,7 +814,12 @@ CREATE TABLE agent_runs (
   cost_usd        numeric(12,6),
   latency_ms      integer,
   started_at      timestamptz NOT NULL DEFAULT now(),
-  finished_at     timestamptz
+  finished_at     timestamptz,
+  UNIQUE (id, user_id),
+  FOREIGN KEY (conversation_id, user_id) REFERENCES ai_conversations (id, user_id)
+    ON DELETE SET NULL (conversation_id),
+  FOREIGN KEY (parent_run_id, user_id) REFERENCES agent_runs (id, user_id)
+    ON DELETE SET NULL (parent_run_id)
 );
 CREATE INDEX agent_runs_user_time_idx  ON agent_runs (user_id, started_at DESC);
 CREATE INDEX agent_runs_agent_idx      ON agent_runs (agent_id, started_at DESC);
@@ -755,12 +828,14 @@ CREATE INDEX agent_runs_parent_idx     ON agent_runs (parent_run_id)
 
 ALTER TABLE ai_messages
   ADD CONSTRAINT ai_messages_agent_run_fk
-  FOREIGN KEY (agent_run_id) REFERENCES agent_runs(id) ON DELETE SET NULL;
+  FOREIGN KEY (agent_run_id, user_id) REFERENCES agent_runs (id, user_id)
+    ON DELETE SET NULL (agent_run_id);
 ALTER TABLE recommendations
   ADD CONSTRAINT recommendations_agent_fk
   FOREIGN KEY (agent_id) REFERENCES agents(id),
   ADD CONSTRAINT recommendations_run_fk
-  FOREIGN KEY (agent_run_id) REFERENCES agent_runs(id) ON DELETE SET NULL;
+  FOREIGN KEY (agent_run_id, user_id) REFERENCES agent_runs (id, user_id)
+    ON DELETE SET NULL (agent_run_id);
 ```
 
 > **`agent_runs` ADALAH AI Audit Trail** naskah 5 §24 — `tools_used`,
@@ -812,6 +887,163 @@ REVOKE UPDATE, DELETE ON audit_logs FROM PUBLIC;
 > **audit menyimpan bahwa sesuatu terjadi, bukan isi dari yang terjadi.**
 > `bigint identity` dipakai, bukan uuid, karena tabel ini hanya pernah
 > ditambah dan dibaca berurutan waktu.
+
+---
+
+## 9 · Pemicu `updated_at`
+
+```sql
+CREATE TRIGGER users_set_updated_at             BEFORE UPDATE ON users             FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+CREATE TRIGGER profiles_set_updated_at          BEFORE UPDATE ON profiles          FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+CREATE TRIGGER permissions_set_updated_at       BEFORE UPDATE ON permissions       FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+CREATE TRIGGER goals_set_updated_at             BEFORE UPDATE ON goals             FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+CREATE TRIGGER goal_milestones_set_updated_at   BEFORE UPDATE ON goal_milestones   FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+CREATE TRIGGER habits_set_updated_at            BEFORE UPDATE ON habits            FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+CREATE TRIGGER daily_checkins_set_updated_at    BEFORE UPDATE ON daily_checkins    FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+CREATE TRIGGER journal_entries_set_updated_at   BEFORE UPDATE ON journal_entries   FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+CREATE TRIGGER memories_set_updated_at          BEFORE UPDATE ON memories          FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+CREATE TRIGGER recommendations_set_updated_at   BEFORE UPDATE ON recommendations   FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+CREATE TRIGGER agents_set_updated_at            BEFORE UPDATE ON agents            FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+```
+
+> 🔴 **Ditambahkan 16 Sep 2026 — dan ketiadaannya bukan kerapian.** Bagian
+> *Awalan* mendefinisikan `set_updated_at()` dengan komentar *“dipakai semua
+> tabel yang punya `updated_at`”* — tetapi sampai hari itu **tidak ada satu
+> pun `CREATE TRIGGER`** di berkas ini. Sebelas tabel punya kolom
+> `updated_at`; tanpa pemicu, kolom itu **tetap berisi waktu pembuatan
+> selamanya**, dan setiap penulis `repository.py` harus *ingat* mengisinya
+> sendiri. Itu aturan tanpa penjaga dalam bentuk yang paling kecil.
+>
+> Ditemukan dengan menulis migrasi 0001 — bukan dengan membaca berkas ini
+> (pola **E-42**). `tests/integration/test_migrasi.py` kini menuntut
+> **tiap tabel ber-`updated_at` punya pemicunya**, jadi tabel ke-24 tidak
+> bisa lupa.
+
+---
+
+## 10 · Hak akses peran aplikasi (B-40)
+
+```sql
+-- `hvx_app` hanya mendapat yang dibutuhkan aplikasi, tabel demi tabel.
+-- Tabel tanpa GRANT tidak tersentuh sama sekali: lupa = gagal keras, bukan bocor.
+
+-- tulisan pengguna: baca · tulis · ubah · hapus (hak hapus nyata — naskah 5 §26)
+GRANT SELECT, INSERT, UPDATE, DELETE ON
+  permissions, goals, goal_milestones, habits, habit_completions,
+  daily_checkins, mood_entries, journal_entries, activities,
+  memories, human_states, ai_conversations, recommendations
+  TO hvx_app;
+
+-- akun & profil: baris dihapus prosedur hapus akun (CASCADE dari users), bukan aplikasi
+GRANT SELECT, INSERT, UPDATE ON users, profiles TO hvx_app;
+
+-- hanya-tambah: riwayat persetujuan · event (02 aturan C) · pesan AI · umpan balik · audit
+GRANT SELECT, INSERT ON
+  consents, events, ai_messages, recommendation_feedback, audit_logs
+  TO hvx_app;
+
+-- audit AI: status run berubah (running → succeeded); barisnya tidak pernah dihapus aplikasi
+GRANT SELECT, INSERT, UPDATE ON agent_runs TO hvx_app;
+
+-- katalog sistem: dikelola migrasi
+GRANT SELECT ON agents, agent_tools TO hvx_app;
+```
+
+> 🛑 **B-40 — ditutup 17 Sep 2026.** Sampai hari itu api tersambung sebagai
+> **superuser pemilik tabel**, sehingga `REVOKE UPDATE, DELETE ON audit_logs
+> FROM PUBLIC` tidak menghalangi apa pun — diverifikasi: `UPDATE` & `DELETE`
+> lolos, dan superuser melewati RLS. Kini api tersambung sebagai anggota
+> `hvx_app`, **menolak mulai** kalau perannya superuser, `BYPASSRLS`, atau
+> pemilik tabel (`platform.pastikan_peran_aplikasi`), dan tiap baris hak akses
+> di atas dijaga `tests/integration/test_kepemilikan_data.py`.
+>
+> ⚠️ **Yang sengaja tidak diberikan:** `DELETE` pada `users` (tahap 3 prosedur
+> hapus akun dijalankan peran pemeliharaan, bukan aplikasi — tugas 6.5) dan
+> `UPDATE`/`DELETE` pada tabel hanya-tambah. Hapus kategori `events` di Privacy
+> Center (6.4) butuh jalur tersendiri; ia tidak boleh dibuka dengan melebarkan
+> `GRANT` di sini.
+
+---
+
+## 11 · Row-Level Security — data tiap pengguna milik pribadinya (H-27)
+
+```sql
+-- Peran aplikasi hanya melihat & menulis baris pengguna yang sedang dilayani
+-- transaksi (app_current_user_id()). Pemilik tabel — peran migrasi — tidak
+-- terkena RLS, sengaja: migrasi dan pemeliharaan. Aplikasi tidak pernah memakainya.
+
+ALTER TABLE users ENABLE ROW LEVEL SECURITY;
+CREATE POLICY users_own_row ON users
+  USING (id = app_current_user_id()) WITH CHECK (id = app_current_user_id());
+
+ALTER TABLE profiles                ENABLE ROW LEVEL SECURITY;
+ALTER TABLE consents                ENABLE ROW LEVEL SECURITY;
+ALTER TABLE permissions             ENABLE ROW LEVEL SECURITY;
+ALTER TABLE goals                   ENABLE ROW LEVEL SECURITY;
+ALTER TABLE goal_milestones         ENABLE ROW LEVEL SECURITY;
+ALTER TABLE habits                  ENABLE ROW LEVEL SECURITY;
+ALTER TABLE habit_completions       ENABLE ROW LEVEL SECURITY;
+ALTER TABLE daily_checkins          ENABLE ROW LEVEL SECURITY;
+ALTER TABLE mood_entries            ENABLE ROW LEVEL SECURITY;
+ALTER TABLE journal_entries         ENABLE ROW LEVEL SECURITY;
+ALTER TABLE activities              ENABLE ROW LEVEL SECURITY;
+ALTER TABLE events                  ENABLE ROW LEVEL SECURITY;
+ALTER TABLE memories                ENABLE ROW LEVEL SECURITY;
+ALTER TABLE human_states            ENABLE ROW LEVEL SECURITY;
+ALTER TABLE ai_conversations        ENABLE ROW LEVEL SECURITY;
+ALTER TABLE ai_messages             ENABLE ROW LEVEL SECURITY;
+ALTER TABLE recommendations         ENABLE ROW LEVEL SECURITY;
+ALTER TABLE recommendation_feedback ENABLE ROW LEVEL SECURITY;
+ALTER TABLE agent_runs              ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY profiles_own_rows                ON profiles                USING (user_id = app_current_user_id()) WITH CHECK (user_id = app_current_user_id());
+CREATE POLICY consents_own_rows                ON consents                USING (user_id = app_current_user_id()) WITH CHECK (user_id = app_current_user_id());
+CREATE POLICY permissions_own_rows             ON permissions             USING (user_id = app_current_user_id()) WITH CHECK (user_id = app_current_user_id());
+CREATE POLICY goals_own_rows                   ON goals                   USING (user_id = app_current_user_id()) WITH CHECK (user_id = app_current_user_id());
+CREATE POLICY goal_milestones_own_rows         ON goal_milestones         USING (user_id = app_current_user_id()) WITH CHECK (user_id = app_current_user_id());
+CREATE POLICY habits_own_rows                  ON habits                  USING (user_id = app_current_user_id()) WITH CHECK (user_id = app_current_user_id());
+CREATE POLICY habit_completions_own_rows       ON habit_completions       USING (user_id = app_current_user_id()) WITH CHECK (user_id = app_current_user_id());
+CREATE POLICY daily_checkins_own_rows          ON daily_checkins          USING (user_id = app_current_user_id()) WITH CHECK (user_id = app_current_user_id());
+CREATE POLICY mood_entries_own_rows            ON mood_entries            USING (user_id = app_current_user_id()) WITH CHECK (user_id = app_current_user_id());
+CREATE POLICY journal_entries_own_rows         ON journal_entries         USING (user_id = app_current_user_id()) WITH CHECK (user_id = app_current_user_id());
+CREATE POLICY activities_own_rows              ON activities              USING (user_id = app_current_user_id()) WITH CHECK (user_id = app_current_user_id());
+CREATE POLICY events_own_rows                  ON events                  USING (user_id = app_current_user_id()) WITH CHECK (user_id = app_current_user_id());
+CREATE POLICY memories_own_rows                ON memories                USING (user_id = app_current_user_id()) WITH CHECK (user_id = app_current_user_id());
+CREATE POLICY human_states_own_rows            ON human_states            USING (user_id = app_current_user_id()) WITH CHECK (user_id = app_current_user_id());
+CREATE POLICY ai_conversations_own_rows        ON ai_conversations        USING (user_id = app_current_user_id()) WITH CHECK (user_id = app_current_user_id());
+CREATE POLICY ai_messages_own_rows             ON ai_messages             USING (user_id = app_current_user_id()) WITH CHECK (user_id = app_current_user_id());
+CREATE POLICY recommendations_own_rows         ON recommendations         USING (user_id = app_current_user_id()) WITH CHECK (user_id = app_current_user_id());
+CREATE POLICY recommendation_feedback_own_rows ON recommendation_feedback USING (user_id = app_current_user_id()) WITH CHECK (user_id = app_current_user_id());
+CREATE POLICY agent_runs_own_rows              ON agent_runs              USING (user_id = app_current_user_id()) WITH CHECK (user_id = app_current_user_id());
+
+-- audit_logs: pengguna membaca jejaknya sendiri; aplikasi menambah baris milik
+-- pengguna yang dilayani ATAU baris sistem (user_id NULL — CHECK tabel memastikan
+-- data_subject baris itu bukan 'user'). Tidak ada kebijakan UPDATE/DELETE.
+ALTER TABLE audit_logs ENABLE ROW LEVEL SECURITY;
+CREATE POLICY audit_logs_read_own ON audit_logs FOR SELECT
+  USING (user_id = app_current_user_id());
+CREATE POLICY audit_logs_append ON audit_logs FOR INSERT
+  WITH CHECK (user_id IS NULL OR user_id = app_current_user_id());
+```
+
+> 🔑 **Keputusan pemilik 17 Sep 2026 (H-27): *“data milik satu pengguna harus
+> milik pengguna tersebut, data masing-masing pengguna milik pribadi user.”***
+> Tiga lapis menegakkannya, dan tidak satu pun bergantung pada ingatan penulis
+> `repository.py`:
+>
+> | Lapis | Menjaga | Penegak |
+> |---|---|---|
+> | **RLS** (§11) | pengguna A tidak pernah **membaca, mengubah, atau menulis** baris pengguna B — bahkan kalau `WHERE user_id = …` terlupa di kueri | `test_kepemilikan_data.py` · 21 tabel |
+> | **FK komposit** (B-41) | baris anak tidak pernah menunjuk **induk milik pengguna lain** — FK PostgreSQL tidak menerapkan RLS, jadi RLS saja tidak cukup | idem · 11 relasi |
+> | **peran aplikasi** (§10, B-40) | tidak ada yang melewati kedua lapis di atas: api bukan superuser, bukan pemilik, tanpa `BYPASSRLS` | idem + api menolak mulai |
+>
+> ⚠️ **Harga yang diakui:** tiap kueri aplikasi wajib berjalan di dalam
+> transaksi yang mengisi `hvx.user_id` (`platform.transaksi_pengguna`).
+> Kueri yang lupa **tidak melihat apa pun** — gagal-tertutup, bukan bocor.
+> Yang butuh melihat lintas pengguna **sebelum** pengguna dikenali (mencari akun
+> saat login) atau **lintas akun** (sapuan hapus akun 6.5) memakai fungsi
+> `SECURITY DEFINER` yang sempit, satu per kebutuhan — bukan pelonggaran
+> kebijakan.
 
 ---
 

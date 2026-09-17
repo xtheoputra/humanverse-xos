@@ -401,12 +401,76 @@ sesudahnya.
 
 ---
 
+## K-17 · Arah IMPOR modul V0: `events` di bawah modul domain
+
+> Diputuskan 16 September 2026, saat Sprint 0 tugas 0.8 menuliskan batas modul
+> [`../spec/06`](../spec/06-MODULE-BOUNDARIES.md) sebagai kontrak `import-linter`.
+
+| | |
+|---|---|
+| **Keputusan** | Lapisan impor V0, atas boleh mengimpor bawah dan tidak pernah sebaliknya: `agents` › `intelligence` › `memory` › `goals \| habits \| checkins \| journal \| activities \| profile` (saling independen) › `events` › `identity` › `platform`. Ditegakkan kontrak `m1-m3-lapisan` di `pyproject.toml`. |
+| **Bukti** | `spec/06` aturan 6: *“setiap tulisan ke tabel domain **wajib** menerbitkan event”* — sebuah modul yang wajib menerbitkan harus bisa **memanggil** penerbitnya. Aturan 4: *“tidak ada modul yang mengimpor `agents`”* ⇒ `agents` di puncak. `platform` *“boleh dipakai semua”* dan (arch/04 §1 aturan 7) tidak boleh tahu aturan domain ⇒ di dasar. `memory` membaca **isi** jurnal untuk ekstraksi (tugas 3.6) — dan isi jurnal sengaja tidak pernah masuk event (`spec/03`: `journal.created` hanya membawa `word_count`) ⇒ `memory` wajib bisa mengimpor `journal`, jadi di atas domain. `intelligence`: 5.3 menulis `human_states` milik `profile`, 5.5 membaca subjek habit & goal ⇒ di atas `memory`. |
+| **Bacaan yang DITOLAK** | *“Gambar `spec/06` menaruh `events` di bawah modul domain dengan panah ke bawah, dan arch/04 §1 menaruh `events` di L2 di atas `services/*` L1 — jadi `events` lapisan yang lebih TINGGI.”* 🛑 **Ditolak:** kedua gambar menggambarkan arah **data** (kejadian mengalir dari domain ke `events` lalu ke `memory`). Kalau arah itu dipakai sebagai arah impor, modul domain tidak bisa menerbitkan event tanpa `events` mengimpor tiap modul domain — kebalikan dari *“komunikasinya lewat event”*. |
+| **Yang TIDAK berubah** | 12 modul · 23 tabel · kepemilikan tabel `spec/06` · aturan 3 (domain tidak saling impor) — seluruhnya tetap. |
+| **Cara membalikkan** | Ubah urutan `layers` kontrak `m1-m3-lapisan`, lalu jalankan `uv run python tools/uji_mutasi_kode.py`. Selama modul domain belum menerbitkan event (Sprint 3), biayanya nol. |
+
+> ⚠️ **Satu hal yang berkas ini TIDAK putuskan, dan akan datang di Sprint 1:**
+> di mana alur *register* membuat baris `profiles` — `identity` di bawah
+> `profile`, jadi `identity` tidak boleh memanggilnya. Dua jalan sah: titik
+> rakit `hvx.main` mengorkestrasi keduanya, atau `profile` mendengarkan
+> kejadian pendaftaran. Dipilih saat tugas 1.1/1.3 ditulis, dengan uji.
+
+---
+
+## K-18 · Satu commit per tugas; PR boleh satu per sprint
+
+> Diputuskan 16 September 2026, saat Sprint 0 (delapan tugas) dibuka sebagai PR.
+
+| | |
+|---|---|
+| **Keputusan** | Unit tinjauan adalah **commit**: tiap tugas `spec/07` satu commit, dengan nomor tugasnya di pesan commit. Satu PR boleh memuat seluruh tugas satu sprint. Baris HUMAN REVIEW §27 tidak berubah — **pemilik yang menggabungkan** (H-25). |
+| **Bukti** | `spec/07` semula menulis *“setiap tugas: satu PR”*. Delapan tugas Sprint 0 saling bergantung dalam satu berkas bersama (`pyproject.toml` memegang konfigurasi uji 0.6, kontrak 0.8, dan dependensi 0.1 sekaligus) — delapan PR bertumpuk akan menuntut pemilik menggabungkan secara berurutan, dan tiap PR sebelum yang terakhir tidak bisa lulus gerbang penuh sendirian. |
+| **Bacaan yang DITOLAK** | *“Satu PR per sprint berarti tinjauan lebih kasar.”* Ditolak sebagian: tinjauan per commit tetap mungkin di antarmuka PR. ⚠️ **Harga yang diakui:** hanya commit TERAKHIR yang dijamin lulus gerbang penuh; commit di tengah tidak diverifikasi satu per satu, dan itu dinyatakan di deskripsi PR. |
+| **Cara membalikkan** | Pecah PR menurut commit (satu branch per tugas, bertumpuk), lalu kembalikan kalimat `spec/07`. |
+
+---
+
+## K-19 · Kepemilikan data dijaga basis data: RLS berbasis pengguna-transaksi, FK komposit, peran aplikasi
+
+> Diputuskan 17 September 2026, menerapkan kata pemilik **H-27** — *“data
+> masing-masing pengguna milik pribadi user”* — dan menutup **B-40** · **B-41**.
+
+| | |
+|---|---|
+| **Keputusan** | **(1)** RLS di tiap tabel milik pengguna: `user_id = app_current_user_id()`, dengan `app_current_user_id()` membaca `hvx.user_id` yang diisi aplikasi **per transaksi** (`set_config(…, true)`, `platform.transaksi_pengguna`) — tidak diisi ⇒ `NULL` ⇒ nol baris. **(2)** FK antara dua tabel milik pengguna selalu pasangan `(induk_id, user_id) → induk(id, user_id)`. **(3)** api tersambung sebagai anggota `hvx_app` — hak akses tabel demi tabel, `audit_logs`/`events` hanya-tambah — dan **menolak mulai** sebagai superuser, `BYPASSRLS`, atau pemilik (termasuk pewaris pemilik) tabel. |
+| **Bukti** | H-27. **B-40**: sebagai superuser pemilik tabel, `REVOKE` tidak berlaku dan RLS dilewati — diverifikasi. **B-41**: diukur, anak B menempel ke goal A lalu ikut terhapus. PostgreSQL: pemeriksaan FK **tidak menerapkan RLS** ⇒ RLS saja tidak menutup B-41; FK komposit saja tidak mencegah **membaca** baris orang lain ⇒ keduanya dibutuhkan, dan keduanya tak berarti tanpa (3). |
+| **Bacaan yang DITOLAK** | **(a)** *“Satu peran PostgreSQL per pengguna, RLS pada `current_user`”* — ditolak: ribuan peran login yang berlaku sekluster, dan pool koneksi tidak bisa dipakai bersama antarpengguna. **(b)** *“Cukup aturan repository `WHERE user_id = :me`, dijaga uji”* — ditolak: satu kueri yang lupa membocorkan data pengguna lain; dengan RLS, kelupaan yang sama memulangkan nol baris. **(c)** *“`FORCE ROW LEVEL SECURITY` supaya pemilik tabel pun terkena”* — ditolak untuk V0: migrasi dan pemeliharaan (sapuan hapus akun) butuh melihat semua baris, dan api tidak pernah memakai peran pemilik — dijaga penjaga mulai. |
+| **Harga yang diakui** | Tiap kueri wajib di dalam `transaksi_pengguna`. Pencarian **sebelum** pengguna dikenali (login per email) dan sapuan **lintas akun** (hapus akun 6.5) butuh fungsi `SECURITY DEFINER` yang sempit, satu per kebutuhan — bukan kebijakan yang dilonggarkan. |
+| **Cara membalikkan** | Migrasi baru yang `DROP POLICY` + `DISABLE ROW LEVEL SECURITY`; FK komposit boleh dibiarkan (tidak merugikan apa pun). `test_kepemilikan_data.py` akan merah — ubah bersamanya, dengan catatan kenapa. |
+
+---
+
+## K-20 · CI tanpa tagihan: status commit dari gerbang lokal
+
+> Diputuskan 17 September 2026, menerapkan kata pemilik **H-26** — *“gunakan
+> alternatif versi gratis jangan ada tagihan”* — untuk [#160](../../issues/160).
+
+| | |
+|---|---|
+| **Keputusan** | `tools/ci_lokal.py --lapor-github` menjalankan gerbang PENUH lalu menempelkan hasilnya ke commit HEAD sebagai status **`ci-lokal`** lewat API status commit. Laporan ditolak untuk gerbang sebagian, pohon kerja kotor, atau commit yang belum menjadi ujung cabang di `origin`. Alur GitHub Actions hanya `workflow_dispatch`, dijaga `test_rantai_pasok.py`. |
+| **Bukti** | H-26. Actions pada repo privat memakai menit berbayar, dan akun ini terhalang tagihan: tiap PR menampilkan job merah **0 langkah** yang tidak pernah dimulai (PR #163). API status commit adalah fitur dasar repo — tidak memakai menit Actions. |
+| **Bacaan yang DITOLAK** | **(a)** *“Runner self-hosted di mesin pemilik”* — ditolak untuk sekarang: layanan yang berjalan terus di mesin pribadi dan menjalankan kode alur kerja, sementara apakah ia lolos dari blokir tagihan akun **belum diverifikasi**. **(b)** *“Jadikan repo publik — Actions dan perlindungan branch gratis”* — bukan milik saya: membuka seluruh naskah pemilik. **(c)** *“Layanan CI pihak ketiga paket gratis”* — butuh akun baru dan akses ke repo privat: keputusan pemilik. |
+| **Harga yang diakui** | Status `ci-lokal` **bisa ditempelkan siapa pun** yang punya akses tulis — ia bukti kejujuran pengembang, bukan penghalang. PR merah tetap tidak terhalang digabung; penghalangnya HUMAN REVIEW. |
+| **Cara membalikkan** | Kembalikan pemicu `pull_request`/`push` di `ci.yml` dan uji `test_alur_actions_tanpa_pemicu_otomatis_supaya_tidak_ada_tagihan` — sesudah pemilik membereskan tagihan atau membuat repo publik. |
+
+---
+
 ## Yang sengaja **tidak** saya putuskan
 
 | Butir | Kenapa |
 |---|---|
 | ~~[#139](../../issues/139) Master Architecture v2.0~~ | ✅ **pemilik memerintahkannya 10 Sep 2026** (*“kerjakan semua tugas dan fase yang masih tersisa”*) — dikerjakan, hasilnya [`../arch/`](../arch/README.md) |
-| [#3](../../issues/3) siapa mengerjakan V0 | orang dan waktu |
+| ~~[#3](../../issues/3) siapa mengerjakan V0~~ | ✅ **pemilik memutuskannya 16 Sep 2026** — AI coding agent di branch + PR, pemilik yang menggabungkan (**H-25**). Yang tetap bukan milik saya: **waktu** pemilik untuk meninjau |
 | [#20](../../issues/20) cek merek & domain | menuntut pencarian merek dan pembelian |
 | **seluruh butir C** (hukum & privasi) | risikonya ditanggung orang yang tidak ikut memilih |
 | §16.5 · §16.7 rantai humanoid | benda yang bisa melukai orang — gerbangnya bukan keputusan gaya |

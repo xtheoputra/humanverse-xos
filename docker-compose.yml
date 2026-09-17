@@ -1,0 +1,126 @@
+# HumanVerse XOS — V0 lokal (arch/09 §1, tahap D0). spec/07 tugas 0.2.
+#
+#   docker compose up -d --wait          # semuanya, tunggu sampai sehat
+#   docker compose up -d --wait postgres redis   # hanya ketergantungan (untuk uji)
+#
+# Port — semuanya HANYA di 127.0.0.1, tidak terbuka ke jaringan lokal:
+#
+#   | Layanan  | Port hos (bawaan) | Ganti lewat          |
+#   |----------|-------------------|----------------------|
+#   | api      | 8000              | HVX_API_PORT         |
+#   | postgres | 5432              | HVX_POSTGRES_PORT    |
+#   | redis    | 6379              | HVX_REDIS_PORT       |
+#
+# Dua peran basis data, dan sengaja tidak pernah tertukar (B-40, spec/01 §10):
+#   migrate  → PEMILIK skema (HVX_POSTGRES_USER)       — membuat tabel, tidak melayani permintaan
+#   api      → HVX_API_DB_USER, anggota `hvx_app`       — bukan superuser, bukan pemilik; RLS berlaku
+#
+# ⚠️ Kredensial bawaan di bawah KHUSUS pengembangan lokal (`*-dev-only`) dan
+#    tidak pernah dipakai di lingkungan lain. Tahap D1+ membaca rahasia dari
+#    lingkungan, bukan dari berkas ini (arch/09 §5 aturan 3). Salin
+#    `.env.example` → `.env` untuk menggantinya.
+
+name: humanverse-xos
+
+x-api-image: &api-image
+  build:
+    context: .
+    dockerfile: infrastructure/docker/api.Dockerfile
+  # CI memakai tag sendiri (hvx-api:ci) supaya pindai tidak menilai citra dev.
+  image: ${HVX_API_IMAGE:-hvx-api:local}
+
+services:
+  postgres:
+    image: postgres:16-alpine@sha256:cf78e76683b9ca8c5733cbbdce6c9262b45b6767934dd0a95e671f9a0fc20685
+    environment:
+      POSTGRES_USER: ${HVX_POSTGRES_USER:-hvx}
+      POSTGRES_PASSWORD: ${HVX_POSTGRES_PASSWORD:-hvx-dev-only}
+      POSTGRES_DB: ${HVX_POSTGRES_DB:-hvx}
+    ports:
+      - "127.0.0.1:${HVX_POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
+
+  redis:
+    image: redis:7-alpine@sha256:ff02b58f971e7d7d156a1267e283fcbbeee91773b6aa36c49dac28ecfe28eadf
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "127.0.0.1:${HVX_REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  # Sekali jalan: skema dimigrasikan SEBELUM api menerima permintaan pertama —
+  # sebagai PEMILIK skema. Migrasi 0001 juga membuat peran NOLOGIN `hvx_app`.
+  migrate:
+    <<: *api-image
+    command: ["alembic", "-c", "data/migrations/alembic.ini", "upgrade", "head"]
+    environment:
+      HVX_MIGRATION_DATABASE_URL: postgresql://${HVX_POSTGRES_USER:-hvx}:${HVX_POSTGRES_PASSWORD:-hvx-dev-only}@postgres:5432/${HVX_POSTGRES_DB:-hvx}
+      HVX_LOG_LEVEL: ${HVX_LOG_LEVEL:-INFO}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  # Sekali jalan: peran LOGIN api, anggota `hvx_app`. KHUSUS D0 — di D1+ peran
+  # ini dibuat infrastruktur dengan sandi dari pengelola rahasia, bukan dari sini.
+  db-roles:
+    image: postgres:16-alpine@sha256:cf78e76683b9ca8c5733cbbdce6c9262b45b6767934dd0a95e671f9a0fc20685
+    command: ["psql", "-v", "ON_ERROR_STOP=1", "-f", "/peran/peran-lokal.sql"]
+    environment:
+      PGHOST: postgres
+      PGUSER: ${HVX_POSTGRES_USER:-hvx}
+      PGPASSWORD: ${HVX_POSTGRES_PASSWORD:-hvx-dev-only}
+      PGDATABASE: ${HVX_POSTGRES_DB:-hvx}
+      HVX_API_DB_USER: ${HVX_API_DB_USER:-hvx_api}
+      HVX_API_DB_PASSWORD: ${HVX_API_DB_PASSWORD:-hvx-api-dev-only}
+    volumes:
+      - ./infrastructure/postgres:/peran:ro
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    restart: "no"
+
+  api:
+    <<: *api-image
+    environment:
+      HVX_ENV: ${HVX_ENV:-local}
+      HVX_DATABASE_URL: postgresql://${HVX_API_DB_USER:-hvx_api}:${HVX_API_DB_PASSWORD:-hvx-api-dev-only}@postgres:5432/${HVX_POSTGRES_DB:-hvx}
+      HVX_REDIS_URL: redis://redis:6379/0
+      HVX_LOG_LEVEL: ${HVX_LOG_LEVEL:-INFO}
+    ports:
+      - "127.0.0.1:${HVX_API_PORT:-8000}:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+      db-roles:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import sys, urllib.request; sys.exit(urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3).status != 200)"
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 5s
+
+volumes:
+  postgres-data:
+  redis-data:

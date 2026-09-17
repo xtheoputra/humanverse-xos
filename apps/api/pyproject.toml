@@ -1,0 +1,28 @@
+[project]
+name = "hvx-api"
+version = "0.0.1"
+description = "HumanVerse XOS — API V0: satu proses, dua belas modul (spec/06)."
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+  "fastapi>=0.115",
+  "uvicorn[standard]>=0.30",
+  "pydantic>=2.8",
+  "pydantic-settings>=2.4",
+  "sqlalchemy[asyncio]>=2.0.32",
+  "asyncpg>=0.29",
+  # Alembic menjalankan migrasi secara sinkron lewat psycopg 3: satu berkas
+  # SQL berisi banyak pernyataan hanya bisa dikirim lewat protokol kueri
+  # sederhana, dan asyncpg selalu memakai prepared statement.
+  "alembic>=1.13",
+  "psycopg[binary]>=3.2",
+  "redis>=5.0",
+  "structlog>=24.4",
+]
+
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/hvx"]

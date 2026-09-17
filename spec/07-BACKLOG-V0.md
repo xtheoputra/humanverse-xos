@@ -2,7 +2,8 @@
 
 > ⚠️ **Bukan kata pemilik** — lihat [`README.md`](README.md).
 > Tujuh sprint naskah 5 §32 dipecah jadi tugas yang bisa diberikan **satu per
-> satu**. Setiap tugas: satu PR, punya definisi selesai yang bisa diuji mesin.
+> satu**. Setiap tugas: **satu commit** (PR boleh satu per sprint — **K-18**),
+> punya definisi selesai yang bisa diuji mesin.
 
 **Aturan untuk setiap tugas** — dari naskah 5 §27 (*governance tetap manusia*):
 
@@ -36,6 +37,22 @@ Tidak ada tugas yang boleh masuk `main` tanpa baris **HUMAN REVIEW**.
 > 🔧 **1.4 kini memuat B-22** ([#59](../../issues/59)): `consents.purpose`
 > harus ada **sebelum baris data pertama**. Biayanya nol sekarang; data V0 yang
 > dikumpulkan tanpa itu tidak bisa melatih model apa pun di Phase 5.
+>
+> 🔨 **Sprint 0 dikodekan 16 Sep 2026** — branch `v0/sprint-0-foundation`, satu
+> commit per tugas, **menunggu HUMAN REVIEW**. Keadaan tiap "Selesai bila",
+> tanpa dibulatkan:
+>
+> | | Dibuktikan | Yang BELUM |
+> |---|---|---|
+> | 0.1–0.6 | mesin — `tools/ci_lokal.py` tahap lint · typecheck · test · build | — |
+> | 0.5 | tiap baris log punya `request_id` & `user_id`; **`latency_ms` di baris penutup permintaan** (baris lain belum punya latensi untuk dilaporkan) | tafsiran itu dinyatakan di `platform/log.py`, bukan diubah di baris tugasnya |
+> | 0.7 | `ci_lokal.py` kelima tahap hijau **di mesin lokal**, dan merah-hijaunya **terlihat di PR** sebagai status `ci-lokal` (`--lapor-github`) — gratis, **H-26** | 🛑 PR merah **tidak terhalang digabung**: perlindungan branch tidak tersedia untuk repo privat pada paket akun ini. Gerbangnya HUMAN REVIEW (H-25). Actions dimatikan dengan sengaja ([#160](../../issues/160)) |
+> | 0.8 | batas modul `spec/06` aturan 1–4 + **B-2** kontrak `import-linter`, **B-6** pohon repo — semuanya terbukti sanggup gagal | **B-1 · B-3 · B-4 · B-5** belum bisa dinyatakan di V0; pemicunya di blok `penegak` [`../arch/11`](../arch/11-PENEGAKAN.md) §6 |
+>
+> Dua hal yang menulis migrasinya temukan di [`01`](01-DATABASE-SCHEMA.md):
+> 11 tabel ber-`updated_at` **tanpa satu pemicu pun** (E-161), dan catatan
+> markdown **di dalam** blok SQL tabel `agents` (G-24) — keduanya kini
+> dibetulkan dan dijaga uji.
 
 ---
 
@@ -50,6 +67,22 @@ Tidak ada tugas yang boleh masuk `main` tanpa baris **HUMAN REVIEW**.
 | 1.5 | Permission engine: `check(user, subject, scope, action)` | default `ask`; hasil di-cache di Redis; uji untuk allow/deny/ask/expired |
 | 1.6 | `audit_logs` + helper `audit()` | `UPDATE`/`DELETE` ditolak; login, izin, ekspor, hapus tercatat |
 | 1.7 | Batas laju per pengguna & per IP | 429 dengan `Retry-After` |
+
+> ✅ **B-40 — ditutup 17 Sep 2026, sebelum 1.5 dan 1.6 ditulis.** Sampai hari
+> itu api tersambung sebagai **superuser pemilik tabel**, dan `UPDATE` **dan**
+> `DELETE` atas `audit_logs` lolos. Kini api tersambung sebagai anggota
+> `hvx_app` — bukan superuser, bukan pemilik, tanpa `BYPASSRLS` — dan **menolak
+> mulai** kalau tidak; `audit_logs` dan `events` hanya-tambah bagi peran itu
+> ([`01`](01-DATABASE-SCHEMA.md) §10).
+>
+> 🔑 **Untuk 1.1–1.7, tiga hal yang kini mengikat** (RLS §11, **H-27**):
+> **(1)** tiap kueri di dalam `platform.transaksi_pengguna(engine, user_id)` —
+> di luarnya RLS memulangkan nol baris; **(2)** login butuh **fungsi
+> `SECURITY DEFINER` yang sempit** untuk mencari akun per email, sebab RLS di
+> `users` tidak meloloskan pencarian sebelum pengguna dikenali — jangan
+> melonggarkan kebijakannya; **(3)** uji 1.6 *“`UPDATE`/`DELETE` ditolak”*
+> tersambung sebagai peran aplikasi (`basis_data_termigrasi` di
+> `tests/integration/conftest.py`), bukan sebagai pemilik.
 
 ---
 
@@ -68,6 +101,15 @@ Tidak ada tugas yang boleh masuk `main` tanpa baris **HUMAN REVIEW**.
 > **2.7 disengaja ada di Sprint 2, bukan Sprint 6.** Kalau layar pertama baru
 > muncul di sprint terakhir, tidak ada yang tahu apakah yang dibangun enak
 > dipakai sampai waktunya habis.
+>
+> ✅ **B-41 — dibetulkan 17 Sep 2026, sebelum 2.1 ditulis.** Sebelas FK satu
+> kolom di [`01`](01-DATABASE-SCHEMA.md) semula membiarkan baris anak milik
+> pengguna B menunjuk induk milik A — diukur: milestone B menempel ke goal A,
+> lalu **ikut terhapus** saat A menghapus goal-nya. Pemilik: *“data milik satu
+> pengguna harus milik pengguna tersebut”* (**H-27**). Kini tiap relasi
+> pasangan `(induk_id, user_id) → induk(id, user_id)` — basis data sendiri yang
+> menolak — dijaga `tests/integration/test_kepemilikan_data.py` di katalog dan
+> di ke-11 relasinya.
 
 ---
 

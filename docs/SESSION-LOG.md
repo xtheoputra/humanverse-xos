@@ -4,6 +4,116 @@
 
 ---
 
+## Sesi 30 — 17 September 2026
+
+**Pemilik membaca ringkasan PR #163 dan menjawab tiga hal sekaligus: *“gunakan alternatif versi gratis jangan ada tagihan”* · *“menulis kode dan menemukan kesalahan, betulkan saja menurut anda benarnya dimana. kerjakan b-40, b-41”* · *“data milik satu pengguna harus milik pengguna tersebut, data masing-masing pengguna milik pribadi user”* — lalu *“lanjutkan tugas yang belum selesai lainnya”*.**
+
+| Hal | Hasil |
+|---|---|
+| Naskah baru | **tidak ada** |
+| Keputusan pemilik | **H-26** CI tanpa tagihan · **H-27** data tiap pengguna milik pribadinya · aturan kerja: kesalahan spec yang ketemu saat coding **dibetulkan** |
+| Keputusan sendiri | **K-19** kepemilikan data dijaga basis data · **K-20** status commit dari gerbang lokal |
+| Temuan ditutup | **B-40** ✅ · **B-41** ✅ |
+| `spec/` diubah | `01` (§10 hak akses · §11 RLS · FK komposit · peran `hvx_app`) · `02` (aturan G · H · I) · `07` |
+| Penjaga baru | `test_kepemilikan_data.py` (20 uji) · penjaga peran api saat mulai · uji tanpa-tagihan — **7 mutasi baru, semuanya berbunyi** (kode: 35 → 42) |
+
+---
+
+### 🔑 “Gratis” tanpa berhenti menjadi gerbang
+
+Actions dimatikan — tetapi gerbang yang hanya berjalan di mesin pengembang tidak terlihat oleh peninjau. Jalan tengahnya fitur dasar repo yang tidak pernah ditagih: **API status commit**. `ci_lokal.py --lapor-github` menempelkan hasil gerbang penuh ke commit PR sebagai `ci-lokal` — dan **menolak** menempel pada gerbang sebagian, pohon kerja kotor, atau commit yang belum di-push, sebab status hijau pada pohon yang tidak diuji lebih buruk daripada tidak ada status.
+
+⚠️ **Yang diakui:** status itu bukti kejujuran, bukan penghalang — siapa pun yang punya akses tulis bisa menempelkannya, dan PR merah tetap tidak terhalang digabung.
+
+---
+
+### 🔒 Tiga lapis, sebab masing-masing menutup lubang yang lain biarkan
+
+| Lapis | Tanpa lapis ini |
+|---|---|
+| **RLS** — aplikasi hanya melihat baris pengguna yang dilayani transaksi | satu kueri yang lupa `WHERE user_id` membocorkan semua pengguna |
+| **FK komposit** `(induk_id, user_id)` | RLS tidak menolong: **pemeriksaan FK PostgreSQL tidak menerapkan RLS** — anak B tetap bisa menunjuk induk A |
+| **peran aplikasi** + penjaga mulai | superuser dan pemilik tabel **melewati RLS** — dua lapis di atas hanya berlaku bagi yang mau mematuhinya |
+
+> 💡 **B-41 semula “sengaja tidak dibetulkan” dengan alasan yang jujur — dua jalan, dua harga.** Jawabannya ternyata sudah ada di kalimat pemilik: kalau data milik pribadi pengguna, maka itu sifat yang dijaga **basis data**, bukan disiplin penulis `repository.py`.
+
+---
+
+### 🔴 Dua penjaga baru hampir lahir buta — keduanya tertangkap sebelum commit
+
+1. **Uji keberadaan RLS** lulus untuk kebijakan `USING (true)` — ada, tetapi membuka semuanya. Ditambah uji **isi** kebijakan, dengan mutasinya.
+2. **Mutasi “FK kembali satu kolom”** versi pertama mengganti kolom anak tanpa kolom induk; migrasinya gagal `InvalidForeignKey`, dan `uji_mutasi_kode.py` **menolak** menghitungnya berbunyi — tuntutan *“gagal dengan alasan yang dimaksud”* dari Sprint 0 menangkap cacat mutasinya sendiri.
+
+---
+
+## Sesi 29 — 16–17 September 2026
+
+**Pemilik: *“lanjutkan semua tugas dan fase yang belum selesai sesuai dokumen yang tertulis”* — dan, sesudah sesi pertama terputus di tengah sapuan dokumen, *“lanjutkan tugas yang belum selesai”*. Menurut [`arch/10`](../arch/10-URUTAN-IMPLEMENTASI.md), tahap berikutnya adalah T0 — kode V0 — dan satu-satunya penahannya [#3](../../issues/3): siapa yang mengerjakan. Itu ditanyakan, bukan ditebak. Pemilik memilih **AI coding agent di branch + PR, pemilik yang menggabungkan** (**H-25**). Sprint 0 dikodekan penuh.**
+
+| Hal | Hasil |
+|---|---|
+| Naskah baru | **tidak ada** |
+| Kode **produksi** | **0 di `master`** · **Sprint 0 — 8 dari 51 tugas** di branch `v0/sprint-0-foundation`, satu commit per tugas, **menunggu HUMAN REVIEW** |
+| Pemeriksaan `arch/11` yang jalan | 12 → **19 dari 26** — B-2 · M-1 · M-2 · M-3 (`import-linter`) · M-4 · E-3 · A-1 |
+| Yang **terbukti sanggup GAGAL** | 12 → **19 dari 19** — 25 mutasi dokumen · 35 mutasi kode |
+| Gerbang | [`../tools/ci_lokal.py`](../tools/README.md) `lint → typecheck → test → build → scan` **hijau di mesin lokal**; Actions tetap terhalang ([#160](../../issues/160)) |
+| `spec/` diubah | **3 dari 8** — `01` (pemicu `updated_at`, pagar SQL, `pgcrypto`) · `06` (penegak aturan 1–4) · `07` (status Sprint 0 · B-40 · B-41 · K-18) |
+| `arch/` diubah | **3 dari 12** — `06` (E-162) · `10` (#3 terjawab) · `11` (blok ` ```penegak ` yang dibaca uji) |
+| Issue | tidak bertambah — **PR Sprint 0** dibuka |
+| Keputusan | **H-25** (pemilik) · **K-17** arah impor modul · **K-18** satu commit per tugas, PR per sprint |
+| Temuan | **E-161** · **E-162** · **G-24** · **B-40** · **B-41** |
+
+---
+
+### 🔑 Pertanyaan yang HARUS ditanyakan, bukan dijawab sendiri
+
+Seratus dua issue terbuka, dan yang tidak diblokir keputusan pemilik tinggal satu: **mulai menulis kode**. Tetapi *siapa yang menulis* adalah soal orang dan waktu — bukan milik agent. Tiga pilihan ditawarkan: **mulai di branch + PR** · *belum, dokumen saja* · *langsung ke `master`* (yang terakhir melewati HUMAN REVIEW naskah 5 §27). Pemilik memilih yang pertama.
+
+⚠️ **Yang tetap terbuka di #3, dan kini lebih nyata:** 4–6 minggu itu taksiran atau tenggat, dan berapa jam per minggu tersedia untuk **meninjau** — sebab sekarang ada PR yang menunggu.
+
+---
+
+### 🔴 Menulis kode menemukan empat hal yang tujuh sesi membaca tidak temukan
+
+| | Temuan | Kenapa pemeriksa lolos |
+|---|---|---|
+| **E-161** | `set_updated_at()` didefinisikan, **nol `CREATE TRIGGER`** — 11 kolom `updated_at` berisi waktu pembuatan selamanya | P-1..P-3 memeriksa anotasi, bukan pemicu |
+| **G-24** | 21 baris markdown **di dalam** blok SQL `spec/01` sejak 10 Sep — DDL-nya **tidak bisa dijalankan** | regex tabel tetap cocok; tidak ada yang pernah **menjalankan** DDL itu |
+| **E-162** | `arch/06` §3 menyebut himpunan `CHECK` milik `activities`, dan menyuruh *summarizer* memakai nilai yang `CHECK` `events` **tolak** | ditemukan **E-3** begitu ia membaca `CHECK` dari DDL |
+| 🛑 **B-40** | `REVOKE … FROM PUBLIC` di `audit_logs` **tidak menghalangi** role yang dipakai api — `UPDATE` & `DELETE` lolos; superuser melewati RLS | penjaganya benar, tidak pernah dijalankan terhadap pelaku yang sebenarnya |
+
+> 💡 **Pola E-42 berulang di DDL yang sudah diperiksa mesin.** Pemeriksa benar untuk yang ia periksa — dan tidak satu pun pernah menjalankan DDL-nya ke basis data. Kini `test_migrasi.py` melakukannya: DDL `spec/01` dan migrasi 0001 ke dua basis data, katalognya dibandingkan.
+
+🚨 **Pindai citra merah di percobaan pertama** — 2 CVE HIGH (libpcre2) di citra dasar Debian. Gerbangnya berbunyi; citranya kini menambal paket saat dibangun, dan harganya (pembangunan tidak sepenuhnya reprodusibel) ditulis di `SECURITY.md`.
+
+---
+
+### 🔍 Tinjauan adversarial — penegak yang lulus tanpa melihat
+
+Sebelum PR dibuka: enam lensa, dan tiap temuan diserahkan ke verifikator yang **berusaha membantahnya**. **35 temuan · 2 terbantah · 33 bertahan (16 medium · 17 low · 0 high) · 32 dibetulkan · 1 dicatat (B-41).**
+
+Yang paling mahal kalau lolos: `/health` dengan batas 1 dtk **menjawab sesudah 60 dtk** saat PostgreSQL berhenti menjawab. Yang paling memalukan bagi repo ini: **separuh temuan medium adalah penegak yang lulus tanpa melihat** — modul ke-13 lolos keempat kontrak, 10 dari 12 kontrak M-2 tak pernah dibuktikan sanggup gagal, pembanding katalog buta terhadap sepuluh perbedaan skema, dan mutasi R-1 dihitung berbunyi sambil **menghapus** temuan.
+
+> 💡💡 **`uji_mutasi.py` dibangun untuk menjawab *“apakah pemeriksa ini bisa merah?”* — dan satu mutasinya sendiri tidak bisa.** Kini tiap mutasi dokumen wajib melahirkan temuan **baru**, dan tiap mutasi kode wajib gagal dengan **alasan yang dimaksud**.
+
+🛑 **B-41** — sebelas FK satu kolom membiarkan baris anak milik B menempel ke induk milik A, dan terhapus saat A menghapus induknya (diukur ulang 17 Sep). **Sengaja tidak dibetulkan di Sprint 0**: belum ada tulisan baris anak, dan dua jalannya (FK komposit, atau aturan repository yang dijaga uji) punya harga berbeda. Dicatat di `spec/07` tepat sebelum tugas 2.1.
+
+---
+
+### 🔴 Sesi pertama terputus — dan sapuan lanjutannya menemukan yang tertinggal
+
+Sesi 16 Sep berhenti di tengah pembaruan dokumen, sebelum satu commit pun dibuat. Yang dilanjutkan 17 Sep: gerbang dijalankan ulang dari nol atas pohon kerja yang ada (**hijau**), lalu dokumen yang belum tersapu — `tools/README.md` masih menulis 21 dan 12 mutasi (kini 25 dan 35), README tanpa **K-18** dan masih menyebut `uv sync --frozen`, ringkasan `docs/99` masih menulis 21 · 12 mutasi dan tujuh bagian katalog (kini 13), dan catatan `arch/10` menunjuk pemisahan *“bisa jalan”* di `arch/11` yang barisnya sudah dihapus.
+
+> 💡 **Angka ringkasan yang ditulis di tengah perbaikan basi sebelum perbaikannya selesai.** Yang menangkapnya bukan ingatan, melainkan `grep` atas setiap angka yang pernah berubah di sesi yang sama.
+
+---
+
+### 🛑 Yang TETAP milik pemilik
+
+**HUMAN REVIEW dan merge PR Sprint 0.** [#160](../../issues/160) — Actions terhalang tagihan, dan perlindungan branch tidak tersedia untuk repo privat pada paket akun ini: **PR merah pun tidak terhalang digabung**. Sisa [#3](../../issues/3) soal waktu. **Nol butir C diputuskan.** R-1 tetap 7 temuan (keputusan cakupan).
+
+---
+
 ## Sesi 28 — 11 September 2026
 
 **Pemilik mengulang: *“lanjutkan semua tugas dan fase”*. Sesi 27 menutup dengan kalimat *“yang tersisa dan tidak diblokir cuma satu, dan sudah dikerjakan”* — dan kalimat itu berhenti benar begitu satu pertanyaan ditanyakan pada `arch/11` sendiri: *apakah yang diperiksa tiap aturan sudah ada dalam bentuk lain?* Jawabannya memindahkan DELAPAN pemeriksaan dari “menunggu kode” ke “jalan hari ini”.**

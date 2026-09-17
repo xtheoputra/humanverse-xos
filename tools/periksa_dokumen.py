@@ -1,19 +1,24 @@
 #!/usr/bin/env python3
-"""Pemeriksa dokumen HumanVerse XOS — E-1, E-2, G-1, R-1.
+"""Pemeriksa dokumen HumanVerse XOS — pemeriksaan `arch/11` yang membaca
+DOKUMEN, DDL, dan POHON DIREKTORI (bukan impor kode — itu `import-linter`).
 
-Empat dari dua puluh lima pemeriksaan `arch/11` yang bisa dijalankan
-TANPA satu baris kode produksi, sebab keempatnya membaca DOKUMEN.
+Semula ditulis untuk empat pemeriksaan tanpa satu baris kode produksi. Sejak
+Sprint 0 ia juga membaca artefak yang sampai ke basis data (berkas migrasi)
+dan pohon repo yang sungguhan — tetapi tetap nol dependensi.
 
     E-1  segmen pertama `event_type` wajib ada di registry domain (arch/07 §2)
     E-2  `event_type` wajib dua segmen, huruf kecil, kata kerja lampau
+    E-3  tidak ada `source='sensor'` di `events` (spec/01 + migrasi)
     E-4  kata kerja pengubah keadaan punya kembaran kegagalan (arch/07 §6)
     E-5  tiap nama event di naskah punya baris di tabel padanan spec/03
-    P-1  tiap CREATE TABLE menyatakan retensi/who-can-set/on-delete (spec/01)
-    P-2  tiap tabel punya kolom `data_subject`
-    P-3  tidak ada `user_id` nullable tanpa penjaga
+    P-1  tiap CREATE TABLE menyatakan retensi/who-can-set/on-delete (spec/01 + migrasi)
+    P-2  tiap tabel punya kolom `data_subject` (spec/01 + migrasi)
+    P-3  tidak ada `user_id` nullable tanpa penjaga (spec/01 + migrasi)
+    A-1  satu angka tidak dipakai untuk R DAN L (manifest spec/05 + DDL `agents`)
     A-2  tiap tool di `tools:` punya `risk_level <= max_risk` (spec/05)
     A-3  agent yang dipanggil agent lain punya entri `kind: agent`
-    B-6  tepat satu pohon `security/` (arch/03)
+    B-6  tepat satu pohon `security/` (arch/03) · tak ada pohon kedua (repo nyata)
+    M-4  tak ada direktori bernama kata kamus tabrakan di luar pemiliknya (repo nyata)
     G-1  tiap pasal Konstitusi §20.16 wajib punya >= 1 penegak (arch/08 §4)
     R-1  tiap pasangan (gerbang G, yang dijaga T): index(G) < index(T)
 
@@ -43,6 +48,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import sys
 from collections import OrderedDict
@@ -203,7 +209,7 @@ LAMPAU_TAK_BERATURAN = {
     "bought", "brought", "caught", "taught", "thought", "felt", "fallen",
     "risen", "broken", "chosen", "frozen", "spoken", "stolen", "woken",
     "forgotten", "hidden", "ridden", "beaten", "eaten", "driven", "run",
-    "sung", "sunk", "swum", "torn", "worn", "bound", "sworn",
+    "sung", "sunk", "swum", "torn", "bound", "sworn",
 }
 
 
@@ -608,55 +614,173 @@ def periksa_r1() -> Hasil:
 #    benar" melainkan "**apakah yang diperiksanya sudah ada dalam
 #    bentuk lain?**"
 
-POLA_TABEL = re.compile(r"CREATE TABLE (\w+) \((.*?)\n\);", re.S)
+# 🔴 Versi pertama: `CREATE TABLE (\w+) \((.*?)\n\);` — SATU ejaan persis.
+#    `IF NOT EXISTS`, nama berskema (`public.x`), `UNLOGGED`, atau akhiran
+#    `) WITH (...);` membuat tabel TIDAK TERLIHAT, dan akhiran yang bukan
+#    `\n);` membuat pola malas MENELAN tabel berikutnya — anotasi, kolom
+#    `data_subject`, dan `user_id` tabel yang tertelan tidak pernah diperiksa.
+#    Kini kepala dicari longgar, badan diambil dengan MENYEIMBANGKAN tanda
+#    kurung, dan jumlah token `CREATE … TABLE` wajib sama dengan jumlah tabel
+#    yang terbaca — tabel yang tidak terbaca parser adalah KEGAGALAN.
+POLA_KEPALA_TABEL = re.compile(
+    r"\bCREATE\s+(?:(?:GLOBAL|LOCAL)\s+)?(?:(?:TEMPORARY|TEMP|UNLOGGED)\s+)?TABLE\s+"
+    r"(?:IF\s+NOT\s+EXISTS\s+)?(?:\"?\w+\"?\.)?\"?(\w+)\"?\s*\(",
+    re.I,
+)
+POLA_TOKEN_TABEL = re.compile(r"\bCREATE\b[\w\s]*?\bTABLE\b", re.I)
 ANOTASI = ("@retention", "@who-can-set", "@on-delete")
+MIGRASI = AKAR / "data" / "migrations" / "versions"
 
 
-def _tabel_ddl() -> list[tuple[str, str, str]]:
-    """[(nama, badan, anotasi di atasnya)] dari spec/01."""
-    teks = baca(SPEC01)
+def buang_komentar_sql(teks: str) -> str:
+    """Buang `-- …` sampai akhir baris, KECUALI di dalam literal '…'."""
+    keluar, di_string, i = [], False, 0
+    while i < len(teks):
+        c = teks[i]
+        if c == "'":
+            di_string = not di_string
+        elif not di_string and teks.startswith("--", i):
+            j = teks.find("\n", i)
+            i = len(teks) if j == -1 else j
+            continue
+        keluar.append(c)
+        i += 1
+    return "".join(keluar)
+
+
+def _badan_seimbang(teks: str, buka: int) -> str | None:
+    """Isi di antara `(` pada posisi `buka` dan pasangannya."""
+    kedalaman, di_string, i = 0, False, buka
+    while i < len(teks):
+        c = teks[i]
+        if c == "'":
+            di_string = not di_string
+        elif not di_string and teks.startswith("--", i):
+            j = teks.find("\n", i)
+            i = len(teks) if j == -1 else j
+            continue
+        elif not di_string and c == "(":
+            kedalaman += 1
+        elif not di_string and c == ")":
+            kedalaman -= 1
+            if kedalaman == 0:
+                return teks[buka + 1:i]
+        i += 1
+    return None
+
+
+def _sumber_ddl() -> list[tuple[str, str]]:
+    """[(label, SQL)] — blok ```sql `spec/01` DAN tiap berkas migrasi naik.
+
+    🔑 Sejak Sprint 0 tugas 0.4 DDL hidup di DUA tempat: sebagai dokumen
+    (`spec/01`) dan sebagai artefak yang benar-benar dijalankan ke basis data
+    (`data/migrations/versions/*.up.sql`). Memeriksa dokumennya saja akan
+    meloloskan migrasi yang lupa anotasinya — dan migrasilah yang sampai ke
+    basis data. Dari `spec/01` hanya blok ```sql yang dibaca: prosa yang
+    menyebut "CREATE TABLE" bukan DDL.
+    """
+    blok = re.findall(r"```sql\n(.*?)```", baca(SPEC01), re.S)
+    if not blok:
+        raise SystemExit("🛑 spec/01 tanpa satu blok ```sql pun — P-1..P-3 tidak melihat apa pun")
+    sumber = [("spec/01", "\n".join(blok))]
+    if MIGRASI.exists():
+        berkas = sorted(MIGRASI.glob("*.up.sql"))
+        if not berkas:
+            raise SystemExit(
+                "🛑 data/migrations/versions ada tetapi tanpa satu pun *.up.sql — "
+                "populasi migrasi kosong, P-1..P-3 tidak akan melihat apa pun"
+            )
+        sumber += [(p.relative_to(AKAR).as_posix(), baca(p)) for p in berkas]
+    return sumber
+
+
+def _tabel_ddl() -> list[tuple[str, str, str, str]]:
+    """[(sumber, nama, badan, anotasi di atasnya)] dari spec/01 + migrasi.
+
+    Badan yang dikembalikan masih memuat komentar SQL; pemeriksa yang
+    menilai KODE wajib membuangnya sendiri (`buang_komentar_sql`).
+    """
     hasil = []
-    for m in POLA_TABEL.finditer(teks):
-        awal = teks.rfind("\n\n", 0, m.start())
-        kepala = teks[max(0, m.start() - 400):m.start()]
-        # hanya baris komentar yang menempel tepat di atas CREATE TABLE
-        atas = []
-        for baris in reversed(kepala.splitlines()):
-            if baris.strip().startswith("--"):
-                atas.append(baris)
-            elif baris.strip() == "":
-                continue
-            else:
-                break
-        hasil.append((m.group(1), m.group(2), "\n".join(atas)))
+    for label, teks in _sumber_ddl():
+        for m in POLA_KEPALA_TABEL.finditer(teks):
+            if "--" in teks[teks.rfind("\n", 0, m.start()) + 1:m.start()]:
+                continue  # kepala di dalam komentar
+            badan = _badan_seimbang(teks, m.end() - 1)
+            if badan is None:
+                raise SystemExit(f"🛑 {label}: tanda kurung CREATE TABLE {m.group(1)} tidak seimbang")
+            kepala = teks[max(0, m.start() - 400):m.start()]
+            # hanya baris komentar yang menempel tepat di atas CREATE TABLE
+            atas = []
+            for baris in reversed(kepala.splitlines()):
+                if baris.strip().startswith("--"):
+                    atas.append(baris)
+                elif baris.strip() == "":
+                    continue
+                else:
+                    break
+            hasil.append((label, m.group(1), badan, "\n".join(atas)))
     return hasil
+
+
+def _populasi_tak_terbaca() -> list[tuple[str, int, int]]:
+    """[(sumber, token CREATE…TABLE, tabel terbaca)] yang jumlahnya tidak sama."""
+    terbaca: dict[str, int] = {}
+    for label, *_ in _tabel_ddl():
+        terbaca[label] = terbaca.get(label, 0) + 1
+    selisih = []
+    for label, teks in _sumber_ddl():
+        token = len(POLA_TOKEN_TABEL.findall(buang_komentar_sql(teks)))
+        if token != terbaca.get(label, 0):
+            selisih.append((label, token, terbaca.get(label, 0)))
+    return selisih
 
 
 def periksa_p1() -> Hasil:
     h = Hasil("P-1", "tiap CREATE TABLE menyatakan retensi, who-can-set, on-delete")
     tabel = _tabel_ddl()
-    h.catatan.append(f"tabel di `spec/01`: **{len(tabel)}**")
-    for nama, _badan, atas in tabel:
+    per_sumber: dict[str, int] = {}
+    for label, *_ in tabel:
+        per_sumber[label] = per_sumber.get(label, 0) + 1
+    h.catatan.append(
+        "tabel per sumber: " + " · ".join(f"`{s}` **{n}**" for s, n in per_sumber.items())
+    )
+    if MIGRASI.exists() and not any(s != "spec/01" for s in per_sumber):
+        h.gagal(
+            "data/migrations",
+            "berkas migrasi ada tetapi tidak satu pun CREATE TABLE terbaca — "
+            "pemeriksa tidak melihat artefak yang sampai ke basis data",
+            "data/migrations/versions",
+        )
+    for label, token, terbaca in _populasi_tak_terbaca():
+        h.gagal(
+            label,
+            f"{token} pernyataan CREATE … TABLE tetapi hanya {terbaca} yang terbaca parser — "
+            "tabel yang tidak terbaca tidak pernah diperiksa",
+            label,
+        )
+    for label, nama, _badan, atas in tabel:
         h.diperiksa += 1
         hilang = [a for a in ANOTASI if a not in atas]
-        h.senarai.append(f"{nama:26s} {'lengkap' if not hilang else 'HILANG ' + ' '.join(hilang)}")
+        h.senarai.append(
+            f"{label:40s} {nama:26s} {'lengkap' if not hilang else 'HILANG ' + ' '.join(hilang)}"
+        )
         if hilang:
-            h.gagal(nama, f"tanpa {' · '.join(hilang)}", "spec/01")
+            h.gagal(nama, f"tanpa {' · '.join(hilang)}", label)
     return h
 
 
 def periksa_p2() -> Hasil:
     h = Hasil("P-2", "tiap tabel punya kolom `data_subject`")
-    for nama, badan, _atas in _tabel_ddl():
+    for label, nama, badan, _atas in _tabel_ddl():
         h.diperiksa += 1
-        ada = re.search(r"^\s*data_subject\s", badan, re.M) is not None
-        h.senarai.append(f"{nama:26s} {'ada' if ada else 'TIDAK ADA'}")
+        ada = re.search(r"^\s*data_subject\s", buang_komentar_sql(badan), re.M) is not None
+        h.senarai.append(f"{label:40s} {nama:26s} {'ada' if ada else 'TIDAK ADA'}")
         if not ada:
             h.gagal(
                 nama,
                 "tanpa kolom `data_subject` — baris pengguna tidak bisa "
                 "dibedakan dari baris orang yang tak punya akun",
-                "spec/01",
+                label,
             )
     return h
 
@@ -669,10 +793,10 @@ def periksa_p3() -> Hasil:
     melakukannya (`profiles.user_id uuid PRIMARY KEY`).
     """
     h = Hasil("P-3", "tidak ada `user_id` yang nullable tanpa penjaga")
-    for nama, badan, _atas in _tabel_ddl():
-        m = re.search(r"^\s*user_id\s+(\S+)([^\n]*)$", badan, re.M)
+    for label, nama, badan, _atas in _tabel_ddl():
+        m = re.search(r"^\s*user_id\s+(\S+)([^\n]*)$", buang_komentar_sql(badan), re.M)
         if not m:
-            h.senarai.append(f"{nama:26s} tanpa user_id")
+            h.senarai.append(f"{label:40s} {nama:26s} tanpa user_id")
             continue
         h.diperiksa += 1
         sisa = m.group(2)
@@ -681,20 +805,66 @@ def periksa_p3() -> Hasil:
         # `[^)]*` tidak cukup: CHECK yang sah punya tanda kurung BERSARANG
         # — `CHECK ((data_subject = 'user') = (user_id IS NOT NULL))` —
         # dan versi pertama pemeriksa ini menolaknya sebagai tak-terjaga.
+        # 🔴 Komentar SQL dibuang dulu: sebuah komentar yang kebetulan
+        # menyebut "CHECK … data_subject … user_id" bukan penjaga, dan
+        # migrasi 0001 memang punya komentar semacam itu di atas CHECK-nya.
         dijaga = any(
-            "CHECK" in b_ and "data_subject" in b_ and "user_id" in b_
-            for b_ in badan.splitlines()
+            "CHECK" in kode and "data_subject" in kode and "user_id" in kode
+            for kode in buang_komentar_sql(badan).splitlines()
         )
         h.senarai.append(
-            f"{nama:26s} {'NOT NULL/PK' if aman else ('dijaga CHECK' if dijaga else 'NULLABLE')}"
+            f"{label:40s} {nama:26s} "
+            f"{'NOT NULL/PK' if aman else ('dijaga CHECK' if dijaga else 'NULLABLE')}"
         )
         if not aman and not dijaga:
             h.gagal(
                 nama,
                 "`user_id` nullable tanpa CHECK yang mengikatnya ke "
                 "`data_subject` — RLS `user_id = current_user` meloloskan NULL",
-                "spec/01",
+                label,
             )
+    return h
+
+
+# ═════════════════════════════════════════ E-3 · bukan aliran sensor ══
+
+
+def periksa_e3() -> Hasil:
+    """arch/06 §3 — `events` hanya menerima kejadian bermakna bagi manusia.
+
+    Separuh E-3 yang membaca DDL bisa jalan sekarang; separuh lainnya (uji
+    admisi saat event diterbitkan) menunggu Sprint 3 tugas 3.1.
+    """
+    h = Hasil("E-3", "tidak ada `source='sensor'` di tabel `events`")
+    for label, nama, badan, _atas in _tabel_ddl():
+        if nama != "events":
+            continue
+        h.diperiksa += 1
+        # Komentar dibuang dulu — pelajaran P-3 berlaku di sini juga — dan
+        # CHECK `source` wajib TEPAT satu.
+        pola_check = r"CHECK\s*\(\s*source\s+IN\s*\(([^)]*)\)\s*\)"
+        cocok = re.findall(pola_check, buang_komentar_sql(badan))
+        if len(cocok) > 1:
+            h.gagal(f"{label} · events.source", f"{len(cocok)} CHECK source — wajib tepat satu", label)
+            continue
+        m = re.search(pola_check, buang_komentar_sql(badan))
+        if not m:
+            h.gagal(
+                f"{label} · events.source",
+                "tanpa CHECK — nilai apa pun lolos, termasuk `sensor`",
+                label,
+            )
+            continue
+        nilai = re.findall(r"'([^']*)'", m.group(1))
+        h.senarai.append(f"{label:40s} events.source ∈ {{{', '.join(nilai)}}}")
+        if "sensor" in nilai:
+            h.gagal(
+                f"{label} · events.source",
+                "`sensor` diizinkan — uji admisi arch/06 §3 bisa dilewati dengan satu nilai enum",
+                label,
+            )
+    if h.diperiksa == 0:
+        h.gagal("events", "tabel `events` tidak ditemukan di DDL mana pun — pemeriksa buta", "spec/01")
     return h
 
 
@@ -742,7 +912,7 @@ def periksa_a2() -> Hasil:
                     "spec/05",
                 )
                 continue
-            kind, risk = reg[t]
+            _kind, risk = reg[t]
             h.senarai.append(f"{nama:22s} {t:24s} risk={risk} <= pagu={pagu}")
             if risk > pagu:
                 h.gagal(
@@ -778,6 +948,61 @@ def periksa_a3() -> Hasil:
     return h
 
 
+def periksa_a1() -> Hasil:
+    """H-21 — `R` (risiko AKSI) dan `L` (otonomi AGENT) adalah dua tangga.
+
+    Yang diperiksanya sudah ada sebagai dokumen: skema manifest `spec/05` dan
+    DDL tabel `agents` (spec/01 + migrasi). Validator manifest (Sprint 4
+    tugas 4.2) kelak memeriksa MANIFEST SUNGGUHAN dengan aturan yang sama.
+    """
+    h = Hasil("A-1", "satu angka tidak dipakai untuk `R` DAN `L`")
+    teks = baca(SPEC05)
+    m = re.search(r"## Skema manifest\s+```yaml\n(.*?)```", teks, re.S)
+    if not m:
+        h.gagal("spec/05", "blok ```yaml skema manifest tidak ditemukan", "spec/05")
+        return h
+    yaml = m.group(1)
+    atas = dict(re.findall(r"^([a-z_]+):[ \t]*([^#\n]*)", yaml, re.M))
+    h.diperiksa += 1
+    for terlarang in ("risk_level", "risk"):
+        if terlarang in atas:
+            h.gagal(
+                f"manifest · {terlarang}",
+                f"`{terlarang}` sebagai properti AGENT membalik H-21 — agent memakai "
+                "`max_risk` (pagu), bukan satu tingkat risiko",
+                "spec/05",
+            )
+    pagu = atas.get("max_risk", "").strip()
+    otonomi = re.search(r"^autonomy:[ \t]*\n((?:[ \t]+[^\n]*\n)+)", yaml, re.M)
+    level = re.search(r"^\s+max_level:[ \t]*(\S+)", otonomi.group(1), re.M) if otonomi else None
+    h.senarai.append(f"manifest max_risk={pagu or '—'} · autonomy.max_level="
+                     f"{level.group(1) if level else '—'}")
+    if not re.fullmatch(r"R[0-4]", pagu):
+        h.gagal("manifest · max_risk", f"wajib bernilai R0–R4, tertulis `{pagu or 'kosong'}`", "spec/05")
+    if not level:
+        h.gagal("manifest · autonomy.max_level", "tidak ada — tangga L tidak punya tempat", "spec/05")
+    elif not re.fullmatch(r"L[0-5]", level.group(1)):
+        h.gagal(
+            "manifest · autonomy.max_level",
+            f"wajib bernilai L0–L5, tertulis `{level.group(1)}` — "
+            "angka dari tangga lain dipakai untuk otonomi",
+            "spec/05",
+        )
+    for label, nama, badan, _atas in _tabel_ddl():
+        if nama != "agents":
+            continue
+        h.diperiksa += 1
+        kolom = re.findall(r"^\s*([a-z_]+)\s+[a-z]", badan, re.M)
+        h.senarai.append(f"{label:40s} agents: max_risk={'max_risk' in kolom} "
+                         f"risk_level={'risk_level' in kolom}")
+        if "risk_level" in kolom:
+            h.gagal(f"{label} · agents.risk_level",
+                    "kolom satu-angka pada baris agent — E-119/#97", label)
+        if "max_risk" not in kolom:
+            h.gagal(f"{label} · agents.max_risk", "pagu risiko agent tidak ada", label)
+    return h
+
+
 # ══════════════════════════════════════════════ B-6 · satu pohon ══
 
 KELUARGA_KEAMANAN = {
@@ -806,6 +1031,143 @@ def periksa_b6() -> Hasil:
             f"wajib tepat 1 — tanpa itu aturan impor §8.42 tidak bisa DINYATAKAN",
             "arch/03",
         )
+
+    # ── Pohon NYATA (sejak Sprint 0). V0 belum punya `security/` sebagai
+    # kode (arch/03 §8), jadi "tepat satu" belum bisa dituntut di sini. Yang
+    # BISA dituntut hari ini adalah bentuk yang membuat B-1 mustahil
+    # dinyatakan: pohon keamanan KEDUA. Diperiksa di tingkat atas repo, di
+    # akar tiap paket aplikasi, dan di antara modulnya.
+    nyata = _direktori_tingkat_atas_nyata()
+    keluarga = [p for p in nyata if p.rsplit("/", 1)[-1] in KELUARGA_KEAMANAN]
+    h.diperiksa += len(nyata)
+    h.catatan.append(
+        f"repo nyata: **{len(nyata)}** direktori tingkat atas/paket/modul · "
+        f"keluarga keamanan: {' '.join(keluarga) or 'NIHIL'}"
+    )
+    bukan_security = [p for p in keluarga if not p.endswith("security")]
+    if bukan_security or len(keluarga) > 1:
+        h.gagal(
+            "repo nyata",
+            f"pohon keluarga keamanan di luar satu `security/`: {' '.join(keluarga)} — "
+            "pohon kedua membuat §8.42 (B-1) tidak bisa DINYATAKAN",
+            "arch/03 §3 · §8",
+        )
+    return h
+
+
+_ABAIKAN_DIREKTORI = {
+    ".git", ".venv", "node_modules", "__pycache__", ".mypy_cache", ".ruff_cache",
+    ".pytest_cache", ".import_linter_cache", "htmlcov", ".idea", ".vscode",
+}
+
+
+def _direktori_tingkat_atas_nyata() -> list[str]:
+    """Tingkat atas repo · akar tiap paket aplikasi dan modulnya · isi
+    `services/` dan `packages/` (wadah kode di pohon final arch/03).
+
+    ⚠️ Yang SENGAJA tidak ditelusuri: subdirektori di DALAM sebuah modul.
+    `identity/consent/` sah — spec/06 memberi `consents` kepada `identity` —
+    dan `tests/security/`, `docs/security/` sah di pohon arch/03 sendiri.
+    Menelusuri semuanya akan menuduh yang benar.
+    """
+    calon = [p for p in AKAR.iterdir() if p.is_dir() and p.name not in _ABAIKAN_DIREKTORI]
+    for wadah in ("services", "packages"):
+        if (AKAR / wadah).is_dir():
+            calon += [
+                p for p in (AKAR / wadah).iterdir()
+                if p.is_dir() and p.name not in _ABAIKAN_DIREKTORI
+            ]
+    for paket in sorted(AKAR.glob("apps/*/src/*")):
+        if paket.is_dir() and paket.name not in _ABAIKAN_DIREKTORI:
+            calon += [p for p in paket.iterdir() if p.is_dir() and p.name not in _ABAIKAN_DIREKTORI]
+            modul = paket / "modules"
+            if modul.is_dir():
+                calon += [p for p in modul.iterdir() if p.is_dir() and p.name not in _ABAIKAN_DIREKTORI]
+    return sorted(p.relative_to(AKAR).as_posix() for p in calon)
+
+
+# ═══════════════════════════════════ M-4 · kata dari kamus tabrakan ══
+
+ARCH02 = AKAR / "arch" / "02-BOUNDED-CONTEXT.md"
+
+# arch/03 §8 — letak modul V0 di dalam monolit lawan letaknya di pohon final.
+# Modul human-core naik ke `services/`; sisanya naik satu tingkat, nama sama.
+AKAR_KODE_V0 = "apps/api/src/hvx/modules/"
+MODUL_SERVICES_V0 = {"identity", "profile", "goals", "habits", "checkins", "journal", "activities"}
+
+
+def _muat_kamus_tabrakan() -> dict[str, set[str]]:
+    """arch/02 §4 → {kata: himpunan path SAH untuk direktori bernama kata itu}.
+
+    Satu baris sah hanya kalau kolom "Nama direktori final" memakai kata itu
+    TELANJANG (`agents/registry/`, `planning/`). Baris yang mengganti nama
+    (`sim-behavior/`) tidak memberi izin apa pun, dan baris ber-🛑
+    (*“tidak punya `research/`”*) adalah LARANGAN, bukan izin.
+    """
+    sek = bagian(baca(ARCH02), r"^## §4 Kamus")
+    kamus: dict[str, set[str]] = {}
+    kata = None
+    for b in sek.splitlines():
+        m = re.match(r"^\|\s*(?:\*\*([a-z]+)\*\*)?\s*\|(.*)\|\s*$", b)
+        if not m:
+            continue
+        kata = m.group(1) or kata
+        kolom = [k.strip() for k in m.group(2).split("|")]
+        if kata is None or len(kolom) < 3:
+            continue
+        kamus.setdefault(kata, set())
+        konteks, final = kolom[0], kolom[-1]
+        if "🛑" in final:
+            continue
+        for path in re.findall(r"`([a-z][a-z0-9/-]*)/`", final):
+            if path.rsplit("/", 1)[-1] != kata:
+                continue
+            if "/" in path:
+                kamus[kata].add(path)
+            else:
+                for k in re.findall(r"[`*]([a-z][a-z0-9-]*)[`*]", konteks):
+                    kamus[kata].add(kata if k == kata else f"{k}/{kata}")
+    return kamus
+
+
+def _normalkan_v0(rel: str) -> str:
+    if not rel.startswith(AKAR_KODE_V0):
+        return rel
+    sisa = rel[len(AKAR_KODE_V0):]
+    return f"services/{sisa}" if sisa.split("/", 1)[0] in MODUL_SERVICES_V0 else sisa
+
+
+def periksa_m4() -> Hasil:
+    h = Hasil("M-4", "tidak ada direktori bernama kata kamus tabrakan di luar pemilik sahnya")
+    kamus = _muat_kamus_tabrakan()
+    if not kamus:
+        h.gagal("arch/02 §4", "kamus tabrakan tidak terbaca — pemeriksa buta", "arch/02")
+        return h
+    # Direktori tingkat atas arch/03 adalah pemilik sah namanya sendiri
+    # (`simulation/` mesin bersama, `memory/`, `research/`).
+    pohon = baca(ARCH03).split("```")[1]
+    for d in re.findall(r"^[├└]── ([a-z][a-z0-9-]*)/", pohon, re.M):
+        if d in kamus:
+            kamus[d].add(d)
+    h.catatan.append(
+        "kamus: " + " · ".join(f"`{k}`→{sorted(v) or '∅'}" for k, v in sorted(kamus.items()))
+    )
+    for akar, dirs, _berkas in os.walk(AKAR):
+        dirs[:] = [d for d in dirs if d not in _ABAIKAN_DIREKTORI]
+        for d in dirs:
+            rel = (Path(akar) / d).relative_to(AKAR).as_posix()
+            h.diperiksa += 1
+            if d not in kamus:
+                continue
+            norm = _normalkan_v0(rel)
+            h.senarai.append(f"{rel} → {norm}")
+            if norm not in kamus[d]:
+                h.gagal(
+                    rel,
+                    f"`{d}/` di luar pemilik sahnya — yang sah: "
+                    f"{', '.join(sorted(kamus[d])) or 'TIDAK ADA (nama wajib dikualifikasi)'}",
+                    "arch/02 §4",
+                )
     return h
 
 
@@ -868,13 +1230,16 @@ def periksa_e4() -> Hasil:
 
 PEMERIKSAAN = {
     "B-6": periksa_b6,
+    "M-4": periksa_m4,
     "P-1": periksa_p1,
     "P-2": periksa_p2,
     "P-3": periksa_p3,
     "E-1": periksa_e1,
     "E-2": periksa_e2,
+    "E-3": periksa_e3,
     "E-4": periksa_e4,
     "E-5": periksa_e5,
+    "A-1": periksa_a1,
     "A-2": periksa_a2,
     "A-3": periksa_a3,
     "G-1": periksa_g1,
@@ -886,7 +1251,7 @@ def main() -> int:
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument(
         "kode", nargs="*",
-        help="B-6 P-1 P-2 P-3 E-1 E-2 E-4 E-5 A-2 A-3 G-1 R-1 (kosong = semua)"
+        help=" ".join(PEMERIKSAAN) + " (kosong = semua)"
     )
     p.add_argument("--senarai", action="store_true", help="cetak daftar panen")
     p.add_argument("--json", action="store_true", help="keluaran mesin")

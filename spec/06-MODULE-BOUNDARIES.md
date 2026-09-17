@@ -96,14 +96,28 @@ dengan SQL — harus lewat `__init__.py` pemiliknya.
                     agents
 ```
 
+> 🔧 **Gambar di atas adalah arah DATA, bukan arah IMPOR** (K-17, 16 Sep 2026).
+> Arah impor ditentukan aturan 6: modul domain yang wajib menerbitkan event
+> harus bisa memanggil `events`, jadi `events` berada **di bawah** modul domain.
+> `memory` di atas modul domain karena ekstraksi memori membaca isi jurnal
+> (tugas 3.6) — dan isi jurnal sengaja **tidak pernah** masuk event
+> ([`03`](03-EVENT-CONTRACTS.md)). `intelligence` di atasnya lagi: 5.3 menulis
+> `human_states` milik `profile`, 5.5 membaca habit dan goal. Urutan lengkap:
+> kontrak `m1-m3-lapisan` di `pyproject.toml`.
+
 | # | Aturan | Ditegakkan oleh |
 |---|---|---|
-| 1 | Modul hanya boleh mengimpor `__init__.py` modul lain, tidak pernah berkas dalamnya | `import-linter` kontrak `forbidden` |
-| 2 | Tidak ada impor melingkar | `import-linter` kontrak `independence` |
-| 3 | Modul domain (`goals`…`activities`) **tidak boleh** saling mengimpor — komunikasinya lewat event | lint + review |
-| 4 | `agents` boleh membaca modul lain; **tidak ada** modul yang mengimpor `agents` | `import-linter` |
-| 5 | `repository.py` hanya boleh menyebut tabel milik modulnya | uji: grep nama tabel per modul |
-| 6 | Setiap tulisan ke tabel domain **wajib** menerbitkan event | uji integrasi per modul |
+| 1 | Modul hanya boleh mengimpor `__init__.py` modul lain, tidak pernah berkas dalamnya | `import-linter` kontrak `protected`, satu per modul (`m2-*`) |
+| 2 | Tidak ada impor melingkar | `import-linter` kontrak `layers` (`m1-m3-lapisan`, antarmodul) + `acyclic_siblings` (`m1-siklus-dalam`, di dalam modul) |
+| 3 | Modul domain (`goals`…`activities`, `profile`) **tidak boleh** saling mengimpor — komunikasinya lewat event | `import-linter` lapisan independen di `m1-m3-lapisan` |
+| 4 | `agents` boleh membaca modul lain; **tidak ada** modul yang mengimpor `agents` | `import-linter` — `agents` lapisan teratas `m1-m3-lapisan`, `exhaustive = true` |
+| 5 | `repository.py` hanya boleh menyebut tabel milik modulnya | uji: grep nama tabel per modul — ⏳ belum ada `repository.py` (Sprint 1) |
+| 6 | Setiap tulisan ke tabel domain **wajib** menerbitkan event | uji integrasi per modul — ⏳ belum ada tulisan domain (Sprint 2–3) |
+
+> Tiap kontrak di atas **terbukti sanggup gagal** — `tools/uji_mutasi_kode.py`
+> memiliki satu mutasi per id kontrak, dan `tests/unit/test_penegak.py`
+> menolak kontrak tanpa mutasi maupun modul di disk yang tidak tercatat di
+> kontrak.
 
 > Aturan **3** yang paling sering dilanggar dan paling mahal dibatalkan. Kalau
 > `habits` boleh memanggil `checkins` langsung, keduanya menyatu dalam sebulan
