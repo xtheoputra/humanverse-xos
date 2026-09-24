@@ -220,6 +220,18 @@ async def test_cache_yang_ditulis_terlambat_tidak_melewati_izin_sementaranya(
     await izin.mesin.tetapkan(uid, COACH, "habits", "read", "allow", expires_at=sampai)
     assert await izin.mesin.cek(uid, COACH, "habits", "read") == "allow"
 
+    # Diukur MUTLAK lebih dulu, seperti uji margin di atas. Jendela perilaku di bawah
+    # hanya jeda − margin = 200 ms: di gerbang penuh yang sibuk, pemeriksaannya sempat
+    # jatuh SESUDAH cache mutan "umur relatif" habis, dan mutasinya lolos (Sprint 3).
+    generasi = await izin.redis.get(f"{izin.awalan}:izin:{uid}:generasi")
+    kunci = f"{izin.awalan}:izin:{uid}:{generasi}:agent:coach-agent:habits:read"
+    sampai_ms = (sampai - datetime(1970, 1, 1, tzinfo=UTC)) // timedelta(milliseconds=1)
+    habis = await izin.redis.pexpiretime(kunci)
+    assert 0 < habis <= sampai_ms - 1_000, (
+        "cache yang ditulis terlambat melewati izin sementaranya: "
+        f"habis {habis - sampai_ms} ms terhadap izinnya"
+    )
+
     batas_tunggu = asyncio.get_running_loop().time() + 30
     while izin.jam_basis_data() <= sampai:
         assert asyncio.get_running_loop().time() < batas_tunggu, "jam basis data tidak bergerak"

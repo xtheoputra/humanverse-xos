@@ -269,6 +269,14 @@ terlalu lebar: mutasi 3.7 *“manifest tidak membatasi”* ikut merah di sana de
 alasan yang salah. Kini `"mood" not in perlu_izin`, dan kedua mutasi merah pada
 alasannya masing-masing.
 
+🔴 **Gerbang ketiga menemukan bahwa uji regresi E-189 sendiri sempit.** Jeda 1,2 dtk
+dikurangi margin 1 dtk menyisakan **200 ms** jendela: di gerbang yang sibuk,
+pemeriksaan sesudah izinnya kedaluwarsa sempat jatuh sesudah cache mutan *“umur
+relatif”* ikut habis, dan mutasinya lolos. Kini uji itu lebih dulu membaca waktu
+habis cache-nya **mutlak** (`PEXPIRETIME` lawan `expires_at`, seperti uji margin) —
+mutan melewati izinnya ±1,2 dtk, terbaca tanpa bergantung pada kapan uji sempat
+memeriksa.
+
 🔴 **Dan gerbang berikutnya menemukan cacat di alat ukurnya sendiri.** Tahap
 `pytest` merah di satu kasus yang lulus bila dijalankan sendiri — `valence 0`
 lolos uji admisi — padahal sumbernya `ge=1`. Penyebabnya bytecode: mutasi
