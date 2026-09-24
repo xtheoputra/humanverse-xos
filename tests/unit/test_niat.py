@@ -77,3 +77,43 @@ def test_permintaan_analisis_ke_model_besar(teks: str) -> None:
 @pytest.mark.parametrize("teks", ["halo", "habit apa hari ini?", "terima kasih"])
 def test_selainnya_model_kecil(teks: str) -> None:
     assert kenali(teks).rute == "simple"
+
+
+@pytest.mark.parametrize(
+    ("teks", "jenis", "sasaran", "status"),
+    [
+        ("tandai lari pagi selesai", "tandai_habit", "lari pagi", "done"),
+        ("centang meditasi", "tandai_habit", "meditasi", "done"),
+        ("Tolong tandai Baca 10 halaman sudah selesai.", "tandai_habit", "Baca 10 halaman", "done"),
+        ("lewati lari hari ini", "tandai_habit", "lari", "skipped"),
+        ("tandai lari dilewati", "tandai_habit", "lari", "skipped"),
+        ("ingat bahwa aku alergi kacang", "ingat", "aku alergi kacang", None),
+        ("tolong ingat, aku vegetarian", "ingat", "aku vegetarian", None),
+        ("apa yang kamu ingat tentang tidurku?", "cari_ingatan", "tidurku", None),
+        ("apa yang kamu tahu", "cari_ingatan", None, None),
+    ],
+)
+def test_niat_memilih_agent(teks: str, jenis: str, sasaran: str | None, status: str | None) -> None:
+    """4.6 — orchestrator memilih agent dari niat; tanpa model."""
+    niat = kenali(teks)
+
+    assert (niat.rute, niat.jenis, niat.sasaran, niat.status) == (
+        "simple",
+        jenis,
+        sasaran,
+        status,
+    ), f"“{teks}” dibaca {niat}"
+
+
+@pytest.mark.parametrize(
+    "teks",
+    [
+        "ingatkan aku minum obat jam 7",  # minta DIINGATKAN — bukan minta diingat
+        "aku mau tandai lari nanti",  # bukan diawali kata perintahnya
+        "kenapa aku selalu lewati lari?",
+        "tandai",
+    ],
+)
+def test_yang_bukan_perintah_agent_ke_coach(teks: str) -> None:
+    """Salah rute ke habit-agent atau memory-agent MENULIS sesuatu yang tidak diminta."""
+    assert kenali(teks).jenis == "tanya", f"“{teks}” dijalankan sebagai perintah agent"

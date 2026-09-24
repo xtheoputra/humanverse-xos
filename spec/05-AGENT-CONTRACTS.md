@@ -331,6 +331,16 @@ Tool V0 — **9 tool + 3 entri `kind: agent`**:
 | `habit-agent` | R2 | habit.list, habit.streak, habit.complete | habits | — |
 | `memory-agent` | R2 | memory.search, memory.write | semua scope **kecuali** `journal_raw` | semua scope **kecuali** `journal_raw` 🔧 |
 
+> 🔧 **`orchestrator-agent` V0 (tugas 4.6, 24 Sep 2026).** Memilih agent dari **niat**
+> (aturan, bukan model — `agents.kenali`): *“tandai/centang/lewati …”* → `agent.habit`,
+> *“ingat bahwa …”* dan *“apa yang kamu ingat …”* → `agent.memory`, selainnya →
+> `agent.coach`. Niat yang BERTINDAK hanya dikenali bila pesannya **diawali** kata
+> perintahnya — *“ingatkan aku …”* (pengingat) bukan *“ingat”*. Pemanggilannya tool
+> `kind: agent` (K-14), jadi run agent itu menjadi **anak** run orchestrator
+> (`parent_run_id`, `trigger='agent'`); balasan, keyakinan, dan alasan anaknya
+> diteruskan apa adanya. Perintah `deterministic` (*“catat mood 3”*) tidak pernah
+> sampai ke orchestrator.
+
 > 🔧 **Runtime V0 (tugas 4.4, 24 Sep 2026).** Program tiap agent hanya memegang
 > `KonteksAgent`: `alat(nama, masukan)` lewat pelaksana tool (4.3) dan
 > `model(tugas, pertanyaan, bahan)` lewat AI Gateway (4.1) — keduanya yang mencatat

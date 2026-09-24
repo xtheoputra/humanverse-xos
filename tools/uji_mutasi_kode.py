@@ -301,6 +301,7 @@ UJI_ALAT = "tests/integration/test_alat_v0.py"
 UJI_KEPUTUSAN = "tests/unit/test_keputusan_agent.py::test_keputusan_rusak_ditolak"
 UJI_RUNTIME = "tests/integration/test_runtime_agent.py"
 UJI_GERBANG = "tests/integration/test_gerbang_risiko.py"
+UJI_ORKESTRATOR = "tests/integration/test_orkestrator.py"
 FK_MILESTONE = (
     "  FOREIGN KEY (goal_id, user_id) REFERENCES goals (id, user_id) ON DELETE CASCADE" + NL + ");"
 )
@@ -6211,6 +6212,148 @@ MUTASI: list[Mutasi] = [
         _pytest(f"{UJI_GERBANG}::test_token_kedaluwarsa_ditolak"),
         harus_memuat="token kedaluwarsa diterima",
         kelompok="db",
+    ),
+    # ── Sprint 4 · 4.6 orchestrator: parent_run_id membentuk pohon eksekusi ──
+    Mutasi(
+        "4.6",
+        "run anak tidak menunjuk induknya — pohon putus",
+        [
+            Sunting(
+                f"{MODUL}/agents/runtime.py",
+                "                parent_run_id=None if induk is None else induk.id,",
+                "                parent_run_id=None,",
+            )
+        ],
+        _pytest(f"{UJI_ORKESTRATOR}::test_parent_run_id_membentuk_pohon_eksekusi"),
+        harus_memuat="pohon eksekusi:",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.6",
+        "run anak tercatat dipicu pengguna, bukan agent",
+        [
+            Sunting(
+                f"{MODUL}/agents/runtime.py",
+                '            pemicu="agent",',
+                '            pemicu="user",',
+            )
+        ],
+        _pytest(f"{UJI_ORKESTRATOR}::test_parent_run_id_membentuk_pohon_eksekusi"),
+        harus_memuat="pohon eksekusi:",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.6",
+        "biaya run anak tidak ikut dibayar permintaannya",
+        [
+            Sunting(
+                f"{MODUL}/agents/runtime.py",
+                "        induk.biaya_turunan_usd += hasil.biaya_usd\n",
+                "",
+            )
+        ],
+        _pytest(
+            f"{UJI_ORKESTRATOR}::test_balasan_anak_sampai_tanpa_dikarang_ulang_dan_biayanya_ikut"
+        ),
+        harus_memuat="biaya run anak tidak ikut dibayar permintaannya",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.6",
+        "orchestrator mengarang ulang keyakinan agent yang menjawab",
+        [
+            Sunting(
+                f"{MODUL}/agents/orkestrator.py",
+                '        Decimal(str(balasan["confidence"])),',
+                '        Decimal("1"),',
+            )
+        ],
+        _pytest(
+            f"{UJI_ORKESTRATOR}::test_balasan_anak_sampai_tanpa_dikarang_ulang_dan_biayanya_ikut"
+        ),
+        harus_memuat="orchestrator mengubah balasan agent yang menjawab",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.6",
+        "perintah habit diserahkan ke coach",
+        [
+            Sunting(
+                f"{MODUL}/agents/orkestrator.py",
+                '    "tandai_habit": "agent.habit",',
+                '    "tandai_habit": "agent.coach",',
+            )
+        ],
+        _pytest(f"{UJI_ORKESTRATOR}::test_niat_menentukan_agent_yang_dipanggil"),
+        harus_memuat="diserahkan ke agent yang salah",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.6",
+        "permintaan mengingat diserahkan ke coach",
+        [
+            Sunting(
+                f"{MODUL}/agents/orkestrator.py",
+                '    "ingat": "agent.memory",',
+                '    "ingat": "agent.coach",',
+            )
+        ],
+        _pytest(f"{UJI_ORKESTRATOR}::test_niat_menentukan_agent_yang_dipanggil"),
+        harus_memuat="diserahkan ke agent yang salah",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.6",
+        "perintah deterministik dijalankan agent (coach)",
+        [
+            Sunting(
+                f"{MODUL}/agents/orkestrator.py",
+                "    alat = AGENT_UNTUK.get(niat.jenis)",
+                '    alat = AGENT_UNTUK.get(niat.jenis, "agent.coach")',
+            )
+        ],
+        _pytest(f"{UJI_ORKESTRATOR}::test_perintah_deterministik_tidak_dijalankan_agent"),
+        harus_memuat="DID NOT RAISE",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.6",
+        "“ingatkan” (pengingat) dibaca sebagai permintaan mengingat",
+        [
+            Sunting(
+                f"{MODUL}/agents/niat.py",
+                '    r"^\\s*(?:tolong\\s+)?ingat(?:lah)?',
+                '    r"^\\s*(?:tolong\\s+)?ingat(?:lah|kan)?',
+            )
+        ],
+        _pytest("tests/unit/test_niat.py::test_yang_bukan_perintah_agent_ke_coach"),
+        harus_memuat="dijalankan sebagai perintah agent",
+    ),
+    Mutasi(
+        "4.6",
+        "kata perintah habit tidak wajib di awal pesan",
+        [
+            Sunting(
+                f"{MODUL}/agents/niat.py",
+                '    r"^\\s*(?:tolong\\s+)?(?P<kata>tandai|',
+                '    r".*?(?P<kata>tandai|',
+            )
+        ],
+        _pytest("tests/unit/test_niat.py::test_yang_bukan_perintah_agent_ke_coach"),
+        harus_memuat="dijalankan sebagai perintah agent",
+    ),
+    Mutasi(
+        "4.6",
+        "“lewati” dicatat sebagai selesai",
+        [
+            Sunting(
+                f"{MODUL}/agents/niat.py",
+                '        lewati = tandai["kata"].lower() in _LEWATI or (tandai["akhir"] or "").lower() in _LEWATI',
+                "        lewati = False",
+            )
+        ],
+        _pytest("tests/unit/test_niat.py::test_niat_memilih_agent"),
+        harus_memuat="“lewati lari hari ini” dibaca",
     ),
     # ── alat ini sendiri: bytecode mutan tidak tertinggal sesudah dipulihkan ──
     Mutasi(

@@ -11,6 +11,17 @@ model menggagalkan tujuannya (biaya & latensi, naskah 4 §48).
   pesan panjang.
 * **`simple`** — selainnya.
 
+🔧 **Sejak 4.6 niat juga memilih AGENT** yang dipanggil `orchestrator-agent`, dengan
+aturan yang sama ketatnya — perintah yang BERTINDAK hanya bila diawali kata
+perintahnya:
+
+* **`tandai_habit`** — *“tandai lari pagi selesai”* · *“centang meditasi”* ·
+  *“lewati lari hari ini”* → `habit-agent` (tulisan R2, ditanya gerbang);
+* **`ingat`** — *“ingat bahwa aku alergi kacang”* → `memory-agent`. *“Ingatkan …”*
+  (minta diingatkan, pengingat) BUKAN permintaan mengingat;
+* **`cari_ingatan`** — *“apa yang kamu ingat tentang tidurku?”* → `memory-agent`;
+* **`tanya`** — selainnya → `coach-agent`.
+
 Dua salah rute tidak sama mahalnya. Pertanyaan analisis yang jatuh ke `simple`
 hanya dijawab lebih dangkal; teks yang BUKAN perintah tetapi dijalankan
 `deterministic` bertindak atas sesuatu yang tidak dimaksudkan pengguna. Karena
@@ -29,7 +40,10 @@ from typing import Literal
 
 from hvx.modules import platform
 
-JenisNiat = Literal["catat_mood", "catat_mood_salah", "tanya"]
+JenisNiat = Literal[
+    "catat_mood", "catat_mood_salah", "tandai_habit", "ingat", "cari_ingatan", "tanya"
+]
+StatusHabit = Literal["done", "skipped"]
 
 # Pesan sepanjang ini (kata) diperlakukan sebagai permintaan analisis.
 KATA_PANJANG = 40
@@ -52,6 +66,26 @@ _LABEL = re.compile(
 )
 _SESUDAH_PEMISAH = re.compile(rf"^{_PEMISAH}\s*(?P<sisa>.*)$", re.DOTALL)
 
+# "tandai lari pagi selesai" · "centang meditasi" · "lewati lari hari ini" · "tolong tandai …"
+_TANDAI = re.compile(
+    r"^\s*(?:tolong\s+)?(?P<kata>tandai|centang|selesaikan|lewati|lewatkan|skip)\s+"
+    r"(?:habit\s+)?(?P<judul>.+?)"
+    r"(?:\s+(?P<akhir>selesai|sudah\s+selesai|sudah|dilewati|terlewat))?"
+    r"(?:\s+hari\s+ini)?\s*[.!]*\s*$",
+    re.IGNORECASE | re.DOTALL,
+)
+_LEWATI = frozenset({"lewati", "lewatkan", "skip", "dilewati", "terlewat"})
+# "ingat bahwa …" · "tolong ingat, …" · "ingatlah: …" — BUKAN "ingatkan" (pengingat).
+_INGAT = re.compile(
+    r"^\s*(?:tolong\s+)?ingat(?:lah)?(?:\s+(?:ya|bahwa|kalau))?\s*[,:]?\s+(?P<isi>\S.*)$",
+    re.IGNORECASE | re.DOTALL,
+)
+_CARI_INGATAN = re.compile(
+    r"^\s*apa\s+(?:saja\s+)?yang\s+(?:kamu|kau|anda)\s+(?:ingat|tahu)"
+    r"(?:\s+tentang\s+(?P<kueri>.+?))?\s*\??\s*$",
+    re.IGNORECASE | re.DOTALL,
+)
+
 _ANALISIS = re.compile(
     r"\b(?:analisis|analisa|menganalisis|pola|tren|kenapa|mengapa|evaluasi|refleksi|"
     r"rencana|strategi|bandingkan|rangkum|ringkas(?:kan)?\s+minggu|minggu\s+ini|bulan\s+ini|"
@@ -73,6 +107,9 @@ class Niat:
     rute: platform.Rute
     jenis: JenisNiat
     mood: MoodDiminta | None = None
+    # tandai_habit: judul yang disebut · ingat: isi yang diminta diingat · cari_ingatan: kuerinya
+    sasaran: str | None = None
+    status: StatusHabit | None = None  # tandai_habit
 
 
 def _urai_mood(sisa: str) -> MoodDiminta | None:
@@ -101,6 +138,18 @@ def kenali(teks: str) -> Niat:
             # Perintah yang jelas, angkanya tidak: dijawab dengan cara mengisinya —
             # bukan ditebak, dan bukan dilempar ke model.
             return Niat("deterministic", "catat_mood_salah")
+    if tandai := _TANDAI.match(teks):
+        lewati = tandai["kata"].lower() in _LEWATI or (tandai["akhir"] or "").lower() in _LEWATI
+        return Niat(
+            "simple",
+            "tandai_habit",
+            sasaran=" ".join(tandai["judul"].split()),
+            status="skipped" if lewati else "done",
+        )
+    if ingat := _INGAT.match(teks):
+        return Niat("simple", "ingat", sasaran=ingat["isi"].strip())
+    if cari := _CARI_INGATAN.match(teks):
+        return Niat("simple", "cari_ingatan", sasaran=(cari["kueri"] or "").strip() or None)
     if _ANALISIS.search(teks) or len(teks.split()) >= KATA_PANJANG:
         return Niat("reasoning", "tanya")
     return Niat("simple", "tanya")
