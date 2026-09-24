@@ -198,3 +198,18 @@ def test_tiap_penegak_yang_jalan_terbukti_sanggup_gagal() -> None:
     assert jalan <= termutasi, (
         f"JALAN tanpa mutasi yang membuktikan merahnya: {sorted(jalan - termutasi)}"
     )
+
+
+def test_alasan_mutasi_pytest_hanya_dibaca_dari_baris_galat() -> None:
+    """🔴 Tinjauan Sprint 1: pytest mencetak SUMBER uji sampai baris yang gagal — pesan
+    `assert` yang LULUS ikut tercetak, dan galat lingkungan sesudahnya terhitung
+    "berbunyi dengan alasan yang dimaksud"."""
+    alat = _modul("uji_mutasi_kode")
+    uji = alat.Mutasi("x", "x", [], [sys.executable, "-m", "pytest", "t.py"], "pesan dimaksud")
+    hanya_sumber = '>       assert lolos, "pesan dimaksud"\nE       ConnectionError: redis mati\n'
+
+    assert not alat.alasan_terbaca(uji, hanya_sumber), "pesan di sumber uji terhitung alasan galat"
+    assert alat.alasan_terbaca(uji, "E       AssertionError: pesan dimaksud\n")
+    # alat selain pytest tidak punya baris `E` — seluruh keluarannya dibaca
+    lint = alat.Mutasi("x", "x", [], ["lint-imports"], "hvx.main -> hvx.modules.goals._dalam")
+    assert alat.alasan_terbaca(lint, "Broken: hvx.main -> hvx.modules.goals._dalam (l.3)")

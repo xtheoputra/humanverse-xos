@@ -7,6 +7,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
+from uuid import UUID, uuid4
 
 from alembic.config import Config
 from sqlalchemy.engine import make_url
@@ -67,3 +69,40 @@ def alembic(dsn: str) -> Config:
     cfg.set_main_option("sqlalchemy.url", dsn)
     cfg.attributes["konfigurasi_log"] = False
     return cfg
+
+
+@dataclass
+class ApiUji:
+    """Aplikasi utuh (create_app + lifespan) sebagai peran APLIKASI, dengan klien HTTP."""
+
+    app: Any
+    klien: Any  # httpx.AsyncClient
+    db: BasisDataV0
+    awalan_redis: str
+
+    def penyimpan_sesi(self) -> Any:
+        from hvx.modules.identity import PenyimpanSesi
+
+        s = self.app.state.settings
+        return PenyimpanSesi(
+            self.app.state.redis, s.redis_prefix, s.access_token_ttl_s, s.refresh_token_ttl_s
+        )
+
+    async def pengguna_baru(
+        self, *, display_name: str = "Pengguna Uji", timezone: str = "Asia/Jakarta"
+    ) -> tuple[UUID, str]:
+        """Pengguna + profil ditulis PEMILIK skema (bukan lewat /auth), plus token akses sah."""
+        import psycopg
+
+        with psycopg.connect(psycopg_dsn(self.db.dsn_pemilik), autocommit=True) as k:
+            (uid,) = k.execute(
+                "INSERT INTO users (email, password_hash) VALUES (%s, 'x') RETURNING id",
+                (f"{uuid4().hex}@uji.id",),
+            ).fetchone() or (None,)
+            k.execute(
+                "INSERT INTO profiles (user_id, display_name, timezone) VALUES (%s, %s, %s)",
+                (uid, display_name, timezone),
+            )
+        assert isinstance(uid, UUID)
+        token = await self.penyimpan_sesi().buat(uid)
+        return uid, token.access_token

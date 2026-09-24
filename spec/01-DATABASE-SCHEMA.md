@@ -152,14 +152,39 @@ CREATE TABLE consents (
                    CHECK (source IN ('app','import','admin')),
   granted_at     timestamptz,
   revoked_at     timestamptz,
-  created_at     timestamptz NOT NULL DEFAULT now()
+  created_at     timestamptz NOT NULL DEFAULT now(),
+  -- spec/07 1.4 · B-22 · naskah 12 §8.9 (Why · Scope · Duration) — migrasi 0002
+  purpose        text NOT NULL CHECK (purpose ~ '^[a-z][a-z0-9_]{0,62}$'),
+  data_scopes    text[] NOT NULL DEFAULT '{}',
+  expires_at     timestamptz
 );
 CREATE INDEX consents_user_kind_idx ON consents (user_id, kind, created_at DESC);
+CREATE INDEX consents_user_purpose_idx ON consents (user_id, purpose, created_at DESC);
 ```
 
 > Riwayat persetujuan **append-only** — baris lama tidak diubah, pencabutan
 > ditulis sebagai baris baru. Itu yang membuat *"kapan dia setuju apa"* bisa
 > dijawab setahun kemudian (naskah 5 §25 *Consent management*).
+>
+> 🔧 **`purpose` · `data_scopes` · `expires_at` — spec/07 1.4, B-22
+> ([#59](../../issues/59)), 17 Sep 2026 (migrasi 0002).** Naskah 12 §8.9 memberi
+> persetujuan sembilan sifat; tiga yang tidak punya kolom — **Why/Purpose**,
+> **What/Scope**, **Duration** — kini punya. Aturan pembatasan tujuan §8.10
+> menjadi satu operasi himpunan yang dijalankan mesin
+> (`identity.boleh_dipakai_untuk`): **tiap tujuan pemakaian wajib punya
+> persetujuan, dan persetujuan TERAKHIR dari TIAP jenis (`kind`) yang pernah
+> dicatat untuk tujuan itu wajib `granted`, belum kedaluwarsa, dan
+> `data_scopes`-nya mencakup data yang dipakai** — tanpa itu, ditolak. Satu
+> jenis dicabut = tujuannya tertutup: `terms` dan `privacy` sama-sama bertujuan
+> `service`, dan versi pertama (*“terakhir per tujuan”*) membiarkan persetujuan
+> `terms` yang lebih baru menutupi pencabutan `privacy` (tinjauan Sprint 1).
+> ⚠️ `terms` dan `privacy` dicatat **tanpa** `data_scopes` — badan `register`
+> [`04`](04-API-CONTRACTS.md) tidak memberinya — jadi pertanyaan `service`
+> **dengan** cakupan data selalu ditolak: gagal-tertutup sampai kosakata cakupan
+> diputuskan (#59 butir 2).
+> `purpose` berbentuk `snake_case` bebas (`fitness_recommendation` di naskah);
+> kosakata finalnya keputusan pemilik (#59 butir 2), bukan `CHECK` di sini.
+> Menolak `model_training` **tidak mengurangi layanan** (#59).
 
 ```sql
 -- @retention   : until-account-deleted
@@ -1044,6 +1069,41 @@ CREATE POLICY audit_logs_append ON audit_logs FOR INSERT
 > saat login) atau **lintas akun** (sapuan hapus akun 6.5) memakai fungsi
 > `SECURITY DEFINER` yang sempit, satu per kebutuhan — bukan pelonggaran
 > kebijakan.
+
+---
+
+## 12 · Fungsi `SECURITY DEFINER` — satu per kebutuhan lintas RLS
+
+```sql
+-- Login (spec/07 1.1): mencari akun per email SEBELUM pengguna dikenali — RLS
+-- `users` (§11) tidak meloloskannya, dan memang tidak boleh dilonggarkan.
+-- Sempit: satu email persis, tiga kolom, tanpa akun terhapus. search_path
+-- dipatok supaya objek dengan nama sama di skema lain tidak bisa dibajak.
+CREATE FUNCTION auth_lookup_for_login(p_email citext)
+  RETURNS TABLE (id uuid, password_hash text, status text)
+  LANGUAGE sql STABLE SECURITY DEFINER
+  SET search_path = pg_catalog, public, pg_temp
+  AS $$
+    SELECT u.id, u.password_hash, u.status
+    FROM public.users u
+    WHERE u.email = p_email AND u.deleted_at IS NULL
+  $$;
+REVOKE ALL ON FUNCTION auth_lookup_for_login(citext) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION auth_lookup_for_login(citext) TO hvx_app;
+```
+
+> 🔑 **Kenapa fungsi, bukan kebijakan RLS yang lebih longgar** (17 Sep 2026,
+> spec/07 1.1, **K-19**). Login harus membaca `password_hash` akun yang
+> belum dikenali — kebijakan `users` yang meloloskan itu akan meloloskannya
+> untuk SEMUA kueri aplikasi, termasuk kueri yang lupa. Fungsi ini hanya
+> menjawab satu pertanyaan, untuk satu email, dan hanya `hvx_app` yang boleh
+> memanggilnya (`EXECUTE` dicabut dari `PUBLIC` — bawaan PostgreSQL
+> memberikannya ke semua orang).
+>
+> `tests/integration/test_kepemilikan_data.py` menuntut: tiap fungsi
+> `SECURITY DEFINER` di skema `public` ada di **daftar izin** uji itu, punya
+> `search_path` terpatok, dan **tidak** bisa dieksekusi `PUBLIC`. Fungsi ke-2
+> berarti baris baru di daftar itu — dan alasan di bagian ini.
 
 ---
 

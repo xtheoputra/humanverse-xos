@@ -103,7 +103,9 @@ KUERI_KATALOG: dict[str, str] = {
         WHERE c.{_PUBLIK}
     """,
     "fungsi": """
-        SELECT p.proname, pg_get_function_identity_arguments(p.oid), md5(pg_get_functiondef(p.oid))
+        SELECT p.proname, pg_get_function_identity_arguments(p.oid), md5(pg_get_functiondef(p.oid)),
+               -- siapa boleh EXECUTE: NULL = bawaan = PUBLIC (spec/01 §12 mencabutnya)
+               COALESCE(p.proacl::text, '<bawaan>')
         FROM pg_proc p
         WHERE p.pronamespace = 'public'::regnamespace AND p.prokind = 'f'
           -- fungsi milik ekstensi (citext) dibandingkan lewat bagian `ekstensi`

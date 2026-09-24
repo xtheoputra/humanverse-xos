@@ -1,7 +1,7 @@
 # `tools/` — perkakas pemeriksa & gerbang
 
 > ⚠️ **Ini bukan kode produksi.** Kode produksi ada di [`../apps/api`](../apps/api/README.md)
-> (Sprint 0, branch `v0/sprint-0-foundation`, menunggu HUMAN REVIEW). Berkas di
+> (Sprint 0 & 1, branch `v0/sprint-0-foundation` · `v0/sprint-1-identity`, menunggu HUMAN REVIEW). Berkas di
 > sini **memeriksa** dokumen, DDL, pohon direktori, dan kode — dan memulangkan
 > kode keluar `1` kalau ada aturan yang dilanggar.
 
@@ -9,7 +9,7 @@
 |---|---|---|
 | [`periksa_dokumen.py`](periksa_dokumen.py) | **15** pemeriksaan [`../arch/11`](../arch/11-PENEGAKAN.md) yang membaca dokumen, DDL, dan pohon repo | nol — Python 3.10+ |
 | [`uji_mutasi.py`](uji_mutasi.py) | membuktikan pemeriksaan di atas **sanggup gagal** — 25 mutasi, tiap mutasi wajib melahirkan temuan **baru** | nol |
-| [`uji_mutasi_kode.py`](uji_mutasi_kode.py) | membuktikan kontrak `import-linter` (satu mutasi per id kontrak), larangan ruff, peta penegak, rantai pasok, uji migrasi, dan pemindai rahasia **sanggup gagal** — 42 mutasi, tiap mutasi wajib gagal dengan **alasan yang dimaksud** | lingkungan `uv` (+ basis data untuk 14 mutasi migrasi & kepemilikan data, Docker untuk 1 mutasi pemindai) |
+| [`uji_mutasi_kode.py`](uji_mutasi_kode.py) | membuktikan kontrak `import-linter` (satu mutasi per id kontrak), larangan ruff, peta penegak, rantai pasok, uji migrasi, dan pemindai rahasia, dan penjaga Sprint 1 (sandi · sesi · persetujuan · izin · batas laju · galat basis data di log) **sanggup gagal** — 108 mutasi, tiap mutasi wajib gagal dengan **alasan yang dimaksud**, dan untuk pytest alasan itu hanya dibaca dari **baris galat** (`E …`) — sumber uji yang ikut tercetak tidak dihitung | lingkungan `uv` (+ basis data & Redis untuk 64 mutasi, Docker untuk 1 mutasi pemindai) |
 | [`ci_lokal.py`](ci_lokal.py) | **gerbang penuh** `lint → typecheck → test → build → scan` — satu sumber untuk mesin lokal dan [`ci.yml`](../.github/workflows/ci.yml) | `uv`, Docker |
 
 ---
@@ -88,14 +88,15 @@ keluar `1`.
 
 ---
 
-## 🔴 Alat ini salah empat kali sebelum benar — dan itu bagian laporannya
+## 🔴 Alat ini salah lima kali sebelum benar — dan itu bagian laporannya
 
 | | Yang keliru | Kalau tidak ketahuan |
 |---|---|---|
 | 1 | panen butir roadmap ikut membaca **catatan audit** ⇒ milestone yang hanya **diusulkan** terhitung **ada** | Phase 18 tampak punya gerbang keselamatan |
 | 2 | panen nama event **hanya membaca token di dalam backtick** | seluruh keluarga `security.*` lolos E-1 dan E-2 |
-| 3 🆕 | `uji_mutasi.py` membaca/menulis lewat `read_text`/`write_text` ⇒ di Windows berkas ber-LF **dikembalikan sebagai CRLF** | "dikembalikan apa adanya" yang diam-diam mengubah berkas |
-| 4 🆕 | P-3 mencari penjaga sebagai *baris yang menyebut `CHECK`, `data_subject`, `user_id`* ⇒ **komentar SQL** yang menyebut ketiganya lolos | migrasi 0001 punya komentar persis begitu, tepat di atas CHECK-nya |
+| 3 | `uji_mutasi.py` membaca/menulis lewat `read_text`/`write_text` ⇒ di Windows berkas ber-LF **dikembalikan sebagai CRLF** | "dikembalikan apa adanya" yang diam-diam mengubah berkas |
+| 4 | P-3 mencari penjaga sebagai *baris yang menyebut `CHECK`, `data_subject`, `user_id`* ⇒ **komentar SQL** yang menyebut ketiganya lolos | migrasi 0001 punya komentar persis begitu, tepat di atas CHECK-nya |
+| 5 🆕 | `uji_mutasi_kode.py` mencari `harus_memuat` di **seluruh** keluaran pytest ⇒ pytest mencetak sumber uji sampai baris yang gagal, jadi pesan `assert` yang **lulus** ikut tercetak | galat lingkungan sesudahnya — Redis mati, sandi peran diganti proses lain — terhitung *“berbunyi dengan alasan yang dimaksud”* (tinjauan Sprint 1) |
 
 > 💡💡 **Pertanyaannya tetap satu, dan ia berbuah lagi: *apa yang alat ukur ini
 > TIDAK PERNAH lihat?*** Untuk nomor 3 dan 4 jawabannya: alat ukur itu sendiri.

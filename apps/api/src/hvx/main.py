@@ -19,7 +19,7 @@ from functools import partial
 from fastapi import FastAPI
 
 from hvx import __version__
-from hvx.modules import platform
+from hvx.modules import identity, platform, profile
 
 DOKUMENTASI_TERBUKA: frozenset[str] = frozenset({"local", "test", "ci"})
 
@@ -42,6 +42,8 @@ def create_app(settings: platform.Settings | None = None) -> FastAPI:
             socket_timeout_s=settings.redis_socket_timeout_s,
             connect_timeout_s=settings.redis_connect_timeout_s,
         )
+        app.state.engine = engine
+        app.state.redis = redis
         app.state.pemeriksaan_kesehatan = {
             "db": partial(platform.ping_db, engine),
             "redis": partial(platform.ping_redis, redis),
@@ -65,6 +67,15 @@ def create_app(settings: platform.Settings | None = None) -> FastAPI:
     )
     app.state.settings = settings
     app.state.versi = __version__
+    # Titik rakit menyambung modul yang tidak boleh saling impor (K-17): identity
+    # mengumumkan pendaftaran, profile membuat profil — di transaksi yang sama.
+    app.state.pendengar_pendaftaran = (profile.buat_profil_awal,)
+    platform.pasang_penangan_galat(app)
+    # Yang ditambahkan TERAKHIR paling luar: 429 batas laju tetap membawa
+    # X-Request-ID dan tercatat di baris `request.completed`.
+    app.add_middleware(platform.BatasLajuIpMiddleware)
     app.add_middleware(platform.RequestContextMiddleware)
     app.include_router(platform.router)
+    app.include_router(identity.router)
+    app.include_router(profile.router)
     return app

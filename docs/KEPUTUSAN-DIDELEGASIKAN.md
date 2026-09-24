@@ -419,6 +419,14 @@ sesudahnya.
 > `profile`, jadi `identity` tidak boleh memanggilnya. Dua jalan sah: titik
 > rakit `hvx.main` mengorkestrasi keduanya, atau `profile` mendengarkan
 > kejadian pendaftaran. Dipilih saat tugas 1.1/1.3 ditulis, dengan uji.
+>
+> ✅ **Dijawab 17 Sep 2026, saat 1.1 ditulis — gabungan keduanya.** `identity`
+> mengumumkan pendaftaran lewat **pendengar** (`PendengarPendaftaran`) yang
+> dijalankan di **transaksi pendaftaran yang sama**; titik rakit `hvx.main`
+> memasang `profile.buat_profil_awal` sebagai pendengarnya. `identity` tidak
+> tahu siapa yang mendengar, dan pendengar yang gagal menggagalkan seluruh
+> pendaftaran — akun tanpa profil tidak pernah tercipta. Bukan event: kejadian
+> yang diproses sesudah commit tidak bisa menjamin itu.
 
 ---
 
@@ -462,6 +470,34 @@ sesudahnya.
 | **Bacaan yang DITOLAK** | **(a)** *“Runner self-hosted di mesin pemilik”* — ditolak untuk sekarang: layanan yang berjalan terus di mesin pribadi dan menjalankan kode alur kerja, sementara apakah ia lolos dari blokir tagihan akun **belum diverifikasi**. **(b)** *“Jadikan repo publik — Actions dan perlindungan branch gratis”* — bukan milik saya: membuka seluruh naskah pemilik. **(c)** *“Layanan CI pihak ketiga paket gratis”* — butuh akun baru dan akses ke repo privat: keputusan pemilik. |
 | **Harga yang diakui** | Status `ci-lokal` **bisa ditempelkan siapa pun** yang punya akses tulis — ia bukti kejujuran pengembang, bukan penghalang. PR merah tetap tidak terhalang digabung; penghalangnya HUMAN REVIEW. |
 | **Cara membalikkan** | Kembalikan pemicu `pull_request`/`push` di `ci.yml` dan uji `test_alur_actions_tanpa_pemicu_otomatis_supaya_tidak_ada_tagihan` — sesudah pemilik membereskan tagihan atau membuat repo publik. |
+
+---
+
+## K-21 · Sesi: token opak di Redis, bukan JWT
+
+> Diputuskan 17 September 2026, saat Sprint 1 tugas 1.2 ditulis.
+
+| | |
+|---|---|
+| **Keputusan** | Token akses dan token segar adalah string acak 256 bit berawalan (`hvxa_` · `hvxr_`). Redis menyimpan **sidik** sha256-nya, tidak pernah tokennya. Akses 15 menit; segar 30 hari dan **berotasi** tiap dipakai (`GETDEL`, atomik); token segar bekas yang dipakai lagi dianggap dicuri — **seluruh sesi dicabut**, termasuk pasangan terbarunya. Tiap operasi yang **membaca lalu menulis** catatan sesi (putar · cabut) adalah **satu skrip Lua**; token akses tidak boleh hidup lebih lama dari catatan sesinya; status akun dibaca **sebelum** tiap rotasi, dan akun yang tidak aktif kehilangan **semua** sesinya. |
+| **Bukti** | `spec/07` 1.2: *“token dicabut → 401 seketika”* menuntut pemeriksaan penyimpanan di **tiap** permintaan. Kalau pemeriksaan itu tetap ada, tanda tangan JWT hanya menambah hal yang bisa salah (algoritme, kunci, `alg: none`). RFC 9700 §4.14.2: klien publik — aplikasi seluler V0 — butuh rotasi token segar dengan deteksi pemakaian ulang. |
+| **Bacaan yang DITOLAK** | **(a)** *“JWT berumur pendek tanpa pemeriksaan penyimpanan”* — ditolak: pencabutan baru berlaku sesudah token kedaluwarsa, melanggar 1.2. **(b)** *“JWT + daftar cabut di Redis”* — ditolak: satu panggilan Redis tiap permintaan tetap ada, ditambah seluruh kerumitan JWT. **(c)** *“Token mentah sebagai kunci Redis”* — ditolak: salinan Redis yang bocor langsung bisa dipakai; sidik atas 256 bit acak tidak bisa dibalik. **(d)** *“Baca catatan sesi, lalu tulis dalam `MULTI`”* — bentuk pertama, ditolak tinjauan Sprint 1: keluar yang jatuh di celahnya dihidupkan kembali oleh penyegaran, dan sesinya tidak bisa dicabut lagi. **(e)** *“`Idempotency-Key` untuk `refresh`”* — ditolak (E-165): memutar ulang jawabannya berarti menyimpan token mentah. |
+| **Harga yang diakui** | Redis menjadi ketergantungan autentikasi: Redis mati → rute bersesi gagal, tidak tetap melayani. Layanan terpisah di V2 yang ingin memeriksa token harus bertanya ke `identity`. **Rotasi ketat** (RFC 9700 §4.14.2): klien yang kehilangan jawaban penyegaran lalu mengulangnya dengan token yang sama dianggap pencuri — sesinya dicabut, pengguna masuk lagi. Penyegaran kini butuh basis data (status akun); tersendat → `500`, tetapi tokennya **tidak** terbakar. Skrip Lua menyentuh kunci yang namanya dibaca di dalamnya — sah untuk satu Redis, **tidak** untuk Redis Cluster (kunci satu sesi wajib berbagi hash tag). |
+| **Cara membalikkan** | Ganti `PenyimpanSesi` (`identity/sesi.py`); kontraknya `pengguna_saat_ini` dan `test_sesi.py`. Belum ada token di tangan klien mana pun — biayanya nol sampai rilis pertama. |
+
+---
+
+## K-22 · Sandi dan batas laju: angka yang dipilih, dan penguncian per akun
+
+> Diputuskan 17 September 2026, saat Sprint 1 tugas 1.1 dan 1.7 ditulis.
+
+| | |
+|---|---|
+| **Keputusan** | **Sandi** — 15–128 karakter tanpa aturan komposisi, **daftar tolak** (kata konteks · pengulangan · urutan), NFKC sebelum hashing. **Batas laju** — GCRA, `jumlah/detik`, boleh meledak sampai `jumlah`: per IP `600/60` di seluruh `/v1/*` (IPv6 per /64) · per pengguna `300/60` · `register` + `login` per IP `30/600` · login **gagal** per akun `100/86400` — jatahnya **dipakai sebelum argon2**, kuncinya email **sebagaimana `citext` membandingkannya** (`lower()` basis data), dihapus begitu berhasil masuk. Semua angka variabel `HVX_RATE_LIMIT_*`. Daftar tolak menilai pengulangan dari yang **diketik**, bukan hanya kerangka huruf-angkanya — sandi simbol atau emoji tidak ditolak karena tak berhuruf. |
+| **Bukti** | NIST SP 800-63B-4 §3.1.1.2 (panjang minimal 15 untuk sandi faktor tunggal, daftar tolak *SHALL*, NFKC *SHOULD*) dan batas ≤ 100 kegagalan beruntun per akun — yang **tidak** dipenuhi V0, lihat harga di bawah (**B-42**). `spec/07` 1.7 menuntut per pengguna **dan** per IP tanpa angka: per IP saja tidak menghentikan tebakan terdistribusi atas satu akun; per akun saja tidak menghentikan satu IP yang mencoba ribuan akun. `refresh` sengaja **di luar** batas kredensial: ia butuh token acak 256 bit, dan semua klien di balik satu NAT operator menyegarkan dari IP yang sama. |
+| **Bacaan yang DITOLAK** | **(a)** *“Jendela tetap per menit”* — ditolak: meloloskan 2× batas di perbatasan dua jendela, dan `Retry-After`-nya hanya bisa menunjuk awal menit berikutnya. **(b)** *“Kunci akun permanen sesudah N kegagalan”* — ditolak: V0 belum punya jalur pemulihan akun, jadi siapa pun yang tahu sebuah email bisa mengunci akunnya selamanya. **(c)** *“Kunci per IP dari `X-Forwarded-For`”* — ditolak: header itu dikarang klien; uvicorn `--proxy-headers` membacanya hanya dari proksi tepercaya (`FORWARDED_ALLOW_IPS`). **(d)** *“Tanya jatah sebelum argon2, hitung sesudah gagal”* — bentuk pertama, ditolak tinjauan Sprint 1: dua belas tebakan serentak lolos pertanyaan sebelum satu pun dihitung. **(e)** *“Kunci = `email.lower()` Python”* — ditolak: `İ` menjadi `i` di PostgreSQL dan `i̇` di Python, dan tiap `i` di email menggandakan jatah. |
+| **Harga yang diakui** | 🔴 **Ini batas LAJU, bukan batas 100 kegagalan beruntun NIST §3.2.2 (*SHALL*)** — dan versi pertama keputusan ini mengklaim sebaliknya (tinjauan Sprint 1). `100/86400` meloloskan 100 tebakan sekaligus, lalu satu tiap ±14 menit tanpa ujung, dan tiap masuk yang berhasil mengosongkannya: setahun, puluhan ribu tebakan atas satu akun. Memenuhi *SHALL* itu berarti mengunci akun — bacaan (b) yang ditolak di atas — sampai jalur pemulihan akun ada (**B-42**). Batas per akun juga **bisa disalahgunakan**, dan tidak selunak yang semula ditulis: jatah dipakai sebelum sandinya dicocokkan, jadi 100 tebakan salah membuat pemilik akun menerima `429` — juga dengan sandi yang benar — dan penyerang yang terus mengirim satu tebakan tiap ±14 menit (±100 permintaan sehari) menahannya di sana **selama ia mau**. Bacaan (b) ditolak karena mengunci selamanya dengan satu ledakan; pilihan ini mengunci selama penyerang bertahan. Diterima untuk V0: menebak sandi 15+ karakter yang lolos daftar tolak jauh lebih mahal daripada mengunci. Angka per IP **belum diukur** terhadap NAT operator seluler — kalau banyak pengguna berbagi satu IP, angkanya yang dinaikkan, bukan kuncinya yang dicabut. |
+| **Cara membalikkan** | Angka: ubah variabel `HVX_RATE_LIMIT_*`, tanpa kode. Satu kunci: hapus pemanggilnya di `identity/laju.py` atau middleware di `hvx.main` — `test_batas_laju.py` merah dan wajib diubah bersamanya. Daftar tolak: `identity/sandi.py` — sebelum baris akun pertama, NFKC boleh dicabut tanpa biaya; sesudahnya, hash yang ada patah. |
 
 ---
 
