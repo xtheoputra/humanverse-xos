@@ -114,6 +114,17 @@ GET    /habits/{id}/streak       → { current, longest, completion_rate_30d }
 > | `DELETE /goals/{id}` | anak goal naik menjadi **akar** — sama dengan hapus-keras `spec/01` (`ON DELETE SET NULL (parent_id)`) |
 > | `…/milestones` · `/milestones/{id}` | `404` untuk goal terhapus; `status: done` mengisi `completed_at` |
 
+> 🔧 **Bentuk habit yang ditegakkan (spec/07 2.2, 24 Sep 2026)** — semula hanya
+> tersirat di contoh `spec/01`:
+>
+> | Medan | Aturan | Kenapa |
+> |---|---|---|
+> | `target_count` | `day` → tepat **1** · `week` → 1–7 · `month` → 1–31 | satu tanggal satu penyelesaian (`UNIQUE (habit_id, for_date)`): *“3× sehari”* tidak bisa dicatat, *“8× seminggu”* tidak pernah terpenuhi |
+> | `schedule` | `{ weekdays?: [1..7] unik & terurut (ISO, 1 = Senin), time?: "HH:MM" }`; `weekdays` **hanya** untuk `period: day` | habit mingguan dihitung per periode, bukan per hari |
+> | `adaptive_tiers` | paling banyak 5: `[{ label, minutes? }]`, indeks 0 = versi penuh (naskah 4 §34) | |
+> | `PATCH` | paduan `period` × `target_count` × `schedule` diperiksa terhadap **baris tersimpan** → `422 invalid_habit` | badan `{period: "day"}` sah sendiri, tidak sah untuk habit `week`/3 |
+> | `goal_id` | goal tidak ada / milik pengguna lain → `422 goal_not_found` (FK komposit) | |
+
 > `POST .../completions` memakai `UNIQUE (habit_id, for_date)`. Kirim ulang
 > tanggal yang sama mengembalikan **200 dengan baris yang sudah ada**, bukan
 > `409` — pencatatan habit dari perangkat luring harus selalu aman diulang.

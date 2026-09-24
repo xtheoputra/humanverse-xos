@@ -142,6 +142,7 @@ UJI_CONFIG = "tests/unit/test_config.py"
 UJI_GOALS = "tests/integration/test_goals.py"
 UJI_IDEM = "tests/integration/test_idempotensi.py"
 UJI_IDEM_RUTE = "tests/unit/test_idempotensi_terpasang.py"
+UJI_HABITS = "tests/integration/test_habits.py"
 FK_MILESTONE = (
     "  FOREIGN KEY (goal_id, user_id) REFERENCES goals (id, user_id) ON DELETE CASCADE" + NL + ");"
 )
@@ -1737,6 +1738,43 @@ MUTASI: list[Mutasi] = [
         ],
         _pytest(f"{UJI_IDEM}::test_galat_tidak_disimpan_sebagai_jawaban"),
         harus_memuat="galat disimpan sebagai jawaban",
+        kelompok="db",
+    ),
+    # ── Sprint 2 · 2.2 habits + jadwal + adaptive_tiers ──────────────────
+    Mutasi(
+        "2.2",
+        "energi rendah (2) diperlakukan normal — tier tidak turun",
+        [
+            Sunting(
+                f"{MODUL}/habits/tier.py",
+                "    if energi is None or energi > ENERGI_RENDAH:",
+                "    if energi is None or energi >= ENERGI_RENDAH:",
+            )
+        ],
+        _pytest("tests/unit/test_tier.py::test_tier_turun_saat_energi_rendah"),
+        harus_memuat="tier tidak turun saat energi rendah",
+    ),
+    Mutasi(
+        "2.2",
+        "PATCH tidak memeriksa paduan period × target_count dengan baris tersimpan",
+        [
+            Sunting(
+                f"{MODUL}/habits/service.py",
+                '                periksa_target(period, perubahan.get("target_count", kini.target_count))'
+                + NL,
+                "",
+            )
+        ],
+        _pytest(f"{UJI_HABITS}::test_patch_yang_membuat_paduan_periode_tidak_sah_ditolak_422"),
+        harus_memuat="paduan period × target_count yang tidak sah tersimpan",
+        kelompok="db",
+    ),
+    Mutasi(
+        "2.2",
+        "habit harian boleh target 7 — satu tanggal hanya satu penyelesaian",
+        [Sunting(f"{MODUL}/habits/schemas.py", '{"day": 1, ', '{"day": 7, ')],
+        _pytest(f"{UJI_HABITS}::test_habit_berbentuk_salah_ditolak_400"),
+        harus_memuat="assert 201 == 400",
         kelompok="db",
     ),
 ]

@@ -19,7 +19,7 @@ from functools import partial
 from fastapi import FastAPI
 
 from hvx import __version__
-from hvx.modules import goals, identity, platform, profile
+from hvx.modules import goals, habits, identity, platform, profile
 
 DOKUMENTASI_TERBUKA: frozenset[str] = frozenset({"local", "test", "ci"})
 
@@ -79,4 +79,5 @@ def create_app(settings: platform.Settings | None = None) -> FastAPI:
     app.include_router(identity.router)
     app.include_router(profile.router)
     app.include_router(goals.router)
+    app.include_router(habits.router)
     return app
