@@ -13,6 +13,7 @@ dibuat wajib — jadi keduanya kini diperlakukan sama.
 
 from __future__ import annotations
 
+import re
 from typing import Literal, Self
 
 from pydantic import Field, SecretStr, field_validator, model_validator
@@ -24,6 +25,13 @@ Lingkungan = Literal["local", "test", "ci", "production"]
 
 # "jumlah/detik" — lihat batas_laju.py
 POLA_BATAS = r"^[1-9][0-9]{0,5}/[1-9][0-9]{0,5}$"
+
+# Satu asal peramban: skema + host + port opsional — persis yang dikirim `Origin`.
+_POLA_ASAL = r"https?://[a-z0-9]([a-z0-9.-]*[a-z0-9])?(:[0-9]{1,5})?"
+
+
+def _pisah_asal(nilai: str) -> tuple[str, ...]:
+    return tuple(a.strip() for a in nilai.split(",") if a.strip())
 
 
 class Settings(BaseSettings):
@@ -77,6 +85,28 @@ class Settings(BaseSettings):
     # bisa dibalik dengan mencoba keempat miliar alamat, dan kunci acak per
     # proses membuat jejak satu IP tidak bisa dipertemukan antarinstans.
     ip_hash_key: SecretStr = Field(min_length=32)
+
+    # Asal peramban yang boleh memanggil api (CORS) — dipisah koma, mis.
+    # `http://localhost:5000` untuk aplikasi Flutter web lokal (spec/07 2.7).
+    # Kosong = tidak ada CORS sama sekali: aplikasi seluler tidak butuh, dan
+    # asal yang tidak disebut tidak pernah diloloskan. `*` DITOLAK — token
+    # bearer di tangan skrip asal mana pun bukan pilihan yang bisa diambil diam-diam.
+    cors_origins: str = ""
+
+    @field_validator("cors_origins")
+    @classmethod
+    def _asal_cors_persis(cls, nilai: str) -> str:
+        for asal in _pisah_asal(nilai):
+            if not re.fullmatch(_POLA_ASAL, asal):
+                raise ValueError(
+                    "HVX_CORS_ORIGINS: tiap asal wajib `http(s)://host[:port]` huruf kecil, "
+                    "tanpa jalur, tanpa `*`"
+                )
+        return nilai
+
+    @property
+    def asal_cors(self) -> tuple[str, ...]:
+        return _pisah_asal(self.cors_origins)
 
     @field_validator("database_url")
     @classmethod

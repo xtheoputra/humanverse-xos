@@ -100,6 +100,8 @@ services:
       HVX_REDIS_URL: redis://redis:6379/0
       HVX_LOG_LEVEL: ${HVX_LOG_LEVEL:-INFO}
       HVX_IP_HASH_KEY: ${HVX_IP_HASH_KEY:-hvx-dev-only-ip-hash-key-0123456789abcdef}
+      # Asal aplikasi Flutter web lokal (apps/mobile) — kosong = tanpa CORS.
+      HVX_CORS_ORIGINS: ${HVX_CORS_ORIGINS:-}
     ports:
       - "127.0.0.1:${HVX_API_PORT:-8000}:8000"
     depends_on:

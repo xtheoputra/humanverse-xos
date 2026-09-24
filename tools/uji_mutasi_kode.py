@@ -40,6 +40,7 @@ if hasattr(sys.stdout, "reconfigure"):
 
 AKAR = Path(__file__).resolve().parent.parent
 MODUL = "apps/api/src/hvx/modules"
+APLIKASI = "apps/mobile"
 MIGRASI = "data/migrations/versions"
 UJI_MIGRASI = "tests/integration/test_migrasi.py"
 NL = "\n"
@@ -66,6 +67,9 @@ class Mutasi:
     kode_tertangkap: set[int] = field(default_factory=lambda: {1})
     # lint (bawaan) · db (butuh HVX_TEST_DATABASE_URL) · docker (butuh daemon Docker)
     kelompok: str = "lint"
+    # Direktori kerja perintah, relatif terhadap akar repo — `flutter test` wajib
+    # dijalankan dari akar aplikasinya.
+    cwd: str | None = None
 
 
 def _lint(kontrak: str) -> list[str]:
@@ -78,6 +82,16 @@ def _pytest(nodeid: str) -> list[str]:
 
 def _ruff(berkas: str) -> list[str]:
     return [sys.executable, "-m", "ruff", "check", "--no-cache", "--select", "TID251", berkas]
+
+
+def _flutter_uji(berkas: str, nama: str) -> list[str]:
+    """`flutter test` satu uji — biner diambil dari tools/ci_lokal.py, bukan disalin."""
+    sys.path.insert(0, str(AKAR / "tools"))
+    try:
+        from ci_lokal import _FLUTTER
+    finally:
+        sys.path.pop(0)
+    return [_FLUTTER, "test", berkas, "--plain-name", nama]
 
 
 def _pindai_rahasia() -> list[str]:
@@ -2038,6 +2052,60 @@ MUTASI: list[Mutasi] = [
         harus_memuat="`to` tidak eksklusif",
         kelompok="db",
     ),
+    # ── Sprint 2 · 2.7 layar V0 pertama (Flutter, apps/mobile) ───────────
+    Mutasi(
+        "2.7",
+        "penyelesaian dari layar dikirim TANPA Idempotency-Key",
+        [
+            Sunting(
+                f"{APLIKASI}/lib/api/klien.dart",
+                "      '/v1/habits/$habitId/completions',"
+                + NL
+                + "      kunciIdempotensi: _kunciBaru(),"
+                + NL,
+                "      '/v1/habits/$habitId/completions'," + NL,
+            )
+        ],
+        _flutter_uji(
+            "test/api/klien_test.dart", "tiap tindakan tulis membawa Idempotency-Key yang BERBEDA"
+        ),
+        harus_memuat="tiap tindakan tulis membawa Idempotency-Key yang BERBEDA [E]",
+        cwd=APLIKASI,
+    ),
+    Mutasi(
+        "2.7",
+        "layar tidak mengirim tier yang dipilih pengguna",
+        [
+            Sunting(
+                f"{APLIKASI}/lib/layar/habit_hari_ini.dart",
+                "      () => widget.layanan.tandaiSelesai(h.id, _tanggal, tier: tier),",
+                "      () => widget.layanan.tandaiSelesai(h.id, _tanggal, tier: null),",
+            )
+        ],
+        _flutter_uji(
+            "test/layar/habit_hari_ini_test.dart",
+            "habit bertier: saran dari energi ditampilkan beserta alasannya, tier dipilih",
+        ),
+        harus_memuat="tier dipilih [E]",
+        cwd=APLIKASI,
+    ),
+    Mutasi(
+        "2.7",
+        "energi disimpan tanpa medan check-in lama — PUT mengganti, fokus & tidur hilang",
+        [
+            Sunting(
+                f"{APLIKASI}/lib/api/klien.dart",
+                "    final badan = lama?.keJsonDenganEnergi(energi) ?? {'energy': energi};",
+                "    final badan = {'energy': energi};",
+            )
+        ],
+        _flutter_uji(
+            "test/api/klien_test.dart",
+            "simpan energi mengirim check-in UTUH — PUT mengganti, medan lama ikut",
+        ),
+        harus_memuat="medan lama ikut [E]",
+        cwd=APLIKASI,
+    ),
 ]
 
 
@@ -2138,7 +2206,7 @@ def main() -> int:
                 _terapkan(s, cadangan, dir_baru)
             r = subprocess.run(
                 m.perintah,
-                cwd=AKAR,
+                cwd=AKAR / m.cwd if m.cwd else AKAR,
                 env=lingkungan,
                 capture_output=True,
                 text=True,

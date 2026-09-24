@@ -17,6 +17,7 @@ from contextlib import asynccontextmanager
 from functools import partial
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 from hvx import __version__
 from hvx.modules import checkins, goals, habits, identity, platform, profile
@@ -80,6 +81,19 @@ def create_app(settings: platform.Settings | None = None) -> FastAPI:
     # X-Request-ID dan tercatat di baris `request.completed`.
     app.add_middleware(platform.BatasLajuIpMiddleware)
     app.add_middleware(platform.RequestContextMiddleware)
+    if settings.asal_cors:
+        # Paling luar: jawaban 401/429 pun membawa header CORS, supaya aplikasi
+        # web membaca galatnya alih-alih "network error". Tanpa kredensial
+        # peramban (cookie) — autentikasi V0 token bearer (K-21).
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=list(settings.asal_cors),
+            allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
+            allow_headers=["Authorization", "Content-Type", "Idempotency-Key", "X-Request-ID"],
+            expose_headers=["Retry-After", "X-Request-ID", "Idempotent-Replayed"],
+            allow_credentials=False,
+            max_age=600,
+        )
     app.include_router(platform.router)
     app.include_router(identity.router)
     app.include_router(profile.router)

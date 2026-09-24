@@ -52,6 +52,10 @@ jobs:
           python-version: "3.12"
           enable-cache: true
       - run: uv sync
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          flutter-version: "3.47.5"
+          channel: stable
       - run: uv run python tools/ci_lokal.py lint
 
   typecheck:
@@ -102,6 +106,10 @@ jobs:
           python-version: "3.12"
           enable-cache: true
       - run: uv sync
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          flutter-version: "3.47.5"
+          channel: stable
       - run: uv run python tools/ci_lokal.py test
 
   # build dan scan SATU job: job Actions tidak berbagi daemon Docker, dan yang
