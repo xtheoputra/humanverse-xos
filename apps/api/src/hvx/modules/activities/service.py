@@ -44,6 +44,8 @@ async def catat(engine: AsyncEngine, user_id: UUID, badan: CatatAktivitas) -> Ak
                 raise platform.GalatApi(
                     422, "occurred_at_in_future", "Waktu aktivitas itu belum terjadi."
                 )
+            if badan.ended_at is not None and badan.ended_at > batas:
+                raise platform.GalatApi(422, "ended_at_in_future", "Aktivitas itu belum selesai.")
             return await repository.sisip(
                 conn,
                 user_id=user_id,

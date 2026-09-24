@@ -1,4 +1,4 @@
-"""spec/07 3.5–3.7 — penyemat lokal `hvx-hash-v1` (K-26): berkunci, deterministik, ternormalkan.
+"""spec/07 3.5–3.7 — penyemat lokal `hvx-hash-v1` (K-26): berkunci, per pengguna, deterministik.
 
 Yang dijanjikan penyemat ini — dan yang TIDAK: kemiripan LEKSIKAL yang tahan
 salah ketik, bukan kemiripan makna (lihat docstring `platform/sematan.py`).
@@ -11,6 +11,7 @@ import math
 import os
 import subprocess
 import sys
+from uuid import UUID, uuid4
 
 import pytest
 
@@ -18,33 +19,53 @@ from hvx.modules.platform import PenyematHash, Settings, penyemat_dari
 
 KUNCI = b"k" * 32
 P = PenyematHash(KUNCI)
+U = UUID(int=1)
+S = P.untuk(U)
 
 
 def _kosinus(a: list[float], b: list[float]) -> float:
     return sum(x * y for x, y in zip(a, b, strict=True))
 
 
-def test_nama_membawa_dimensi_dan_sidik_kunci() -> None:
+def test_nama_membawa_dimensi_dan_sidik_kunci_proses() -> None:
     lain = PenyematHash(b"x" * 32)
 
     assert P.dimensi == 384
     assert P.nama.startswith("hvx-hash-v1-384-")
     assert P.nama != lain.nama, "dua kunci, satu nama — ruang vektornya tercampur"
+    assert S.nama == P.nama, "nama per pengguna berbeda — pencarian tidak menemukan apa pun"
+
+
+def test_penyemat_proses_tidak_menyemat_sendiri() -> None:
+    """S1: satu kunci untuk semua pengguna = kamus bagi siapa pun yang punya akun."""
+    assert not hasattr(P, "semat")
+    with pytest.raises(TypeError, match="user_id"):
+        P.untuk("bukan-uuid")  # type: ignore[arg-type]
+
+
+def test_tiap_pengguna_ruang_vektornya_sendiri() -> None:
+    """Tinjauan keamanan Sprint 3 (S1): teks yang sama dari dua pengguna tidak sebanding —
+    akun penyerang tidak bisa menyemat kamus lalu membandingkannya dengan vektor korban."""
+    lain = P.untuk(uuid4()).semat("ingin berhenti")
+
+    assert abs(_kosinus(S.semat("ingin berhenti"), lain)) < 0.3, "vektor dua pengguna sebanding"
+    assert S.semat("ingin berhenti") == P.untuk(U).semat("ingin berhenti")
 
 
 def test_ternormalkan_dan_teks_tanpa_kata_vektor_nol() -> None:
-    v = P.semat("Lari pagi bikin lega")
+    v = S.semat("Lari pagi bikin lega")
 
     assert math.isclose(math.sqrt(sum(x * x for x in v)), 1.0, rel_tol=1e-9)
-    assert P.semat("  ... !!! ") == [0.0] * 384
+    assert S.semat("  ... !!! ") == [0.0] * 384
 
 
 def test_sama_di_tiap_proses_bukan_hash_python_yang_diacak() -> None:
     """`hash()` Python diacak per proses (PYTHONHASHSEED): vektor yang disimpan
     kemarin tidak akan cocok dengan kueri hari ini, dan tidak ada yang tahu."""
     kode = (
-        "import json; from hvx.modules.platform import PenyematHash; "
-        "print(json.dumps(PenyematHash(b'k' * 32).semat('capek sekali hari ini')))"
+        "import json, uuid; from hvx.modules.platform import PenyematHash; "
+        "print(json.dumps(PenyematHash(b'k' * 32).untuk(uuid.UUID(int=1))"
+        ".semat('capek sekali hari ini')))"
     )
     lain = subprocess.run(  # noqa: S603 - interpreter uji sendiri, argumen tetap
         [sys.executable, "-c", kode],
@@ -54,24 +75,29 @@ def test_sama_di_tiap_proses_bukan_hash_python_yang_diacak() -> None:
         env={**os.environ, "PYTHONHASHSEED": "12345"},
     )
 
-    assert json.loads(lain.stdout) == P.semat("capek sekali hari ini")
+    assert json.loads(lain.stdout) == S.semat("capek sekali hari ini")
 
 
 def test_tanpa_kunci_yang_sama_kata_tidak_bisa_ditebak_dari_vektor() -> None:
     """Serangan kamus: penyerang yang memegang vektor dari Qdrant menyemat kata calon
     dengan penyemat MILIKNYA. Tanpa kunci yang sama, kemiripannya tidak lebih dari acak."""
-    rahasia = P.semat("selingkuh")
-    tebakan = PenyematHash(b"penyerang-tanpa-kunci-asli-00000").semat("selingkuh")
+    rahasia = S.semat("selingkuh")
+    tebakan = PenyematHash(b"penyerang-tanpa-kunci-asli-00000").untuk(U).semat("selingkuh")
 
     assert abs(_kosinus(rahasia, tebakan)) < 0.5, "kata terbaca tanpa kunci"
-    assert _kosinus(rahasia, P.semat("selingkuh")) > 0.999
+    assert _kosinus(rahasia, S.semat("selingkuh")) > 0.999
+
+
+def test_huruf_besar_dan_kecil_kata_yang_sama() -> None:
+    """Pengguna menulis "Rapat" di jurnal dan mencari "rapat" (tinjauan penegak buta)."""
+    assert S.semat("Rapat Pagi") == S.semat("rapat pagi"), "Rapat ≠ rapat"
 
 
 def test_tahan_salah_ketik_dan_tidak_menyamakan_yang_asing() -> None:
-    dasar = P.semat("lelah sekali sesudah rapat")
+    dasar = S.semat("lelah sekali sesudah rapat")
 
-    salah_ketik = _kosinus(dasar, P.semat("leleh sekali sesudah rapat"))
-    asing = _kosinus(dasar, P.semat("belanja sayur bulanan"))
+    salah_ketik = _kosinus(dasar, S.semat("leleh sekali sesudah rapat"))
+    asing = _kosinus(dasar, S.semat("belanja sayur bulanan"))
 
     assert salah_ketik > 0.6
     assert asing < 0.2
@@ -97,4 +123,4 @@ def test_penyemat_proses_diturunkan_dari_setelan() -> None:
     a = penyemat_dari(Settings(**dasar, sematan_key="s" * 32))  # type: ignore[arg-type]
     b = penyemat_dari(Settings(**dasar, sematan_key="s" * 32))  # type: ignore[arg-type]
     assert a.nama == b.nama
-    assert a.semat("lega") == b.semat("lega")
+    assert a.untuk(U).semat("lega") == b.untuk(U).semat("lega")

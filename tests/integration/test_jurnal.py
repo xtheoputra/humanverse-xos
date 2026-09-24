@@ -116,6 +116,15 @@ async def test_ubah_isi_menghitung_ulang_kata_dan_judul_bisa_dihapus(
     assert kosong.json()["updated_at"] == r.json()["updated_at"]
 
 
+async def test_jumlah_kata_dipisah_spasi_apa_pun(api_bersama: ApiUji) -> None:
+    """Baris baru, tab, spasi ganda — `word_count` satu-satunya yang event bawa (spec/03)."""
+    _uid, token = await api_bersama.pengguna_baru()
+
+    j = await _tulis(api_bersama, token, body="satu\ndua\ttiga  empat\n")
+
+    assert j["word_count"] == 4, f"kata dihitung {j['word_count']}, bukan 4"
+
+
 @pytest.mark.parametrize(
     "isi",
     [
@@ -137,13 +146,22 @@ async def test_jurnal_berbentuk_salah_400(api_bersama: ApiUji, isi: dict[str, An
 
 
 async def test_jurnal_masa_depan_422(api_bersama: ApiUji) -> None:
+    """Ditulis ATAU dikoreksi ke masa depan — `PATCH` bukan jalan memutar."""
     _uid, token = await api_bersama.pengguna_baru()
+    j = await _tulis(api_bersama, token)
+    nanti = "2999-01-01T00:00:00Z"
 
-    nanti = {"body": "nanti", "occurred_at": "2999-01-01T00:00:00Z"}
-    r = await api_bersama.klien.post("/v1/journal", json=nanti, headers=auth(token))
+    buat = await api_bersama.klien.post(
+        "/v1/journal", json={"body": "nanti", "occurred_at": nanti}, headers=auth(token)
+    )
+    ubah = await api_bersama.klien.patch(
+        f"/v1/journal/{j['id']}", json={"occurred_at": nanti}, headers=auth(token)
+    )
 
-    assert r.status_code == 422, r.text
-    assert r.json()["error"]["code"] == "occurred_at_in_future"
+    assert buat.status_code == 422, buat.text
+    assert ubah.status_code == 422, f"PATCH ke masa depan diterima: {ubah.status_code}"
+    assert buat.json()["error"]["code"] == "occurred_at_in_future"
+    assert ubah.json()["error"]["code"] == "occurred_at_in_future"
 
 
 async def test_hapus_lunak_dan_jurnal_orang_lain_tidak_terlihat(api_bersama: ApiUji) -> None:
@@ -181,3 +199,74 @@ async def test_id_buatan_klien_409_dan_kunci_idempotensi(api_bersama: ApiUji) ->
             0,
         )
     assert n == 1
+
+
+@pytest.mark.parametrize(
+    "isi",
+    [
+        {"body": None},
+        {"occurred_at": None},
+        {"judul": "x"},  # medan yang tidak dikenal
+    ],
+)
+async def test_ubah_jurnal_berbentuk_salah_400(api_bersama: ApiUji, isi: dict[str, Any]) -> None:
+    """`title: null` menghapus judul; `body`/`occurred_at` null tidak punya arti — 400, bukan
+    500 dari NOT NULL (tinjauan penegak buta Sprint 3)."""
+    _uid, token = await api_bersama.pengguna_baru()
+    j = await _tulis(api_bersama, token)
+
+    r = await api_bersama.klien.patch(f"/v1/journal/{j['id']}", json=isi, headers=auth(token))
+
+    assert r.status_code == 400, f"{isi} → {r.status_code} {r.text}"
+
+
+async def test_jurnal_yang_dihapus_tidak_bisa_diubah_atau_dihapus_lagi(
+    api_bersama: ApiUji,
+) -> None:
+    """Hapus-lunak bukan arsip yang bisa disunting: `PATCH` sesudah `DELETE` menghidupkan
+    isi yang dicabut pemiliknya ke memori, dan `DELETE` kedua menjalankan pendengarnya
+    lagi."""
+    _uid, token = await api_bersama.pengguna_baru()
+    j = await _tulis(api_bersama, token)
+    k = api_bersama.klien
+
+    pertama = await k.delete(f"/v1/journal/{j['id']}", headers=auth(token))
+    kedua = await k.delete(f"/v1/journal/{j['id']}", headers=auth(token))
+    ubah = await k.patch(f"/v1/journal/{j['id']}", json={"body": "hidup lagi"}, headers=auth(token))
+
+    assert pertama.status_code == 204, pertama.text
+    assert kedua.status_code == 404, f"DELETE kedua: {kedua.status_code}"
+    assert ubah.status_code == 404, f"PATCH sesudah DELETE: {ubah.status_code}"
+
+
+async def test_daftar_terbaru_dulu_dan_rentang_waktu(api_bersama: ApiUji) -> None:
+    _uid, token = await api_bersama.pengguna_baru()
+    for hari in ("01", "02", "03"):
+        await _tulis(api_bersama, token, occurred_at=f"2026-09-{hari}T08:00:00Z")
+    k = api_bersama.klien
+
+    tanggal: list[str] = []
+    kursor = None
+    while True:
+        param: dict[str, Any] = {"limit": 2, **({"cursor": kursor} if kursor else {})}
+        r = await k.get("/v1/journal", params=param, headers=auth(token))
+        assert r.status_code == 200, r.text
+        tanggal += [j["occurred_at"][:10] for j in r.json()["items"]]
+        kursor = r.json()["next_cursor"]
+        if not kursor:
+            break
+    rentang = await k.get(
+        "/v1/journal",
+        params={"from": "2026-09-02T00:00:00Z", "to": "2026-09-03T00:00:00Z"},
+        headers=auth(token),
+    )
+    terbalik = await k.get(
+        "/v1/journal",
+        params={"from": "2026-09-03T00:00:00Z", "to": "2026-09-02T00:00:00Z"},
+        headers=auth(token),
+    )
+
+    assert tanggal == ["2026-09-03", "2026-09-02", "2026-09-01"], f"urutan halaman: {tanggal}"
+    dalam = [j["occurred_at"][:10] for j in rentang.json()["items"]]
+    assert dalam == ["2026-09-02"], f"rentang from–to: {dalam}"
+    assert terbalik.status_code == 400, f"from sesudah to: {terbalik.status_code}"

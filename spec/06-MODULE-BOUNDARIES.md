@@ -171,12 +171,22 @@ tetap di riwayat. Event konfigurasi (mis. `goal.changed` di tabel padanan) bisa
 mulai diterbitkan kapan saja tanpa kehilangan apa pun — tabelnya menyimpan
 keadaannya.
 
+🔧 **Tiga tulisan yang semula tidak disebut di peta maupun di sini** (tinjauan
+kontrak Sprint 3, K6):
+
+| Tulisan | Kenapa tanpa event V0 |
+|---|---|
+| `POST /activities` (3.8) | ⚠️ **Fakta perilaku — dan diakui sebagai pengecualian.** Event padanannya (`workout.completed`, `meal.logged`, `learning.completed`, `meeting.completed`) ada di [`03`](03-EVENT-CONTRACTS.md) tetapi **belum ✅ V0**, dan bentuk payload-nya tidak memetakan kosakata `activities.kind` yang masih terbuka. Tabel `activities` menyimpan faktanya, jadi event bisa diterbitkan belakangan dengan `source='backfill'` tanpa kehilangan apa pun. Sampai itu aturan **D** tidak berlaku untuk `activities` — dinyatakan di sini, bukan diam-diam |
+| `PATCH /journal/{id}` | menyunting tulisan tidak melahirkan fakta perilaku baru: *menulis jurnal* terjadi pada `occurred_at`-nya, dan isinya tidak pernah masuk event |
+| `DELETE /journal/{id}` | hapus-lunak (`deleted_at`); `journal.created` (hanya `word_count`) tetap di riwayat. Apakah fakta *pernah menulis jurnal* ikut dicabut bersama tulisannya — bentuk E-178 untuk jurnal — terikat **C-31**, milik pemilik |
+
 > 🔧 **Aturan 6 dipersempit 24 Sep 2026 (E-179), saat 3.2 ditulis.** Kalimat
 > sebelumnya (*“setiap tulisan ke tabel yang punya event padanan”*) menuntut
 > event untuk tiap `PATCH` judul goal — padahal 23 event `03` tidak punya satu
 > pun jenis untuknya, dan menambah sepuluh event konfigurasi ke V0 gagal uji
 > [`../arch/07`](../arch/07-EVENT-CONTRACTS.md) §7. Yang dijaga kini persis yang
-> membuat aturan **D** benar: **tidak ada fakta perilaku yang lolos tanpa event**.
+> membuat aturan **D** benar: **tidak ada fakta perilaku yang lolos tanpa event** —
+> dengan satu pengecualian yang dinyatakan: `activities` V0 (tabel di atas).
 
 > Tiap kontrak di atas **terbukti sanggup gagal** — `tools/uji_mutasi_kode.py`
 > memiliki satu mutasi per id kontrak, dan `tests/unit/test_penegak.py`

@@ -12,36 +12,45 @@ bahasa** — dan itu keputusan yang dinyatakan, bukan penghematan diam-diam (K-2
 * 🔒 **Berkunci** (`HVX_SEMATAN_KEY`). *Feature hashing* tanpa kunci bisa
   DIBALIK dengan kamus: siapa pun yang memegang vektornya menghitung hash tiap
   kata calon dan membaca kata mana yang ada — isi jurnal (Level 3 *Sensitive*,
-  naskah `docs/133`) terbaca dari Qdrant, yang tidak punya RLS. Dengan kunci,
-  vektor di Qdrant tidak bisa dipetakan ke kata tanpa rahasia yang tinggal di
-  proses api/pekerja. Sidik kunci ikut di `nama`: vektor dari kunci lain tidak
-  pernah dibandingkan, dan penyelaras menyemat ulang memori yang
-  `model_version`-nya berbeda.
+  naskah `docs/133`) terbaca dari Qdrant, yang tidak punya RLS. Sidik kunci ikut
+  di `nama`: vektor dari kunci lain tidak pernah dibandingkan, dan penyelaras
+  menyemat ulang memori yang `embedding_model`-nya berbeda.
+* 🔒 **Satu ruang vektor per pengguna**: kunci tiap pengguna diturunkan dari
+  kunci proses (`untuk(user_id)`), dan penyemat proses sendiri TIDAK menyemat.
+  🔴 Versi pertama memakai satu kunci untuk semua: penyerang yang bisa membaca
+  Qdrant cukup membuat akun biasa, menulis kata-kata kamus sebagai jurnalnya
+  sendiri, dan membandingkan vektor yang disemat server dengan vektor korban —
+  kuncinya tidak pernah ia sentuh (tinjauan keamanan Sprint 3, S1). Dengan kunci
+  turunan, vektor dua pengguna tidak sebanding sama sekali.
 
 Yang dihasilkannya: kemiripan **leksikal** yang tahan salah ketik — kata,
 pasangan kata, dan trigram huruf di-hash ke 384 dimensi bertanda, lalu
 dinormalkan (kosinus = hasil kali titik). ⚠️ Itu BUKAN kemiripan makna:
 *“lelah”* dan *“capek”* tidak berdekatan. Antarmuka `Penyemat` memisahkan
 pemanggilnya dari pilihan ini — model sungguhan (lokal atau penyedia) masuk
-lewat kelas lain dengan `nama` lain, dan `memories.model_version` mencatat
+lewat kelas lain dengan `nama` lain, dan `memories.embedding_model` mencatat
 dengan apa tiap memori disemat, supaya penggantian tidak mencampur ruang vektor.
 """
 
 from __future__ import annotations
 
 import hashlib
+import hmac
 import math
 import re
 import unicodedata
 from itertools import pairwise
 from typing import Protocol
+from uuid import UUID
 
 from .config import Settings
 
 _KATA = re.compile(r"[^\W_]+", re.UNICODE)
 
 
-class Penyemat(Protocol):
+class SematanPengguna(Protocol):
+    """Penyemat SATU pengguna — vektornya hanya sebanding dengan vektor pengguna yang sama."""
+
     @property
     def nama(self) -> str: ...
 
@@ -51,18 +60,60 @@ class Penyemat(Protocol):
     def semat(self, teks: str) -> list[float]: ...
 
 
+class Penyemat(Protocol):
+    """Penyemat proses — tidak menyemat sendiri; tiap pengguna mendapat ruang vektornya."""
+
+    @property
+    def nama(self) -> str: ...
+
+    @property
+    def dimensi(self) -> int: ...
+
+    def untuk(self, user_id: UUID) -> SematanPengguna: ...
+
+
+def _periksa(kunci: bytes, dimensi: int) -> None:
+    if not isinstance(kunci, bytes) or not 32 <= len(kunci) <= 64:
+        raise ValueError("kunci penyemat wajib 32–64 byte")
+    if dimensi < 16:
+        raise ValueError("dimensi sematan terlalu kecil")
+
+
 class PenyematHash:
-    """Feature hashing bertanda BERKUNCI atas kata · pasangan kata · trigram huruf."""
+    """Feature hashing bertanda BERKUNCI — kunci proses, dari sana kunci tiap pengguna."""
 
     def __init__(self, kunci: bytes, dimensi: int = 384) -> None:
-        if not isinstance(kunci, bytes) or not 32 <= len(kunci) <= 64:
-            raise ValueError("kunci penyemat wajib 32–64 byte")
-        if dimensi < 16:
-            raise ValueError("dimensi sematan terlalu kecil")
+        _periksa(kunci, dimensi)
         self._kunci = kunci
         self._dimensi = dimensi
         sidik = hashlib.blake2b(b"hvx-sematan-sidik", key=kunci, digest_size=4).hexdigest()
         self._nama = f"hvx-hash-v1-{dimensi}-{sidik}"
+
+    @property
+    def nama(self) -> str:
+        return self._nama
+
+    @property
+    def dimensi(self) -> int:
+        return self._dimensi
+
+    def untuk(self, user_id: UUID) -> SematanPengguna:
+        if not isinstance(user_id, UUID):
+            raise TypeError("penyemat wajib diturunkan untuk satu user_id (S1, H-27)")
+        turunan = hmac.new(
+            self._kunci, b"hvx-sematan-pengguna:" + user_id.bytes, hashlib.sha256
+        ).digest()
+        return _SematanHash(turunan, self._dimensi, self._nama)
+
+
+class _SematanHash:
+    """Feature hashing bertanda atas kata · pasangan kata · trigram huruf, satu kunci."""
+
+    def __init__(self, kunci: bytes, dimensi: int, nama: str) -> None:
+        _periksa(kunci, dimensi)
+        self._kunci = kunci
+        self._dimensi = dimensi
+        self._nama = nama
 
     @property
     def nama(self) -> str:

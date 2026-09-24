@@ -68,8 +68,22 @@ class EventMasuk:
 Penangan = Callable[[AsyncConnection, EventMasuk], Awaitable[None]]
 
 
+# Rujukan di stream mati (grup · pesan · pengguna · event) disimpan selama ini —
+# cukup untuk memeriksa kenapa sebuah event gagal, bukan selamanya (K-25). Versi
+# pertama tidak pernah memangkasnya: rujukan hidup juga sesudah akunnya dihapus.
+UMUR_MATI_S = 7 * 86_400
+
+
 def kunci_mati(awalan: str) -> str:
     return f"{awalan}:events:mati"
+
+
+async def pangkas_mati(redis: Redis, awalan: str) -> int:
+    """Buang pesan stream mati yang lebih tua dari `UMUR_MATI_S` — menurut jam REDIS
+    (id pesan = milidetik jam Redis), bukan jam proses ini."""
+    detik, mikro = await redis.time()
+    batas_ms = detik * 1000 + mikro // 1000 - UMUR_MATI_S * 1000
+    return int(await redis.xtrim(kunci_mati(awalan), minid=f"{batas_ms}-0", approximate=False))
 
 
 class KonsumenStream:

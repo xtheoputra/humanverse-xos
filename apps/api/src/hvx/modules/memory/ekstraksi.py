@@ -26,9 +26,10 @@ pembacaan sumbernya commit bersama, di bawah RLS.
 * **Scope** menentukan siapa boleh membacanya (`identity.SCOPE_RESMI`): mood →
   `mood`; jurnal → `journal_raw`, scope SENSITIF yang tidak pernah terbuka
   karena bawaan (naskah 5 §15: *private journal* tidak boleh otomatis).
-* **Vektor bukan urusan ekstraksi** — memori lahir dengan `model_version` NULL,
-  dan `PenyelarasVektor` menyematnya sesudah commit. Ekstraksi tidak pernah
-  gagal karena Qdrant.
+* **Vektor bukan urusan ekstraksi** — memori lahir dengan `embedding_model`
+  NULL, dan `PenyelarasVektor` menyematnya sesudah commit. Ekstraksi tidak
+  pernah gagal karena Qdrant. `model_version` mencatat CARA memori ini lahir
+  (`VERSI_EKSTRAKSI`), bukan penyematnya.
 """
 
 from __future__ import annotations
@@ -45,6 +46,9 @@ from . import repository
 JENIS_EVENT = frozenset({"journal.created", "mood.logged"})
 KEYAKINAN_LAPORAN_SENDIRI = Decimal("1.000")
 BUKTI_SATU_KEJADIAN = 1
+# `memories.model_version` — cara memori ini dan keyakinannya dihasilkan (tempat
+# ambang #34, arch/README). Naik bila aturan ekstraksi episodik berubah.
+VERSI_EKSTRAKSI = "hvx-episodik-v1"
 # Ruang nama uuid5 id memori — TETAP selamanya: mengubahnya membuat event lama
 # melahirkan memori kembar saat diproses ulang.
 _RUANG_ID_MEMORI = UUID("58904fe6-22dc-41df-a02a-54f192720a00")
@@ -94,6 +98,7 @@ async def ekstrak(conn: AsyncConnection, ev: events.EventMasuk) -> None:
         content=isi,
         confidence=KEYAKINAN_LAPORAN_SENDIRI,
         evidence_count=BUKTI_SATU_KEJADIAN,
+        model_version=VERSI_EKSTRAKSI,
         source_event_id=ev.id,
         valid_from=sejak,
     )

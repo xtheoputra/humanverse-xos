@@ -14,9 +14,17 @@ bawah RLS pemiliknya (`stream.KonsumenStream`) — prinsip yang sama dengan
   menyisip bisa lebih akhir commit: event-nya punya `recorded_at` DI BELAKANG
   kursor yang sudah lewat, dan relay yang hanya maju melompatinya selamanya.
   Tiap putaran memindai ulang jendela itu.
-* **Tidak pernah terkirim dua kali**: penanda per event (`SET NX`) dan `XADD`
-  dalam SATU skrip Lua — relay yang mati di antara keduanya tidak ada, dan
-  pemindaian ulang jendela belakang tidak menggandakan apa pun.
+* **Tidak pernah terkirim dua kali**: penanda (`ZADD NX` ke satu himpunan
+  terurut, skornya `recorded_at`) dan `XADD` dalam SATU skrip Lua — relay yang
+  mati di antara keduanya tidak ada, dan pemindaian ulang jendela belakang tidak
+  menggandakan apa pun.
+* **Penanda berbatas jendela belakang**, bukan waktu: begitu kursor maju, penanda
+  event yang `recorded_at`-nya lebih tua dari kursor − `LIHAT_BELAKANG_S` dibuang —
+  tidak ada putaran yang akan memindainya lagi. 🔴 Versi pertama: satu kunci per
+  event, umur 24 jam — batas laju per pengguna meninggalkan ±50 MB per akun sehari
+  di Redis `noeviction` yang sama dengan sesi (tinjauan keamanan Sprint 3, S3).
+  Relay yang berhenti lama pun tidak menggandakan: penanda dibuang menurut kursor,
+  bukan menurut jam.
 * **Pangkas aman**: stream dipangkas hanya sampai pesan tertua yang masih
   ditunggu SATU pun grup konsumen (belum dibaca atau belum di-ACK) — memori
   Redis berbatas tanpa membuang event yang belum selesai diproses.
@@ -42,7 +50,6 @@ from hvx.modules import platform
 log = structlog.get_logger("hvx.relay")
 
 LIHAT_BELAKANG_S = 60
-UMUR_PENANDA_S = 86_400  # jauh di atas jendela belakang: penanda hidup lebih lama dari pindaian
 BATAS_PUTARAN = 500
 BATAS_BELAKANG = 1_000
 _NOL = UUID(int=0)
@@ -53,9 +60,10 @@ _UNTUK_RELAY = text(
     "events_untuk_relay(CAST(:sesudah AS timestamptz), CAST(:sesudah_id AS uuid), :batas)"
 )
 
-# KEYS[1] penanda event · KEYS[2] stream · ARGV[1] umur penanda · ARGV[2..4] rujukan
+# KEYS[1] himpunan penanda (skor = recorded_at ms) · KEYS[2] stream
+# ARGV[1] skor · ARGV[2..4] rujukan
 _KIRIM = """
-if redis.call('SET', KEYS[1], '1', 'NX', 'EX', ARGV[1]) then
+if redis.call('ZADD', KEYS[1], 'NX', ARGV[1], ARGV[2]) == 1 then
   return redis.call('XADD', KEYS[2], '*', 'id', ARGV[2], 'user_id', ARGV[3],
                     'event_type', ARGV[4])
 end
@@ -89,6 +97,9 @@ class Relay:
     def _k_posisi(self) -> str:
         return f"{self._awalan}:relay:posisi"
 
+    def _k_terkirim(self) -> str:
+        return f"{self._awalan}:relay:terkirim"
+
     async def _posisi(self) -> tuple[datetime, UUID] | None:
         nilai = await self._r.get(self._k_posisi())
         if not nilai:
@@ -107,8 +118,8 @@ class Relay:
         terkirim = 0
         for r in rujukan:
             hasil = await self._kirim(
-                keys=[f"{self._awalan}:relay:terkirim:{r.id}", self.stream],
-                args=[UMUR_PENANDA_S, str(r.id), str(r.user_id), r.event_type],
+                keys=[self._k_terkirim(), self.stream],
+                args=[_ms(r.recorded_at), str(r.id), str(r.user_id), r.event_type],
             )
             terkirim += 1 if hasil else 0
         return terkirim
@@ -130,6 +141,9 @@ class Relay:
             await self._r.set(self._k_posisi(), f"{maju[0].isoformat()}|{maju[1]}")
             if len(rujukan) < BATAS_PUTARAN:
                 break
+        # Pindaian berikutnya tidak pernah menoleh lebih jauh dari kursor − jendela belakang.
+        batas = _ms(maju[0] - timedelta(seconds=LIHAT_BELAKANG_S))
+        await self._r.zremrangebyscore(self._k_terkirim(), "-inf", f"({batas}")
         if terkirim:
             log.info("relay.terkirim", jumlah=terkirim)
         return terkirim
@@ -154,6 +168,10 @@ class Relay:
         # Tepat, bukan `~`: pemangkasan kira-kira hanya membuang simpul radix utuh
         # (±100 entri), jadi stream kecil tidak pernah terpangkas sama sekali.
         return int(await self._r.xtrim(self.stream, minid=paling_awal, approximate=False))
+
+
+def _ms(saat: datetime) -> int:
+    return int(saat.timestamp() * 1000)
 
 
 def _urutan_id(id_pesan: str) -> tuple[int, int]:

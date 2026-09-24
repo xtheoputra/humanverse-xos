@@ -178,8 +178,8 @@ GET    /journal/{id}                                 → dengan body
 POST   /journal              { id?, title?, body, occurred_at? }
 PATCH  /journal/{id}
 DELETE /journal/{id}
-GET    /activities           ?kind=&from=&to=&cursor=
-POST   /activities           { id?, kind, occurred_at, duration_seconds?, payload? }
+GET    /activities           ?kind=&source=&from=&to=&cursor=
+POST   /activities           { id?, kind, occurred_at, ended_at?, duration_seconds?, payload? }
 ```
 
 > `GET /journal` **tidak** mengembalikan `body`. Daftar jurnal sering dimuat
@@ -194,6 +194,19 @@ POST   /activities           { id?, kind, occurred_at, duration_seconds?, payloa
 > (`deleted_at`): isi jurnal tersimpan sampai akun dihapus — **C-31**, milik
 > pemilik.
 
+> 🔧 **`/activities` (spec/07 3.8, 24 Sep 2026 — tinjauan kontrak Sprint 3, K5).**
+> Klien **tidak** menyatakan sumber: badan dengan `source` → `400`, rute selalu
+> mencatat `manual`, dan `inferred` hanya lewat jalur sistem (Behavior Engine).
+> `?source=` memisahkan keduanya saat membaca — supaya mesin tidak belajar dari
+> tebakannya sendiri (spec/01). `ended_at` (kolom spec/01) **dan**
+> `duration_seconds` dua fakta tentang satu rentang: keduanya dikirim → wajib
+> cocok (±1 dtk), rentang paling lama 7 hari → selain itu `400`; `ended_at` tidak
+> boleh lebih dari 5 menit di depan jam basis data (`422 ended_at_in_future`),
+> seperti `occurred_at` (`422 occurred_at_in_future`). `payload` paling besar
+> 16 KB dan 32 tingkat bersarang (S5). `id` yang sudah dipakai → `409
+> already_exists`. `from` inklusif / `to` eksklusif, keduanya berzona; kursor
+> keyset `(occurred_at, id)`.
+>
 > 🔧 **`PUT /checkins/{for_date}` = GANTI, bukan tambal (spec/07 2.5, 24 Sep
 > 2026).** Badan adalah check-in tanggal itu: medan yang tidak dikirim menjadi
 > kosong — dua `PUT` yang sama selalu menghasilkan baris yang sama, apa pun

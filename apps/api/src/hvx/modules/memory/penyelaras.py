@@ -6,23 +6,37 @@ Qdrant tersendat — atau lebih buruk, berhasil di satu sisi saja. Karena itu
 PostgreSQL satu-satunya yang ditulis di jalan pengguna, dan penyelaras ini
 (proses `hvx.pekerja`) menyusul:
 
-* memori yang `model_version`-nya bukan penyemat ini (baru, isinya berubah,
+* memori yang `embedding_model`-nya bukan penyemat ini (baru, isinya berubah,
   atau disemat penyemat/kunci lain) → disemat ke titik ber-id memori itu
   (`upsert` — menimpa vektor lama);
 * memori terhapus (isinya sudah kosong) → titiknya dibuang, lalu barisnya.
   Naskah: *“tidak boleh hanya menghapus row di PostgreSQL”* (docs/139).
 
-Siapa yang punya pekerjaan ditanyakan lewat fungsi sempit
-`memori_perlu_diselaraskan` (spec/01 §12) — hanya `user_id`; barisnya dibaca
-dan dikunci di transaksi PEMILIKNYA, di bawah RLS. Qdrant dipanggil di dalam
-transaksi itu: kalau Qdrant gagal, tidak ada yang ditandai selesai, dan putaran
-berikutnya mengulang (simpan dan hapus titik idempoten).
+Tiga langkah, dan tidak satu pun menahan kunci baris selama Qdrant dipanggil:
 
-Payload titik hanya `user_id` · `scope` · `kind` · `model` — tidak pernah isi.
+1. **Baca** baris yang punya pekerjaan di transaksi PEMILIKNYA (RLS) — beserta
+   sidik (`sha256`) isinya — lalu commit.
+2. **Semat dan kirim** di luar transaksi: penyematan (CPU murni Python) di
+   thread, bukan di event loop yang juga menjalankan relay dan konsumen; teks
+   yang disemat paling panjang `MAKS_TEKS_SEMAT` karakter.
+3. **Tandai** hanya baris yang isinya MASIH sama dengan sidiknya. Yang berubah
+   di antaranya tetap belum tersemat, dan putaran berikutnya menyematnya ulang.
+
+🔴 Versi pertama menyemat 200 baris di dalam transaksi `FOR UPDATE`, di event
+loop: 40 jurnal 100 ribu karakter dari SATU pengguna menahan event loop pekerja
+6,5 dtk (tinjauan keamanan Sprint 3, S2), dan `PATCH /journal` menunggu Qdrant
+yang lambat (tinjauan kontrak Sprint 3, K3) — padahal Qdrant dijanjikan tidak
+pernah ada di jalan pengguna.
+
+Siapa yang punya pekerjaan ditanyakan lewat fungsi sempit
+`memori_perlu_diselaraskan` (spec/01 §12) — hanya `user_id`. Payload titik hanya
+`user_id` · `scope` · `kind` · `model` — tidak pernah isi. Vektor tiap pengguna
+disemat dengan kuncinya sendiri (`Penyemat.untuk`, S1).
 """
 
 from __future__ import annotations
 
+import asyncio
 from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncEngine
@@ -33,7 +47,10 @@ from . import repository
 
 INDEKS_PAYLOAD = ("user_id", "scope", "kind", "model")
 BATAS_PENGGUNA = 100
-BATAS_BARIS = 200
+BATAS_BARIS = 50
+# Karakter pertama yang disemat per memori (K-26): ±3.000 kata. Isi tetap utuh
+# di PostgreSQL; yang dipotong hanya bahan pencarian leksikalnya.
+MAKS_TEKS_SEMAT = 20_000
 # Satu putaran menghabiskan antrean sampai batas ini, lalu memberi jeda —
 # penyematan ulang besar (kunci diganti) tidak memonopoli pekerja.
 _MAKS_GELOMBANG = 10
@@ -78,27 +95,30 @@ class PenyelarasVektor:
         return selesai
 
     async def _selaraskan(self, user_id: UUID) -> int:
+        nama = self._penyemat.nama
         async with platform.transaksi_pengguna(self._engine, user_id) as conn:
-            baris = await repository.perlu_diselaraskan(conn, self._penyemat.nama, BATAS_BARIS)
-            buang = [b.id for b in baris if b.deleted_at is not None]
-            semat = [b for b in baris if b.deleted_at is None]
-            await self._vektor.hapus(self._koleksi, buang)
+            baris = await repository.perlu_diselaraskan(conn, nama, BATAS_BARIS)
+        if not baris:
+            return 0
+        buang = [b.id for b in baris if b.deleted_at is not None]
+        semat = [b for b in baris if b.deleted_at is None]
+        penyemat = self._penyemat.untuk(user_id)
+        vektor = await asyncio.to_thread(
+            lambda: [penyemat.semat(b.content[:MAKS_TEKS_SEMAT]) for b in semat]
+        )
+        await self._vektor.hapus(self._koleksi, buang)
+        await self._vektor.simpan(
+            self._koleksi,
+            [
+                platform.Titik(
+                    b.id,
+                    v,
+                    {"user_id": str(b.user_id), "scope": b.scope, "kind": b.kind, "model": nama},
+                )
+                for b, v in zip(semat, vektor, strict=True)
+            ],
+        )
+        async with platform.transaksi_pengguna(self._engine, user_id) as conn:
             await repository.buang(conn, buang)
-            await self._vektor.simpan(
-                self._koleksi,
-                [
-                    platform.Titik(
-                        b.id,
-                        self._penyemat.semat(b.content),
-                        {
-                            "user_id": str(b.user_id),
-                            "scope": b.scope,
-                            "kind": b.kind,
-                            "model": self._penyemat.nama,
-                        },
-                    )
-                    for b in semat
-                ],
-            )
-            await repository.tandai_tersemat(conn, [b.id for b in semat], self._penyemat.nama)
+            await repository.tandai_tersemat(conn, semat, nama)
         return len(baris)

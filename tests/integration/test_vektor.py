@@ -36,9 +36,8 @@ async def vektor(url_qdrant_uji: str) -> AsyncIterator[tuple[KlienVektor, str]]:
 
 
 def _titik(user_id: UUID, scope: str, teks: str) -> Titik:
-    return Titik(
-        uuid4(), PENYEMAT.semat(teks), {"user_id": str(user_id), "scope": scope, "kind": "episodic"}
-    )
+    vektor = PENYEMAT.untuk(user_id).semat(teks)
+    return Titik(uuid4(), vektor, {"user_id": str(user_id), "scope": scope, "kind": "episodic"})
 
 
 async def test_koleksi_dipastikan_berulang_tanpa_galat(vektor: tuple[KlienVektor, str]) -> None:
@@ -56,7 +55,7 @@ async def test_pencarian_hanya_titik_milik_pengguna_itu(vektor: tuple[KlienVekto
     )
 
     hasil_b = await klien.cari(
-        nama, PENYEMAT.semat("lari pagi"), user_id=b, saring={"scope": ["mood"]}, batas=10
+        nama, PENYEMAT.untuk(b).semat("lari pagi"), user_id=b, saring={"scope": ["mood"]}, batas=10
     )
 
     assert {h.payload["user_id"] for h in hasil_b} == {str(b)}, "titik pengguna lain ikut"
@@ -73,10 +72,14 @@ async def test_saringan_scope_dan_scope_kosong_tidak_berarti_semua(
     )
 
     mood = await klien.cari(
-        nama, PENYEMAT.semat("cemas kerja"), user_id=a, saring={"scope": ["mood"]}, batas=10
+        nama,
+        PENYEMAT.untuk(a).semat("cemas kerja"),
+        user_id=a,
+        saring={"scope": ["mood"]},
+        batas=10,
     )
     kosong = await klien.cari(
-        nama, PENYEMAT.semat("cemas kerja"), user_id=a, saring={"scope": []}, batas=10
+        nama, PENYEMAT.untuk(a).semat("cemas kerja"), user_id=a, saring={"scope": []}, batas=10
     )
 
     assert [h.payload["scope"] for h in mood] == ["mood"], "scope yang tidak diizinkan ikut"
@@ -91,10 +94,10 @@ async def test_pencarian_tanpa_pengguna_ditolak_sebelum_ke_qdrant(
     with pytest.raises(TypeError, match="H-27"):
         await klien.cari(
             nama,
-            PENYEMAT.semat("x"),
-            user_id=None,
+            PENYEMAT.untuk(uuid4()).semat("x"),
+            user_id=None,  # type: ignore[arg-type]
             saring={},
-            batas=1,  # type: ignore[arg-type]
+            batas=1,
         )
 
 
@@ -107,9 +110,10 @@ async def test_hapus_milik_menghapus_titik_satu_pengguna_saja(
 
     await klien.hapus_milik(nama, a)
 
-    kueri = PENYEMAT.semat("tidur cukup")
-    assert await klien.cari(nama, kueri, user_id=a, saring={}, batas=5) == []
-    assert len(await klien.cari(nama, kueri, user_id=b, saring={}, batas=5)) == 1, (
+    kueri_a = PENYEMAT.untuk(a).semat("tidur cukup")
+    kueri_b = PENYEMAT.untuk(b).semat("tidur cukup")
+    assert await klien.cari(nama, kueri_a, user_id=a, saring={}, batas=5) == []
+    assert len(await klien.cari(nama, kueri_b, user_id=b, saring={}, batas=5)) == 1, (
         "titik pengguna lain ikut terhapus"
     )
 
@@ -120,7 +124,7 @@ async def test_galat_qdrant_tidak_memantulkan_isi_permintaan(
     """Badan galat Qdrant MEMANTULKAN masukan (mis. id titik yang tidak sah) — pesan
     `GalatVektor` hanya metode, jalur, dan kode status; ia berakhir di log."""
     klien, nama = vektor
-    titik = Titik("rahasia-sekali", PENYEMAT.semat("x"), {})  # type: ignore[arg-type]
+    titik = Titik("rahasia-sekali", PENYEMAT.untuk(uuid4()).semat("x"), {})  # type: ignore[arg-type]
 
     with pytest.raises(GalatVektor) as galat:
         await klien.simpan(nama, [titik])
@@ -137,6 +141,27 @@ async def test_qdrant_tak_terjangkau_menjadi_galat_tanpa_isi() -> None:
         await klien.tutup()
 
     assert "rahasia" not in str(galat.value)
+
+
+async def test_koleksi_berjarak_lain_ditolak_bukan_dipakai(url_qdrant_uji: str) -> None:
+    """Skor dibaca sebagai KOSINUS — `> 0` = mirip, terbesar dulu. Koleksi `Euclid`
+    berdimensi sama menjawab JARAK: semua "mirip", dan urutannya terbalik
+    (tinjauan penegak buta Sprint 3)."""
+    nama = f"uji-{uuid.uuid4().hex[:12]}"
+    async with httpx.AsyncClient(base_url=url_qdrant_uji) as h:
+        r = await h.put(
+            f"/collections/{nama}",
+            json={"vectors": {"size": PENYEMAT.dimensi, "distance": "Euclid"}},
+        )
+        assert r.status_code == 200, r.text
+    klien = KlienVektor(url_qdrant_uji)
+    try:
+        with pytest.raises(GalatVektor, match="bukan kosinus"):
+            await klien.pastikan_koleksi(nama, PENYEMAT.dimensi, ["user_id"])
+    finally:
+        async with httpx.AsyncClient(base_url=url_qdrant_uji) as h:
+            await h.delete(f"/collections/{nama}")
+        await klien.tutup()
 
 
 async def test_koleksi_berdimensi_lain_ditolak_bukan_dipakai(url_qdrant_uji: str) -> None:

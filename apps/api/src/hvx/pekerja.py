@@ -91,8 +91,9 @@ async def jalankan(settings: platform.Settings, berhenti: asyncio.Event) -> None
     )
     vektor = platform.klien_vektor_dari(settings)
     try:
-        # B-40: pekerja membaca event SEMUA pengguna — lewat fungsi sempit, sebagai hvx_app.
-        await platform.pastikan_peran_aplikasi(engine)
+        # B-40 · S4: pekerja membaca event SEMUA pengguna lewat fungsi sempit — sebagai
+        # anggota hvx_app DAN hvx_pekerja; api sebaliknya menolak peran ini.
+        await platform.pastikan_peran_aplikasi(engine, pekerja=True)
         relay = events.Relay(engine, redis, settings.redis_prefix)
         konsumen = rakit_konsumen(engine, redis, settings)
         for k in konsumen:
@@ -112,6 +113,7 @@ async def jalankan(settings: platform.Settings, berhenti: asyncio.Event) -> None
             putaran += 1
             if putaran % PANGKAS_TIAP == 0:
                 await relay.pangkas()
+                await events.pangkas_mati(redis, settings.redis_prefix)
 
         tugas = [asyncio.create_task(_ulang("relay", relay_sekali, JEDA_RELAY_S, berhenti))]
         tugas += [

@@ -15,6 +15,7 @@
 # Dua peran basis data, dan sengaja tidak pernah tertukar (B-40, spec/01 §10):
 #   migrate  → PEMILIK skema (HVX_POSTGRES_USER)       — membuat tabel, tidak melayani permintaan
 #   api      → HVX_API_DB_USER, anggota `hvx_app`       — bukan superuser, bukan pemilik; RLS berlaku
+#   pekerja  → HVX_PEKERJA_DB_USER, `hvx_app` + `hvx_pekerja` — fungsi relay & penyelaras (S4)
 #
 # ⚠️ Kredensial bawaan di bawah KHUSUS pengembangan lokal (`*-dev-only`) dan
 #    tidak pernah dipakai di lingkungan lain. Tahap D1+ membaca rahasia dari
@@ -106,6 +107,8 @@ services:
       PGDATABASE: ${HVX_POSTGRES_DB:-hvx}
       HVX_API_DB_USER: ${HVX_API_DB_USER:-hvx_api}
       HVX_API_DB_PASSWORD: ${HVX_API_DB_PASSWORD:-hvx-api-dev-only}
+      HVX_PEKERJA_DB_USER: ${HVX_PEKERJA_DB_USER:-hvx_pekerja_login}
+      HVX_PEKERJA_DB_PASSWORD: ${HVX_PEKERJA_DB_PASSWORD:-hvx-pekerja-dev-only}
     volumes:
       - ./infrastructure/postgres:/peran:ro
     depends_on:
@@ -154,7 +157,8 @@ services:
     command: ["python", "-m", "hvx.pekerja"]
     environment:
       HVX_ENV: ${HVX_ENV:-local}
-      HVX_DATABASE_URL: postgresql://${HVX_API_DB_USER:-hvx_api}:${HVX_API_DB_PASSWORD:-hvx-api-dev-only}@postgres:5432/${HVX_POSTGRES_DB:-hvx}
+      # Login pekerja: anggota hvx_app DAN hvx_pekerja (fungsi relay & penyelaras, S4).
+      HVX_DATABASE_URL: postgresql://${HVX_PEKERJA_DB_USER:-hvx_pekerja_login}:${HVX_PEKERJA_DB_PASSWORD:-hvx-pekerja-dev-only}@postgres:5432/${HVX_POSTGRES_DB:-hvx}
       HVX_REDIS_URL: redis://redis:6379/0
       HVX_LOG_LEVEL: ${HVX_LOG_LEVEL:-INFO}
       HVX_IP_HASH_KEY: ${HVX_IP_HASH_KEY:-hvx-dev-only-ip-hash-key-0123456789abcdef}

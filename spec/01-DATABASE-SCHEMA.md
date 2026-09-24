@@ -539,6 +539,7 @@ CREATE TABLE memories (
   created_at        timestamptz NOT NULL DEFAULT now(),
   updated_at        timestamptz NOT NULL DEFAULT now(),
   deleted_at        timestamptz,
+  embedding_model   text,                        -- 🔧 penyemat vektornya (3.5); NULL = belum/basi
   FOREIGN KEY (source_event_id, user_id) REFERENCES events (id, user_id)
     ON DELETE SET NULL (source_event_id)
 );
@@ -1101,30 +1102,42 @@ CREATE FUNCTION auth_lookup_for_login(p_email citext)
 REVOKE ALL ON FUNCTION auth_lookup_for_login(citext) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION auth_lookup_for_login(citext) TO hvx_app;
 
+-- Peran PEKERJA (spec/07 3.3): NOLOGIN, satu-satunya pemegang EXECUTE fungsi
+-- relay dan penyelaras. Peran login proses pekerja anggota `hvx_app` DAN peran
+-- ini; peran login api hanya `hvx_app` — api menghadap internet (S4).
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'hvx_pekerja') THEN
+    CREATE ROLE hvx_pekerja NOLOGIN;
+  END IF;
+EXCEPTION WHEN duplicate_object THEN
+  NULL;
+END $$;
+
 -- Relay event (spec/07 3.3): kotak keluar `events` → Redis Streams. Relay
 -- membaca event SEMUA pengguna, urut waktu masuk — RLS `events` (§11) tidak
--- meloloskannya. Sempit: hanya-baca, lima kolom RUJUKAN (payload TIDAK ikut —
+-- meloloskannya. Sempit: hanya-baca, empat kolom RUJUKAN (payload TIDAK ikut —
 -- konsumen membacanya di bawah RLS pemiliknya), paling banyak 1000 baris.
 CREATE FUNCTION events_untuk_relay(p_sesudah timestamptz, p_sesudah_id uuid, p_batas integer)
-  RETURNS TABLE (id uuid, user_id uuid, event_type text, recorded_at timestamptz,
-                 occurred_at timestamptz)
+  RETURNS TABLE (id uuid, user_id uuid, event_type text, recorded_at timestamptz)
   LANGUAGE sql STABLE SECURITY DEFINER
   SET search_path = pg_catalog, public, pg_temp
   AS $$
-    SELECT e.id, e.user_id, e.event_type, e.recorded_at, e.occurred_at
+    SELECT e.id, e.user_id, e.event_type, e.recorded_at
     FROM public.events e
     WHERE (e.recorded_at, e.id) > (p_sesudah, p_sesudah_id)
     ORDER BY e.recorded_at, e.id
     LIMIT least(greatest(p_batas, 1), 1000)
   $$;
 REVOKE ALL ON FUNCTION events_untuk_relay(timestamptz, uuid, integer) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION events_untuk_relay(timestamptz, uuid, integer) TO hvx_app;
+GRANT EXECUTE ON FUNCTION events_untuk_relay(timestamptz, uuid, integer) TO hvx_pekerja;
 
 -- Penyelaras vektor memori (spec/07 3.5–3.7): memories → Qdrant, untuk SEMUA
 -- pengguna — RLS `memories` (§11) tidak meloloskannya. Sempit: hanya-baca, hanya
 -- `user_id` yang punya pekerjaan (memori terhapus yang titiknya belum dibuang,
 -- atau yang vektornya belum/tidak lagi cocok dengan penyemat `p_model`); isinya
 -- dibaca di transaksi PEMILIKNYA. Paling banyak 1000 pengguna per panggilan.
+-- Hanya untuk `hvx_pekerja`.
 CREATE FUNCTION memori_perlu_diselaraskan(p_model text, p_batas integer)
   RETURNS TABLE (user_id uuid)
   LANGUAGE sql STABLE SECURITY DEFINER
@@ -1132,13 +1145,13 @@ CREATE FUNCTION memori_perlu_diselaraskan(p_model text, p_batas integer)
   AS $$
     SELECT m.user_id
     FROM public.memories m
-    WHERE m.deleted_at IS NOT NULL OR m.model_version IS DISTINCT FROM p_model
+    WHERE m.deleted_at IS NOT NULL OR m.embedding_model IS DISTINCT FROM p_model
     GROUP BY m.user_id
     ORDER BY min(m.updated_at), m.user_id
     LIMIT least(greatest(p_batas, 1), 1000)
   $$;
 REVOKE ALL ON FUNCTION memori_perlu_diselaraskan(text, integer) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION memori_perlu_diselaraskan(text, integer) TO hvx_app;
+GRANT EXECUTE ON FUNCTION memori_perlu_diselaraskan(text, integer) TO hvx_pekerja;
 ```
 
 > 🔑 **Kenapa fungsi, bukan kebijakan RLS yang lebih longgar** (17 Sep 2026,
@@ -1169,13 +1182,25 @@ GRANT EXECUTE ON FUNCTION memori_perlu_diselaraskan(text, integer) TO hvx_app;
 > ([`../docs/139`](../docs/139-PRIVACY-DELETION-RETENTION.md)). Fungsi ini hanya
 > menjawab **pengguna mana** yang punya pekerjaan; baris dan isinya dibaca di
 > transaksi pemiliknya, di bawah RLS. Tiga kolom yang dibacanya berarti:
-> `model_version` = penyemat vektor yang **cocok dengan isi saat ini** (`NULL` =
+> `embedding_model` = penyemat vektor yang **cocok dengan isi saat ini** (`NULL` =
 > belum disemat, atau isinya berubah sesudah disemat) · `embedding_id` = id
 > titik Qdrant sesudah pertama disemat (`NULL` = belum pernah) · `deleted_at`
 > terisi = isi sudah dikosongkan, titik dan barisnya menunggu dibuang.
-> ⚠️ Kondisi `model_version IS DISTINCT FROM p_model` memindai tabel penuh tiap
+> ⚠️ Kondisi `embedding_model IS DISTINCT FROM p_model` memindai tabel penuh tiap
 > putaran — cukup untuk V0 (satu pengguna nyata, spec/06); V1 butuh kolom
 > penanda berindeks ([K-25](../docs/KEPUTUSAN-DIDELEGASIKAN.md)).
+>
+> 🔧 **Dua koreksi tinjauan Sprint 3.** **(K4)** Versi pertama memakai
+> `model_version` untuk penyemat — padahal kolom itu tempat ambang keyakinan
+> #34 ([`../arch/README.md`](../arch/README.md): versi yang menghasilkan memori
+> dan keyakinannya), dan penyelaras menimpanya tiap kali. Kini `embedding_model`
+> kolom sendiri, ditambahkan 0006 di ujung tabel. **(S4)** Fungsi ke-2 dan ke-3
+> semula untuk `hvx_app` — peran api yang menghadap internet: injeksi SQL di
+> sana membaca linimasa (pengguna · jenis · waktu) semua pengguna lewat fungsi
+> relay. Kini hanya `hvx_pekerja`, peran NOLOGIN yang hanya dimiliki login
+> proses pekerja; api **menolak mulai** sebagai anggotanya
+> (`platform.pastikan_peran_aplikasi`), dan fungsi relay tidak lagi
+> mengembalikan `occurred_at` yang tidak dipakainya.
 
 ---
 

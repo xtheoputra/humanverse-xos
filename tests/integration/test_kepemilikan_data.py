@@ -202,13 +202,14 @@ def test_hak_akses_peran_aplikasi_sesempit_yang_dinyatakan(v0_bersama: BasisData
 # Tiap fungsi SECURITY DEFINER melewati RLS atas nama pemiliknya — satu per
 # kebutuhan, dengan alasannya di spec/01 §12. Nama baru di sini = keputusan baru.
 # Tiap fungsi SECURITY DEFINER: satu kebutuhan lintas RLS, alasannya di spec/01 §12.
-DEFINER_DIIZINKAN = frozenset(
-    {
-        "auth_lookup_for_login",  # login: mencari akun per email sebelum pengguna dikenali
-        "events_untuk_relay",  # relay 3.3: RUJUKAN event semua pengguna, tanpa payload
-        "memori_perlu_diselaraskan",  # penyelaras vektor 3.5–3.7: HANYA user_id yang berpekerjaan
-    }
-)
+# Nama → SATU-SATUNYA peran NOLOGIN yang boleh mengeksekusinya. Fungsi milik proses
+# pekerja tidak boleh bisa dipanggil peran api yang menghadap internet (tinjauan
+# keamanan Sprint 3, S4): injeksi SQL di api akan membaca linimasa semua pengguna.
+DEFINER_DIIZINKAN = {
+    "auth_lookup_for_login": "hvx_app",  # login: mencari akun per email sebelum dikenali
+    "events_untuk_relay": "hvx_pekerja",  # relay 3.3: RUJUKAN event semua pengguna
+    "memori_perlu_diselaraskan": "hvx_pekerja",  # penyelaras 3.5–3.7: HANYA user_id berpekerjaan
+}
 NL = chr(10)
 
 
@@ -223,22 +224,48 @@ def test_fungsi_security_definer_hanya_daftar_izin_terpatok_dan_bukan_untuk_publ
                p.proacl IS NULL
                  OR EXISTS (SELECT 1 FROM aclexplode(p.proacl) a
                             WHERE a.grantee = 0 AND a.privilege_type = 'EXECUTE'),
-               has_function_privilege('hvx_app', p.oid, 'EXECUTE')
+               ARRAY(SELECT r.rolname::text FROM pg_roles r
+                     WHERE r.rolname IN ('hvx_app', 'hvx_pekerja')
+                       AND has_function_privilege(r.oid, p.oid, 'EXECUTE')
+                     ORDER BY r.rolname)
         FROM pg_proc p
         WHERE p.pronamespace = 'public'::regnamespace AND p.prosecdef
         """,
     )
     nama = {b[0] for b in baris}
     salah = [
-        f"{n}: search_path={konfig!r} public_boleh={untuk_public} hvx_app_boleh={aplikasi}"
-        for n, konfig, untuk_public, aplikasi in baris
-        if "search_path=" not in konfig or untuk_public or not aplikasi
+        f"{n}: search_path={konfig!r} public_boleh={untuk_public} dieksekusi={peran} "
+        f"(seharusnya [{DEFINER_DIIZINKAN.get(n)!r}])"
+        for n, konfig, untuk_public, peran in baris
+        if "search_path=" not in konfig or untuk_public or peran != [DEFINER_DIIZINKAN.get(n)]
     ]
 
-    assert nama == DEFINER_DIIZINKAN, (
-        f"SECURITY DEFINER di luar daftar izin: {sorted(nama ^ DEFINER_DIIZINKAN)}"
+    assert nama == set(DEFINER_DIIZINKAN), (
+        f"SECURITY DEFINER di luar daftar izin: {sorted(nama ^ set(DEFINER_DIIZINKAN))}"
     )
     assert not salah, "fungsi SECURITY DEFINER yang tidak terkunci:" + NL + NL.join(salah)
+
+
+@pytest.mark.parametrize(
+    "panggil",
+    [
+        "SELECT * FROM events_untuk_relay('-infinity', '00000000-0000-0000-0000-000000000000', 10)",
+        "SELECT * FROM memori_perlu_diselaraskan('bukan-model', 10)",
+    ],
+)
+def test_peran_api_tidak_bisa_memanggil_fungsi_pekerja(
+    v0_bersama: BasisDataV0, panggil: str
+) -> None:
+    """S4: tanpa `hvx.user_id`, RLS menutup `events` bagi peran api — tetapi lewat fungsi
+    relay ia membaca linimasa (pengguna · jenis · waktu) SEMUA pengguna. Hanya peran
+    pekerja yang boleh; peran api menghadap internet."""
+    with (
+        psycopg.connect(psycopg_dsn(v0_bersama.dsn_aplikasi)) as k,
+        pytest.raises(psycopg.errors.InsufficientPrivilege),
+    ):
+        k.execute(panggil)
+    with psycopg.connect(psycopg_dsn(v0_bersama.dsn_pekerja)) as k:
+        k.execute(panggil).fetchall()
 
 
 # ──────────────────────────────────────────────── perilaku: B-41 ──

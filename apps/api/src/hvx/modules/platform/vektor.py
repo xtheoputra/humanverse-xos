@@ -115,6 +115,7 @@ class KlienVektor:
         user_id: UUID,
         saring: dict[str, list[str]],
         batas: int,
+        offset: int = 0,
     ) -> list[HasilCari]:
         if not isinstance(user_id, UUID):
             raise TypeError("pencarian vektor wajib dibatasi satu user_id (H-27)")
@@ -126,7 +127,13 @@ class KlienVektor:
         jawab = await self._minta(
             "POST",
             f"/collections/{nama}/points/search",
-            {"vector": vektor, "filter": {"must": wajib}, "limit": batas, "with_payload": True},
+            {
+                "vector": vektor,
+                "filter": {"must": wajib},
+                "limit": batas,
+                "offset": offset,
+                "with_payload": True,
+            },
         )
         hasil = jawab.get("result", []) if jawab else []
         return [

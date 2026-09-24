@@ -26,7 +26,7 @@ sini kecuali dibutuhkan V0 — menulisnya sekarang berarti menebak.
 |---|---|
 | [`01-DATABASE-SCHEMA.md`](01-DATABASE-SCHEMA.md) | DDL PostgreSQL lengkap — **23 tabel**, tipe, PK, FK, index, constraint |
 | [`02-ERD.md`](02-ERD.md) | Relasi antar tabel + aturan kepemilikan data |
-| [`03-EVENT-CONTRACTS.md`](03-EVENT-CONTRACTS.md) | Envelope, versi skema, idempotensi, **22 event** + payload |
+| [`03-EVENT-CONTRACTS.md`](03-EVENT-CONTRACTS.md) | Envelope, versi skema, idempotensi, **23 event** + payload (9 dipakai V0) |
 | [`04-API-CONTRACTS.md`](04-API-CONTRACTS.md) | Endpoint REST V0, request/response, kode galat |
 | [`05-AGENT-CONTRACTS.md`](05-AGENT-CONTRACTS.md) | Manifest schema, tool registry, permission & risk |
 | [`06-MODULE-BOUNDARIES.md`](06-MODULE-BOUNDARIES.md) | Batas modul di dalam modular monolith + aturan ketergantungan |
@@ -40,7 +40,8 @@ sini kecuali dibutuhkan V0 — menulisnya sekarang berarti menebak.
 
 ### Tiga perubahan V0 (10 Sep 2026) — ketiganya penerapan keputusan lama
 
-Angkanya tidak bergeser: **23 tabel · 22 event · 51 tugas · 12 modul · 4 agent.**
+Angkanya tidak bergeser: **23 tabel · 23 event · 51 tugas · 12 modul · 4 agent.**
+(🔧 Event ke-23, `habit.completion_retracted`, ditambahkan saat tugas 3.2 ditulis — E-178.)
 
 | | Perubahan | Menerapkan |
 |---|---|---|

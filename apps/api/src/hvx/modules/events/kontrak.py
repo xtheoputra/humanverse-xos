@@ -8,8 +8,11 @@ dengan baris ✅ tabel spec/03, jadi nama dan bentuknya tidak bisa menyimpang
 diam-diam dari dokumennya.
 
 * **Produsen ketat, konsumen longgar** (spec/03 aturan 3): payload yang
-  diterbitkan ditolak kalau membawa medan yang tidak dikenal (`extra="forbid"`);
-  konsumen wajib mengabaikan medan yang tidak dikenalnya.
+  diterbitkan ditolak kalau membawa medan yang tidak dikenal (`extra="forbid"`)
+  **atau bertipe lain** (`strict=True`) — `True` bukan valensi, `"3"` bukan
+  angka, `"2026-09-24"` bukan tanggal: kelas galat E-170 di sisi penerbit, yang
+  versi pertama loloskan (tinjauan kontrak Sprint 3, K7). Konsumen wajib
+  mengabaikan medan yang tidak dikenalnya.
 * **Isi jurnal tidak pernah masuk event** — `journal.created` hanya membawa
   `word_count` (spec/03). Model payload-nya menolak medan lain.
 """
@@ -29,7 +32,7 @@ SUMBER: frozenset[str] = frozenset({"app", "agent", "integration", "backfill"})
 
 
 class _Payload(BaseModel):
-    model_config = ConfigDict(extra="forbid", frozen=True)
+    model_config = ConfigDict(extra="forbid", frozen=True, strict=True)
 
 
 class HabitDibuat(_Payload):

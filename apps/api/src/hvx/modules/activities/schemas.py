@@ -54,7 +54,8 @@ class HalamanAktivitas(BaseModel):
 
 
 class CatatAktivitas(BaseModel):
-    """`POST /activities` — spec/04 `{ id?, kind, occurred_at, duration_seconds?, payload? }`."""
+    """`POST /activities` — spec/04 `{ id?, kind, occurred_at, ended_at?, duration_seconds?,
+    payload? }`."""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -70,4 +71,12 @@ class CatatAktivitas(BaseModel):
         # Sama dengan CHECK spec/01 — 400, bukan 500 dari basis data.
         if self.ended_at is not None and self.ended_at < self.occurred_at:
             raise ValueError("ended_at tidak boleh sebelum occurred_at")
+        # `ended_at` dan `duration_seconds` dua fakta tentang SATU rentang: yang saling
+        # membantah semula tersimpan apa adanya (tinjauan kontrak Sprint 3, K5).
+        if self.ended_at is not None:
+            rentang = (self.ended_at - self.occurred_at).total_seconds()
+            if rentang > _DURASI_MAKS_S:
+                raise ValueError(f"rentang aktivitas maksimal {_DURASI_MAKS_S} detik")
+            if self.duration_seconds is not None and abs(self.duration_seconds - rentang) > 1:
+                raise ValueError("duration_seconds tidak cocok dengan occurred_at–ended_at")
         return self

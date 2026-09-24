@@ -98,20 +98,30 @@ _KUERI_PERAN = text(
                AND c.relkind IN ('r', 'p')
                AND pg_has_role(current_user, c.relowner, 'USAGE')
              ORDER BY c.relname
-           ) AS tabel_dimiliki
+           ) AS tabel_dimiliki,
+           EXISTS (
+             SELECT 1 FROM pg_roles p
+             WHERE p.rolname = 'hvx_pekerja' AND pg_has_role(current_user, p.oid, 'MEMBER')
+           ) AS anggota_pekerja
     FROM pg_roles r
     WHERE r.rolname = current_user
     """
 )
 
 
-async def pastikan_peran_aplikasi(engine: AsyncEngine) -> None:
-    """Tolak peran yang membuat RLS dan hak akses spec/01 §10–§11 tidak berlaku.
+async def pastikan_peran_aplikasi(engine: AsyncEngine, *, pekerja: bool = False) -> None:
+    """Tolak peran yang membuat RLS dan hak akses spec/01 §10–§12 tidak berlaku.
 
     🔴 B-40: sampai 17 Sep 2026 api tersambung sebagai superuser pemilik tabel,
     dan `REVOKE UPDATE, DELETE ON audit_logs` tidak menghalangi apa pun. Aturan
     yang bergantung pada peran yang benar wajib memeriksa perannya sendiri —
     konfigurasi yang keliru harus gagal saat mulai, bukan diam-diam lolos.
+
+    🔴 S4 (tinjauan keamanan Sprint 3): peran yang bisa memanggil fungsi relay &
+    penyelaras (`hvx_pekerja`) membaca linimasa SEMUA pengguna di luar RLS. Api
+    menghadap internet — ia menolak mulai sebagai anggotanya; pekerja
+    (`pekerja=True`) sebaliknya menolak mulai TANPA peran itu, alih-alih gagal di
+    tiap putaran relay.
     """
     async with engine.connect() as conn:
         peran = (await conn.execute(_KUERI_PERAN)).one()
@@ -128,6 +138,18 @@ async def pastikan_peran_aplikasi(engine: AsyncEngine) -> None:
             f"peran basis data `{peran.rolname}` tidak boleh dipakai api — {'; '.join(masalah)}. "
             "Keduanya melewati RLS. Pakai peran login anggota `hvx_app` "
             "(B-40, spec/01 §10); peran pemilik hanya untuk HVX_MIGRATION_DATABASE_URL."
+        )
+    if pekerja and not peran.anggota_pekerja:
+        raise PeranTidakAman(
+            f"peran basis data `{peran.rolname}` bukan anggota `hvx_pekerja` — relay dan "
+            "penyelaras tidak bisa memanggil fungsinya (spec/01 §12). Pakai peran login "
+            "pekerja (HVX_PEKERJA_DB_USER di compose)."
+        )
+    if not pekerja and peran.anggota_pekerja:
+        raise PeranTidakAman(
+            f"peran basis data `{peran.rolname}` anggota `hvx_pekerja` — api menghadap "
+            "internet dan tidak boleh memanggil fungsi relay & penyelaras (S4, spec/01 §12). "
+            "Pakai peran login api yang hanya anggota `hvx_app`."
         )
 
 

@@ -68,8 +68,9 @@ bukan galat. Ini yang membuat aplikasi luring aman menyinkron ulang.
 > Tiap kasus membuat tabel domain dan `events` berbeda, dan aturan **D**
 > [`02`](02-ERD.md) (*"kalau keduanya berbeda, event yang benar"*) lalu
 > **membenarkan yang salah**. Kunci kini mengikuti **baris** yang lahir
-> (`completion_id`, `mood_id` — id buatan klien, jadi kirim ulang tetap satu
-> kunci) atau **keadaan** yang lahir (`achieved_at`, `updated_at` check-in).
+> (`mood_id` — id buatan klien; `completion_id` — dibuat server, dan kirim ulang
+> tanggal yang sama mengembalikan baris LAMA, jadi keduanya tetap satu kunci) atau
+> **keadaan** yang lahir (`achieved_at`, `updated_at` check-in).
 > Kirim ulang yang sesungguhnya tidak melahirkan baris atau keadaan baru, jadi
 > tidak menerbitkan apa pun.
 
@@ -234,7 +235,7 @@ ditambahkan 11 September 2026.** Ia terlewat dari
 pertanyaan *“apa yang E-1 dan E-2 TIDAK PERNAH lihat?”*, dan jawabannya: nama
 yang tidak pernah masuk tabel ini tidak punya `event_type` sama sekali.
 
-⚠️ Tabel ini **tidak** menambahkan satu pun event ke V0. V0 tetap **22 event**
+⚠️ Tabel ini **tidak** menambahkan satu pun event ke V0. V0 tetap **23 event** (E-178)
 di bagian atas berkas ini; sisanya milik Phase 9–20.
 
 | PascalCase di naskah | `domain.verb` | Naskah |
@@ -396,7 +397,7 @@ baris pertamanya terbit.
 | `emergency.recovery_completed` | melengkapi `emergency.recovery_started` | 16 |
 | `tool.called` | `tool.failed` | 11 |
 
-⚠️ **Nol di antaranya masuk V0.** V0 tetap **22 event domain**; aturan yang
+⚠️ **Nol di antaranya masuk V0.** V0 tetap **23 event domain** (E-178); aturan yang
 dipakai: *yang boleh ditambahkan ke V0 hanyalah hal yang **tidak bisa**
 ditambahkan nanti* — dan sebuah event selalu bisa mulai diterbitkan kemudian.
 
@@ -434,6 +435,6 @@ amplop tersendiri.
 > diaudit**. Bentuk khusus itu menghapus tepat kemampuan yang paling
 > dibutuhkannya.
 
-⚠️ Kedelapan nama di atas **tidak** menambah event V0 — V0 tetap **22 event**;
+⚠️ Kedelapan nama di atas **tidak** menambah event V0 — V0 tetap **23 event**;
 security event lahir di Phase 8.
 

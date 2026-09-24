@@ -11,12 +11,17 @@ Tiga saringan berlapis, dan tiap lapis sanggup menahan sendiri:
    dicari. `ask` → tidak dicari DAN dilaporkan di `perlu_izin`: gerbang risiko
    (4.5) yang meminta izin, bukan pencarian yang diam-diam melewatinya.
 3. **Baris PostgreSQL** — titik dari Qdrant hanya KANDIDAT. Tiap hasil dibaca
-   ulang di bawah RLS pemiliknya, dan scope, hapus-lunak, serta `valid_until`
-   diperiksa di barisnya: payload Qdrant bisa basi, dan Qdrant tidak punya RLS.
+   ulang di bawah RLS pemiliknya, dan scope, hapus-lunak, `valid_until`, serta
+   **kesegaran vektornya** (`embedding_model` = penyemat ini) diperiksa di
+   barisnya: payload Qdrant bisa basi, Qdrant tidak punya RLS, dan vektor lama
+   sesudah `PATCH /journal` masih mencocokkan kata yang sudah dihapus pemiliknya
+   sampai penyelaras lewat (tinjauan kontrak Sprint 3, K2).
 
-Tidak satu scope pun diizinkan → Qdrant tidak ditanya sama sekali.
-Hanya titik yang disemat penyemat yang sama (`model`) yang dibandingkan —
-kosinus antar-ruang vektor tidak bermakna.
+Titik yang barisnya tidak lolos tidak mengurangi hasil yang sah: kandidat
+diambil per halaman sampai `batas` baris sah terkumpul atau Qdrant habis.
+Tidak satu scope pun diizinkan → Qdrant tidak ditanya sama sekali. Hanya titik
+yang disemat penyemat yang sama (`model`) — dan dengan kunci pengguna yang sama
+(`Penyemat.untuk`) — yang dibandingkan: kosinus antar-ruang vektor tidak bermakna.
 """
 
 from __future__ import annotations
@@ -32,9 +37,11 @@ from . import repository
 from .schemas import HasilCariMemori, MemoriDitemukan
 
 MAKS_HASIL = 50
-# Kandidat dari Qdrant per hasil yang diminta: titik yang barisnya sudah tidak
-# boleh diserahkan (basi, terhapus) tidak mengurangi jumlah hasil yang sah.
+# Kandidat dari Qdrant per hasil yang diminta, per halaman.
 _KANDIDAT_PER_HASIL = 3
+# Halaman kandidat paling banyak per pencarian — titik basi yang menumpuk (pekerja
+# mati) tidak membuat satu pencarian membaca seluruh koleksi pengguna.
+_MAKS_HALAMAN = 5
 # `memory.search` — risk 0 di tool registry spec/05, dan bawaan V0 risk 0 = `allow`.
 _BAWAAN_RISK_0: identity.Keputusan = "allow"
 
@@ -84,25 +91,29 @@ class PencariMemori:
         if not dipakai:
             return HasilCariMemori([], [], perlu_izin)
 
-        vektor = self._penyemat.semat(kueri)
+        vektor = self._penyemat.untuk(user_id).semat(kueri)
         if not any(vektor):
             # Kueri tanpa satu kata pun: vektor nol "berjarak" 0 ke SEMUA titik, dan
             # Qdrant mengembalikan semuanya dengan skor 0 — itu bukan kecocokan.
             return HasilCariMemori([], dipakai, perlu_izin)
-        kandidat = [
-            k
-            for k in await self._vektor.cari(
+        halaman = batas * _KANDIDAT_PER_HASIL
+        items: list[MemoriDitemukan] = []
+        for nomor in range(_MAKS_HALAMAN):
+            kandidat = await self._vektor.cari(
                 self._koleksi,
                 vektor,
                 user_id=user_id,
                 saring={"scope": dipakai, "model": [self._penyemat.nama]},
-                batas=batas * _KANDIDAT_PER_HASIL,
+                batas=halaman,
+                offset=nomor * halaman,
             )
-            if k.skor > 0  # kosinus ≤ 0 bukan kemiripan
-        ]
-        if not kandidat:
-            return HasilCariMemori([], dipakai, perlu_izin)
-        async with platform.transaksi_pengguna(self._engine, user_id) as conn:
-            baris = await repository.hidup_menurut_id(conn, [k.id for k in kandidat], dipakai)
-        items = [MemoriDitemukan(baris[k.id], k.skor) for k in kandidat if k.id in baris]
+            positif = [k for k in kandidat if k.skor > 0]  # kosinus ≤ 0 bukan kemiripan
+            if positif:
+                async with platform.transaksi_pengguna(self._engine, user_id) as conn:
+                    baris = await repository.hidup_menurut_id(
+                        conn, [k.id for k in positif], dipakai, self._penyemat.nama
+                    )
+                items += [MemoriDitemukan(baris[k.id], k.skor) for k in positif if k.id in baris]
+            if len(items) >= batas or len(kandidat) < halaman or len(positif) < len(kandidat):
+                break  # cukup · Qdrant habis · sisanya tidak mirip lagi
         return HasilCariMemori(items[:batas], dipakai, perlu_izin)

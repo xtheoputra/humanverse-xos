@@ -6,8 +6,8 @@
 > bawah menunjuk penegaknya, supaya tidak ada yang hanya dinyatakan.
 
 Keadaan: **Sprint 0 (Foundation) + Sprint 1 (Identity) + Sprint 2 (Human
-Core)** — 22 dari 51 tugas `spec/07`, di tiga branch bertumpuk yang menunggu
-HUMAN REVIEW.
+Core) + Sprint 3 (Memory & event)** — 30 dari 51 tugas `spec/07`, di empat
+branch bertumpuk yang menunggu HUMAN REVIEW.
 
 ---
 
@@ -18,8 +18,10 @@ docker compose                                   arch/09 §1
 ├── postgres   PostgreSQL 16         K1 · 23 tabel spec/01
 ├── redis      Redis 7               sesi · cache · Streams
 ├── migrate    alembic upgrade head  sekali jalan, SEBELUM api — sebagai PEMILIK skema
-├── db-roles   psql peran-lokal.sql  sekali jalan: peran login api, anggota hvx_app (D0 saja)
-└── api        uvicorn hvx.main:create_app --factory — sebagai anggota hvx_app
+├── qdrant     Qdrant 1.19           memori vektor (ADR-003) — hanya titik & rujukan, tanpa isi
+├── db-roles   psql peran-lokal.sql  sekali jalan: login api (hvx_app) + login pekerja (hvx_app + hvx_pekerja), D0 saja
+├── api        uvicorn hvx.main:create_app --factory — sebagai anggota hvx_app
+└── pekerja    python -m hvx.pekerja — relay event, konsumen `memori`, penyelaras memories → Qdrant
 
 apps/mobile     Flutter — layar V0 pertama (spec/07 2.7): Android · iOS · web
 ```
@@ -62,7 +64,7 @@ HTTP/SDK model hanya di `platform`.
 | | Di mana | Penegak |
 |---|---|---|
 | bentuk 23 tabel | [`spec/01`](spec/01-DATABASE-SCHEMA.md) | — sumber |
-| migrasi | `data/migrations/versions/` — `0001_v0_skema` · `0002_persetujuan_tujuan` (`consents.purpose`, B-22) · `0003_pencarian_masuk` (fungsi login, §12) · `0004_goal_bukan_induk_dirinya` (`CHECK goals_parent_not_self`); tiap migrasi `.up.sql` + `.down.sql` | `test_migrasi.py`: katalog migrasi **==** katalog DDL `spec/01` — tabel (persistensi · RLS · opsi · hak akses · komentar) · kolom (tipe · null · bawaan · collation · identity · generated) · hak akses & komentar kolom · constraint · index · pemicu (`pg_get_triggerdef` + menyala/mati) · kebijakan RLS · rule · sequence · fungsi · tipe · ekstensi (+ versi). **Tidak** dibandingkan: statistik, `STORAGE`/`COMPRESSION` kolom, kepemilikan, hak bawaan |
+| migrasi | `data/migrations/versions/` — `0001_v0_skema` · `0002_persetujuan_tujuan` (`consents.purpose`, B-22) · `0003_pencarian_masuk` (fungsi login, §12) · `0004_goal_bukan_induk_dirinya` (`CHECK goals_parent_not_self`) · `0005_relay_event` (peran `hvx_pekerja`, fungsi relay §12) · `0006_penyelaras_memori` (`memories.embedding_model`, fungsi penyelaras §12); tiap migrasi `.up.sql` + `.down.sql` | `test_migrasi.py`: katalog migrasi **==** katalog DDL `spec/01` — tabel (persistensi · RLS · opsi · hak akses · komentar) · kolom (tipe · null · bawaan · collation · identity · generated) · hak akses & komentar kolom · constraint · index · pemicu (`pg_get_triggerdef` + menyala/mati) · kebijakan RLS · rule · sequence · fungsi · tipe · ekstensi (+ versi). **Tidak** dibandingkan: statistik, `STORAGE`/`COMPRESSION` kolom, kepemilikan, hak bawaan |
 | naik & turun bersih | idem | `test_migrasi.py`: naik → turun (kosong, kecuali ekstensi — lihat bawah) → naik (identik) |
 | parser P-1..P-3 melihat semua tabel | — | `test_migrasi.py`: nama tabel yang parser baca **==** tabel di katalog basis data sungguhan |
 | anotasi retensi + `data_subject` (K-16) | komentar SQL di atas tiap `CREATE TABLE` | `periksa_dokumen.py` P-1 · P-2 · P-3 atas `spec/01` **dan** migrasi |
@@ -70,6 +72,7 @@ HTTP/SDK model hanya di `platform`.
 | **data tiap pengguna milik pribadinya** (H-27) | RLS di 21 tabel (`spec/01` §11): peran aplikasi hanya melihat & menulis baris `app_current_user_id()` | `test_kepemilikan_data.py`: tiap tabel milik pengguna ber-RLS, **isi** kebijakannya tepat, A tidak membaca/mengubah/menulis baris B, tanpa pengguna → nol baris |
 | anak & induk satu pemilik (B-41) | FK komposit `(induk_id, user_id) → induk(id, user_id)`, 11 relasi | idem: katalog (tiap FK antar tabel milik pengguna berpasangan) + perilaku (11 relasi, anak B → induk A ditolak) |
 | peran aplikasi sempit (B-40) | `hvx_app` NOLOGIN — bukan superuser, bukan pemilik, tanpa `BYPASSRLS`; hanya-tambah untuk `consents`, `events`, `ai_messages`, `recommendation_feedback`, `audit_logs` | idem: matriks hak akses; `UPDATE`/`DELETE` audit & event ditolak |
+| fungsi lintas-RLS milik pekerja (S4) | `hvx_pekerja` NOLOGIN — satu-satunya pemegang `EXECUTE` fungsi relay & penyelaras (§12); login pekerja anggota `hvx_app` **dan** peran ini, login api hanya `hvx_app` | idem: tiap fungsi `SECURITY DEFINER` punya tepat satu peran pemanggil |
 
 SQL migrasi hidup di berkas `.sql`, bukan `op.create_table`: anotasi P-1 adalah
 **komentar SQL**, dan komentar tidak bertahan lewat DSL Python.
@@ -109,7 +112,7 @@ tersedia apa adanya di berkas `.up.sql`/`.down.sql`.
 | rute yang butuh pengguna | dependensi `identity.PenggunaDiperlukan`, **bukan** middleware | rute menyatakannya di tanda tangan; rute yang lupa tidak punya `user_id` untuk dipakai sama sekali |
 | login di bawah RLS | fungsi `SECURITY DEFINER` sempit `auth_lookup_for_login` — satu-satunya di daftar izin `test_kepemilikan_data.py` | RLS `users` tidak meloloskan pencarian per email sebelum pengguna dikenali; kebijakannya **tidak** dilonggarkan |
 | pendaftaran membuat profil | `identity` menjalankan **pendengar pendaftaran** di transaksi yang sama; `hvx.main` memasang `profile.buat_profil_awal` | `identity` di bawah `profile` (K-17) — ia tidak boleh mengimpornya, dan akun tanpa profil tidak boleh tercipta |
-| bacaan & pendengar lintas modul domain | `hvx.main` memasang fungsi pintu keluar di `app.state`, dipanggil dengan koneksi **pemanggil**: zona waktu profil · energi check-in · goal yang hidup (dikunci `FOR SHARE`) → `habits`; hapus goal → `habits.lepas_goal` (**K-23**) | domain tidak saling impor (`spec/06` aturan 3) dan SQL hanya tabel sendiri (aturan 5), tetapi bacaan ini harus satu transaksi — event melayani tulisan, bukan bacaan. Rute yang butuh sambungannya menolak berjalan tanpanya; `test_main.py` memeriksa kelimanya |
+| bacaan & pendengar lintas modul domain | `hvx.main` memasang fungsi pintu keluar di `app.state`, dipanggil dengan koneksi **pemanggil**: zona waktu profil · energi check-in · goal yang hidup (dikunci `FOR SHARE`) → `habits`; hapus goal → `habits.lepas_goal`; sunting & hapus jurnal → `memory.selaraskan_jurnal` (**K-23**) | domain tidak saling impor (`spec/06` aturan 3) dan SQL hanya tabel sendiri (aturan 5), tetapi bacaan ini harus satu transaksi — event melayani tulisan, bukan bacaan. Rute yang butuh sambungannya menolak berjalan tanpanya; `test_main.py` memeriksa keenamnya |
 | hapus-lunak vs tulisan serentak | goal HIDUP dikunci `FOR SHARE` sebelum anak, milestone, atau tautan habit ditulis; hapus-lunak (`FOR NO KEY UPDATE`) menunggu, lalu pernyataan berikutnya melihat tulisan barunya | tanpa kunci: 40 dari 40 goal anak yang dibuat serentak dengan hapus induknya menjadi yatim (tinjauan Sprint 2, E-172) |
 | batas ukuran data | ≤ 1.000 goal · ≤ 100 milestone per goal · ≤ 500 habit per pengguna, **saat menulis**, diperiksa di bawah kunci penasihat per pemilik (**K-24**) | pohon goal dan daftar habit dibaca utuh dalam satu jawaban — dibatasi di pintu masuk, tidak pernah dipotong saat dibaca |
 | izin agent | `identity.MesinIzin`: tanpa baris / kedaluwarsa → `ask`, atau `bawaan` pemanggil; cache Redis bergenerasi, generasi diganti sebelum **dan** sesudah commit; cache menyimpan *“tanpa keputusan”*, bukan bawaan | menghapus kunci cache saja membiarkan pembaca lambat menghidupkan kembali izin yang baru dicabut; gerbang risiko `spec/05` butuh bawaan per risk tanpa menimpa `ask` yang disetel pengguna (E-167) |
@@ -122,6 +125,10 @@ tersedia apa adanya di berkas `.up.sql`/`.down.sql`.
 | ukuran badan | ≤ 1 MiB → `413`, middleware ASGI **sebelum** autentikasi, juga untuk badan *chunked* | FastAPI membaca badan utuh sebelum dependensi autentikasi berjalan |
 | `Idempotency-Key` | Redis mengingat **rujukan** (sidik HMAC · status · id) 24 jam; ulangan membaca ulang sumber daya di bawah RLS; ≤ 1.000 kunci baru per pengguna per 24 jam; satu skrip Lua *ambil-atau-kunci* (**K-24**) | menyimpan isi jawaban: ~5 KiB per permintaan 19 byte di Redis `noeviction` bersama sesi, dan isi pengguna tinggal sesudah dihapus (E-171) |
 | middleware | ASGI murni, bukan `BaseHTTPMiddleware` | yang kedua memutus `contextvars` dan menahan SSE (tugas 4.8) |
+| event (Sprint 3) | fakta perilaku menerbitkan event di transaksi tulisannya (`spec/06` aturan 6); tabel `events` = kotak keluar; proses **pekerja** menyalin RUJUKAN (id · pemilik · jenis) ke satu stream Redis (**K-25**) — jendela belakang 60 dtk, penanda dipangkas menurut kursor | payload di stream = isi pengguna di Redis/AOF sesudah akunnya dihapus (E-171); relay di api = tiap replika menjalankan relay-nya sendiri |
+| konsumen stream | satu grup per konsumen `spec/03`; isi event dibaca di transaksi PEMILIKNYA, ACK sesudah commit; `XAUTOCLAIM` sesudah 30 dtk; stream mati sesudah 5 kali, dipangkas sesudah 7 hari | konsumen yang mati di tengah tidak kehilangan pesannya; satu event beracun tidak menahan grupnya |
+| memori (3.5–3.7) | ekstraksi episodik menulis PostgreSQL saja; **penyelaras** menyusul ke Qdrant — baca → semat (thread) → kirim → tandai hanya bila sidik isinya masih sama; pencarian tiga saringan (manifest · izin · baris PostgreSQL) | Qdrant tidak ikut transaksi: menulis keduanya di jalan pengguna berarti gagal saat Qdrant tersendat, atau berhasil di satu sisi saja (K3) |
+| penyemat (K-26) | lokal `hvx-hash-v1-384`, berkunci `HVX_SEMATAN_KEY`, kunci turunan **per pengguna**; `memories.embedding_model` mencatat penyematnya | penyedia model milik pemilik; CI tanpa tagihan; kunci bersama = kamus bagi akun mana pun (S1) |
 | dokumentasi interaktif | terbuka **hanya** di `local` · `test` · `ci`; `HVX_ENV` **wajib** | daftar izin, bukan daftar tolak: lingkungan yang lupa diisi atau baru ditambahkan jatuh ke sisi tertutup |
 
 ## 5 · Gerbang
@@ -141,6 +148,8 @@ apa: [`arch/11`](arch/11-PENEGAKAN.md) §6.
 | ekspor & hapus tercatat di audit | fiturnya: tugas 6.4 · 6.5 |
 | rute izin per agent (`/privacy/permissions`) | tugas 6.4 — mesinnya sudah ada (1.5) |
 | pohon `security/` — B-1 belum bisa dinyatakan | risk gate, tugas 4.5 |
-| Qdrant | Sprint 3 tugas 3.5 |
-| event domain — keenam tabel Sprint 2 ditulis tanpa event (`spec/06` aturan 6, E-176) | Sprint 3 tugas 3.1–3.2 |
+| memori TURUNAN (fakta, preferensi) — V0 hanya episodik | AI Gateway, tugas 4.1 (penyedia model milik pemilik) |
+| pemanggil pencarian memori (tool `memory.search`) | tugas 4.3 · 4.7 |
+| alat putar ulang stream mati | belum punya tugas |
+| event `activities` — pengecualian aturan D yang diakui (`spec/06`) | bersama event padanannya di `spec/03` |
 | penyimpanan token & antrean luring di aplikasi | tugas 6.6 |

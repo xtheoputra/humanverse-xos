@@ -94,7 +94,7 @@ Tidak ada tugas yang boleh masuk `main` tanpa baris **HUMAN REVIEW**.
 > | 1.2 | token dicabut → 401 pada permintaan berikutnya — **juga bila keluar atau token bekas jatuh di tengah penyegaran, dan bila masuk baru jatuh di tengah cabut-semua** (tiap celah antarperintah diuji); umur token akses & segar diukur; status akun dibaca sebelum tiap penyegaran, tidak aktif → semua sesi dicabut; Redis hanya menyimpan **sidik** token | token akses akun yang ditangguhkan hidup sampai kedaluwarsa — alur yang mengubah status wajib `cabut_semua` (6.5) |
 > | 1.3 | timezone dari paket `tzdata`, peka huruf: `asia/jakarta` · `WIB` · `GMT+7` → 400 | — |
 > | 1.4 | riwayat hanya-tambah (peran aplikasi tanpa `UPDATE`/`DELETE`), urutannya tentu di dalam satu transaksi; pencabutan = baris baru; `data.purpose ⊆ consent.purpose` **dan** cakupan data — per **jenis** persetujuan | kosakata `purpose` & teks kebijakan — pemilik ([#59](../../issues/59) butir 2); persetujuan `service` dicatat tanpa cakupan, jadi pertanyaan `service` bercakupan selalu ditolak sampai kosakata itu ada |
-> | 1.5 | tanpa baris → `ask` (atau bawaan pemanggil — E-167); `allow` · `deny`; kedaluwarsa → `ask`; di-cache Redis ≤ sisa umur izin − 1 dtk, dan **pencabutan berlaku seketika** — juga terhadap pembaca yang sedang membaca | `condition.consent` naskah 12 §8.7 — pemilik (#59 butir 3); rute `PUT /privacy/permissions` datang bersama layar 6.4 |
+> | 1.5 | tanpa baris → `ask` (atau bawaan pemanggil — E-167); `allow` · `deny`; kedaluwarsa → `ask`; di-cache Redis paling lama sampai `expires_at` − 1 dtk, **mutlak** menurut jam basis data (**E-189**), dan **pencabutan berlaku seketika** — juga terhadap pembaca yang sedang membaca | `condition.consent` naskah 12 §8.7 — pemilik (#59 butir 3); rute `PUT /privacy/permissions` datang bersama layar 6.4 |
 > | 1.6 | `UPDATE`/`DELETE` ditolak (SQLSTATE 42501, sebagai peran aplikasi); **login ✅ · izin ✅** tercatat — dan audit yang gagal menggagalkan perubahannya | **ekspor · hapus** belum tercatat — fiturnya belum ada (6.4 · 6.5) |
 > | 1.7 | `429` + `Retry-After` per IP (`/v1/*`, IPv6 per /64) · per pengguna · daftar & masuk per IP · login gagal per akun — dipakai sebelum argon2, kunci = pembanding `citext` | angka batasnya keputusan teknis (**K-22**), belum diukur terhadap lalu lintas nyata; per IP bergantung proksi tepercaya di D1+; batas per akun **bukan** batas 100 *beruntun* NIST (**B-42**) |
 >
@@ -191,19 +191,37 @@ Tidak ada tugas yang boleh masuk `main` tanpa baris **HUMAN REVIEW**.
 | 3.8 | `activities` | `source='inferred'` terpisah dari `manual` |
 
 > 🔨 **Sprint 3 dikodekan 24 Sep 2026** — branch `v0/sprint-3-memory-event` (di
-> atas `v0/sprint-2-human-core`), satu commit per tugas (**K-18**), **menunggu
-> HUMAN REVIEW**. Keadaan tiap "Selesai bila", tanpa dibulatkan:
+> atas `v0/sprint-2-human-core`), satu commit per tugas (**K-18**), lalu satu
+> commit untuk seluruh perbaikan tinjauan, **menunggu HUMAN REVIEW**. Keadaan
+> tiap "Selesai bila", tanpa dibulatkan:
 >
 > | | Dibuktikan | Yang BELUM |
 > |---|---|---|
-> | 3.1 | kunci yang sama dua kali → satu baris, galatnya ditelan sebagai sukses — juga serentak; kunci sama untuk kejadian **lain** ditolak keras; uji admisi saat terbit menolak jenis di luar tabel padanan, medan payload tak dikenal, sumber di luar `spec/03`, waktu tanpa zona — sebelum menyentuh basis data; event ikut batal bersama tulisannya | — |
+> | 3.1 | kunci yang sama dua kali → satu baris, galatnya ditelan sebagai sukses — juga serentak; kunci sama untuk kejadian **lain** — payload, subjek, atau jenis lain — ditolak keras; uji admisi saat terbit menolak jenis di luar tabel padanan, medan payload tak dikenal **atau bertipe lain** (`strict`, **E-187**), sumber di luar `spec/03`, waktu tanpa zona — sebelum menyentuh basis data; `recorded_at` = saat event masuk, bukan awal transaksinya; event ikut batal bersama tulisannya | — |
 > | 3.2 | tiap baris peta aturan 6 [`06`](06-MODULE-BOUNDARIES.md) lewat HTTP, di transaksi yang sama (galat penerbitan membatalkan tulisannya); kirim ulang tidak menerbitkan apa pun; kunci per **kejadian** (**E-177**); pembatalan penyelesaian punya eventnya (**E-178**) | aturan 6 dipersempit ke fakta perilaku (**E-179**) — event konfigurasi belum ada |
-> | 3.3 | konsumen yang mati sebelum ACK → pesannya diklaim konsumen lain dan diproses (`XAUTOCLAIM`); penangan yang selalu gagal → stream **mati** sesudah 5 kali; event yang commit **di belakang** kursor relay tetap terkirim (jendela 60 dtk); stream membawa **rujukan**, isi dibaca di bawah RLS (**K-25**); pangkas tidak membuang yang masih ditunggu; proses `hvx.pekerja` diuji sebagai proses | transaksi yang commit > 60 dtk sesudah menyisip tidak terkirim; stream mati belum punya alat putar ulang |
+> | 3.3 | konsumen yang mati sebelum ACK → pesannya diklaim konsumen lain dan diproses (`XAUTOCLAIM`); penangan yang selalu gagal → stream **mati** sesudah 5 kali — bawaan yang pekerja pakai, bukan angka uji; event yang commit **di belakang** kursor relay tetap terkirim (jendela 60 dtk), dan riwayat tidak terkirim ulang: penanda dipangkas menurut kursor (**E-185**); event akun yang dihapus di antara relay dan konsumen selesai tanpa stream mati; stream membawa **rujukan**, isi dibaca di bawah RLS (**K-25**); pangkas tidak membuang yang masih ditunggu, dan pekerja sungguh memangkas; stream mati 7 hari; fungsi relay hanya untuk peran `hvx_pekerja` — api menolak mulai sebagai anggotanya (**E-186**); proses `hvx.pekerja` diuji sebagai proses | transaksi yang commit > 60 dtk sesudah menyisip tidak terkirim; stream mati belum punya alat putar ulang |
 > | 3.4 | `GET /journal` tanpa `body` di tiga lapis — jawaban tiap halaman, kontrak OpenAPI, dan **SQL yang sampai ke PostgreSQL** (**E-181**); isi jurnal tidak masuk event | hapus jurnal = hapus-lunak, isinya tersimpan sampai akun dihapus — **C-31**, milik pemilik |
-> | 3.5 | saringan `user_id` **wajib** di tiap pencarian vektor (Qdrant tanpa RLS); scope kosong ≠ semua; galat Qdrant tanpa isi permintaan; koleksi berdimensi lain ditolak; penyemat lokal **berkunci** (**K-26**) — kata tidak terbaca dari vektor tanpa kunci; penyelaras menyemat, menyemat ulang isi yang berubah, dan membuang titik memori yang dihapus | kemiripan **leksikal**, bukan makna; enkripsi sematan (naskah 145) milik pemilik |
+> | 3.5 | saringan `user_id` **wajib** di tiap pencarian vektor (Qdrant tanpa RLS); scope kosong ≠ semua; galat Qdrant tanpa isi permintaan; koleksi berdimensi atau berjarak lain ditolak; penyemat lokal **berkunci per pengguna** (**K-26**, **E-182**) — kata tidak terbaca dari vektor tanpa kunci, juga oleh akun yang menyemat kamusnya sendiri; penyelaras menyemat di thread, paling banyak 20.000 karakter pertama, tanpa menahan kunci baris selama Qdrant — `PATCH /journal` tidak menunggu Qdrant yang lambat (**E-183**); menyemat ulang isi yang berubah, dan membuang titik memori yang dihapus | kemiripan **leksikal**, bukan makna; enkripsi sematan (naskah 145) milik pemilik |
 > | 3.6 | dua mood + satu jurnal → tiga memori, **tiap** memori punya `kind` · `scope` · `confidence` · `evidence_count` · `source_event_id` yang menunjuk event sumbernya; isi dibaca dari barisnya (bukan dari event); event yang diserahkan lagi tidak menggandakan; jurnal dihapus sebelum diekstrak tidak diingat; `PATCH` serentak menunggu ekstraksi yang sedang membaca (**K-27**) | memori **turunan** (fakta, preferensi) — butuh model (4.1) |
-> | 3.7 | agent **tanpa izin scope tidak menerima barisnya** — tiga jalan: scope sensitif tanpa `allow` tersimpan · scope yang pengguna **tolak** · izin pengguna yang **tidak** melebarkan manifest; dan buktinya: dengan manifest **dan** izin, baris yang sama diserahkan. Payload Qdrant yang basi kalah oleh baris PostgreSQL; memori terhapus tidak diserahkan; daftar scope resmi ditulis dan ditegakkan (**E-180**) | pemanggilnya (tool `memory.search`, gerbang risiko) — Sprint 4 |
-> | 3.8 | klien **tidak bisa** mencatat `inferred` (badan dengan `source` → `400`); jalur sistem selalu `inferred`; `?source=` memisahkan keduanya | pemanggil `catat_disimpulkan` — Behavior Engine (5.1) |
+> | 3.7 | agent **tanpa izin scope tidak menerima barisnya** — tiga jalan: scope sensitif tanpa `allow` tersimpan · scope yang pengguna **tolak** (dan tidak dilaporkan *perlu izin*) · izin pengguna yang **tidak** melebarkan manifest; dan buktinya: dengan manifest **dan** izin, baris yang sama diserahkan. Payload **dan vektor** Qdrant yang basi kalah oleh baris PostgreSQL — kata yang dihapus pemiliknya tidak cocok lagi (**E-184**); memori terhapus atau kedaluwarsa tidak diserahkan dan tidak menyingkirkan hasil yang sah; hasil dibatasi `batas`, terurut dari yang paling mirip; daftar scope resmi ditulis dan ditegakkan (**E-180**) | pemanggilnya (tool `memory.search`, gerbang risiko) — Sprint 4 |
+> | 3.8 | klien **tidak bisa** mencatat `inferred` (badan dengan `source` → `400`); jalur sistem selalu `inferred`; `?source=` memisahkan keduanya — kontraknya kini di [`04`](04-API-CONTRACTS.md), bersama `ended_at` (masa depan → `422`, membantah `duration_seconds` → `400`) dan batas kedalaman `payload` (**E-187**) | pemanggil `catat_disimpulkan` — Behavior Engine (5.1) |
+>
+> 🔍 **Tinjauan adversarial sebelum PR** (keamanan · kontrak · penegak buta;
+> rinciannya [`../docs/99-CATATAN-AUDIT.md`](../docs/99-CATATAN-AUDIT.md)): 14
+> temuan terbukti dan **49 dari 68 kerusakan yang lolos seluruh suite**, tiap
+> temuan kode dibuktikan **merah dulu** lalu dijaga mutasi — **E-182** satu
+> kunci penyemat untuk semua pengguna (akun biasa membaca vektor orang lain
+> dengan kamusnya sendiri) · **E-183** penyelaras yang menahan event loop dan
+> kunci baris selama Qdrant · **E-184** pencarian yang memercayai vektor basi ·
+> **E-185** penanda relay yang menumpuk 24 jam di Redis `noeviction` · **E-186**
+> peran api yang bisa membaca linimasa semua pengguna lewat fungsi pekerja ·
+> **E-187** masukan (`jsonb` tanpa batas kedalaman, `ended_at`, admisi event
+> yang mengoersi) · **E-188** klaim *“dibuktikan”* tanpa uji. Dan satu cacat
+> Sprint 1 yang ketahuan lewat uji yang berkedip di gerbang penuh: cache izin
+> sementara yang ditulis > 1 dtk sesudah basis data dibaca menjawab `allow`
+> sesudah izinnya habis — kini berakhir **mutlak** (**E-189**). Satu pertanyaan
+> baru untuk pemilik — **C-33** teks bebas di payload event — dan dua yang
+> diperluas: **C-31** · **C-32**.
 
 ---
 

@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import AsyncIterator
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from typing import Any
 from uuid import UUID, uuid4
 
@@ -16,6 +16,7 @@ import psycopg
 import pytest
 from _bantuan_db import BasisDataV0, psycopg_dsn
 from psycopg import errors
+from sqlalchemy import text
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import AsyncEngine
 
@@ -128,6 +129,65 @@ async def test_kunci_sama_untuk_kejadian_lain_ditolak_keras(
         await _terbit(engine, uid, idempotency_key="mood:tabrak", payload={"valence": 1})
 
     assert len(_baris(v0_bersama, uid)) == 1
+
+
+@pytest.mark.parametrize(
+    "lain",
+    [
+        {"subject_id": UUID("00000000-0000-4000-8000-000000000002")},
+        {"event_type": "habit.completion_retracted"},  # payload yang SAMA sah bagi keduanya
+    ],
+)
+async def test_kunci_sama_untuk_subjek_atau_jenis_lain_ditolak_keras(
+    engine: AsyncEngine, v0_bersama: BasisDataV0, lain: dict[str, Any]
+) -> None:
+    """Payload yang sama tidak cukup untuk menelan: subjek lain, atau jenis lain (dilewati
+    lalu DICABUT), adalah kejadian lain — tinjauan penegak buta Sprint 3."""
+    uid = _pengguna(v0_bersama)
+    cid = uuid4()
+    isi: dict[str, Any] = {
+        "event_type": "habit.skipped",
+        "idempotency_key": f"habit-completion:{cid}",
+        "payload": {"for_date": date(2026, 9, 10), "completion_id": cid},
+        "subject_type": "habit",
+        "subject_id": UUID("00000000-0000-4000-8000-000000000001"),
+    }
+    await _terbit(engine, uid, **isi)
+
+    with pytest.raises(events.EventTidakSah, match="kejadian yang berbeda"):
+        await _terbit(engine, uid, **{**isi, **lain})
+
+    assert len(_baris(v0_bersama, uid)) == 1
+
+
+async def test_recorded_at_saat_event_masuk_bukan_awal_transaksinya(
+    engine: AsyncEngine, v0_bersama: BasisDataV0
+) -> None:
+    """`now()` membeku di awal transaksi: event yang disisip di ujung transaksi panjang
+    tercatat LEBIH AWAL dari event transaksi lain yang sudah commit — dan relay yang
+    membaca menurut `recorded_at` melompatinya (events/repository.py)."""
+    uid = _pengguna(v0_bersama)
+
+    async with transaksi_pengguna(engine, uid) as conn:
+        awal = (await conn.execute(text("SELECT now()"))).scalar_one()
+        await asyncio.sleep(0.5)  # transaksi yang sibuk sebelum menerbitkan
+        await events.terbitkan(
+            conn,
+            user_id=uid,
+            event_type="mood.logged",
+            occurred_at=SEKARANG,
+            idempotency_key="mood:ujung-transaksi",
+            payload={"valence": 3},
+        )
+
+    with psycopg.connect(psycopg_dsn(v0_bersama.dsn_pemilik)) as k:
+        (masuk,) = k.execute(
+            "SELECT recorded_at FROM events WHERE user_id = %s", (uid,)
+        ).fetchone() or (None,)
+    assert masuk is not None
+    assert masuk - awal >= timedelta(seconds=0.4), (
+        f"recorded_at = awal transaksi, bukan saat event masuk ({masuk - awal})"
+    )
 
 
 @pytest.mark.parametrize(

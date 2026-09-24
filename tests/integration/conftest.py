@@ -12,7 +12,9 @@ import psycopg
 import pytest
 from _bantuan_db import (
     BUAT_HVX_APP,
+    BUAT_HVX_PEKERJA,
     PERAN_APLIKASI_UJI,
+    PERAN_PEKERJA_UJI,
     ApiUji,
     BasisDataV0,
     alembic,
@@ -25,7 +27,7 @@ from asgi_lifespan import LifespanManager
 from psycopg import sql
 
 from hvx.main import create_app
-from hvx.modules.platform import Settings
+from hvx.modules.platform import Settings, buat_engine
 
 
 @contextmanager
@@ -70,36 +72,59 @@ def sandi_peran_aplikasi_uji(dsn_admin_uji: str) -> str:
     return sandi
 
 
+@pytest.fixture(scope="session")
+def sandi_peran_pekerja_uji(dsn_admin_uji: str, sandi_peran_aplikasi_uji: str) -> str:
+    """Peran LOGIN `hvx_pekerja_uji`, anggota `hvx_app` + `hvx_pekerja` (S4)."""
+    sandi = secrets.token_urlsafe(24)
+    peran = sql.Identifier(PERAN_PEKERJA_UJI)
+    with psycopg.connect(psycopg_dsn(dsn_admin_uji), autocommit=True) as k:
+        k.execute(BUAT_HVX_PEKERJA)
+        if not k.execute(
+            "SELECT 1 FROM pg_roles WHERE rolname = %s", (PERAN_PEKERJA_UJI,)
+        ).fetchone():
+            k.execute(sql.SQL("CREATE ROLE {} LOGIN").format(peran))
+        k.execute(
+            sql.SQL(
+                "ALTER ROLE {} WITH LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS "
+                "INHERIT PASSWORD {}"
+            ).format(peran, sql.Literal(sandi))
+        )
+        k.execute(sql.SQL("GRANT hvx_app, hvx_pekerja TO {}").format(peran))
+    return sandi
+
+
+def _v0(dsn_admin: str, dsn_pemilik: str, sandi_api: str, sandi_pekerja: str) -> BasisDataV0:
+    db = nama_db(dsn_pemilik)
+    return BasisDataV0(
+        dsn_pemilik=dsn_pemilik,
+        dsn_aplikasi=dsn_ke(dsn_admin, db, PERAN_APLIKASI_UJI, sandi_api),
+        dsn_pekerja=dsn_ke(dsn_admin, db, PERAN_PEKERJA_UJI, sandi_pekerja),
+    )
+
+
 @pytest.fixture
 def basis_data_termigrasi(
     basis_data_sekali_pakai: Callable[[str], str],
     dsn_admin_uji: str,
     sandi_peran_aplikasi_uji: str,
+    sandi_peran_pekerja_uji: str,
 ) -> Callable[[str], BasisDataV0]:
     def _buat(awalan: str) -> BasisDataV0:
         dsn_pemilik = basis_data_sekali_pakai(awalan)
         command.upgrade(alembic(dsn_pemilik), "head")
-        return BasisDataV0(
-            dsn_pemilik=dsn_pemilik,
-            dsn_aplikasi=dsn_ke(
-                dsn_admin_uji, nama_db(dsn_pemilik), PERAN_APLIKASI_UJI, sandi_peran_aplikasi_uji
-            ),
-        )
+        return _v0(dsn_admin_uji, dsn_pemilik, sandi_peran_aplikasi_uji, sandi_peran_pekerja_uji)
 
     return _buat
 
 
 @pytest.fixture(scope="module")
-def v0_bersama(dsn_admin_uji: str, sandi_peran_aplikasi_uji: str) -> Iterator[BasisDataV0]:
+def v0_bersama(
+    dsn_admin_uji: str, sandi_peran_aplikasi_uji: str, sandi_peran_pekerja_uji: str
+) -> Iterator[BasisDataV0]:
     """Satu basis data termigrasi untuk seluruh uji satu berkas; tiap uji memakai pengguna baru."""
     with _basis_data(dsn_admin_uji, "bersama") as dsn_pemilik:
         command.upgrade(alembic(dsn_pemilik), "head")
-        yield BasisDataV0(
-            dsn_pemilik=dsn_pemilik,
-            dsn_aplikasi=dsn_ke(
-                dsn_admin_uji, nama_db(dsn_pemilik), PERAN_APLIKASI_UJI, sandi_peran_aplikasi_uji
-            ),
-        )
+        yield _v0(dsn_admin_uji, dsn_pemilik, sandi_peran_aplikasi_uji, sandi_peran_pekerja_uji)
 
 
 @pytest.fixture
@@ -121,7 +146,13 @@ async def api_uji(
         LifespanManager(app),
         httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://uji") as klien,
     ):
-        yield ApiUji(app=app, klien=klien, db=db, awalan_redis=awalan)
+        engine_pekerja = buat_engine(db.dsn_pekerja)
+        try:
+            yield ApiUji(
+                app=app, klien=klien, db=db, awalan_redis=awalan, engine_pekerja=engine_pekerja
+            )
+        finally:
+            await engine_pekerja.dispose()
 
 
 @pytest.fixture(scope="module")
@@ -149,4 +180,14 @@ async def api_bersama(v0_bersama: BasisDataV0, url_redis_uji: str) -> AsyncItera
         LifespanManager(app),
         httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://uji") as klien,
     ):
-        yield ApiUji(app=app, klien=klien, db=v0_bersama, awalan_redis=awalan)
+        engine_pekerja = buat_engine(v0_bersama.dsn_pekerja)
+        try:
+            yield ApiUji(
+                app=app,
+                klien=klien,
+                db=v0_bersama,
+                awalan_redis=awalan,
+                engine_pekerja=engine_pekerja,
+            )
+        finally:
+            await engine_pekerja.dispose()

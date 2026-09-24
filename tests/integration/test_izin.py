@@ -190,6 +190,35 @@ async def test_cache_izin_sementara_tidak_hidup_lebih_lama_dari_izinnya(izin: Iz
     assert await izin.mesin.cek(uid, COACH, "habits", "read") == "ask"
 
 
+async def test_cache_yang_ditulis_terlambat_tidak_melewati_izin_sementaranya(
+    izin: Izin, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Sistem yang sibuk menulis cache lama sesudah basis data dibaca. Umur RELATIF yang
+    dihitung saat dibaca lalu memperpanjang cache sebesar jedanya: `allow` yang sudah
+    kedaluwarsa tetap dijawab dari Redis — uji di atas sempat merah karena itu di
+    gerbang penuh Sprint 3. Jeda 1,2 dtk di sini melebihi margin 1 dtk."""
+    asli = MesinIzin._baca_basis_data
+
+    async def lambat(self: MesinIzin, *a: Any, **k: Any) -> Any:
+        hasil = await asli(self, *a, **k)
+        await asyncio.sleep(1.2)  # di antara membaca basis data dan menulis Redis
+        return hasil
+
+    monkeypatch.setattr(MesinIzin, "_baca_basis_data", lambat)
+    uid = izin.pengguna_baru()
+    sampai = izin.jam_basis_data() + timedelta(seconds=3)
+    await izin.mesin.tetapkan(uid, COACH, "habits", "read", "allow", expires_at=sampai)
+    assert await izin.mesin.cek(uid, COACH, "habits", "read") == "allow"
+
+    batas_tunggu = asyncio.get_running_loop().time() + 30
+    while izin.jam_basis_data() <= sampai:
+        assert asyncio.get_running_loop().time() < batas_tunggu, "jam basis data tidak bergerak"
+        await asyncio.sleep(0.1)
+    assert await izin.mesin.cek(uid, COACH, "habits", "read") == "ask", (
+        "cache yang ditulis terlambat melewati izin sementaranya"
+    )
+
+
 async def test_hasil_di_cache_di_redis(izin: Izin) -> None:
     uid = izin.pengguna_baru()
     await izin.mesin.tetapkan(uid, COACH, "habits", "read", "allow")

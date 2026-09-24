@@ -8,7 +8,9 @@ ada, dan kenapa bentuknya begitu: [`ARCHITECTURE.md`](../../ARCHITECTURE.md).
 # butuh HVX_ENV, HVX_DATABASE_URL, HVX_REDIS_URL, HVX_IP_HASH_KEY
 uv run --locked uvicorn hvx.main:create_app --factory --reload
 # proses KEDUA, citra yang sama (spec/07 3.3–3.6): relay event → Redis Streams,
-# konsumen `memori`, penyelaras memories → Qdrant (bila HVX_QDRANT_URL diisi)
+# konsumen `memori`, penyelaras memories → Qdrant (bila HVX_QDRANT_URL diisi).
+# HVX_DATABASE_URL-nya login LAIN: anggota `hvx_app` DAN `hvx_pekerja` (S4) — api
+# menolak mulai dengan login itu, pekerja menolak mulai tanpanya.
 uv run --locked python -m hvx.pekerja
 ```
 
@@ -36,7 +38,7 @@ uv run --locked python -m hvx.pekerja
 | `HVX_QDRANT_URL` | | kosong — basis data vektor memori (3.5). Kosong = memori tetap diekstrak ke PostgreSQL, **tidak** disemat; penyelaras menyusul begitu diisi |
 | `HVX_QDRANT_API_KEY` | | kosong — kunci API Qdrant (wajib di luar D0 lokal) |
 | `HVX_QDRANT_KOLEKSI` | | `memories` — nama koleksi (uji memakai koleksi sekali pakai) |
-| `HVX_SEMATAN_KEY` | bila Qdrant | ≥ 32 karakter — kunci penyemat lokal (**K-26**). Tanpa kunci, vektor di Qdrant bisa **dibalik menjadi kata** isi jurnal; menggantinya = seluruh memori disemat ulang |
+| `HVX_SEMATAN_KEY` | bila Qdrant | ≥ 32 karakter — kunci penyemat lokal (**K-26**), diturunkan per pengguna. Tanpa kunci, vektor di Qdrant bisa **dibalik menjadi kata** isi jurnal; menggantinya = seluruh memori disemat ulang |
 
 Rute yang ada — kontraknya [`spec/04`](../../spec/04-API-CONTRACTS.md):
 
