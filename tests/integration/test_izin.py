@@ -10,7 +10,7 @@ import asyncio
 import uuid
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import psycopg
@@ -175,10 +175,20 @@ async def test_cache_izin_sementara_tidak_hidup_lebih_lama_dari_izinnya(izin: Iz
     await izin.mesin.tetapkan(uid, COACH, "habits", "read", "allow", expires_at=sampai)
 
     assert await izin.mesin.cek(uid, COACH, "habits", "read") == "allow"
-    pola = f"{izin.awalan}:izin:{uid}:*:agent:coach-agent:habits:read"
-    umur = [await izin.redis.pttl(k) async for k in izin.redis.scan_iter(match=pola)]
-    assert umur, "keputusan tidak di-cache"
-    assert all(0 < u <= 2_000 for u in umur), f"cache hidup lebih lama dari izinnya: {umur} ms"
+    # Kunci cache dibaca LANGSUNG dari generasinya, bukan dicari dengan SCAN: Redis uji
+    # bersama memuat puluhan ribu kunci, dan SCAN-nya memakan detik — di gerbang penuh
+    # itu menelan margin 1 dtk yang diuji, dan mutasi "tanpa margin" lolos (Sprint 3).
+    generasi = await izin.redis.get(f"{izin.awalan}:izin:{uid}:generasi")
+    kunci = f"{izin.awalan}:izin:{uid}:{generasi}:agent:coach-agent:habits:read"
+    # Waktu habis MUTLAK (Redis 7 `PEXPIRETIME`) dibandingkan dengan `expires_at` izinnya —
+    # tidak bergantung pada berapa lama uji ini berjalan sebelum membacanya.
+    habis = await izin.redis.pexpiretime(kunci)
+    assert habis > 0, "keputusan tidak di-cache"
+    sampai_ms = (sampai - datetime(1970, 1, 1, tzinfo=UTC)) // timedelta(milliseconds=1)
+    assert habis <= sampai_ms - 1_000, (
+        f"cache hidup lebih lama dari izinnya: habis {sampai_ms - habis} ms sebelum izinnya "
+        "(margin 1.000)"
+    )
 
     # Menunggu menurut jam BASIS DATA, bukan tidur 3,3 dtk jam hos: di bawah beban,
     # jam VM Docker Desktop tertinggal dan izinnya belum kedaluwarsa di sana — uji

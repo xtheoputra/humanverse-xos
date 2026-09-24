@@ -258,6 +258,17 @@ Redis (satu mesin di V0). Uji regresinya menyisipkan jeda 1,2 dtk; mutasi yang
 mengembalikan umur relatif merah — dan enam mutasi 1.5 lama dipindah ke kode
 barunya.
 
+🔴 **Gerbang penuh berikutnya menemukan dua penegak yang lemah — kodenya benar,
+ujinya tidak.** **(a)** Uji margin cache mencari kuncinya dengan `SCAN` di Redis
+uji bersama yang memuat ±52 ribu kunci: pemindaiannya memakan detik, dan `PTTL`
+yang dibaca sesudahnya sudah kehilangan margin 1 dtk yang diuji — mutasi *“tanpa
+margin”* lolos. Kini kuncinya dibaca **langsung** dari generasinya, dan waktu
+habisnya dibandingkan **mutlak** (`PEXPIRETIME` lawan `expires_at`). **(b)** Asersi
+M22 (*scope yang ditolak tidak dilaporkan perlu izin*) ditulis `perlu_izin == []` —
+terlalu lebar: mutasi 3.7 *“manifest tidak membatasi”* ikut merah di sana dengan
+alasan yang salah. Kini `"mood" not in perlu_izin`, dan kedua mutasi merah pada
+alasannya masing-masing.
+
 #### Yang TIDAK dibetulkan di Sprint 3
 
 | Temuan | Kenapa | Ke mana |

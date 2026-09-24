@@ -601,7 +601,9 @@ async def test_agent_tanpa_izin_scope_tidak_menerima_barisnya(
     )
     assert ditolak.items == [], "scope yang ditolak pengguna tetap diserahkan"
     assert "mood" not in ditolak.scope_dipakai
-    assert ditolak.perlu_izin == [], "scope yang DITOLAK dilaporkan perlu izin — ditanya lagi"
+    assert "mood" not in ditolak.perlu_izin, (
+        "scope yang DITOLAK dilaporkan perlu izin — ditanya lagi"
+    )
 
     # 3 · scope yang tidak diminta manifest — izin pengguna tidak melebarkan manifest
     await izin.tetapkan(uid, COACH, "journal_raw", "read", "allow")
