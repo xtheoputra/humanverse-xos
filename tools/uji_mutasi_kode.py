@@ -224,6 +224,7 @@ _UJI_ID_SAMA = (
 UJI_KETAT_RUTE = "tests/unit/test_masukan_ketat_semua_rute.py"
 UJI_BALAPAN = "tests/integration/test_batas_dan_balapan.py"
 UJI_BADAN = "tests/unit/test_batas_badan.py"
+UJI_EVENT = "tests/integration/test_event.py"
 FK_MILESTONE = (
     "  FOREIGN KEY (goal_id, user_id) REFERENCES goals (id, user_id) ON DELETE CASCADE" + NL + ");"
 )
@@ -3323,6 +3324,74 @@ MUTASI: list[Mutasi] = [
         _flutter_uji("test/layar/habit_hari_ini_test.dart", _UJI_TENGAH_MALAM),
         harus_memuat=_UJI_TENGAH_MALAM + " [E]",
         cwd=APLIKASI,
+    ),
+    # ── Sprint 3 · 3.1 events + amplop + idempotensi ─────────────────────
+    Mutasi(
+        "3.1",
+        "event tanpa ON CONFLICT — event ganda menjadi galat, bukan ditelan",
+        [
+            Sunting(
+                f"{MODUL}/events/repository.py",
+                "    ON CONFLICT (user_id, idempotency_key) DO NOTHING" + NL,
+                "",
+            )
+        ],
+        _pytest(f"{UJI_EVENT}::test_event_ganda_ditelan_sebagai_sukses"),
+        harus_memuat="IntegrityError",
+        kelompok="db",
+    ),
+    Mutasi(
+        "E-3",
+        "uji admisi tidak memeriksa sumber — `sensor` sampai ke basis data",
+        [
+            Sunting(
+                f"{MODUL}/events/penerbit.py",
+                "    if source not in SUMBER:",
+                '    if source not in SUMBER | {"sensor"}:',
+            )
+        ],
+        _pytest(f"{UJI_EVENT}::test_uji_admisi_menolak_sebelum_menyentuh_basis_data"),
+        harus_memuat="IntegrityError",
+        kelompok="db",
+    ),
+    Mutasi(
+        "3.1",
+        "kunci yang sama untuk kejadian lain ditelan diam-diam",
+        [Sunting(f"{MODUL}/events/penerbit.py", "    if not sama:", "    if False:")],
+        _pytest(f"{UJI_EVENT}::test_kunci_sama_untuk_kejadian_lain_ditolak_keras"),
+        harus_memuat="DID NOT RAISE",
+        kelompok="db",
+    ),
+    Mutasi(
+        "3.1",
+        "registry kode menambah jenis event yang tidak ada di spec/03",
+        [
+            Sunting(
+                f"{MODUL}/events/kontrak.py",
+                '    "checkin.logged": (1, CheckinDicatat),',
+                '    "checkin.logged": (1, CheckinDicatat),'
+                + NL
+                + '    "habit.deleted": (1, HabitDilewati),',
+            )
+        ],
+        _pytest("tests/unit/test_kontrak_event.py::test_registry_sama_dengan_baris_v0_spec03"),
+        harus_memuat="hanya di kode: ['habit.deleted']",
+    ),
+    Mutasi(
+        "3.1",
+        "payload journal.created menerima medan lain — isi jurnal bisa masuk event",
+        [
+            Sunting(
+                f"{MODUL}/events/kontrak.py",
+                "class JurnalDibuat(_Payload):" + NL,
+                "class JurnalDibuat(_Payload):"
+                + NL
+                + '    model_config = ConfigDict(extra="allow")'
+                + NL,
+            )
+        ],
+        _pytest("tests/unit/test_kontrak_event.py::test_isi_jurnal_tidak_pernah_masuk_event"),
+        harus_memuat="DID NOT RAISE",
     ),
 ]
 
