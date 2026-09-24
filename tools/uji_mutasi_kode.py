@@ -300,6 +300,7 @@ UJI_PELAKSANA = "tests/unit/test_pelaksana_alat.py"
 UJI_ALAT = "tests/integration/test_alat_v0.py"
 UJI_KEPUTUSAN = "tests/unit/test_keputusan_agent.py::test_keputusan_rusak_ditolak"
 UJI_RUNTIME = "tests/integration/test_runtime_agent.py"
+UJI_GERBANG = "tests/integration/test_gerbang_risiko.py"
 FK_MILESTONE = (
     "  FOREIGN KEY (goal_id, user_id) REFERENCES goals (id, user_id) ON DELETE CASCADE" + NL + ");"
 )
@@ -5800,8 +5801,8 @@ MUTASI: list[Mutasi] = [
         [
             Sunting(
                 f"{MODUL}/agents/runtime.py",
-                '            dict(keputusan.aksi) if keputusan is not None else {"action": status}',
-                '            {"action": status}',
+                '            dict(keputusan.aksi) if keputusan is not None else dict(aksi or {"action": status})',
+                '            dict(aksi or {"action": status})',
             )
         ],
         _pytest(f"{UJI_RUNTIME}::test_run_mencatat_tools_scope_decision_confidence_cost"),
@@ -5884,7 +5885,7 @@ MUTASI: list[Mutasi] = [
         [
             Sunting(
                 f"{MODUL}/agents/runtime.py",
-                '            await self._tutup(\n                j, status, None, {"code": _kode_galat(galat), "type": type(galat).__name__}, mulai\n            )\n',
+                '            await self._tutup(\n                j,\n                status,\n                None,\n                {"code": _kode_galat(galat), "type": type(galat).__name__},\n                mulai,\n                aksi=_aksi_tertahan(galat) if status == "blocked" else None,\n            )\n',
                 "",
             )
         ],
@@ -5986,6 +5987,229 @@ MUTASI: list[Mutasi] = [
         ],
         _pytest(f"{UJI_RUNTIME}::test_run_anak_tidak_bisa_menunjuk_run_pengguna_lain"),
         harus_memuat="IntegrityError",
+        kelompok="db",
+    ),
+    # ── Sprint 4 · 4.5 gerbang risiko: risk 2 minta izin sekali; risk 3 minta setiap kali ──
+    Mutasi(
+        "4.5",
+        "R2 dijalankan tanpa bertanya — bawaan allow untuk semua risiko",
+        [
+            Sunting(
+                f"{MODUL}/agents/gerbang.py",
+                '            "allow" if delegasi or alat.risk_level <= RISIKO_BAWAAN_IZINKAN else "ask"',
+                '            "allow"',
+            )
+        ],
+        _pytest(f"{UJI_GERBANG}::test_risk_2_minta_izin_sekali"),
+        harus_memuat="gerbang tidak menahan — dijalankan tanpa bertanya",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.5",
+        "delegasi ditanya sendiri — satu permintaan ditanya dua kali",
+        [
+            Sunting(
+                f"{MODUL}/agents/gerbang.py",
+                '            "allow" if delegasi or alat.risk_level <= RISIKO_BAWAAN_IZINKAN else "ask"',
+                '            "allow" if alat.risk_level <= RISIKO_BAWAAN_IZINKAN else "ask"',
+            )
+        ],
+        _pytest(f"{UJI_GERBANG}::test_delegasi_tidak_ditanya_dua_kali"),
+        harus_memuat="delegasi ditanyakan sendiri",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.5",
+        "izin R2 yang disetujui tidak diingat — ditanya lagi tiap giliran",
+        [
+            Sunting(
+                f"{MODUL}/agents/konfirmasi.py",
+                '            await mesin_izin.tetapkan(user_id, subjek, scope, p.aksi, "allow")',
+                "            pass",
+            )
+        ],
+        _pytest(f"{UJI_GERBANG}::test_risk_2_minta_izin_sekali"),
+        harus_memuat="menunggu izin pengguna",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.5",
+        "R3 lolos tanpa konfirmasi bila izinnya allow",
+        [
+            Sunting(
+                f"{MODUL}/agents/gerbang.py",
+                "        konfirmasi = not delegasi and alat.risk_level >= RISIKO_KONFIRMASI",
+                "        konfirmasi = False",
+            )
+        ],
+        _pytest(f"{UJI_GERBANG}::test_risk_3_minta_setiap_kali"),
+        harus_memuat="gerbang tidak menahan — dijalankan tanpa bertanya",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.5",
+        "konfirmasi R3 bisa diingat — tidak lagi ditanya tiap kali",
+        [
+            Sunting(
+                f"{MODUL}/agents/konfirmasi.py",
+                '    if jawaban == "izinkan_selalu" and p.jenis != "izin":',
+                "    if False:",
+            )
+        ],
+        _pytest(f"{UJI_GERBANG}::test_risk_3_minta_setiap_kali"),
+        harus_memuat="DID NOT RAISE",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.5",
+        "konfirmasi pengguna tidak tercatat di run",
+        [
+            Sunting(
+                f"{MODUL}/agents/gerbang.py",
+                "        if disetujui:\n            jalannya.dikonfirmasi = True\n",
+                "",
+            )
+        ],
+        _pytest(f"{UJI_GERBANG}::test_risk_3_minta_setiap_kali"),
+        harus_memuat="konfirmasi pengguna tidak tercatat di run",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.5",
+        "deny pengguna tidak menolak",
+        [
+            Sunting(
+                f"{MODUL}/agents/gerbang.py", '        if "deny" in keputusan:', "        if False:"
+            )
+        ],
+        _pytest(f"{UJI_GERBANG}::test_deny_ditolak_dan_dicatat"),
+        harus_memuat="DID NOT RAISE",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.5",
+        "penolakan gerbang tidak tercatat di audit",
+        [
+            Sunting(
+                f"{MODUL}/agents/gerbang.py",
+                '                aksi="agent.tool_denied",',
+                '                aksi="agent.tool_skipped",',
+            )
+        ],
+        _pytest(f"{UJI_GERBANG}::test_deny_ditolak_dan_dicatat"),
+        harus_memuat="penolakan tidak tercatat",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.5",
+        "R4 bisa dikonfirmasi — tidak DENY",
+        [
+            Sunting(
+                f"{MODUL}/agents/gerbang.py",
+                "        if alat.risk_level >= RISIKO_TERLARANG:",
+                "        if False:",
+            )
+        ],
+        _pytest(f"{UJI_GERBANG}::test_risk_4_ditolak_tanpa_bertanya"),
+        harus_memuat="R4 bisa dikonfirmasi",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.5",
+        "persetujuan berpindah ke pemanggilan lain — sidik masukan tidak dibandingkan",
+        [
+            Sunting(
+                f"{MODUL}/agents/gerbang.py",
+                "            p.agent == jalannya.agent.name and p.alat == alat.name and p.sidik == sidik",
+                "            p.agent == jalannya.agent.name and p.alat == alat.name",
+            )
+        ],
+        _pytest(f"{UJI_GERBANG}::test_persetujuan_tidak_berpindah_ke_pemanggilan_lain"),
+        harus_memuat="gerbang tidak menahan — dijalankan tanpa bertanya",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.5",
+        "persetujuan giliran tidak diwarisi run anak",
+        [
+            Sunting(
+                f"{MODUL}/agents/runtime.py",
+                "            persetujuan=persetujuan if induk is None else induk.persetujuan,",
+                "            persetujuan=persetujuan,",
+            )
+        ],
+        _pytest(f"{UJI_GERBANG}::test_delegasi_tidak_ditanya_dua_kali"),
+        harus_memuat="menunggu izin pengguna",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.5",
+        "jawaban konfirmasi bisa dipakai dua kali",
+        [
+            Sunting(
+                f"{MODUL}/agents/repository.py",
+                "    WHERE id = :id AND status = 'blocked' AND confirmed_by_user IS NULL",
+                "    WHERE id = :id AND status = 'blocked'",
+            )
+        ],
+        _pytest(f"{UJI_GERBANG}::test_jawaban_sekali_pakai"),
+        harus_memuat="KonfirmasiTerjawab",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.5",
+        "jawaban pengguna tidak tercatat di audit",
+        [
+            Sunting(
+                f"{MODUL}/agents/konfirmasi.py",
+                '            aksi="agent.action_approved" if setuju else "agent.action_rejected",',
+                '            aksi="agent.action_noted",',
+            )
+        ],
+        _pytest(f"{UJI_GERBANG}::test_risk_2_minta_izin_sekali"),
+        harus_memuat="jawaban pengguna tidak tercatat",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.5",
+        "token milik pengguna lain diterima",
+        [
+            Sunting(
+                f"{MODUL}/agents/konfirmasi.py",
+                '        if d["u"] != str(user_id):',
+                "        if False:",
+            )
+        ],
+        _pytest(f"{UJI_GERBANG}::test_token_milik_pengguna_lain_ditolak"),
+        harus_memuat="KonfirmasiTerjawab",  # lapis kedua (RLS) menahan, dengan galat yang salah
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.5",
+        "tanda tangan token tidak diperiksa",
+        [
+            Sunting(
+                f"{MODUL}/agents/konfirmasi.py",
+                "        if not hmac.compare_digest(self._penanda(isi), tanda):",
+                "        if False:",
+            )
+        ],
+        _pytest(f"{UJI_GERBANG}::test_token_yang_diubah_ditolak"),
+        harus_memuat="token yang tanda tangannya diubah diterima",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.5",
+        "token kedaluwarsa diterima",
+        [
+            Sunting(
+                f"{MODUL}/agents/konfirmasi.py",
+                '        if d["e"] < time.time():',
+                "        if False:",
+            )
+        ],
+        _pytest(f"{UJI_GERBANG}::test_token_kedaluwarsa_ditolak"),
+        harus_memuat="token kedaluwarsa diterima",
         kelompok="db",
     ),
     # ── alat ini sendiri: bytecode mutan tidak tertinggal sesudah dipulihkan ──

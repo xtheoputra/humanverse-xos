@@ -15,6 +15,7 @@ from uuid import UUID
 
 from hvx.modules import platform
 
+from .konfirmasi import PersetujuanAksi
 from .registri import Manifest
 
 Pemicu = Literal["user", "schedule", "event", "agent"]
@@ -30,6 +31,8 @@ class Jalannya:
     percakapan_id: UUID | None = None
     # Baris `agent_runs`-nya sudah ada (4.4) — rujukan (FK) ke run ini baru sah sesudahnya.
     tersimpan: bool = False
+    # Pemanggilan yang disetujui pengguna untuk giliran ini (4.5) — diwarisi run anak.
+    persetujuan: frozenset[PersetujuanAksi] = field(default_factory=frozenset)
     alat_dipakai: list[str] = field(default_factory=list)
     scope_dipakai: set[str] = field(default_factory=set)
     risiko_tertinggi: int | None = None

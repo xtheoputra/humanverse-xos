@@ -393,8 +393,8 @@ jalankan · catat agent_runs · catat audit_logs
 > (E-167, tinjauan Sprint 1). Mesin izin 1.5 semula menjawab `ask` untuk *tanpa
 > baris* dan untuk *`ask` yang disetel pengguna* — gerbang tidak bisa menerapkan
 > risk 0 · 1 → `allow` tanpa menimpa pilihan *“tanya aku”*. Mesin izin kini
-> menerima `MesinIzin.cek(…, bawaan=…)`; gerbang risiko (tugas 4.5, **belum
-> ada**) memanggilnya dengan bawaan per risk. Keputusan tersimpan yang **belum
+> menerima `MesinIzin.cek(…, bawaan=…)`; gerbang risiko (tugas 4.5,
+> `agents.GerbangRisiko`) memanggilnya dengan bawaan per risk. Keputusan tersimpan yang **belum
 > kedaluwarsa** — termasuk `ask` — menang atas bawaan itu. **R ≥ 3 tidak
 > terpengaruh**: konfirmasi manusia diminta sebelum mesin izin ditanya, jadi
 > `allow` yang tersimpan tidak pernah melewatinya.
@@ -402,6 +402,39 @@ jalankan · catat agent_runs · catat audit_logs
 > V0 tidak punya satu pun tool level 3 atau 4. Itu disengaja: janji *"Act
 > selalu di bawah kontrol pengguna"* paling mudah ditepati dengan tidak
 > memberi agent kemampuan yang belum perlu.
+
+> 🔧 **Gerbang V0 (tugas 4.5, 24 Sep 2026) — `agents.GerbangRisiko`, ditanya pelaksana
+> tool untuk tiap pemanggilan.** Urutan yang ditegakkan, dan dua bedanya dari diagram
+> di atas:
+>
+> 1. **R4 → DENY**, tanpa konfirmasi ([`../arch/04`](../arch/04-DEPENDENCY-GRAPH.md) §3,
+>    H-21 — *irreversible*); tercatat.
+> 2. **Mesin izin per scope** yang disentuh pemanggilan itu (scope masukan
+>    `memory.write`, selainnya `scopes` tool), subjek = agent pemanggil, aksi menurut
+>    `kind` (`read` · `write` · `execute`). **`deny` → tolak & catat**
+>    (`audit_logs` `agent.tool_denied`) — 🔧 *sebelum* konfirmasi R3: meminta manusia
+>    mengonfirmasi aksi yang toh akan ditolak hanya membuang perhatiannya.
+> 3. **R3 → konfirmasi setiap kali**, bahkan bila izinnya `allow`.
+> 4. **`ask` → minta izin**. Jawabannya tiga: `izinkan_selalu` (izin `allow` disimpan
+>    per scope — *minta izin sekali*; tidak tersedia untuk R3), `izinkan_sekali`
+>    (hanya pemanggilan ini), `tolak`.
+>
+> Yang ditahan: run-nya `blocked`, dan pengguna menerima permintaan **bertanda tangan**
+> (HMAC berlabel `HVX_IP_HASH_KEY`, 15 menit) yang memuat agent, tool, risiko, scope,
+> dan **sidik** masukannya — bukan masukannya: tulisan pengguna tidak masuk token,
+> jejak audit, maupun Redis. Jawabannya **sekali pakai** (`agent_runs.confirmed_by_user`
+> run yang ditahan) dan tercatat (`agent.action_approved` · `agent.action_rejected`).
+> Giliran yang disetujui **diulang dari awal** dengan persetujuan itu; gerbang
+> meloloskan pemanggilan yang agent, tool, dan sidik masukannya sama — dan hanya itu.
+> Persetujuan diwarisi run anak (orchestrator → agent).
+>
+> 🔧 **Delegasi tidak ditanyakan sendiri (E-192).** K-14 membuat pemanggilan agent
+> lain melewati gerbang ini; dibaca harfiah bersama *“risk 2 minta izin”*, satu
+> permintaan (*“tandai lari selesai”*) ditanya **dua kali** — delegasi `agent.habit`
+> (R2), lalu tulisan `habit.complete` (R2). Pemanggilan `kind: agent` karena itu
+> berbawaan `allow` dan tanpa konfirmasi R3 — yang berisiko adalah tool di dalamnya,
+> yang ditanyakan di run agent itu sendiri; R4, `deny`, dan `ask` yang **disetel**
+> pengguna untuk delegasinya tetap berlaku.
 
 > 🔧 **Gerbang di atas adalah bentuk V0 dari rantai kanonik 12 gerbang**
 > [`../arch/04`](../arch/04-DEPENDENCY-GRAPH.md) §3. Yang belum ada di V0 —

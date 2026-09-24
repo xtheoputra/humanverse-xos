@@ -35,6 +35,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 from hvx.modules import memory, platform
 
 from .jalannya import Jalannya
+from .konfirmasi import PermintaanKonfirmasi
 from .registri import Alat, RegistriAgent
 
 _JENDELA_S = {"min": 60, "hour": 3_600}
@@ -43,11 +44,21 @@ _TANGGAL = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 class AlatDitolak(RuntimeError):
     """Pemanggilan tool tidak dijalankan. `kode` — `tidak_terdaftar` · `bukan_alat_agent` ·
-    `masukan_salah` · `terlalu_sering` · keputusan gerbang (4.5). Pesannya tanpa isi masukan."""
+    `masukan_salah` · `scope_di_luar_manifest` · `terlalu_sering` · keputusan gerbang (4.5:
+    `perlu_izin` · `perlu_konfirmasi` membawa `konfirmasi`). Pesannya tanpa isi masukan."""
 
-    def __init__(self, kode: str, pesan: str) -> None:
+    def __init__(
+        self,
+        kode: str,
+        pesan: str,
+        *,
+        alat: str | None = None,
+        konfirmasi: PermintaanKonfirmasi | None = None,
+    ) -> None:
         super().__init__(pesan)
         self.kode = kode
+        self.alat = alat
+        self.konfirmasi = konfirmasi
 
 
 class AlatGagal(RuntimeError):

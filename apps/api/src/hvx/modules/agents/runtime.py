@@ -38,6 +38,7 @@ from hvx.modules import memory, platform
 
 from . import repository
 from .jalannya import Jalannya, Pemicu
+from .konfirmasi import PersetujuanAksi
 from .pelaksana_alat import AlatDitolak, AlatGagal, LayananAlat, PelaksanaAlat
 from .registri import RegistriAgent
 
@@ -104,6 +105,22 @@ Pendengar = Callable[[str, Mapping[str, Any]], Awaitable[None]]
 
 class ProgramAgent(Protocol):
     async def __call__(self, k: KonteksAgent, pesan: str) -> Keputusan: ...
+
+
+def _aksi_tertahan(galat: BaseException) -> dict[str, NilaiAksi]:
+    """`decision` run yang ditahan gerbang — tool apa, menunggu apa; tanpa masukannya."""
+    if not isinstance(galat, AlatDitolak):  # pragma: no cover - `blocked` hanya dari AlatDitolak
+        return {"action": "blocked"}
+    if galat.konfirmasi is None:
+        return {"action": "denied", "tool": galat.alat, "code": galat.kode}
+    k = galat.konfirmasi
+    return {
+        "action": "awaiting_confirmation",
+        "tool": k.alat,
+        "agent": k.agent,
+        "risk_level": k.risk_level,
+        "jenis": k.jenis,
+    }
 
 
 def _kode_galat(galat: BaseException) -> str:
@@ -225,6 +242,7 @@ class RuntimeAgent:
         pemicu: Pemicu,
         induk: Jalannya | None = None,
         percakapan_id: UUID | None = None,
+        persetujuan: frozenset[PersetujuanAksi] = frozenset(),
     ) -> Jalannya:
         """Tulis baris `agent_runs` (`running`) — id-nya sah dirujuk sejak saat ini."""
         manifest = self.registri.agent.get(agent)
@@ -232,7 +250,15 @@ class RuntimeAgent:
             raise ValueError(f"agent {agent} tidak punya program di runtime ini")
         if induk is not None and (induk.user_id != user_id or not induk.tersimpan):
             raise ValueError("run induk milik pengguna lain, atau belum tersimpan")
-        j = Jalannya(uuid4(), user_id, manifest, pemicu, induk=induk, percakapan_id=percakapan_id)
+        j = Jalannya(
+            uuid4(),
+            user_id,
+            manifest,
+            pemicu,
+            induk=induk,
+            percakapan_id=percakapan_id,
+            persetujuan=persetujuan if induk is None else induk.persetujuan,
+        )
         async with platform.transaksi_pengguna(self.engine, user_id) as conn:
             await repository.mulai_run(
                 conn,
@@ -267,7 +293,12 @@ class RuntimeAgent:
                 else "failed"
             )
             await self._tutup(
-                j, status, None, {"code": _kode_galat(galat), "type": type(galat).__name__}, mulai
+                j,
+                status,
+                None,
+                {"code": _kode_galat(galat), "type": type(galat).__name__},
+                mulai,
+                aksi=_aksi_tertahan(galat) if status == "blocked" else None,
             )
             raise
         await self._tutup(j, "succeeded", keputusan, None, mulai)
@@ -283,9 +314,15 @@ class RuntimeAgent:
         induk: Jalannya | None = None,
         percakapan_id: UUID | None = None,
         pendengar: Pendengar | None = None,
+        persetujuan: frozenset[PersetujuanAksi] = frozenset(),
     ) -> HasilRun:
         j = await self.mulai(
-            user_id, agent, pemicu=pemicu, induk=induk, percakapan_id=percakapan_id
+            user_id,
+            agent,
+            pemicu=pemicu,
+            induk=induk,
+            percakapan_id=percakapan_id,
+            persetujuan=persetujuan,
         )
         return await self.lanjutkan(j, pesan, pendengar=pendengar)
 
@@ -296,9 +333,11 @@ class RuntimeAgent:
         keputusan: Keputusan | None,
         galat: Mapping[str, Any] | None,
         mulai: float,
+        *,
+        aksi: Mapping[str, NilaiAksi] | None = None,
     ) -> None:
         keputusan_run: dict[str, NilaiAksi] = (
-            dict(keputusan.aksi) if keputusan is not None else {"action": status}
+            dict(keputusan.aksi) if keputusan is not None else dict(aksi or {"action": status})
         )
         async with platform.transaksi_pengguna(self.engine, j.user_id) as conn:
             tertutup = await repository.selesai_run(

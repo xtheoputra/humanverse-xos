@@ -40,6 +40,14 @@ _SELESAI_RUN = text(
     WHERE id = :id AND status = 'running'
     """
 )
+# Jawaban pengguna atas run yang ditahan gerbang (4.5) — SEKALI: hanya run `blocked`
+# yang belum dijawab.
+_JAWAB_RUN = text(
+    """
+    UPDATE agent_runs SET confirmed_by_user = :setuju
+    WHERE id = :id AND status = 'blocked' AND confirmed_by_user IS NULL
+    """
+)
 _BACA_RUN = text(
     """
     SELECT id, agent_id, agent_version, conversation_id, parent_run_id, trigger, status,
@@ -145,3 +153,9 @@ async def selesai_run(
 async def baca_run(conn: AsyncConnection, run_id: UUID) -> BarisRun | None:
     baris = (await conn.execute(_BACA_RUN, {"id": run_id})).mappings().first()
     return None if baris is None else BarisRun(**baris)
+
+
+async def jawab_run(conn: AsyncConnection, run_id: UUID, setuju: bool) -> bool:
+    """False = run itu tidak menunggu jawaban (sudah dijawab, tidak ditahan, bukan miliknya)."""
+    hasil = await conn.execute(_JAWAB_RUN, {"id": run_id, "setuju": setuju})
+    return hasil.rowcount == 1

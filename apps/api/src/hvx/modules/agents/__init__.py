@@ -11,7 +11,19 @@ Berkas ini satu-satunya pintu keluar modul (spec/06 aturan 1).
 
 from .alat_v0 import IMPLEMENTASI
 from .deterministik import CARA_MENGISI_MOOD, HasilDeterministik, jalankan_deterministik
+from .gerbang import GerbangRisiko
 from .jalannya import Jalannya, Pemicu
+from .konfirmasi import (
+    UMUR_TOKEN_S,
+    JawabanKonfirmasi,
+    KonfirmasiTerjawab,
+    KonfirmasiTidakSah,
+    PermintaanKonfirmasi,
+    PersetujuanAksi,
+    TokenKonfirmasi,
+    jawab_konfirmasi,
+    sidik_masukan,
+)
 from .niat import MoodDiminta, Niat, kenali
 from .pelaksana_alat import (
     AlatDitolak,
@@ -55,16 +67,21 @@ __all__ = [
     "IMPLEMENTASI",
     "KODE_GERBANG",
     "RUANG_ID_AGENT",
+    "UMUR_TOKEN_S",
     "Alat",
     "AlatDitolak",
     "AlatGagal",
     "Gerbang",
+    "GerbangRisiko",
     "HasilDeterministik",
     "HasilRun",
     "Jalannya",
+    "JawabanKonfirmasi",
     "KatalogBerbeda",
     "Keputusan",
     "KeputusanTidakSah",
+    "KonfirmasiTerjawab",
+    "KonfirmasiTidakSah",
     "KonteksAgent",
     "KonteksAlat",
     "LayananAlat",
@@ -76,11 +93,15 @@ __all__ = [
     "Pelanggaran",
     "Pemicu",
     "Pendengar",
+    "PermintaanKonfirmasi",
+    "PersetujuanAksi",
     "ProgramAgent",
     "RegistriAgent",
     "RegistriTidakSah",
     "RuntimeAgent",
+    "TokenKonfirmasi",
     "jalankan_deterministik",
+    "jawab_konfirmasi",
     "kenali",
     "manifest_json",
     "muat_registri",
@@ -89,5 +110,6 @@ __all__ = [
     "periksa_keputusan",
     "periksa_masukan",
     "scope_panggilan",
+    "sidik_masukan",
     "validasi_registri",
 ]
