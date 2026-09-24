@@ -30,11 +30,301 @@ Diperbarui: 24 September 2026 · Mencakup **dua puluh empat naskah**:
 | [H](#h-sudah-diputuskan--ditutup) | **Sudah diputuskan / ditutup** | 27 |
 | [A](#a-perlu-jawaban-pemilik) | Pertanyaan yang memblokir | 26 |
 | [B](#b-risiko-teknis) | Risiko teknis | 42 |
-| [C](#c-risiko-hukum--kepatuhan) | Risiko hukum & kepatuhan | 30 |
+| [C](#c-risiko-hukum--kepatuhan) | Risiko hukum & kepatuhan | 33 |
 | [D](#d-celah-yang-belum-tertutup) | Celah yang belum tertutup | 5 |
 | [E](#e-ketidakcocokan-antar-naskah) | **Ketidakcocokan antar-naskah** | 162 |
 | [F](#f-yang-sudah-saya-periksa-dan-ternyata-benar) | Sudah diperiksa, ternyata benar | 136 |
 | [G](#g-lubang-di-dalam-naskah-sendiri) | Lubang di dalam naskah sendiri | 21 |
+
+---
+
+## 🔨 Sprint 3 dikodekan (24 Sep 2026) — apa yang berubah bagi berkas ini
+
+Sprint 3 (`spec/07` 3.1–3.8, *Memory & event*) dikerjakan di branch
+`v0/sprint-3-memory-event`, **di atas** branch Sprint 2 (PR #165) yang masih
+menunggu HUMAN REVIEW — satu commit per tugas (**K-18**), lalu satu commit
+untuk seluruh perbaikan tinjauan. Keadaan tiap *“Selesai bila”*, tanpa
+dibulatkan, ada di [`../spec/07`](../spec/07-BACKLOG-V0.md) Sprint 3. Tiga keputusan didelegasikan baru: **K-25** (relay & grup konsumen),
+**K-26** (penyemat lokal berkunci), **K-27** (memori episodik) —
+[`KEPUTUSAN-DIDELEGASIKAN.md`](KEPUTUSAN-DIDELEGASIKAN.md).
+
+> 🔑 **Pola E-42 untuk kelima kalinya** — dan kali ini bukan rute, melainkan
+> **daftar**: `spec/05` aturan 2 merujuk *“daftar scope resmi”* sejak versi
+> pertamanya, dan daftar itu tidak pernah ditulis sampai tugas 3.7 harus
+> memeriksanya (E-180).
+
+### 🔴 E-177 — tiga contoh kunci idempotensi `spec/03` menelan koreksi
+
+Kunci harus mengidentifikasi **kejadian**; tiga contoh lama mengidentifikasi
+sesuatu yang lebih kasar — `habit:<habit_id>:<for_date>` (penyelesaian yang
+dibatalkan lalu dicatat lagi), `mood:<user_id>:<menit>` (dua mood dalam satu
+menit), `goal:<goal_id>` (goal yang dibuka lagi lalu tercapai lagi). Aturan
+**D** `spec/02` (*“kalau berbeda, event yang benar”*) lalu membenarkan yang
+salah. ✅ **Dibetulkan** di [`../spec/03`](../spec/03-EVENT-CONTRACTS.md): kunci
+mengikuti **baris** yang lahir (`completion_id`, `mood_id`) atau **keadaan**
+yang lahir (`achieved_at`, `updated_at` check-in).
+
+### 🔴 E-178 — pembatalan penyelesaian habit tidak meninggalkan jejak
+
+`spec/04` punya `DELETE /habits/{id}/completions/{for_date}`, tetapi tidak satu
+event pun mencatat bahwa penyelesaian **dibatalkan**: proyeksi yang dibangun
+ulang dari `events` menghidupkan kembali hari yang tidak pernah dijalankan.
+✅ **Dibetulkan:** `habit.completion_retracted` — event V0 ke-9 (event ke-23), lulus
+uji [`../arch/07`](../arch/07-EVENT-CONTRACTS.md) §7 dengan alasan terbalik:
+pembatalan sebelum event ini ada tidak bisa diterbitkan belakangan, barisnya
+sudah terhapus.
+
+### 🔴 E-179 — `spec/06` aturan 6 menuntut event yang tidak ada
+
+*“Setiap tulisan ke tabel yang punya event padanan”* menuntut event untuk tiap
+`PATCH` judul goal — 23 event `spec/03` tidak punya satu pun jenisnya. ✅
+**Dipersempit:** tidak ada **fakta perilaku** yang lolos tanpa event; tulisan
+konfigurasi (judul, jadwal, hapus-lunak) tidak — peta lengkapnya di
+[`../spec/06`](../spec/06-MODULE-BOUNDARIES.md), ditegakkan
+`test_penerbitan_event.py`.
+
+### 🔴 E-180 — “daftar scope resmi” dirujuk, tidak pernah ditulis
+
+`spec/05` aturan 2 menolak manifest yang meminta scope di luar *daftar resmi*;
+tugas 3.7 (*“agent tanpa izin scope tidak menerima barisnya”*) butuh daftar
+yang sama sebagai pembanding. Daftarnya tidak ada di `spec/`, `arch/`, maupun
+kode — mesin izin 1.5 menerima scope apa pun yang berbentuk `snake_case`. ✅
+**Dibetulkan:** enam scope V0 di [`../spec/05`](../spec/05-AGENT-CONTRACTS.md)
+(*Daftar scope resmi V0*), satu sumber di kode (`identity.SCOPE_RESMI`), mesin
+izin **menolak** scope di luar daftar, dan `journal_raw` **sensitif** — tidak
+pernah `allow` karena bawaan, hanya karena keputusan yang disimpan pengguna.
+Dua koreksi ikut: aturan 6 kini juga menyebut `journal_raw` (larangan untuk
+pihak ketiga semula dilewati dengan meminta scope mentahnya), dan kolom *Memory
+write* `memory-agent` berisi nama **tabel** `memories`, bukan scope.
+
+### 🔴 E-181 — penegak yang buta: kueri daftar jurnal boleh memuat `body`
+
+Ditemukan **uji mutasi**, bukan tinjauan: mengubah kueri `GET /journal`
+supaya memilih `body` **lolos seluruh suite** — skema jawaban
+`RingkasanJurnal` menyaringnya, jadi tidak ada jawaban HTTP yang berubah.
+Tetapi docstring repository menjanjikan lebih: *isi tulisan pribadi tidak
+pernah sampai ke memori proses untuk permintaan yang tidak membutuhkannya*.
+✅ **Ditegakkan:** `test_kueri_daftar_tidak_membaca_body_dari_basis_data`
+membaca SQL yang benar-benar sampai ke PostgreSQL; mutasinya kini merah.
+
+### 🔍 Tinjauan adversarial sebelum PR — tiga lensa serentak
+
+Keamanan (5 terbukti **S1–S5**, 2 pertanyaan pemilik) dan kontrak (9 terbukti
+**K1–K9**, 3 pertanyaan pemilik), tiap temuan dibuktikan **merah** terhadap
+PostgreSQL, Redis, dan Qdrant sungguhan; dan **penegak buta** — 68 kerusakan
+dicoba di salinan, **49 lolos seluruh suite** (bagian terakhir di bawah). Tiap
+temuan kode dibuktikan merah dulu, lalu dijaga mutasi di
+`tools/uji_mutasi_kode.py` (kode tugasnya; maksud berawalan `S1:` … `K8:`).
+Label S/K dipakai apa adanya di kode dan di
+[`KEPUTUSAN-DIDELEGASIKAN.md`](KEPUTUSAN-DIDELEGASIKAN.md).
+
+#### 🔴 E-182 — satu kunci penyemat untuk semua pengguna: akun biasa membaca vektor orang lain (S1)
+
+K-26 mengakui harga *“perbandingan, bukan pembacaan kata”* — dan dengan SATU
+kunci untuk semua pengguna, perbandingan itu adalah serangan kamus. Penyerang
+yang bisa membaca Qdrant (ancaman yang K-26 jaga: Qdrant tanpa RLS) cukup
+mendaftar akun biasa dan menulis jurnal satu kata serta mood untuk tiap
+pasangan (valensi, label) — server menyematnya dengan kunci yang sama. Diuji:
+korban mencatat mood {2, *“cemas”*} dan jurnal enam kata; kamus 20 kata
+membaca **mood dan keenam katanya**, tanpa pernah menyentuh kunci. ✅
+**Dibetulkan:** kunci turunan per pengguna `HMAC(kunci, user_id)`
+(`Penyemat.untuk`); penyemat proses sendiri tidak menyemat apa pun. Teks yang
+sama dari dua akun kini berkosinus ±0 (diuji `|kos| < 0,3`).
+
+#### 🔴 E-183 — penyelaras: event loop pekerja ditahan, kunci baris ditahan selama Qdrant, vektor lama ditandai cocok (S2 · K3)
+
+Penyelaras versi pertama menyemat 200 baris **di dalam** transaksi
+`FOR UPDATE`, di event loop yang sama dengan relay dan konsumen: 40 jurnal
+100 ribu karakter dari SATU pengguna menahan event loop 6,5 dtk — dan
+`PATCH /journal` menunggu Qdrant yang lambat 3 dtk, padahal Qdrant dijanjikan
+tidak pernah ada di jalan pengguna. ✅ **Dibetulkan:** tiga langkah tanpa kunci
+baris — baca (beserta `sha256` isinya) → semat di thread, paling banyak 20.000
+karakter pertama, lalu kirim → tandai tersemat **hanya** baris yang isinya
+masih sama dengan sidiknya; yang berubah di antaranya disemat ulang putaran
+berikutnya.
+
+#### 🔴 E-184 — pencarian memercayai keadaan Qdrant yang basi; `model_version` dipakai ulang (K2 · K4)
+
+**(a)** Sesudah `PATCH /journal`, vektor lama tinggal di Qdrant sampai
+penyelaras lewat — dan pencarian mencocokkan kata yang sudah dihapus
+pemiliknya (*“daftar belanja sayur”*, skor 0,43). **(b)** Titik memori yang
+sudah dihapus memakan jatah kandidat 3× yang diambil sekali: hasil yang sah
+hilang. **(c)** Nama penyemat ditulis ke `memories.model_version` — kolom yang
+[`../arch/README.md`](../arch/README.md) sediakan untuk ambang keyakinan #34 —
+dan tiap suntingan mengosongkannya. ✅ **Dibetulkan:** kolom `embedding_model`
+sendiri (`spec/01` + migrasi 0006); pencarian membaca ulang baris dengan
+`embedding_model` = penyemat ini, dan mengambil kandidat per halaman sampai
+`batas` baris sah terkumpul (paling banyak 5 halaman).
+
+#### 🔴 E-185 — penanda relay: satu kunci per event selama 24 jam, dan kiriman ulang sesudah 24 jam sepi (S3 · K1)
+
+Tiap event meninggalkan `…:relay:terkirim:<id>` 24 jam, padahal jendela yang
+membacanya 60 dtk: batas laju per pengguna (432 ribu event sehari) = ±52 MB per
+akun di Redis `noeviction` yang sama dengan sesi — pola yang **K-24 (d)** tolak
+untuk `Idempotency-Key`. Dan karena jendela belakang dihitung dari **kursor**,
+relay yang sepi 24 jam (wajar bagi V0) mengirim ulang menit terakhirnya:
+konsumen *wajib* Sprint 5 (Behavior projector, Habit streak) akan menghitung
+dua kali. ✅ **Dibetulkan:** satu himpunan terurut (`ZADD NX`, skor
+`recorded_at`) di skrip Lua yang sama dengan `XADD`, dipangkas menurut kursor —
+bukan menurut jam.
+
+#### 🔴 E-186 — peran api yang menghadap internet bisa memanggil fungsi pekerja (S4)
+
+`events_untuk_relay` dan `memori_perlu_diselaraskan` diberikan ke `hvx_app`, dan
+api serta pekerja memakai login yang sama: injeksi SQL di proses api membaca
+**linimasa semua pengguna** (pengguna · jenis · waktu) melewati RLS. Diuji: 139
+event dari 6 pengguna. ✅ **Dibetulkan:** peran `hvx_pekerja` (hanya `EXECUTE`
+kedua fungsi) dengan login pekerja sendiri; api **menolak mulai** sebagai
+anggotanya, pekerja menolak mulai tanpanya (**B-40** berlaku bagi keduanya);
+`occurred_at` dibuang dari hasil fungsi relay — tidak dibaca siapa pun.
+
+#### 🔴 E-187 — masukan: `jsonb` tanpa batas kedalaman, `ended_at` tanpa aturan, admisi event yang mengoersi (S5 · K5 · K7)
+
+Payload aktivitas 600 byte bersarang 100 tingkat lolos validasi,
+**tersimpan**, lalu jawabannya gagal diserialisasi — dan sejak itu
+`GET /v1/activities` pengguna itu 500, tanpa rute untuk menghapus barisnya.
+`ended_at` 2999 dengan `duration_seconds` 60 tersimpan — dua fakta tentang
+satu aktivitas yang saling membantah — dan `spec/04` tidak mengenal `ended_at`
+maupun `?source=`. Uji admisi event menerima `valence: true` sebagai 1: kelas
+**E-170** di sisi penerbit. ✅ **Dibetulkan:** kedalaman `jsonb` ≤ 32
+(`platform.tanpa_nul_bersarang`); `ended_at` masa depan → `422`, rentang > 7
+hari atau durasi yang membantahnya → `400`, dan kontraknya di `spec/04`;
+payload event `strict=True`.
+
+#### 🔴 E-188 — dokumen, dan klaim *“dibuktikan”* yang tidak dibuktikan uji (K6 · K8 · K9)
+
+Peta aturan 6 `spec/06` tidak menyebut tiga tulisan yang tidak menerbitkan
+event (`POST /activities`, `PATCH`/`DELETE /journal`). *“Galat penerbitan
+membatalkan tulisannya”* hanya diuji untuk goals — penerbit jurnal yang menelan
+galatnya lolos 332 uji. *“`spec/05` dan `SCOPE_RESMI` di PR yang sama”* tanpa
+uji yang membaca `spec/05`. *“Proses `hvx.pekerja` diuji sebagai proses”* —
+padahal `main()` yang tidak memanggil apa pun lolos. `spec/README` dan `spec/03`
+masih *“22 event”*, dan `completion_id` disebut *id buatan klien*. ✅
+**Dibetulkan:** tiga tulisan itu tercatat di `spec/06` beserta alasannya; uji
+batal-bila-gagal untuk **tiap** baris peta; `test_scope_resmi.py` membaca tabel
+`spec/05`; `python -m hvx.pekerja` dijalankan sebagai proses; hitungan dan
+kalimatnya dibetulkan.
+
+#### 🔴 Penegak buta — 49 dari 68 kerusakan lolos seluruh suite
+
+Peninjau ketiga merusak kode e7b9c53 di salinan, satu kerusakan per percobaan,
+menjalankan uji yang relevan lalu **seluruh** suite: 19 kerusakan kendali
+tertangkap, 49 tidak. Yang paling mahal:
+
+| Kerusakan yang lolos | Kenapa tidak ada uji yang merah |
+|---|---|
+| kunci yang sama untuk **subjek** atau **jenis** lain ditelan sebagai kiriman ulang | uji tabrakan hanya mengubah payload |
+| relay tidak menyimpan kursornya | penanda menutupi kiriman ulangnya — sampai penanda itu dipangkas |
+| bawaan konsumen `min_idle_ms` 0 · `maks_kirim` 50 (`spec/03`: 30 dtk · 5 kali) | tiap uji menimpa keduanya |
+| pesan yang event-nya sudah tidak ada (akun dihapus) tidak di-ACK | tidak ada uji yang menghapus akun di antara relay dan konsumen |
+| pekerja tidak pernah memangkas stream; putaran yang gagal diulang tanpa jeda | uji pekerja berhenti jauh sebelum putaran ke-60 |
+| memori yang `valid_until`-nya lewat diserahkan; hasil melebihi `batas`; urutan terbalik | data uji: satu memori, tanpa `valid_until` |
+| koreksi waktu jurnal tidak menggeser memorinya; ubah judul saja tidak menyelaraskannya | uji sunting hanya mengubah `body` |
+| `PATCH`/`DELETE` jurnal yang sudah dihapus; `?from=`; halaman terurut naik | uji daftar memakai jurnal yang ditulis bersamaan |
+| `mood.logged` membawa waktu tercatat; check-in dibandingkan sebagai `Decimal`; `PUT` serentak tanpa kunci baris | data uji tanpa `occurred_at` mundur, tanpa `sleep_hours` pecahan, tanpa penulis serentak |
+| kunci API Qdrant di kepala `api_key`; penyemat peka huruf besar; koleksi `Euclid` dipakai | Qdrant uji tanpa kunci; kueri uji selalu huruf kecil |
+
+✅ **Dibetulkan:** satu uji per kerusakan — merah pada kerusakannya,
+dibuktikan **46 mutasi baru**. Tiga tidak berlaku lagi karena desainnya sudah
+diganti tinjauan: penanda ber-TTL (M07 · M08, kini E-185) dan
+`FOR UPDATE SKIP LOCKED` penyelaras (M19, kini E-183). Tidak ada mutan yang
+diterima sebagai setara: saringan `model` di Qdrant (M21) — yang tampak
+berlebih karena baris PostgreSQL memeriksanya lagi — dipatok lewat saringan
+yang benar-benar dikirim ke Qdrant.
+
+🔴 **Dan satu cacat alat ukur:** mutasi *“pekerja mulai tanpa peran
+`hvx_pekerja`”* membuat ujinya **menggantung** — pekerja yang tidak menolak
+berjalan terus — dan seluruh putaran mutasi berhenti di sana sampai dimatikan
+tangan. ✅ Ujinya kini menghentikan pekerja sesudah 10 dtk (*DID NOT RAISE*,
+bukan menggantung), dan `uji_mutasi_kode.py` menghentikan tiap mutasi sesudah
+600 dtk beserta **pohon** prosesnya — peluncur `python.exe` venv di Windows
+menjalankan interpreter sebagai proses anak yang memegang pipa keluaran
+(dibuktikan mutasi `alat`).
+
+#### 🔴 E-189 — cache izin sementara melewati izinnya saat sistem sibuk (ditemukan uji yang berkedip)
+
+Gerbang penuh pertama sesudah perbaikan tinjauan merah di satu uji **Sprint 1**
+yang lulus bila dijalankan sendiri:
+`test_cache_izin_sementara_tidak_hidup_lebih_lama_dari_izinnya`. Penyebabnya
+bukan ujinya. Umur cache izin sementara dihitung **relatif** saat basis data
+dibaca (`sisa − 1 dtk`), lalu ditulis ke Redis sesudahnya — jeda tulis > 1 dtk
+di sistem yang sibuk membuat `allow` yang sudah habis tetap dijawab dari cache.
+Docstring-nya sudah mengakuinya (*“jeda di atas sedetik … tetap bisa
+melewatinya”*); diukur: jeda 1,2 dtk di antara membaca dan menulis → `allow`
+sesudah `expires_at`. ✅ **Dibetulkan:** cache izin sementara berakhir pada waktu
+**mutlak** menurut jam basis data (`SET … PXAT`), jadi jeda apa pun tidak
+memperpanjangnya; margin 1 dtk kini hanya menyerap selisih jam PostgreSQL dan
+Redis (satu mesin di V0). Uji regresinya menyisipkan jeda 1,2 dtk; mutasi yang
+mengembalikan umur relatif merah — dan enam mutasi 1.5 lama dipindah ke kode
+barunya.
+
+🔴 **Gerbang penuh berikutnya menemukan dua penegak yang lemah — kodenya benar,
+ujinya tidak.** **(a)** Uji margin cache mencari kuncinya dengan `SCAN` di Redis
+uji bersama yang memuat ±52 ribu kunci: pemindaiannya memakan detik, dan `PTTL`
+yang dibaca sesudahnya sudah kehilangan margin 1 dtk yang diuji — mutasi *“tanpa
+margin”* lolos. Kini kuncinya dibaca **langsung** dari generasinya, dan waktu
+habisnya dibandingkan **mutlak** (`PEXPIRETIME` lawan `expires_at`). **(b)** Asersi
+M22 (*scope yang ditolak tidak dilaporkan perlu izin*) ditulis `perlu_izin == []` —
+terlalu lebar: mutasi 3.7 *“manifest tidak membatasi”* ikut merah di sana dengan
+alasan yang salah. Kini `"mood" not in perlu_izin`, dan kedua mutasi merah pada
+alasannya masing-masing.
+
+🔴 **Gerbang ketiga menemukan bahwa uji regresi E-189 sendiri sempit.** Jeda 1,2 dtk
+dikurangi margin 1 dtk menyisakan **200 ms** jendela: di gerbang yang sibuk,
+pemeriksaan sesudah izinnya kedaluwarsa sempat jatuh sesudah cache mutan *“umur
+relatif”* ikut habis, dan mutasinya lolos. Kini uji itu lebih dulu membaca waktu
+habis cache-nya **mutlak** (`PEXPIRETIME` lawan `expires_at`, seperti uji margin) —
+mutan melewati izinnya ±1,2 dtk, terbaca tanpa bergantung pada kapan uji sempat
+memeriksa.
+
+🔴 **Dan gerbang berikutnya menemukan cacat di alat ukurnya sendiri.** Tahap
+`pytest` merah di satu kasus yang lulus bila dijalankan sendiri — `valence 0`
+lolos uji admisi — padahal sumbernya `ge=1`. Penyebabnya bytecode: mutasi
+`ge=1` → `ge=0` berukuran **sama**, dan dipulihkan di **detik yang sama**, jadi
+`.pyc` mutannya cocok dengan berkas aslinya (Python hanya memeriksa detik mtime
+dan ukuran) — tahap uji sesudahnya menjalankan kode mutan. ✅ Perintah mutasi kini
+berjalan tanpa menulis bytecode (`PYTHONDONTWRITEBYTECODE=1`), dan pemulihan
+membuang `.pyc` tiap berkas yang dimutasi; keduanya dibuktikan uji dan mutasi `alat`.
+
+#### Yang TIDAK dibetulkan di Sprint 3
+
+| Temuan | Kenapa | Ke mana |
+|---|---|---|
+| Teks bebas di payload event (`note`, `reason`, judul, label) tinggal di `events` sesudah dicabut pemiliknya | bentuk payload kontrak `spec/03`; hukum & privasi | **C-33** |
+| Catatan mood dibaca agent ber-scope `mood` dengan bawaan `allow` | apakah `mood` sensitif — hukum & privasi | **C-32** |
+| `journal.created` tetap di riwayat sesudah jurnalnya dihapus | bagian dari retensi jurnal | **C-31** |
+| Enkripsi sematan sebelum jurnal disimpan di Qdrant | catatan naskah 145 — kunci per pengguna (E-182) mempersempit, tidak menjawabnya | butir C |
+
+### 🔒 Yang dijaga lebih ketat daripada yang diminta
+
+* **Isi memori tidak pernah ke Redis maupun ke payload Qdrant** — stream membawa
+  rujukan (K-25), titik Qdrant hanya `user_id · scope · kind · model` (diuji).
+* **Vektor tidak bisa dibaca tanpa kunci** (K-26) — dan kuncinya per pengguna
+  (E-182): kamus yang disemat akun lain tidak sebanding. Rancangan pemilik menyemat
+  jurnal (naskah [`84`](84-DATABASE-ARCHITECTURE.md) `journal_embeddings`);
+  *feature hashing* tanpa kunci bisa dibalik dengan kamus, dan Qdrant tidak
+  punya RLS. Catatan di naskah [`145`](145-DATA-VAULT-ENKRIPSI-PRIVACY-AI.md)
+  bahwa sematan tidak ikut terenkripsi **tetap terbuka** — itu keputusan
+  pemilik (butir C).
+* **Jurnal yang dihapus mengosongkan memorinya SEKETIKA**, di transaksi
+  hapusnya; titik vektor dan barisnya dibuang penyelaras sesudah commit
+  (naskah [`139`](139-PRIVACY-DELETION-RETENTION.md): *tidak boleh hanya
+  menghapus row di PostgreSQL*). Jurnalnya sendiri tetap hapus-lunak — **C-31**.
+* **Tiga saringan pencarian, masing-masing sanggup menahan sendiri** —
+  manifest, keputusan pengguna, dan baris PostgreSQL yang dibaca ulang di bawah
+  RLS (payload Qdrant bisa basi, dan vektornya juga — E-184; diuji dengan
+  keduanya).
+
+### ⚠️ Yang sengaja TIDAK diputuskan di Sprint 3
+
+* **C-31** — hapus jurnal menyimpan isinya sampai akun dihapus.
+* **C-32** — `mood` bukan scope sensitif; pihak ketiga tidak dilarang memintanya.
+* **C-33** — teks bebas di payload event tidak bisa dicabut pemiliknya.
+* Enkripsi sematan (catatan naskah 145) — butir C.
+* Ambang keyakinan untuk bertindak (#34) — K-27 memilih **nilai** memori
+  episodik, bukan ambangnya.
+* Memori **turunan** (fakta, preferensi) — butuh penyedia model (A-6/#18).
+* Status `memory-agent` di percakapan (4.7) — [`../arch/08`](../arch/08-AGENT-CONTRACTS.md) §2.2.
 
 ---
 
@@ -1006,6 +1296,9 @@ Diurutkan dari yang paling menghambat.
 
 | # | Catatan |
 |---|---|
+| C-33 | 🆕 **Teks bebas di payload event tidak bisa dicabut pemiliknya** (tinjauan keamanan Sprint 3, dibuktikan). `spec/03` memasukkan teks bebas ke payload: `note` penyelesaian habit, `reason` habit dilewati, `title` habit & goal, `label` mood. Tabel `events` **hanya-tambah** (aturan C `spec/02`, `hvx_app` tanpa `UPDATE`/`DELETE`), jadi teks itu tinggal di sana sampai akunnya dihapus — juga sesudah pemiliknya **membatalkan** penyelesaiannya (`DELETE …/completions`, E-178) atau mengganti judulnya. Diuji: alasan lewat *“kambuh, dirawat di RS jiwa”* bertahan di `events` sesudah penyelesaiannya dicabut. Alasan yang membuat isi jurnal **tidak pernah** masuk event (`spec/03`: event mengalir ke banyak konsumen) berlaku juga di sini, dan `spec/03` sendiri tidak menerapkannya. Yang perlu dijawab pemilik: **(a)** apakah payload event boleh membawa teks bebas sama sekali, atau cukup rujukan (`completion_id`) dan konsumen membaca teksnya di bawah RLS seperti isi jurnal; **(b)** kalau boleh, berapa lama teks yang sudah dicabut pemiliknya disimpan. Tidak diputuskan di kode: bentuk payload adalah kontrak `spec/03` yang diturunkan dari naskah 5 §7. |
+| C-32 | 🆕 **`mood` tidak sensitif — dan aturan 6 `spec/05` tidak melarang pihak ketiga memintanya.** Daftar scope resmi V0 (**E-180**) menandai hanya `journal_raw` sensitif, karena `spec/05` memberi `coach-agent` bacaan `mood` **tanpa** izin eksplisit (tool `mood.recent` risk 0 → `allow`). Tetapi mood yang dilaporkan — valensi, label *“cemas”*, catatan bebas — dekat dengan **data kesehatan jiwa**, dan aturan 6 hanya melarang `journal` · `journal_raw` · `finance` · `health`. Yang perlu dijawab pemilik: **(a)** apakah `mood` termasuk `health` bagi aturan 6 (agent pihak ketiga dilarang memintanya), dan **(b)** apakah ia sensitif (coach pun butuh `allow` yang disimpan pengguna). Tidak diputuskan di Sprint 3 — pihak ketiga belum ada di V0, jadi tidak ada yang bocor hari ini. ⚠️ Diperberat tinjauan keamanan Sprint 3: memori mood memuat **catatan bebas** (`note`) mood itu — agent mana pun yang manifest-nya menyebut `mood` membacanya dengan bawaan risk 0 (`allow`). Bertaut **C-3** ([#21](../../issues/21)) dan **C-25**. |
+| C-31 | 🆕 **Menghapus jurnal menyimpan isinya sampai akun dihapus.** `DELETE /journal/{id}` adalah hapus-lunak (`journal_entries.deleted_at`, bentuk `spec/01`), dan retensi tabelnya `until-account-deleted` — `@on-delete: hard` menjawab **hapus akun**, bukan hapus satu baris ([`../arch/06`](../arch/06-DATA-ARCHITECTURE.md) §5). Akibatnya tulisan paling pribadi (Level 3 *Sensitive*, naskah [`133`](133-DATA-CLASSIFICATION.md)) yang dihapus pemiliknya **tetap tersimpan, bisa bertahun-tahun**. Sprint 3 sudah mengosongkan **memori turunannya** seketika (K-27) — tetapi retensi jurnal itu sendiri milik pemilik. Pilihan: **(a)** hapus-keras seketika; **(b)** hapus-lunak dengan jendela batal (mis. 30 hari, seperti hapus akun), lalu dikosongkan; **(c)** tetap seperti sekarang — dan Privacy Center (6.4) wajib menyatakannya. Yang sama berlaku untuk hapus-lunak goal & habit, tetapi isinya bukan tulisan bebas. ⚠️ Dan event `journal.created` (hanya `word_count`) tetap di riwayat sesudah jurnalnya dihapus: apakah fakta *pernah menulis jurnal* ikut dicabut — bentuk E-178 untuk jurnal — bagian dari pertanyaan yang sama (`spec/06`, tinjauan kontrak Sprint 3 K6). Bertaut **C-9** ([#22](../../issues/22)). |
 | C-30 | 🆕🛑🛑🛑 **Fungsi utilitas menetapkan harga bagi hal yang ditanggung orang lain — dan *“dikontrol manusia”* tidak menjawab MANUSIA YANG MANA.** §20.9: `Utility = Benefit − Risk − Cost − **Externality** + **Resilience**`. ⭐⭐⭐⭐ Kedua suku yang ditebalkan justru yang paling sering ditinggalkan: eksternalitas tidak muncul di neraca siapa pun, dan `Resilience` bertanda **plus** — ketahanan sebagai nilai, bukan biaya efisiensi. ⭐⭐⭐ Dan *“utility weight harus dapat dikontrol manusia”* tepat sasaran: pada rumus lima suku, **bobotnyalah yang memutuskan**. 🔴 Tetapi lima suku itu **bersatuan berbeda** (uang · peluang×dampak · kerugian pihak ketiga · sifat sistem), sehingga penjumlahannya menuntut nilai tukar — dan **nilai tukar itulah keputusan yang sebenarnya**. 🔴🔴 Pertanyaan yang belum ditanyakan: *“dikontrol manusia”* menjawab **bukan mesin**, bukan **siapa**. Pada skala peradaban, **yang menetapkan bobot dan yang menanggung `Externality` hampir tidak pernah orang yang sama** — itu justru definisi eksternalitas. ⭐ Naskah ini punya dua bahan penutupnya: **§20.17 menaruh `Stakeholders` sebagai gerbang** dan **§20.18 menghasilkan `Affected Stakeholders`** sebagai keluaran; §20.35 bahkan menaruh `IMPACT ASSESSMENT` **sebelum** `HUMAN APPROVAL`, sehingga yang menyetujui melihat daftar terdampak lebih dulu. Usul: **bobot utilitas tidak sah tanpa daftar pihak terdampak, dan pilihan yang memindahkan biaya ke pihak yang tidak menyetel bobotnya memerlukan persetujuan terpisah.** 🔴 **Tiga bentuk lain dari masalah yang sama di naskah ini:** **(a)** §20.6 menjadikan **`Family` tingkat kembaran** — anggota keluarga tidak punya akun, tidak memberi persetujuan, dan sebagian **tidak bisa** memberi persetujuan (anak, orang yang dirawat); enam sumbu kedaulatan §20.13 mengandaikan **satu orang memutuskan untuk dirinya**, dan tidak ada bentuk untuk data yang menyangkut beberapa orang. **(b)** §20.21 menaruh **`Human Labor` di daftar sumber daya yang akan *dioptimalkan*** — bentuk **C-27**/[#122](../../issues/122) pada skala terbesarnya: §8.10 menutup *menilai*, belum menutup *mengoptimalkan*, dan yang kedua lebih jauh. ⭐ Penawarnya ditulis naskah ini sendiri: §20.22 menaruh **`Human Wellbeing` sebagai suku PERTAMA** fungsi tujuannya ⇒ **manusia adalah TUJUAN fungsi itu, bukan suku di dalam masukannya.** **(c)** §20.34 menaruh **`Government / Institution` sebagai simpul setara** sementara graf §20.4 memuat `Human`, `Family`, `Community` — sepuluh pasal Konstitusi mengikat **agent**, tidak ada yang mengikat **penerima** di seberang batas (bentuk **C-26**/[#118](../../issues/118) pada mitra yang jauh lebih kuat). ⚠️ Dan §20.22 adalah **fungsi tujuan KEDUA** di naskah yang sama, beririsan dengan §20.9 **hanya pada `Resilience`** — dua rumus untuk *apa yang dianggap baik*, tanpa satu pun menyatakan hubungannya. Lihat [`268`](268-SIMULATION-SCENARIO-DAN-DECISION-INTELLIGENCE.md) & [`271`](271-IMPACT-RESILIENCE-CRISIS-DAN-RESOURCE-INTELLIGENCE.md). |
 | C-29 | 🆕🛑🛑🛑 **Ethics & Safety dijadwalkan PALING AKHIR untuk naskah KEEMPAT berturut-turut — di fase yang menamai `Biosecurity` dan `Dangerous Capability`, dan yang MENGGERAKKAN MATERI FISIK.** §19.22 menyebut dirinya ***“komponen wajib”***; §19.33 menaruhnya di `S19.10`, terakhir dari sepuluh. Lintasannya tetap: naskah 20 `R16.10` ([#111](../../issues/111)) → naskah 21 `H17.12` di luar MVP ([#116](../../issues/116)) → naskah 22 **nol milestone** ([#121](../../issues/121)) → naskah 23 `S19.10`. 🔴🔴 **Yang menjadikannya kelas tersendiri: §19.15 Digital Laboratory** — `robotic pipette · liquid handler · experiment scheduler`, dengan *“HumanVerse **mengirimkan protocol** ke lab automation”*. Rantainya, disambung dari §19.2: `Hypothesis (mesin) → Experiment Planning (mesin) → protocol → lab automation`. **Ini satu-satunya tempat di 23 naskah di mana HumanVerse menggerakkan materi fisik atas dasar kesimpulannya sendiri**, dan tiga pengaman absen: **`ACTION GATEWAY`/`GOVERNANCE MESH`** (§14.69 wajib — naskah **kelima** berturut-turut tanpanya) · **`Confirmation`** (**H-15**: wajib mulai R3; menjalankan protokol kimia tanpa orang di ruangan adalah kandidat R4 yang lebih jelas daripada membuka kunci pintu §16.13) · **§19.22 sendiri**. 🔴 **Dan §19.22 tidak berdiri di rantai mana pun**: bukan di §19.2, bukan di §19.11, bukan di lini masa §19.27 — sementara `Ethics Agent` §19.16 berdiri **sederet dengan** `Writing Agent`. *Pemeriksa yang menjadi saudara dari yang diperiksanya bukan gerbang, melainkan peserta.* ⭐ Bentuk benarnya sudah tercatat sebagai butir F: **§17.46 menaruh Safety Kernel DI DALAM runtime**, bukan di sampingnya. 🛑 **Ditambah §19.23 mencampur DUA SUMBU**: `Low · Medium · High` (derajat, berurutan) dijejalkan dengan `Human Subjects · Biosecurity · Dangerous Capability` (jenis, sejajar) ⇒ kuesioner anonim dan uji klinis sama-sama *“Human Subjects”* dan tidak bisa dibedakan. Usul: **`severity` × `category`**, bentuk yang §18.24 sudah pakai. ⚠️ Contoh paling konkretnya §19.29: **laboratorium pertama yang dipakai pemiliknya sendiri adalah yang mengumpulkan data TUBUH MANUSIA** (`WiFi CSI → Pose Research`) — menyentuh **C-22** ([#102](../../issues/102), Level 3–4) tanpa menyebutnya. ⭐⭐⭐⭐ **Dan jawabannya ditulis pemilik sendiri DUA BAGIAN sebelumnya**, di §19.23: ***“Semakin tinggi risiko, semakin ketat governance”*** — kalimat yang sama dengan penutup §17.56. ⇒ **Naskah ini memuat aturannya dan pelanggarannya sekaligus**, dan karena prinsip itu kini muncul di **dua naskah terpisah**, ia berhenti menjadi tafsir dan menjadi posisi pemiliknya. Lihat [`260`](260-SIMULATION-MONTE-CARLO-DAN-DIGITAL-LABORATORY.md) & [`263`](263-ETHICS-GOVERNANCE-SAFETY-LAYER-DATASET-DAN-MODEL-REGISTRY.md). |
 | C-28 | 🆕🛑🛑 **Early Warning System §18.25 MENGELUARKAN peringatan tanpa gerbang dan tanpa penerima yang ditentukan — dan dua dari event §18.5 adalah wabah dan gempa.** ⭐⭐ Yang benar lebih dulu: rantai enam langkah (`Signal → Anomaly → Pattern → Acceleration → Risk → Early Warning`) **mensyaratkan penumpukan bukti, bukan satu pemicu**, dan pemilik memberi **kalimat penggantinya** — *“Early warning detected”*, bukan *“This definitely will happen”* — kebiasaan ketiga naskah berturut-turut (§17.7, §17.16), dan larangan dengan pengganti bisa diperiksa. 🔴 Tetapi **peringatan ADALAH tindakan**, bukan informasi netral: peringatan keliru tentang kelangkaan pasokan menyebabkan penimbunan yang **menciptakan** kelangkaan itu; peringatan keliru tentang wabah atau bencana menyebabkan kepanikan, dan yang benar tetapi diabaikan lebih buruk lagi. Di banyak yurisdiksi peringatan bencana dan kesehatan masyarakat adalah **kewenangan yang diatur**, bukan fitur produk — dan §18.5 memberi `DiseaseOutbreakReported` · `EarthquakeDetected` · `StormFormed` berdiri sederet dengan `ProductLaunched`. Yang tidak ada: **siapa penerimanya** (satu pengguna? organisasi? kota?), **ambang mana yang memicu**, **apakah manusia meninjau sebelum keluar**, dan **apa yang terjadi ketika keliru**. ⚠️ Diperberat §18.32: `early warning` cuma sub-butir di dalam `G18.6`, jadi ia akan dibangun sebagai fitur pelaporan, bukan kewenangan yang butuh gerbang. ⭐ Bahannya lengkap dan tinggal disambung: **§17.38 tujuh kategori dengan escalation berjenjang** menjawab *“seberapa keras ini disampaikan dan ke mana diteruskan”*; §18.24 `Confidence`/`Horizon` menentukan ambangnya; **H-15** memberi aturan konfirmasi manusia. Usul minimum: **peringatan yang menyentuh keselamatan atau kesehatan publik tidak pernah keluar tanpa tinjauan manusia, dan tidak pernah melampaui orang yang datanya memicunya.** Lihat [`253`](253-SAFETY-KERNEL-INFORMATION-INTEGRITY-RISK-EARLY-WARNING.md). |

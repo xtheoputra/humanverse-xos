@@ -93,6 +93,26 @@ class Settings(BaseSettings):
     # bearer di tangan skrip asal mana pun bukan pilihan yang bisa diambil diam-diam.
     cors_origins: str = ""
 
+    # Basis data vektor memori (spec/07 3.5, ADR-003). Kosong = memori tanpa
+    # pencarian semantik: ekstraksi tetap menulis memori ke PostgreSQL, pekerja
+    # tidak menyemat, dan pencarian memori tidak tersedia — fitur lain tetap
+    # berjalan (Qdrant bukan ketergantungan autentikasi). Memori yang tertunda
+    # disemat penyelaras begitu Qdrant diisi.
+    qdrant_url: str | None = None
+    qdrant_api_key: SecretStr | None = None
+    qdrant_koleksi: str = Field(default="memories", pattern=r"^[a-z0-9][a-z0-9_-]{0,59}$")
+    # Kunci penyemat lokal (K-26) — WAJIB bila `qdrant_url` diisi: feature hashing
+    # tanpa kunci bisa dibalik dengan kamus, jadi vektor di Qdrant membocorkan kata
+    # isi jurnal. Mengganti kunci = seluruh memori disemat ulang (sidiknya ikut di
+    # nama penyemat, `memories.model_version`).
+    sematan_key: SecretStr | None = Field(default=None, min_length=32)
+
+    @model_validator(mode="after")
+    def _vektor_berkunci(self) -> Self:
+        if self.qdrant_url and self.sematan_key is None:
+            raise ValueError("HVX_SEMATAN_KEY wajib bila HVX_QDRANT_URL diisi (K-26)")
+        return self
+
     @field_validator("cors_origins")
     @classmethod
     def _asal_cors_persis(cls, nilai: str) -> str:

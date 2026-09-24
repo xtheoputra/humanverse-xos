@@ -10,7 +10,7 @@ import asyncio
 import uuid
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import psycopg
@@ -100,6 +100,21 @@ async def test_bawaan_pemanggil_hanya_untuk_yang_tanpa_keputusan_tersimpan(izin:
     assert await izin.mesin.cek(uid, COACH, "mood", "read", bawaan="allow") == "allow"
 
 
+async def test_scope_sensitif_tidak_pernah_allow_karena_bawaan(izin: Izin) -> None:
+    """E-180 · naskah 5 §15 — jurnal mentah *“tidak boleh otomatis”*: hanya `allow` yang
+    DISIMPAN pengguna sendiri membukanya, bukan bawaan risk 0 gerbang risiko."""
+    uid = izin.pengguna_baru()
+
+    for _ in range(2):  # yang kedua dari cache "tanpa keputusan"
+        assert await izin.mesin.cek(uid, COACH, "journal_raw", "read", bawaan="allow") == "ask", (
+            "journal_raw terbuka karena bawaan"
+        )
+    assert await izin.mesin.cek(uid, COACH, "mood", "read", bawaan="allow") == "allow"
+
+    await izin.mesin.tetapkan(uid, COACH, "journal_raw", "read", "allow")
+    assert await izin.mesin.cek(uid, COACH, "journal_raw", "read", bawaan="allow") == "allow"
+
+
 async def test_perubahan_izin_tidak_tersimpan_tanpa_jejak_audit(
     izin: Izin, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -160,10 +175,20 @@ async def test_cache_izin_sementara_tidak_hidup_lebih_lama_dari_izinnya(izin: Iz
     await izin.mesin.tetapkan(uid, COACH, "habits", "read", "allow", expires_at=sampai)
 
     assert await izin.mesin.cek(uid, COACH, "habits", "read") == "allow"
-    pola = f"{izin.awalan}:izin:{uid}:*:agent:coach-agent:habits:read"
-    umur = [await izin.redis.pttl(k) async for k in izin.redis.scan_iter(match=pola)]
-    assert umur, "keputusan tidak di-cache"
-    assert all(0 < u <= 2_000 for u in umur), f"cache hidup lebih lama dari izinnya: {umur} ms"
+    # Kunci cache dibaca LANGSUNG dari generasinya, bukan dicari dengan SCAN: Redis uji
+    # bersama memuat puluhan ribu kunci, dan SCAN-nya memakan detik — di gerbang penuh
+    # itu menelan margin 1 dtk yang diuji, dan mutasi "tanpa margin" lolos (Sprint 3).
+    generasi = await izin.redis.get(f"{izin.awalan}:izin:{uid}:generasi")
+    kunci = f"{izin.awalan}:izin:{uid}:{generasi}:agent:coach-agent:habits:read"
+    # Waktu habis MUTLAK (Redis 7 `PEXPIRETIME`) dibandingkan dengan `expires_at` izinnya —
+    # tidak bergantung pada berapa lama uji ini berjalan sebelum membacanya.
+    habis = await izin.redis.pexpiretime(kunci)
+    assert habis > 0, "keputusan tidak di-cache"
+    sampai_ms = (sampai - datetime(1970, 1, 1, tzinfo=UTC)) // timedelta(milliseconds=1)
+    assert habis <= sampai_ms - 1_000, (
+        f"cache hidup lebih lama dari izinnya: habis {sampai_ms - habis} ms sebelum izinnya "
+        "(margin 1.000)"
+    )
 
     # Menunggu menurut jam BASIS DATA, bukan tidur 3,3 dtk jam hos: di bawah beban,
     # jam VM Docker Desktop tertinggal dan izinnya belum kedaluwarsa di sana — uji
@@ -173,6 +198,47 @@ async def test_cache_izin_sementara_tidak_hidup_lebih_lama_dari_izinnya(izin: Iz
         assert asyncio.get_running_loop().time() < batas_tunggu, "jam basis data tidak bergerak"
         await asyncio.sleep(0.1)
     assert await izin.mesin.cek(uid, COACH, "habits", "read") == "ask"
+
+
+async def test_cache_yang_ditulis_terlambat_tidak_melewati_izin_sementaranya(
+    izin: Izin, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Sistem yang sibuk menulis cache lama sesudah basis data dibaca. Umur RELATIF yang
+    dihitung saat dibaca lalu memperpanjang cache sebesar jedanya: `allow` yang sudah
+    kedaluwarsa tetap dijawab dari Redis — uji di atas sempat merah karena itu di
+    gerbang penuh Sprint 3. Jeda 1,2 dtk di sini melebihi margin 1 dtk."""
+    asli = MesinIzin._baca_basis_data
+
+    async def lambat(self: MesinIzin, *a: Any, **k: Any) -> Any:
+        hasil = await asli(self, *a, **k)
+        await asyncio.sleep(1.2)  # di antara membaca basis data dan menulis Redis
+        return hasil
+
+    monkeypatch.setattr(MesinIzin, "_baca_basis_data", lambat)
+    uid = izin.pengguna_baru()
+    sampai = izin.jam_basis_data() + timedelta(seconds=3)
+    await izin.mesin.tetapkan(uid, COACH, "habits", "read", "allow", expires_at=sampai)
+    assert await izin.mesin.cek(uid, COACH, "habits", "read") == "allow"
+
+    # Diukur MUTLAK lebih dulu, seperti uji margin di atas. Jendela perilaku di bawah
+    # hanya jeda − margin = 200 ms: di gerbang penuh yang sibuk, pemeriksaannya sempat
+    # jatuh SESUDAH cache mutan "umur relatif" habis, dan mutasinya lolos (Sprint 3).
+    generasi = await izin.redis.get(f"{izin.awalan}:izin:{uid}:generasi")
+    kunci = f"{izin.awalan}:izin:{uid}:{generasi}:agent:coach-agent:habits:read"
+    sampai_ms = (sampai - datetime(1970, 1, 1, tzinfo=UTC)) // timedelta(milliseconds=1)
+    habis = await izin.redis.pexpiretime(kunci)
+    assert 0 < habis <= sampai_ms - 1_000, (
+        "cache yang ditulis terlambat melewati izin sementaranya: "
+        f"habis {habis - sampai_ms} ms terhadap izinnya"
+    )
+
+    batas_tunggu = asyncio.get_running_loop().time() + 30
+    while izin.jam_basis_data() <= sampai:
+        assert asyncio.get_running_loop().time() < batas_tunggu, "jam basis data tidak bergerak"
+        await asyncio.sleep(0.1)
+    assert await izin.mesin.cek(uid, COACH, "habits", "read") == "ask", (
+        "cache yang ditulis terlambat melewati izin sementaranya"
+    )
 
 
 async def test_hasil_di_cache_di_redis(izin: Izin) -> None:

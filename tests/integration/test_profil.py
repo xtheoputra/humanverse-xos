@@ -75,6 +75,13 @@ async def test_patch_hanya_mengubah_medan_yang_dikirim(api_uji: ApiUji) -> None:
     assert r.json()["preferences"] == {"tema": "gelap"}
 
 
+def _bersarang(dalam: int) -> dict[str, object]:
+    isi: object = "x"
+    for _ in range(dalam):
+        isi = {"a": isi}
+    return {"a": isi}
+
+
 @pytest.mark.parametrize(
     "badan",
     [
@@ -88,6 +95,10 @@ async def test_patch_hanya_mengubah_medan_yang_dikirim(api_uji: ApiUji) -> None:
         {"preferences": {"catatan": "a\u0000b"}},
         {"preferences": {"ku\u0000nci": "nilai"}},
         {"preferences": {"daftar": [{"dalam": "\u0000"}]}},
+        # Bersarang lebih dalam dari platform.KEDALAMAN_JSON_MAKS (tinjauan Sprint 3, S5):
+        # tersimpan, lalu tiap GET /v1/me menjadi 500 — serialisasi melewati batasnya.
+        {"preferences": _bersarang(33)},
+        {"preferences": {"daftar": [_bersarang(40)]}},
     ],
 )
 async def test_patch_yang_tidak_sah_ditolak_400_dan_tidak_menyentuh_apa_pun(

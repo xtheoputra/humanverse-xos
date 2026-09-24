@@ -53,6 +53,17 @@ _PADA = text(
     """
 )
 
+# Isi check-in SEBELUM PUT — dikunci sampai transaksi selesai, supaya "berubah
+# atau tidak" diputuskan terhadap baris yang tidak bisa berubah di tengahnya.
+_SEBELUM = text(
+    """
+    SELECT energy, focus, sleep_hours
+    FROM daily_checkins
+    WHERE user_id = :user_id AND for_date = :for_date
+    FOR UPDATE
+    """
+)
+
 _RENTANG = text(
     """
     SELECT id, for_date, energy, focus, sleep_hours, note, created_at, updated_at
@@ -119,6 +130,22 @@ async def simpan(
     # Isi sama persis dengan yang tersimpan — baris lama, tidak ditulis ulang.
     lama = (await conn.execute(_PADA, {"user_id": user_id, "for_date": for_date})).mappings().one()
     return HasilSimpan(_checkin(lama), baru=False)
+
+
+async def sebelum(
+    conn: AsyncConnection, user_id: UUID, for_date: date
+) -> tuple[int | None, int | None, float | None] | None:
+    """(energy, focus, sleep_hours) tanggal itu — `None` bila belum pernah check-in.
+
+    `sleep_hours` sebagai float, SAMA dengan `Checkin.sleep_hours` (E-170): yang
+    dibandingkan `service.simpan` harus bertipe sama — `Decimal("7.1") != 7.1`,
+    dan check-in yang identik akan terbaca "berubah" lalu menerbitkan event palsu.
+    """
+    b = (await conn.execute(_SEBELUM, {"user_id": user_id, "for_date": for_date})).first()
+    if b is None:
+        return None
+    tidur = float(b.sleep_hours) if b.sleep_hours is not None else None
+    return (b.energy, b.focus, tidur)
 
 
 async def rentang(

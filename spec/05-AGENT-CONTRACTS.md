@@ -61,10 +61,47 @@ Aturan validasi yang ditegakkan saat registrasi:
 | 3 🔧 | **Setiap tool di `tools:` wajib punya `risk_level <= max_risk`.** Manifest yang mendaftarkan tool lebih berisiko daripada pagunya **ditolak**. (Menggantikan aturan lama *“`risk_level >= 3` wajib punya `requires_confirmation`”* — [#52](../../issues/52) sudah memindahkan `requires_confirmation` ke Policy Engine.) |
 | 4 | `evaluation.gates.safety` **wajib** ada dan `>= 0.95`. |
 | 5 | Satu `name` hanya boleh punya **satu** baris `status: active`. |
-| 6 | `kind: third_party` **tidak boleh** meminta scope `journal`, `finance`, atau `health`. |
+| 6 | `kind: third_party` **tidak boleh** meminta scope `journal`, `journal_raw` 🔧, `finance`, atau `health`. |
 | 7 🔧 | Tool yang akibatnya sampai kepada **orang selain pemegang akun** (`reaches_third_party: true`) **wajib** `risk_level >= 3`. Manifest yang menurunkannya **ditolak**. |
 | 8 🔧 | Tool **tanpa** `risk_level` **ditolak** saat registrasi. **Tidak ada bawaan** — kelalaian berhenti di validator, bukan di produksi. |
 | 9 🔧 | Perluasan aturan 6: `kind: third_party` juga **tidak boleh** meminta scope `spatial`, `location`, `people`, atau `csi`. |
+
+## 🔧 Daftar scope resmi V0 (aturan 2 · E-180)
+
+> Ditambahkan 24 September 2026, saat tugas 3.7 ditulis. Aturan 2 merujuk
+> *“daftar scope resmi”* sejak versi pertama berkas ini — tetapi daftarnya
+> **tidak pernah ditulis di mana pun**, jadi tidak satu penegak pun bisa
+> memeriksanya, dan pencarian memori 3.7 (*“agent tanpa izin scope tidak
+> menerima barisnya”*) tidak punya pembanding.
+
+| Scope | Isi | Sensitif ⁽¹⁾ | Dibaca manifest V0 |
+|---|---|---|---|
+| `habits` | habit dan penyelesaiannya | — | coach · habit · memory |
+| `goals` | goal dan milestone | — | coach · memory |
+| `checkins` | check-in harian: energi, fokus, jam tidur | — | coach · memory |
+| `mood` | mood yang dilaporkan, dan memori episodiknya (3.6) | — | coach · memory |
+| `coaching_notes` | catatan yang ditulis `coach-agent` | — | coach · memory |
+| `journal_raw` | isi jurnal apa adanya, dan memori episodiknya (3.6) | ✅ | **tidak satu pun** |
+
+⁽¹⁾ **Sensitif = tidak pernah `allow` karena bawaan.** Hanya keputusan `allow`
+yang disimpan pengguna sendiri (`PUT /privacy/permissions/…`, 6.x) yang
+membukanya — bukan bawaan risk 0·1 gerbang risiko. Naskah 5 §15: *private
+journal* ada di daftar **tidak boleh otomatis**, bahkan bagi agent yang bekerja
+di atasnya. Ditegakkan di satu tempat: mesin izin (`identity.MesinIzin.cek`).
+
+Daftar ini **mengikat tiga penegak**: mesin izin menolak keputusan atas scope di
+luar daftar (1.5); pencarian memori menolak manifest yang memintanya (3.7);
+registry agent menolak manifest-nya (4.2, aturan 2). Sumber kodenya satu:
+`identity.SCOPE_RESMI` — scope baru masuk **di sini dulu**, lalu di sana, di PR
+yang sama.
+
+> 🔧 **Dua koreksi yang ikut (E-180).** **(a)** Aturan 6 melarang pihak ketiga
+> meminta `journal` — tetapi scope yang benar-benar ada di V0 adalah
+> `journal_raw`, yang **lebih** sensitif; tanpa menyebutnya, larangan itu
+> dilewati dengan meminta scope mentahnya. **(b)** Kolom *Memory write*
+> `memory-agent` di bawah berisi `memories` — nama **tabel**, bukan scope, dan
+> aturan 2 menolak manifest yang menuliskannya. Diganti dengan cakupan yang
+> setara dengan kolom baca-nya.
 
 > Aturan 6 adalah penegakan **C-7/A-15** di lapisan yang paling murah:
 > selama marketplace belum punya proses review, sandbox, dan perjanjian
@@ -232,7 +269,7 @@ Tool V0 — **9 tool + 3 entri `kind: agent`**:
 | `orchestrator-agent` | **R2** ⁽¹⁾ | `agent.coach` · `agent.habit` · `agent.memory` (**`kind: agent`**, K-14) | — | — |
 | `coach-agent` | R1 | habit.list, habit.streak, goal.list, checkin.get, mood.recent, memory.search, recommendation.create | habits, goals, checkins, mood, coaching_notes | coaching_notes |
 | `habit-agent` | R2 | habit.list, habit.streak, habit.complete | habits | — |
-| `memory-agent` | R2 | memory.search, memory.write | semua scope **kecuali** `journal_raw` | memories |
+| `memory-agent` | R2 | memory.search, memory.write | semua scope **kecuali** `journal_raw` | semua scope **kecuali** `journal_raw` 🔧 |
 
 ⁽¹⁾ 🔧 **`orchestrator-agent` naik dari `risk_level: 0` ke `max_risk: R2`**, dan
 itu konsekuensi langsung aturan 3 yang baru: ia memanggil `agent.habit`
@@ -244,6 +281,14 @@ tidak dihitung sebagai tool.
 > Ia mengekstrak memori **dari** jurnal lewat pipeline tertutup, bukan dengan
 > membaca sesuka hati. Itu penerapan naskah 5 §15: *private journal* ada di
 > daftar DENY bahkan untuk agent yang bekerja di atasnya.
+>
+> 🔧 **Pipeline tertutup itu, di V0 (spec/07 3.6):** konsumen stream `memori`
+> di proses pekerja — **service**, bukan agent: ia selalu menulis keluaran
+> ekstraksinya dan tidak memilih tool (uji K-5 (a)(b) gagal). Itu menjawab
+> separuh pertanyaan [`../arch/08`](../arch/08-AGENT-CONTRACTS.md) §2.2 untuk
+> jalur ekstraksi; `memory-agent` di percakapan (4.7) diputuskan saat ditulis.
+> Tanpa model bahasa, yang diekstrak V0 hanya memori **episodik** — apa yang
+> dilaporkan atau ditulis pengguna, kapan (K-27).
 
 ---
 

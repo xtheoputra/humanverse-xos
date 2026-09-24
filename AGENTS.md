@@ -54,6 +54,7 @@ Coding Agent → Implementation → Unit Test → Integration Test
 ```
 apps/api/src/hvx/
 ├── main.py            titik rakit — satu-satunya yang menyambung 12 modul
+├── pekerja.py         proses kedua: relay event → Redis Streams, konsumen, penyelaras memories → Qdrant
 └── modules/           spec/06 — satu tabel dimiliki tepat satu modul
     ├── platform/      config · db · redis · log · galat · batas laju · /health (tanpa aturan domain)
     ├── identity/      users · consents · permissions · audit_logs — sesi · sandi · izin · audit
@@ -89,13 +90,21 @@ tools/                 pemeriksa dokumen, uji mutasi, CI lokal
 | operasi sesi yang membaca lalu menulis catatan sesi = **satu skrip Lua** | `test_sesi.py` (menyela tiap celah antarperintah) | jangan pecah menjadi `GET`/`HGETALL` lalu `MULTI` — keluar dan pencabutan kalah balapan |
 | perubahan basis data dan jejak auditnya satu transaksi | `test_izin.py` · `test_persetujuan.py` · `test_auth.py` | panggil `audit(conn, …)` dengan `conn` perubahannya; jangan `commit()` di antaranya |
 | galat basis data dicatat **tanpa pesan** (pesan PostgreSQL membawa isi baris) | `test_galat_basis_data.py` | jangan konfigurasi ulang log tanpa `_galat_basis_data_tanpa_isi`; baca SQLSTATE dan nama constraint, bukan pesannya |
-| teks bebas dari klien tidak memuat NUL | `test_auth.py` · `test_profil.py` | medan `str` yang disimpan: `platform.TeksTanpaNul`; `jsonb`: `platform.tanpa_nul_bersarang` |
+| teks bebas dari klien tidak memuat NUL; `jsonb` dari klien paling dalam 32 tingkat (S5) | `test_auth.py` · `test_profil.py` · `test_aktivitas.py` | medan `str` yang disimpan: `platform.TeksTanpaNul`; `jsonb`: `platform.tanpa_nul_bersarang` (NUL **dan** kedalaman) |
 | angka · boolean · tanggal · waktu dari klien **ketat** — pydantic mode python mengoersi `true`→1, detik Unix→tanggal UTC (E-170) | `test_masukan_ketat_semua_rute.py` (skema inti tiap rute) | medan badan: `platform.Bulat` · `Benar` · `Tanggal` · `WaktuBerzona` · `AngkaJson`; kueri/jalur bertanggal: `platform.Tanggal` · `WaktuBerzona` — jangan `int`/`bool`/`date`/`datetime` polos |
 | rute tulis domain **menyatakan dan memanggil** `Idempotency-Key` | `test_idempotensi_terpasang.py` | `idem: platform.Idempoten` + `return await idem.jalankan(user_id, kerja, baca_ulang)`; `kerja` mengembalikan `platform.Jawaban(status, isi, id)` — Redis hanya menyimpan rujukan (E-171) |
 | bacaan/pendengar lintas modul domain lewat titik rakit, bukan impor (K-23) | `test_main.py` | fungsi pintu keluar modul dipasang `hvx.main` di `app.state`; rute mengambilnya dan **menolak berjalan** tanpanya |
 | tulisan yang menaut baris lain (goal) mengunci barisnya hidup | `test_batas_dan_balapan.py` (serentak) | `goals.kunci_goal_hidup(conn, id)` — `FOR SHARE` — **sebelum** menulis anak, milestone, atau tautan |
 | daftar yang dibaca utuh dibatasi **saat menulis** (K-24) | `test_batas_dan_balapan.py` | hitung di bawah `pg_advisory_xact_lock` per pemilik → `422 *_limit_reached`; jangan memotong saat membaca |
 | kursor halaman terikat daftar asalnya | `test_halaman.py` | `platform.kursor_waktu("<daftar>", …)` · `baca_kursor_waktu("<daftar>", …)` |
+| tulisan **fakta perilaku** menerbitkan eventnya di transaksi yang sama (`spec/06` aturan 6); kunci per **kejadian** (`spec/03` aturan 1) | `test_penerbitan_event.py` | `events.terbitkan(conn, …)` dengan `conn` tulisannya; baris peta baru di `spec/06` **dan** ujinya |
+| stream Redis membawa **rujukan**, bukan isi; konsumen membaca event di bawah RLS pemiliknya dan ACK **sesudah** commit (K-25) | `test_relay.py` | penangan `(conn, EventMasuk)` yang **idempoten**; jangan menaruh payload di stream |
+| Qdrant tidak punya RLS: tiap pencarian vektor bersaring `user_id`, payload titik **tanpa isi**, hasilnya dibaca ulang di PostgreSQL | `test_vektor.py` · `test_memori.py` | cari lewat `memory.PencariMemori`; tulis ke Qdrant hanya lewat `memory.PenyelarasVektor` — tidak pernah dari jalan permintaan |
+| scope hanya dari **daftar resmi** `spec/05`; scope sensitif tidak pernah `allow` karena bawaan (E-180) | `test_izin_masukan.py` · `test_izin.py` · `test_memori.py` | scope baru: `spec/05` *Daftar scope resmi* **dan** `identity.SCOPE_RESMI`, di PR yang sama |
+| turunan data pribadi mengikuti sumbernya — jurnal disunting/dihapus → memorinya, di transaksi yang sama (K-27) | `test_memori.py` | pendengar lewat titik rakit (`pendengar_jurnal_berubah`); vektornya menyusul lewat penyelaras |
+| penyemat memori **berkunci, per pengguna** — vektor tidak bisa dibalik jadi kata, dan vektor dua pengguna tidak sebanding (K-26, S1) | `test_sematan.py` · `test_config.py` · `test_memori.py` | `platform.penyemat_dari(settings)` lalu `.untuk(user_id)`; penyemat proses sendiri tidak menyemat |
+| fungsi lintas-RLS milik proses pekerja hanya untuk `hvx_pekerja`; api **menolak mulai** sebagai anggotanya, pekerja menolak mulai **tanpa** peran itu (S4) | `test_kepemilikan_data.py` · `test_aplikasi_hidup.py` | `GRANT EXECUTE … TO hvx_pekerja` (bukan `hvx_app`) di `spec/01` §12 **dan** migrasi; login pekerja `HVX_PEKERJA_DB_USER` |
+| Qdrant tidak pernah dipanggil sambil memegang kunci baris, dan penyematan tidak berjalan di event loop pekerja (K3, S2) | `test_memori.py` | baca → semat (thread) → kirim → tandai hanya bila sidik isinya masih sama |
 | aplikasi Flutter bersih dan teruji | `ci_lokal.py`: `dart format` · `flutter analyze --fatal-infos` · `flutter test` · layar diketuk lawan api hidup (smoke) | `flutter`/`dart` di PATH, atau `HVX_FLUTTER`/`HVX_DART` |
 
 🔑 **Setiap penegak baru wajib dibuktikan sanggup gagal** — tambahkan
@@ -116,7 +125,7 @@ kebutuhan, di migrasi — **bukan** kebijakan RLS yang dilonggarkan.
 python -m pip install uv          # sekali, kalau belum ada
 uv sync                           # seluruh lingkungan dari uv.lock
 uv run pytest -m "not integration"                  # putaran cepat
-docker compose up -d --wait postgres redis          # layanan untuk uji integrasi
+docker compose up -d --wait postgres redis qdrant   # layanan untuk uji integrasi
 (cd apps/mobile && flutter test)                    # aplikasi — tanpa server
 uv run --locked python tools/ci_lokal.py            # GERBANG PENUH sebelum PR
 git push && uv run --locked python tools/ci_lokal.py --lapor-github   # + status di PR

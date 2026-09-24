@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+import socket
 
 from fastapi import Request
 from redis.asyncio import Redis
@@ -57,3 +58,8 @@ def sidik_ip(request: Request) -> str | None:
         return None
     kunci = settings_dari(request).ip_hash_key.get_secret_value().encode()
     return hmac.new(kunci, request.client.host.encode(), hashlib.sha256).hexdigest()
+
+
+def nama_hos() -> str:
+    """Nama mesin/wadah proses ini — nama konsumen stream pekerja (B-2: `socket` hanya di sini)."""
+    return socket.gethostname()

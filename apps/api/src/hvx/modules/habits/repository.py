@@ -9,7 +9,8 @@ from __future__ import annotations
 
 import json
 from collections.abc import Mapping
-from datetime import date
+from dataclasses import dataclass
+from datetime import date, datetime
 from typing import Any
 from uuid import UUID
 
@@ -153,8 +154,14 @@ _SELESAI_TANGGAL = text(
     """
 )
 
+# Baris yang dihapus dipulangkan — pembatalannya diterbitkan sebagai event
+# (`habit.completion_retracted`, spec/07 3.2) dengan id baris itu sendiri.
 _HAPUS_SELESAI = text(
-    "DELETE FROM habit_completions WHERE habit_id = :habit_id AND for_date = :for_date"
+    """
+    DELETE FROM habit_completions
+    WHERE habit_id = :habit_id AND for_date = :for_date
+    RETURNING id, for_date, clock_timestamp() AS dicabut_pada
+    """
 )
 
 # ── spec/07 2.4 — rentetan ───────────────────────────────────────────────────
@@ -333,8 +340,19 @@ async def selesai_id(conn: AsyncConnection, completion_id: UUID) -> Penyelesaian
     return _penyelesaian(baris) if baris else None
 
 
-async def hapus_selesai(conn: AsyncConnection, habit_id: UUID, for_date: date) -> None:
-    await conn.execute(_HAPUS_SELESAI, {"habit_id": habit_id, "for_date": for_date})
+@dataclass(frozen=True)
+class SelesaiDicabut:
+    id: UUID
+    for_date: date
+    dicabut_pada: datetime
+
+
+async def hapus_selesai(
+    conn: AsyncConnection, habit_id: UUID, for_date: date
+) -> SelesaiDicabut | None:
+    """Baris yang dihapus — atau `None` bila tanggal itu memang tidak tercatat."""
+    b = (await conn.execute(_HAPUS_SELESAI, {"habit_id": habit_id, "for_date": for_date})).first()
+    return SelesaiDicabut(b.id, b.for_date, b.dicabut_pada) if b else None
 
 
 async def mulai_lokal(conn: AsyncConnection, habit_id: UUID, zona: str) -> date | None:

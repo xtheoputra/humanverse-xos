@@ -24,10 +24,12 @@ from .persetujuan import (
 from .repository import ambil_pengguna
 from .routes import router
 from .schemas import PenggunaRingkas
+from .scope import SCOPE_RESMI, Scope
 from .service import PendengarPendaftaran, PenggunaBaru
 from .sesi import HasilPenyegaran, PenyimpanSesi, SesiAktif, Token
 
 __all__ = [
+    "SCOPE_RESMI",
     "TUJUAN_LAYANAN",
     "TUJUAN_PELATIHAN_MODEL",
     "Aksi",
@@ -45,6 +47,7 @@ __all__ = [
     "PenyimpanSesi",
     "Persetujuan",
     "PersetujuanTidakSah",
+    "Scope",
     "SesiAktif",
     "Subjek",
     "SubjekTipe",

@@ -4,6 +4,36 @@
 
 ---
 
+## Sesi 32 — 24 September 2026
+
+**Pemilik: *“kerjakan semua tugas yang belum terselesaikan dengan sempurna”*** —
+sesi yang sama dengan Sesi 31, berlanjut ke Sprint 3.
+
+| Hal | Hasil |
+|---|---|
+| Naskah baru | **tidak ada** |
+| Keputusan pemilik | tidak ada yang baru — yang diikuti: H-25 · H-26 · H-27 · *“betulkan saja menurut anda benarnya dimana”* |
+| Keputusan sendiri | **K-25** relay kotak keluar & grup konsumen · **K-26** penyemat lokal berkunci per pengguna · **K-27** memori episodik |
+| Temuan ditutup | 🆕 **E-177 … E-181** (menulis Sprint 3) · 🆕 **E-182 … E-188** (tinjauan sebelum PR) · 🆕 **E-189** (cacat Sprint 1 yang ketahuan lewat uji yang berkedip di gerbang penuh) |
+| Butir pemilik | 🆕 **C-33** teks bebas di payload event · **C-31** · **C-32** baru di sprint ini, diperluas tinjauan |
+| `spec/` diubah | `01` (`embedding_model` · fungsi relay & penyelaras · peran `hvx_pekerja`) · `03` (kunci per kejadian · `habit.completion_retracted` · `for_date` & `completion_id` · bentuk konsumen V0 · 23 event) · `04` (`journal` · `activities`: `?source=`, `ended_at`) · `05` (daftar scope resmi · aturan 6 `journal_raw`) · `06` (aturan 6 dipersempit ke fakta perilaku · tiga tulisan tanpa event · pendengar jurnal) · `07` (status Sprint 3) |
+| Kode | 🔨 **Sprint 3 — 3.1–3.8 seluruhnya**, branch `v0/sprint-3-memory-event`: `events` · relay & konsumen di **proses pekerja** · `journal` · Qdrant + penyemat · `memory` · `activities`, migrasi 0005–0006 — **767 uji Python + 40 uji Flutter**, **127 mutasi baru, semuanya berbunyi** (kode: 217 → 344) |
+| Tinjauan sebelum PR | 🔍 **tiga lensa serentak** — keamanan (5 terbukti) · kontrak (9 terbukti) · penegak buta (**49 dari 68 kerusakan lolos seluruh suite**, kini tiap kerusakan punya uji dan mutasi). Yang paling mahal: satu kunci penyemat untuk semua pengguna — akun biasa membaca vektor orang lain dengan kamusnya sendiri |
+
+---
+
+### 🔴 Tiga hal yang “cukup” di kepala tetapi tidak di mesin
+
+| Yang diandaikan | Yang terjadi |
+|---|---|
+| vektor berkunci tidak bisa dibaca tanpa kunci | benar — tetapi dengan SATU kunci untuk semua pengguna, server sendiri menyematkan kamus milik akun penyerang |
+| penanda relay 24 jam cukup untuk jendela 60 detik | ±52 MB per akun sehari di Redis `noeviction` — dan relay yang sepi 24 jam mengirim ulang menit terakhirnya |
+| uji mutasi selalu selesai | satu mutasi membuat ujinya menggantung, dan seluruh putaran berhenti tanpa satu baris keluaran — kini dibatasi 600 dtk, seluruh pohon prosesnya dihentikan |
+
+Ketiganya ditutup — dengan uji yang **merah pada kode lama** dan mutasi.
+
+---
+
 ## Sesi 31 — 24 September 2026
 
 **Pemilik: *“kerjakan semua tugas yang belum terselesaikan dengan sempurna”*.**

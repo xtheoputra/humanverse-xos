@@ -18,6 +18,10 @@ from pydantic import AfterValidator
 
 _NUL = "\x00"
 _PESAN = "tidak boleh memuat karakter NUL"
+# `jsonb` dari klien paling banyak sedalam ini (tinjauan keamanan Sprint 3, S5): payload
+# 100 tingkat lolos validasi, TERSIMPAN, lalu jawabannya gagal diserialisasi pydantic
+# (*“depth exceeded”*) — 500, dan sejak itu tiap daftar yang memuat barisnya 500 juga.
+KEDALAMAN_JSON_MAKS = 32
 
 
 def _tanpa_nul(nilai: str) -> str:
@@ -26,17 +30,21 @@ def _tanpa_nul(nilai: str) -> str:
     return nilai
 
 
-def tanpa_nul_bersarang(nilai: Any) -> Any:
-    """Kunci dan nilai teks di dalam struktur yang disimpan sebagai `jsonb`."""
+def tanpa_nul_bersarang(nilai: Any, _wadah: int = 0) -> Any:
+    """Struktur yang disimpan sebagai `jsonb`: kunci dan nilai teks tanpa NUL, dan tidak
+    lebih dari `KEDALAMAN_JSON_MAKS` wadah (objek/larik) bersarang."""
     if isinstance(nilai, str):
         _tanpa_nul(nilai)
-    elif isinstance(nilai, dict):
-        for kunci, isi in nilai.items():
-            _tanpa_nul(str(kunci))
-            tanpa_nul_bersarang(isi)
-    elif isinstance(nilai, list):
-        for isi in nilai:
-            tanpa_nul_bersarang(isi)
+    elif isinstance(nilai, dict | list):
+        if _wadah >= KEDALAMAN_JSON_MAKS:
+            raise ValueError(f"struktur bersarang maksimal {KEDALAMAN_JSON_MAKS} tingkat")
+        if isinstance(nilai, dict):
+            for kunci, isi in nilai.items():
+                _tanpa_nul(str(kunci))
+                tanpa_nul_bersarang(isi, _wadah + 1)
+        else:
+            for isi in nilai:
+                tanpa_nul_bersarang(isi, _wadah + 1)
     return nilai
 
 

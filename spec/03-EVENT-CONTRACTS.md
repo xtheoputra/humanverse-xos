@@ -42,14 +42,37 @@ Setiap event memakai amplop yang sama. Yang berbeda hanya `payload`.
 bukan dari waktu kirim:
 
 ```
-habit.completed   →  habit:<habit_id>:<for_date>
-mood.logged       →  mood:<user_id>:<occurred_at menit>
-journal.created   →  journal:<journal_id>
-goal.completed    →  goal:<goal_id>
+habit.created               →  habit:<habit_id>:created
+habit.completed · skipped   →  habit-completion:<completion_id>
+habit.completion_retracted  →  habit-completion:<completion_id>:retracted
+mood.logged                 →  mood:<mood_id>
+journal.created             →  journal:<journal_id>
+goal.created                →  goal:<goal_id>:created
+goal.completed              →  goal:<goal_id>:completed:<achieved_at>
+checkin.logged              →  checkin:<for_date>:<updated_at>
 ```
 
 Kirim ulang menghasilkan `UNIQUE` violation yang **ditelan sebagai sukses**,
 bukan galat. Ini yang membuat aplikasi luring aman menyinkron ulang.
+
+> 🔧 **Tiga contoh kunci semula MENELAN KOREKSI — dibetulkan 24 Sep 2026
+> (E-177), saat tugas 3.2 ditulis.** Kunci harus mengidentifikasi *kejadian*,
+> dan tiga contoh lama mengidentifikasi sesuatu yang lebih kasar:
+>
+> | Kunci lama | Kejadian yang DITELAN sebagai "kirim ulang" |
+> |---|---|
+> | `habit:<habit_id>:<for_date>` | penyelesaian dibatalkan lalu dicatat lagi (tier lain, atau `skipped`) — satu tanggal, dua kejadian |
+> | `mood:<user_id>:<occurred_at menit>` | dua mood yang dilaporkan dalam satu menit — dua baris, satu event |
+> | `goal:<goal_id>` | goal dibuka lagi lalu tercapai lagi |
+>
+> Tiap kasus membuat tabel domain dan `events` berbeda, dan aturan **D**
+> [`02`](02-ERD.md) (*"kalau keduanya berbeda, event yang benar"*) lalu
+> **membenarkan yang salah**. Kunci kini mengikuti **baris** yang lahir
+> (`mood_id` — id buatan klien; `completion_id` — dibuat server, dan kirim ulang
+> tanggal yang sama mengembalikan baris LAMA, jadi keduanya tetap satu kunci) atau
+> **keadaan** yang lahir (`achieved_at`, `updated_at` check-in).
+> Kirim ulang yang sesungguhnya tidak melahirkan baris atau keadaan baru, jadi
+> tidak menerbitkan apa pun.
 
 **2 · Urutan.** Consumer **tidak boleh** mengandalkan urutan datang. Urutan
 kebenaran adalah `occurred_at`; `recorded_at` hanya untuk memantau
@@ -62,7 +85,7 @@ Perubahan yang melanggar kontrak **menerbitkan `event_type` baru**
 
 ---
 
-## 22 event — 21 dari naskah 5 §7 + 1 usulan
+## 23 event — 21 dari naskah 5 §7 + 2 usulan
 
 Tanda ✅ = dipakai V0. Sisanya kontraknya ditulis sekarang, implementasinya
 menyusul — supaya nama dan bentuknya tidak berubah nanti.
@@ -70,13 +93,14 @@ menyusul — supaya nama dan bentuknya tidak berubah nanti.
 | Event | V0 | Payload |
 |---|---|---|
 | `habit.created` | ✅ | `{title, period, target_count}` |
-| `habit.completed` | ✅ | `{status, tier_used?, note?}` |
-| `habit.skipped` | ✅ | `{reason?}` |
+| `habit.completed` | ✅ | `{status, tier_used?, note?, for_date, completion_id}` |
+| `habit.skipped` | ✅ | `{reason?, for_date, completion_id}` |
+| `habit.completion_retracted` | ✅ | `{for_date, completion_id}` 🔧 |
 | `mood.logged` | ✅ | `{valence, label?}` |
 | `journal.created` | ✅ | `{word_count}` — **isi jurnal tidak pernah masuk event** |
 | `goal.created` | ✅ | `{title, domain?, target_date?}` |
 | `goal.completed` | ✅ | `{days_taken}` |
-| `checkin.logged` | ✅ | `{energy?, focus?, sleep_hours?}` |
+| `checkin.logged` | ✅ | `{energy?, focus?, sleep_hours?, for_date}` |
 | `sleep.started` | | `{}` |
 | `sleep.completed` | | `{duration_minutes, quality?}` |
 | `workout.started` | | `{exercise_type}` |
@@ -95,6 +119,26 @@ menyusul — supaya nama dan bentuknya tidak berubah nanti.
 > `checkin.logged` **saya tambahkan** — Daily Check-in ada di V0 tetapi tidak
 > punya event di daftar 21 naskah 5 §7. Tanpa itu, Behavior Engine tidak
 > melihat salah satu sinyal harian paling padat. 🔧
+
+> 🔧 **`habit.completion_retracted` ditambahkan 24 Sep 2026 (E-178), saat 3.2
+> ditulis — event V0 ke-9, event ke-23.** [`04`](04-API-CONTRACTS.md) punya
+> `DELETE /habits/{id}/completions/{for_date}`, tetapi tidak satu pun event
+> mencatat bahwa penyelesaian **dibatalkan**: proyeksi yang dibangun ulang dari
+> `events` (aturan **D** [`02`](02-ERD.md)) menghidupkan kembali penyelesaian
+> yang sudah dibatalkan pemiliknya, dan rentetan serta pola (Sprint 5) belajar
+> dari hari yang tidak pernah dijalankan.
+> ⚠️ Ia lulus uji [`../arch/07`](../arch/07-EVENT-CONTRACTS.md) §7 — *yang boleh
+> ditambahkan ke V0 hanyalah hal yang TIDAK BISA ditambahkan nanti* —
+> dengan alasan yang terbalik dari biasanya: pembatalan yang terjadi sebelum
+> event ini ada **tidak meninggalkan jejak apa pun** untuk diterbitkan
+> belakangan; barisnya sudah terhapus.
+>
+> 🔧 **`for_date` dan `completion_id` di `habit.*`, `for_date` di
+> `checkin.logged`** (3.2): tanpa keduanya proyeksi tidak bisa dibangun ulang —
+> tanggal LOKAL tidak bisa diturunkan dari `occurred_at` tanpa menebak zona
+> waktunya, dan pembatalan harus bisa menunjuk penyelesaian mana yang batal.
+> Medan WAJIB, bukan opsional: belum satu event pun pernah terbit, jadi
+> kontraknya masih bisa dilengkapi tanpa `schema_version` baru.
 
 > **`journal.created` sengaja hanya membawa `word_count`.** Isi jurnal tinggal
 > di `journal_entries` yang tunduk pada permission scope. Event mengalir ke
@@ -116,6 +160,18 @@ menyusul — supaya nama dan bentuknya tidak berubah nanti.
 > Consumer yang "boleh gagal" wajib **idempoten**, karena akan diulang.
 > Di V0 antreannya Redis Streams dengan consumer group; Kafka baru bila
 > skalanya menuntut (naskah 5 §5).
+
+> 🔧 **Bentuk V0-nya (spec/07 3.3 · 3.6, K-25).** Tabel `events` adalah kotak
+> keluar: relay di proses pekerja (`hvx/pekerja.py`) menyalin **rujukan** tiap event yang
+> sudah commit — `id` · `user_id` · `event_type`, **bukan** `payload` — ke satu
+> stream Redis. Tiap consumer adalah satu **grup**; ia membaca isi event dari
+> PostgreSQL di transaksi **pemiliknya** (RLS berlaku) dan meng-ACK **sesudah**
+> commit. Pesan yang menganggur 30 dtk diklaim anggota grup lain; sesudah 5 kali
+> diserahkan ia pindah ke stream **mati**. Yang terpasang di V0: **Memory
+> extractor** (grup `memori`, 3.6). Behavior projector, Habit streak,
+> Recommendation trigger, dan Analytics menyusul bersama tugasnya (5.1, 5.5) —
+> grup baru membaca stream **dari awal**, jadi tidak ada event yang terlewat
+> selama stream belum dipangkas melewatinya.
 
 ---
 
@@ -179,7 +235,7 @@ ditambahkan 11 September 2026.** Ia terlewat dari
 pertanyaan *“apa yang E-1 dan E-2 TIDAK PERNAH lihat?”*, dan jawabannya: nama
 yang tidak pernah masuk tabel ini tidak punya `event_type` sama sekali.
 
-⚠️ Tabel ini **tidak** menambahkan satu pun event ke V0. V0 tetap **22 event**
+⚠️ Tabel ini **tidak** menambahkan satu pun event ke V0. V0 tetap **23 event** (E-178)
 di bagian atas berkas ini; sisanya milik Phase 9–20.
 
 | PascalCase di naskah | `domain.verb` | Naskah |
@@ -341,7 +397,7 @@ baris pertamanya terbit.
 | `emergency.recovery_completed` | melengkapi `emergency.recovery_started` | 16 |
 | `tool.called` | `tool.failed` | 11 |
 
-⚠️ **Nol di antaranya masuk V0.** V0 tetap **22 event domain**; aturan yang
+⚠️ **Nol di antaranya masuk V0.** V0 tetap **23 event domain** (E-178); aturan yang
 dipakai: *yang boleh ditambahkan ke V0 hanyalah hal yang **tidak bisa**
 ditambahkan nanti* — dan sebuah event selalu bisa mulai diterbitkan kemudian.
 
@@ -379,6 +435,6 @@ amplop tersendiri.
 > diaudit**. Bentuk khusus itu menghapus tepat kemampuan yang paling
 > dibutuhkannya.
 
-⚠️ Kedelapan nama di atas **tidak** menambah event V0 — V0 tetap **22 event**;
+⚠️ Kedelapan nama di atas **tidak** menambah event V0 — V0 tetap **23 event**;
 security event lahir di Phase 8.
 

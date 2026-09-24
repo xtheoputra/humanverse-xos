@@ -19,9 +19,21 @@ byte demi byte — termasuk bila prosesnya gagal di tengah.
     uv run python tools/uji_mutasi_kode.py --hanya-db   # hanya mutasi migrasi (tahap test)
     uv run python tools/uji_mutasi_kode.py --hanya-docker   # hanya pemindai rahasia (tahap scan)
 
-Mutasi migrasi butuh `HVX_TEST_DATABASE_URL`. Tanpa itu — dan tanpa
+Mutasi migrasi butuh `HVX_TEST_DATABASE_URL` (dan `HVX_TEST_QDRANT_URL` sejak
+memori vektor 3.5). Tanpa itu — dan tanpa
 `--tanpa-db` yang MENYATAKAN bahwa bagian itu tidak dijalankan — berkas ini
 keluar 1: bagian yang tidak dijalankan tidak boleh terbaca sebagai lulus.
+
+Tiap mutasi dihentikan — beserta seluruh proses turunannya — sesudah
+`BATAS_DETIK_MUTASI`, dan terhitung DIAM: kerusakan yang membuat ujinya
+menggantung tidak menahan gerbang tanpa batas.
+
+Mutasi tidak meninggalkan **bytecode basi**: perintahnya berjalan tanpa menulis
+`__pycache__`, dan pemulihan membuang bytecode tiap berkas yang dimutasi. 🔴 Tanpa
+itu, mutasi berukuran SAMA (`ge=1` → `ge=0`) yang dipulihkan di DETIK yang sama
+meninggalkan `.pyc` yang cocok dengan berkas aslinya (Python memeriksa detik mtime
+dan ukuran) — dan tahap `pytest` berikutnya menjalankan kode mutan (gerbang penuh
+Sprint 3: `valence 0` lolos uji admisi di tahap uji, kode sumbernya benar).
 """
 
 from __future__ import annotations
@@ -29,6 +41,7 @@ from __future__ import annotations
 import argparse
 import os
 import shutil
+import signal
 import subprocess
 import sys
 import uuid
@@ -65,11 +78,56 @@ class Mutasi:
     # juga keluar 1. Keluarannya WAJIB memuat alasan yang dimaksud mutasi.
     harus_memuat: str
     kode_tertangkap: set[int] = field(default_factory=lambda: {1})
-    # lint (bawaan) · db (butuh HVX_TEST_DATABASE_URL) · docker (butuh daemon Docker)
+    # lint (bawaan) · db (butuh HVX_TEST_DATABASE_URL · _QDRANT_URL) · docker (daemon Docker)
     kelompok: str = "lint"
     # Direktori kerja perintah, relatif terhadap akar repo — `flutter test` wajib
     # dijalankan dari akar aplikasinya.
     cwd: str | None = None
+
+
+# Satu mutasi — mutasi paling lambat (uji pekerja) selesai < 1 menit.
+BATAS_DETIK_MUTASI = 600
+
+
+def jalankan_terbatas(
+    perintah: list[str], cwd: Path, env: dict[str, str], batas_s: float = BATAS_DETIK_MUTASI
+) -> tuple[int, str]:
+    """(kode keluar, keluaran) — dihentikan beserta proses turunannya sesudah `batas_s`.
+
+    🔴 Tinjauan Sprint 3: mutasi yang membuat ujinya menggantung (pekerja yang tidak
+    menolak peran yang salah berjalan terus) menahan seluruh uji mutasi — dan
+    gerbangnya — tanpa batas. Menghentikan proses langsungnya saja tidak cukup: di
+    Windows `python.exe` venv meluncurkan interpreter sebagai proses ANAK, dan anak
+    itu tetap memegang pipa keluaran, jadi `communicate()` ikut menunggunya.
+    """
+    proses = subprocess.Popen(
+        perintah,
+        cwd=cwd,
+        env=env,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        start_new_session=os.name != "nt",
+    )
+    try:
+        keluaran, _ = proses.communicate(timeout=batas_s)
+    except subprocess.TimeoutExpired:
+        if os.name == "nt":
+            subprocess.run(
+                ["taskkill", "/F", "/T", "/PID", str(proses.pid)], capture_output=True, check=False
+            )
+        else:
+            os.killpg(proses.pid, signal.SIGKILL)
+        keluaran, _ = proses.communicate()
+        return -1, f"{keluaran or ''}\nMENGGANTUNG — dihentikan sesudah {batas_s:g} dtk"
+    return proses.returncode, keluaran or ""
+
+
+def lingkungan_mutasi() -> dict[str, str]:
+    """Lingkungan perintah tiap mutasi — tanpa menulis bytecode (lihat docstring modul)."""
+    return {**os.environ, "PYTHONIOENCODING": "utf-8", "PYTHONDONTWRITEBYTECODE": "1"}
 
 
 def _lint(kontrak: str) -> list[str]:
@@ -224,6 +282,15 @@ _UJI_ID_SAMA = (
 UJI_KETAT_RUTE = "tests/unit/test_masukan_ketat_semua_rute.py"
 UJI_BALAPAN = "tests/integration/test_batas_dan_balapan.py"
 UJI_BADAN = "tests/unit/test_batas_badan.py"
+UJI_EVENT = "tests/integration/test_event.py"
+UJI_RELAY = "tests/integration/test_relay.py"
+UJI_VEKTOR = "tests/integration/test_vektor.py"
+UJI_MEMORI = "tests/integration/test_memori.py"
+UJI_JURNAL = "tests/integration/test_jurnal.py"
+UJI_AKTIVITAS = "tests/integration/test_aktivitas.py"
+UJI_PEKERJA = "tests/integration/test_pekerja.py"
+_UJI_PEKERJA_PENUH = "test_pekerja_menyalurkan_mengekstrak_dan_menyemat_lalu_berhenti_bersih"
+UJI_TERBIT = "tests/integration/test_penerbitan_event.py"
 FK_MILESTONE = (
     "  FOREIGN KEY (goal_id, user_id) REFERENCES goals (id, user_id) ON DELETE CASCADE" + NL + ");"
 )
@@ -501,8 +568,14 @@ MUTASI: list[Mutasi] = [
         [
             Sunting(
                 f"{MODUL}/identity/izin.py",
-                "        if baris is None:" + NL + "            return None, self._ttl_ms" + NL,
-                "        if baris is None:" + NL + '            return "allow", self._ttl_ms' + NL,
+                "        if baris is None:"
+                + NL
+                + "            return None, _UmurCache(px=self._ttl_ms)"
+                + NL,
+                "        if baris is None:"
+                + NL
+                + '            return "allow", _UmurCache(px=self._ttl_ms)'
+                + NL,
             )
         ],
         _pytest(f"{UJI_IZIN}::test_tanpa_keputusan_tersimpan_jawabannya_ask"),
@@ -512,7 +585,13 @@ MUTASI: list[Mutasi] = [
     Mutasi(
         "1.5",
         "izin kedaluwarsa tetap berlaku — 'izinkan sekali' menjadi izin permanen",
-        [Sunting(f"{MODUL}/identity/izin.py", "        if sisa_ms <= 0:", "        if False:")],
+        [
+            Sunting(
+                f"{MODUL}/identity/izin.py",
+                "        if baris.habis_ms <= baris.kini_ms:",
+                "        if False:",
+            )
+        ],
         _pytest(f"{UJI_IZIN}::test_izin_kedaluwarsa_kembali_ke_ask"),
         harus_memuat="assert 'allow' == 'ask'",
         kelompok="db",
@@ -523,8 +602,8 @@ MUTASI: list[Mutasi] = [
         [
             Sunting(
                 f"{MODUL}/identity/izin.py",
-                "min(self._ttl_ms, sisa_ms - _MARGIN_KEDALUWARSA_MS)",
-                "self._ttl_ms",
+                "        habis = min(baris.kini_ms + self._ttl_ms, baris.habis_ms - _MARGIN_KEDALUWARSA_MS)",
+                "        habis = baris.kini_ms + self._ttl_ms",
             )
         ],
         _pytest(f"{UJI_IZIN}::test_cache_izin_sementara_tidak_hidup_lebih_lama_dari_izinnya"),
@@ -537,8 +616,8 @@ MUTASI: list[Mutasi] = [
         [
             Sunting(
                 f"{MODUL}/identity/izin.py",
-                "sisa_ms - _MARGIN_KEDALUWARSA_MS)",
-                "sisa_ms)",
+                "baris.habis_ms - _MARGIN_KEDALUWARSA_MS)",
+                "baris.habis_ms)",
             )
         ],
         _pytest(f"{UJI_IZIN}::test_cache_izin_sementara_tidak_hidup_lebih_lama_dari_izinnya"),
@@ -1216,8 +1295,8 @@ MUTASI: list[Mutasi] = [
         [
             Sunting(
                 f"{MODUL}/identity/izin.py",
-                "await self._r.set(kunci, keputusan or _TANPA_KEPUTUSAN, px=umur_ms)",
-                "await self._r.set(kunci, keputusan or bawaan, px=umur_ms)",
+                "await self._r.set(kunci, keputusan or _TANPA_KEPUTUSAN, px=umur.px, pxat=umur.pxat)",
+                "await self._r.set(kunci, keputusan or bawaan, px=umur.px, pxat=umur.pxat)",
             )
         ],
         _pytest(f"{UJI_IZIN}::test_bawaan_pemanggil_hanya_untuk_yang_tanpa_keputusan_tersimpan"),
@@ -1230,9 +1309,9 @@ MUTASI: list[Mutasi] = [
         [
             Sunting(
                 f"{MODUL}/identity/izin.py",
-                "            return cast(Keputusan, baris.decision), self._ttl_ms",
+                "            return cast(Keputusan, baris.decision), _UmurCache(px=self._ttl_ms)",
                 '            return (None if baris.decision == "ask" else '
-                "cast(Keputusan, baris.decision)), self._ttl_ms",
+                "cast(Keputusan, baris.decision)), _UmurCache(px=self._ttl_ms)",
             )
         ],
         _pytest(f"{UJI_IZIN}::test_bawaan_pemanggil_hanya_untuk_yang_tanpa_keputusan_tersimpan"),
@@ -3324,6 +3403,2004 @@ MUTASI: list[Mutasi] = [
         harus_memuat=_UJI_TENGAH_MALAM + " [E]",
         cwd=APLIKASI,
     ),
+    # ── Sprint 3 · 3.1 events + amplop + idempotensi ─────────────────────
+    Mutasi(
+        "3.1",
+        "event tanpa ON CONFLICT — event ganda menjadi galat, bukan ditelan",
+        [
+            Sunting(
+                f"{MODUL}/events/repository.py",
+                "    ON CONFLICT (user_id, idempotency_key) DO NOTHING" + NL,
+                "",
+            )
+        ],
+        _pytest(f"{UJI_EVENT}::test_event_ganda_ditelan_sebagai_sukses"),
+        harus_memuat="IntegrityError",
+        kelompok="db",
+    ),
+    Mutasi(
+        "E-3",
+        "uji admisi tidak memeriksa sumber — `sensor` sampai ke basis data",
+        [
+            Sunting(
+                f"{MODUL}/events/penerbit.py",
+                "    if source not in SUMBER:",
+                '    if source not in SUMBER | {"sensor"}:',
+            )
+        ],
+        _pytest(f"{UJI_EVENT}::test_uji_admisi_menolak_sebelum_menyentuh_basis_data"),
+        harus_memuat="IntegrityError",
+        kelompok="db",
+    ),
+    Mutasi(
+        "3.1",
+        "kunci yang sama untuk kejadian lain ditelan diam-diam",
+        [Sunting(f"{MODUL}/events/penerbit.py", "    if not sama:", "    if False:")],
+        _pytest(f"{UJI_EVENT}::test_kunci_sama_untuk_kejadian_lain_ditolak_keras"),
+        harus_memuat="DID NOT RAISE",
+        kelompok="db",
+    ),
+    Mutasi(
+        "3.1",
+        "registry kode menambah jenis event yang tidak ada di spec/03",
+        [
+            Sunting(
+                f"{MODUL}/events/kontrak.py",
+                '    "checkin.logged": (1, CheckinDicatat),',
+                '    "checkin.logged": (1, CheckinDicatat),'
+                + NL
+                + '    "habit.deleted": (1, HabitDilewati),',
+            )
+        ],
+        _pytest("tests/unit/test_kontrak_event.py::test_registry_sama_dengan_baris_v0_spec03"),
+        harus_memuat="hanya di kode: ['habit.deleted']",
+    ),
+    Mutasi(
+        "3.1",
+        "payload journal.created menerima medan lain — isi jurnal bisa masuk event",
+        [
+            Sunting(
+                f"{MODUL}/events/kontrak.py",
+                "class JurnalDibuat(_Payload):" + NL,
+                "class JurnalDibuat(_Payload):"
+                + NL
+                + '    model_config = ConfigDict(extra="allow")'
+                + NL,
+            )
+        ],
+        _pytest("tests/unit/test_kontrak_event.py::test_isi_jurnal_tidak_pernah_masuk_event"),
+        harus_memuat="DID NOT RAISE",
+    ),
+    # ── Sprint 3 · 3.2 penerbitan event dari goals · habits · checkins (aturan 6) ─
+    Mutasi(
+        "3.2",
+        "POST /goals tanpa goal.created",
+        [
+            Sunting(
+                f"{MODUL}/goals/service.py",
+                "            await events.terbitkan("
+                + NL
+                + "                conn,"
+                + NL
+                + "                user_id=user_id,"
+                + NL
+                + '                event_type="goal.created",',
+                # Seluruh jangkar diganti — `.replace()` pada potongan terakhir saja
+                # membuat mutasi ini tidak mengubah apa pun (tinjauan Sprint 3).
+                "            await _tidak_menerbitkan("
+                + NL
+                + "                conn,"
+                + NL
+                + "                user_id=user_id,"
+                + NL
+                + '                event_type="goal.created",',
+            ),
+            _sisip(
+                f"{MODUL}/goals/service.py",
+                "async def _tidak_menerbitkan(*_a: object, **_k: object) -> None:"
+                + NL
+                + "    return None",
+            ),
+        ],
+        _pytest(f"{UJI_TERBIT}::test_goal_dibuat_menerbitkan_goal_created_sekali"),
+        harus_memuat="POST /goals tidak menerbitkan tepat satu goal.created",
+        kelompok="db",
+    ),
+    Mutasi(
+        "3.2",
+        "galat penerbitan ditelan — goal tersimpan tanpa event-nya",
+        [
+            Sunting(
+                f"{MODUL}/goals/service.py",
+                "            await events.terbitkan("
+                + NL
+                + "                conn,"
+                + NL
+                + "                user_id=user_id,"
+                + NL
+                + '                event_type="goal.created",',
+                # Seluruh jangkar diganti — `.replace()` pada potongan terakhir saja
+                # membuat mutasi ini tidak mengubah apa pun (tinjauan Sprint 3).
+                "            await _terbit_diam("
+                + NL
+                + "                conn,"
+                + NL
+                + "                user_id=user_id,"
+                + NL
+                + '                event_type="goal.created",',
+            ),
+            _sisip(
+                f"{MODUL}/goals/service.py",
+                "async def _terbit_diam(conn: AsyncConnection, **isi: Any) -> None:"
+                + NL
+                + "    try:"
+                + NL
+                + "        await events.terbitkan(conn, **isi)"
+                + NL
+                + "    except events.EventTidakSah:"
+                + NL
+                + "        pass"
+                + NL
+                + "from sqlalchemy.ext.asyncio import AsyncConnection  # noqa: E402",
+            ),
+        ],
+        _pytest(f"{UJI_TERBIT}::test_event_yang_gagal_terbit_membatalkan_tulisannya"),
+        harus_memuat="goal tersimpan tanpa event-nya",
+        kelompok="db",
+    ),
+    Mutasi(
+        "3.2",
+        "DELETE penyelesaian tanpa habit.completion_retracted",
+        [
+            Sunting(
+                f"{MODUL}/habits/service.py",
+                "        if dicabut is not None:" + NL + "            await events.terbitkan(",
+                "        if dicabut is None:" + NL + "            await events.terbitkan(",
+            )
+        ],
+        _pytest(f"{UJI_TERBIT}::test_penyelesaian_kirim_ulang_batal_dan_koreksi"),
+        harus_memuat="peta aturan 6 tidak ditepati",
+        kelompok="db",
+    ),
+    Mutasi(
+        "3.2",
+        "check-in diterbitkan juga saat isinya tidak berubah",
+        [
+            Sunting(
+                f"{MODUL}/checkins/service.py",
+                "        if lama != (c.energy, c.focus, c.sleep_hours):",
+                "        if True:",
+            )
+        ],
+        _pytest(
+            f"{UJI_TERBIT}"
+            "::test_check_in_diterbitkan_hanya_saat_isinya_berubah_dan_koreksi_tidak_ditelan"
+        ),
+        harus_memuat="event check-in tidak mengikuti perubahan isinya",
+        kelompok="db",
+    ),
+    Mutasi(
+        "3.2",
+        "kunci mood per menit (spec/03 lama) — mood kedua dalam satu menit ditolak",
+        [
+            Sunting(
+                f"{MODUL}/checkins/service.py",
+                '                idempotency_key=f"mood:{mood.id}",',
+                '                idempotency_key=f"mood:{user_id}:{mood.occurred_at:%Y%m%d%H%M}",',
+            )
+        ],
+        _pytest(f"{UJI_TERBIT}::test_dua_mood_dalam_satu_menit_dua_event"),
+        harus_memuat="mood kedua dalam menit yang sama gagal",
+        kelompok="db",
+    ),
+    # ── Sprint 3 · 3.3 relay kotak keluar → Redis Streams + grup konsumen ──
+    Mutasi(
+        "3.3",
+        "relay tanpa penanda per event — pindaian ulang jendela belakang menggandakan",
+        [
+            Sunting(
+                f"{MODUL}/events/relay.py",
+                "if redis.call('ZADD', KEYS[1], 'NX', ARGV[1], ARGV[2]) == 1 then",
+                "if true then",
+            )
+        ],
+        _pytest(f"{UJI_RELAY}::test_relay_menyalin_rujukan_sekali_tanpa_payload"),
+        harus_memuat="event terkirim 2 kali",
+        kelompok="db",
+    ),
+    Mutasi(
+        "3.3",
+        "relay hanya maju — event yang commit di belakang kursor hilang selamanya",
+        [
+            Sunting(
+                f"{MODUL}/events/relay.py",
+                "        if posisi is not None:"
+                + NL
+                + "            belakang = (posisi[0] - timedelta(seconds=LIHAT_BELAKANG_S), _NOL)",
+                "        if False:"
+                + NL
+                + "            belakang = (posisi[0] - timedelta(seconds=LIHAT_BELAKANG_S), _NOL)",
+            )
+        ],
+        _pytest(f"{UJI_RELAY}::test_event_yang_commit_belakangan_tetap_terkirim"),
+        harus_memuat="event yang commit di belakang kursor tidak pernah terkirim",
+        kelompok="db",
+    ),
+    Mutasi(
+        "3.3",
+        "konsumen tidak mengklaim pesan yang menggantung — milik konsumen mati hilang",
+        [
+            Sunting(
+                f"{MODUL}/events/stream.py",
+                "            for id_pesan, isi in pesan:"
+                + NL
+                + "                selesai += await self._proses(str(id_pesan), isi, diklaim=True)",
+                "            for id_pesan, isi in pesan[:0]:"
+                + NL
+                + "                selesai += await self._proses(str(id_pesan), isi, diklaim=True)",
+            )
+        ],
+        _pytest(f"{UJI_RELAY}::test_konsumen_mati_event_tidak_hilang_saat_hidup_lagi"),
+        harus_memuat="event milik konsumen yang mati hilang",
+        kelompok="db",
+    ),
+    Mutasi(
+        "3.3",
+        "tanpa stream mati — event yang selalu gagal dicoba tanpa akhir",
+        [
+            Sunting(
+                f"{MODUL}/events/stream.py",
+                "        if diklaim and await self._kali_diserahkan(id_pesan) > self._maks_kirim:",
+                "        if False:",
+            )
+        ],
+        _pytest(f"{UJI_RELAY}::test_penangan_yang_selalu_gagal_pindah_ke_stream_mati"),
+        harus_memuat="dead letter: []",
+        kelompok="db",
+    ),
+    Mutasi(
+        "3.3",
+        "event jenis lain tidak di-ACK — menggantung di grup selamanya",
+        [
+            Sunting(
+                f"{MODUL}/events/stream.py",
+                '        if isi.get("event_type") not in self._jenis:'
+                + NL
+                + "            await self._r.xack(self.stream, self.grup, id_pesan)"
+                + NL,
+                '        if isi.get("event_type") not in self._jenis:' + NL,
+            )
+        ],
+        _pytest(f"{UJI_RELAY}::test_penangan_menerima_isi_dari_postgresql_dan_jenis_lain_dilewati"),
+        harus_memuat="goal.created tidak di-ACK",
+        kelompok="db",
+    ),
+    Mutasi(
+        "3.3",
+        "pangkas mengabaikan pesan yang belum di-ACK — event yang sedang diproses dibuang",
+        [
+            Sunting(
+                f"{MODUL}/events/relay.py",
+                '            if int(ringkas["pending"]) > 0:'
+                + NL
+                + '                batas.append(str(ringkas["min"]))'
+                + NL,
+                "",
+            )
+        ],
+        _pytest(f"{UJI_RELAY}::test_pangkas_tidak_membuang_yang_masih_ditunggu"),
+        harus_memuat="pesan yang belum di-ACK dibuang dari stream",
+        kelompok="db",
+    ),
+    Mutasi(
+        "3.3",
+        "pekerja tidak menyalakan relay",
+        [
+            Sunting(
+                "apps/api/src/hvx/pekerja.py",
+                '        tugas = [asyncio.create_task(_ulang("relay", relay_sekali, JEDA_RELAY_S, berhenti))]',
+                "        tugas: list[asyncio.Task[None]] = []",
+            )
+        ],
+        _pytest(f"{UJI_PEKERJA}::{_UJI_PEKERJA_PENUH}"),
+        harus_memuat="pekerja tidak menyalurkan event dalam 15 detik",
+        kelompok="db",
+    ),
+    Mutasi(
+        "3.3",
+        "EXECUTE fungsi relay tidak dicabut dari PUBLIC (spec/01 DAN migrasi)",
+        [
+            Sunting(
+                "spec/01-DATABASE-SCHEMA.md",
+                "REVOKE ALL ON FUNCTION events_untuk_relay(timestamptz, uuid, integer) FROM PUBLIC;"
+                + NL,
+                "",
+            ),
+            Sunting(
+                f"{MIGRASI}/0005_relay_event.up.sql",
+                "REVOKE ALL ON FUNCTION events_untuk_relay(timestamptz, uuid, integer) FROM PUBLIC;"
+                + NL,
+                "",
+            ),
+        ],
+        _pytest(
+            "tests/integration/test_kepemilikan_data.py"
+            "::test_fungsi_security_definer_hanya_daftar_izin_terpatok_dan_bukan_untuk_public"
+        ),
+        harus_memuat="events_untuk_relay",
+        kelompok="db",
+    ),
+    # ── Sprint 3 · 3.5 Qdrant — Qdrant tidak punya RLS; saringannya yang menjaga H-27 ──
+    Mutasi(
+        "3.5",
+        "pencarian vektor tanpa saringan user_id — titik pengguna lain ikut",
+        [
+            Sunting(
+                f"{MODUL}/platform/vektor.py",
+                'wajib: list[dict[str, Any]] = [{"key": "user_id", "match": {"value": str(user_id)}}]',
+                "wajib: list[dict[str, Any]] = []",
+            )
+        ],
+        _pytest(f"{UJI_VEKTOR}::test_pencarian_hanya_titik_milik_pengguna_itu"),
+        harus_memuat="titik pengguna lain ikut",
+        kelompok="db",
+    ),
+    Mutasi(
+        "3.5",
+        "saringan scope kosong dibaca sebagai 'semua scope'",
+        [
+            Sunting(
+                f"{MODUL}/platform/vektor.py",
+                '                return []  # saringan kosong = tidak ada yang boleh cocok, bukan "semua"',
+                "                continue",
+            )
+        ],
+        _pytest(f"{UJI_VEKTOR}::test_saringan_scope_dan_scope_kosong_tidak_berarti_semua"),
+        harus_memuat="tanpa scope yang diizinkan, pencarian mengembalikan sesuatu",
+        kelompok="db",
+    ),
+    Mutasi(
+        "3.5",
+        "pencarian tanpa user_id tidak ditolak sebelum ke Qdrant",
+        [
+            Sunting(
+                f"{MODUL}/platform/vektor.py",
+                "        if not isinstance(user_id, UUID):"
+                + NL
+                + '            raise TypeError("pencarian vektor wajib dibatasi satu user_id (H-27)")'
+                + NL,
+                "",
+            )
+        ],
+        _pytest(f"{UJI_VEKTOR}::test_pencarian_tanpa_pengguna_ditolak_sebelum_ke_qdrant"),
+        harus_memuat="DID NOT RAISE",
+        kelompok="db",
+    ),
+    Mutasi(
+        "3.5",
+        "hapus_milik tanpa saringan pengguna — titik semua pengguna terhapus",
+        [
+            Sunting(
+                f"{MODUL}/platform/vektor.py",
+                '            {"filter": {"must": [{"key": "user_id", "match": {"value": str(user_id)}}]}},',
+                '            {"filter": {"must": []}},',
+            )
+        ],
+        _pytest(f"{UJI_VEKTOR}::test_hapus_milik_menghapus_titik_satu_pengguna_saja"),
+        harus_memuat="titik pengguna lain ikut terhapus",
+        kelompok="db",
+    ),
+    Mutasi(
+        "3.5",
+        "pesan GalatVektor memuat badan galat Qdrant (yang memantulkan masukan)",
+        [
+            Sunting(
+                f"{MODUL}/platform/vektor.py",
+                """raise GalatVektor(f"qdrant {metode} {jalur.split('?')[0]} → {r.status_code}")""",
+                """raise GalatVektor(f"qdrant {metode} {jalur.split('?')[0]} → {r.status_code} {r.text}")""",
+            )
+        ],
+        _pytest(f"{UJI_VEKTOR}::test_galat_qdrant_tidak_memantulkan_isi_permintaan"),
+        harus_memuat="badan galat Qdrant ikut",
+        kelompok="db",
+    ),
+    Mutasi(
+        "3.5",
+        "koleksi berdimensi lain dipakai begitu saja",
+        [
+            Sunting(
+                f"{MODUL}/platform/vektor.py",
+                '                raise GalatVektor(f"koleksi {nama} bukan kosinus berdimensi {dimensi}")',
+                "                pass",
+            )
+        ],
+        _pytest(f"{UJI_VEKTOR}::test_koleksi_berdimensi_lain_ditolak_bukan_dipakai"),
+        harus_memuat="DID NOT RAISE",
+        kelompok="db",
+    ),
+    Mutasi(
+        "3.5",
+        "penyemat memakai hash() Python — vektor berbeda tiap proses",
+        [
+            Sunting(
+                f"{MODUL}/platform/sematan.py",
+                "            cerna = hashlib.blake2b(fitur.encode(), digest_size=8, key=self._kunci).digest()",
+                '            cerna = hash(fitur).to_bytes(8, "little", signed=True)',
+            )
+        ],
+        _pytest(
+            "tests/unit/test_sematan.py::test_sama_di_tiap_proses_bukan_hash_python_yang_diacak"
+        ),
+        harus_memuat="assert [",
+    ),
+    Mutasi(
+        "3.5",
+        "penyemat mengabaikan kuncinya — kata isi jurnal terbaca dari vektor dengan kamus",
+        [
+            Sunting(
+                f"{MODUL}/platform/sematan.py",
+                "            cerna = hashlib.blake2b(fitur.encode(), digest_size=8, key=self._kunci).digest()",
+                "            cerna = hashlib.blake2b(fitur.encode(), digest_size=8).digest()",
+            )
+        ],
+        _pytest(
+            "tests/unit/test_sematan.py::test_tanpa_kunci_yang_sama_kata_tidak_bisa_ditebak_dari_vektor"
+        ),
+        harus_memuat="kata terbaca tanpa kunci",
+    ),
+    # ── Sprint 3 · 3.4 journal — daftar TANPA body; isi jurnal tidak pernah masuk event ──
+    Mutasi(
+        "3.4",
+        "kontrak daftar jurnal memuat body (walau kosong)",
+        [
+            Sunting(
+                f"{MODUL}/journal/schemas.py",
+                "    word_count: int"
+                + NL
+                + "    created_at: datetime"
+                + NL
+                + "    updated_at: datetime"
+                + NL
+                + NL
+                + NL
+                + "class Jurnal(RingkasanJurnal):",
+                "    word_count: int"
+                + NL
+                + "    created_at: datetime"
+                + NL
+                + "    updated_at: datetime"
+                + NL
+                + "    body: str | None = None"
+                + NL
+                + NL
+                + NL
+                + "class Jurnal(RingkasanJurnal):",
+            )
+        ],
+        _pytest(f"{UJI_JURNAL}::test_kontrak_daftar_jurnal_tidak_punya_medan_body"),
+        harus_memuat="kontrak GET /journal memuat body",
+        kelompok="db",
+    ),
+    Mutasi(
+        "3.4",
+        "kueri daftar jurnal memilih body — isi tulisan ikut ke layar ringkasan",
+        [
+            Sunting(
+                f"{MODUL}/journal/repository.py",
+                "title, occurred_at, word_count, created_at, updated_at"
+                + NL
+                + "    FROM journal_entries",
+                "title, body, occurred_at, word_count, created_at, updated_at"
+                + NL
+                + "    FROM journal_entries",
+            ),
+            Sunting(
+                f"{MODUL}/journal/repository.py",
+                "    return [RingkasanJurnal.model_validate(dict(b)) for b in hasil.mappings()]",
+                "    return [Jurnal.model_validate(dict(b)) for b in hasil.mappings()]",
+            ),
+        ],
+        _pytest(f"{UJI_JURNAL}::test_kueri_daftar_tidak_membaca_body_dari_basis_data"),
+        harus_memuat="kueri daftar memilih body",
+        kelompok="db",
+    ),
+    # ── Sprint 3 · 3.6 ekstraksi memori dari jurnal & mood ──
+    Mutasi(
+        "3.6",
+        "memori ekstraksi tanpa event sumber",
+        [
+            Sunting(
+                f"{MODUL}/memory/ekstraksi.py",
+                "        source_event_id=ev.id,",
+                "        source_event_id=None,  # type: ignore[arg-type]",
+            )
+        ],
+        _pytest(
+            f"{UJI_MEMORI}::test_tiap_memori_punya_kind_scope_confidence_bukti_dan_event_sumber"
+        ),
+        harus_memuat="memori tanpa event sumber",
+        kelompok="db",
+    ),
+    Mutasi(
+        "3.6",
+        "keyakinan memori dibiarkan bawaan kolom (0.500)",
+        [
+            Sunting(
+                f"{MODUL}/memory/repository.py",
+                "scope, content, confidence, evidence_count,"
+                + NL
+                + "                          model_version, source_event_id, valid_from)"
+                + NL
+                + "    VALUES (:id, :user_id, :kind, :scope, :content, :confidence, :evidence_count,",
+                "scope, content, evidence_count,"
+                + NL
+                + "                          model_version, source_event_id, valid_from)"
+                + NL
+                + "    VALUES (:id, :user_id, :kind, :scope, :content, :evidence_count,",
+            )
+        ],
+        _pytest(
+            f"{UJI_MEMORI}::test_tiap_memori_punya_kind_scope_confidence_bukti_dan_event_sumber"
+        ),
+        harus_memuat="Decimal('0.500')",
+        kelompok="db",
+    ),
+    Mutasi(
+        "3.6",
+        "id memori tidak deterministik — event yang diserahkan lagi menggandakan memori",
+        [
+            Sunting(
+                f"{MODUL}/memory/ekstraksi.py",
+                'return uuid5(_RUANG_ID_MEMORI, f"{event_type}:{subjek_id}:{kind}")',
+                'return uuid5(_RUANG_ID_MEMORI, f"{event_type}:{subjek_id}:{kind}:'
+                "{__import__('os').urandom(8).hex()}\")",
+            )
+        ],
+        _pytest(f"{UJI_MEMORI}::test_event_yang_diserahkan_lagi_tidak_menggandakan_memori"),
+        harus_memuat="memori ganda untuk satu event",
+        kelompok="db",
+    ),
+    Mutasi(
+        "3.6",
+        "ekstraksi membaca jurnal yang sudah dihapus",
+        [
+            Sunting(
+                f"{MODUL}/journal/repository.py",
+                "    WHERE id = :id AND deleted_at IS NULL" + NL + "    FOR SHARE",
+                "    WHERE id = :id" + NL + "    FOR SHARE",
+            )
+        ],
+        _pytest(f"{UJI_MEMORI}::test_jurnal_yang_dihapus_sebelum_diekstrak_tidak_diingat"),
+        harus_memuat="jurnal terhapus tetap diingat",
+        kelompok="db",
+    ),
+    Mutasi(
+        "3.6",
+        "ekstraksi tanpa kunci BAGI — PATCH serentak kalah, memori memuat isi lama",
+        [
+            Sunting(
+                f"{MODUL}/journal/repository.py",
+                "    WHERE id = :id AND deleted_at IS NULL" + NL + "    FOR SHARE" + NL,
+                "    WHERE id = :id AND deleted_at IS NULL" + NL,
+            )
+        ],
+        _pytest(f"{UJI_MEMORI}::test_sunting_jurnal_menunggu_ekstraksi_yang_sedang_membacanya"),
+        harus_memuat="PATCH tidak menunggu ekstraksi yang sedang membaca jurnal",
+        kelompok="db",
+    ),
+    Mutasi(
+        "3.6",
+        "hapus jurnal tidak memanggil pendengarnya — isi hidup terus di memori",
+        [
+            Sunting(
+                f"{MODUL}/journal/service.py",
+                "            raise _tidak_ditemukan()"
+                + NL
+                + "        for p in pendengar:"
+                + NL
+                + "            await p(conn, jurnal_id)"
+                + NL,
+                "            raise _tidak_ditemukan()" + NL,
+            )
+        ],
+        _pytest(f"{UJI_MEMORI}::test_jurnal_dihapus_isi_memori_hilang_seketika_lalu_titiknya"),
+        harus_memuat="isi jurnal terhapus tetap di memori sampai penyelaras lewat",
+        kelompok="db",
+    ),
+    Mutasi(
+        "3.6",
+        "sunting jurnal tidak memanggil pendengarnya — memori memuat isi lama",
+        [
+            Sunting(
+                f"{MODUL}/journal/service.py",
+                "            if jurnal is not None:"
+                + NL
+                + "                for p in pendengar:"
+                + NL
+                + "                    await p(conn, jurnal_id)"
+                + NL,
+                "",
+            )
+        ],
+        _pytest(f"{UJI_MEMORI}::test_jurnal_disunting_memori_dan_vektornya_mengikuti"),
+        harus_memuat="assert 'bertengkar dengan atasan' == 'berdamai dengan atasan'",
+        kelompok="db",
+    ),
+    Mutasi(
+        "3.6",
+        "titik rakit tidak memasang pendengar jurnal",
+        [
+            Sunting(
+                "apps/api/src/hvx/main.py",
+                "    app.state.pendengar_jurnal_berubah = (memory.selaraskan_jurnal,)",
+                "    app.state.pendengar_jurnal_berubah = ()",
+            )
+        ],
+        _pytest("tests/unit/test_main.py::test_titik_rakit_memasang_pembaca_lintas_modul"),
+        harus_memuat="sunting & hapus jurnal tidak menyelaraskan memorinya",
+    ),
+    Mutasi(
+        "3.6",
+        "pekerja tidak merakit konsumen memori",
+        [
+            Sunting(
+                "apps/api/src/hvx/pekerja.py",
+                "            tangani=memory.ekstrak," + NL + "        )," + NL + "    ]",
+                "            tangani=memory.ekstrak," + NL + "        )," + NL + "    ][:0]",
+            )
+        ],
+        _pytest(f"{UJI_PEKERJA}::{_UJI_PEKERJA_PENUH}"),
+        harus_memuat="pekerja tidak mengekstrak memori dari mood",
+        kelompok="db",
+    ),
+    # ── Sprint 3 · 3.5 penyelaras memories → Qdrant ──
+    Mutasi(
+        "3.5",
+        "pekerja tidak menyalakan penyelaras vektor",
+        [Sunting("apps/api/src/hvx/pekerja.py", "        if penyelaras:", "        if False:")],
+        _pytest(f"{UJI_PEKERJA}::{_UJI_PEKERJA_PENUH}"),
+        harus_memuat="pekerja tidak menyemat memori ke Qdrant",
+        kelompok="db",
+    ),
+    Mutasi(
+        "3.5",
+        "sunting isi tidak menandai vektornya basi",
+        [
+            Sunting(
+                f"{MODUL}/memory/repository.py",
+                "      embedding_model = CASE WHEN content IS DISTINCT FROM :content THEN NULL"
+                + NL
+                + "                             ELSE embedding_model END",
+                "      embedding_model = embedding_model",
+            )
+        ],
+        _pytest(f"{UJI_MEMORI}::test_jurnal_disunting_memori_dan_vektornya_mengikuti"),
+        harus_memuat="isi berubah, vektor lama dianggap masih cocok",
+        kelompok="db",
+    ),
+    Mutasi(
+        "3.5",
+        "penyelaras membuang baris tanpa membuang titiknya",
+        [
+            Sunting(
+                f"{MODUL}/memory/penyelaras.py",
+                "        await self._vektor.hapus(self._koleksi, buang)" + NL,
+                "",
+            )
+        ],
+        _pytest(f"{UJI_MEMORI}::test_jurnal_dihapus_isi_memori_hilang_seketika_lalu_titiknya"),
+        harus_memuat="titik vektornya tertinggal",
+        kelompok="db",
+    ),
+    Mutasi(
+        "3.5",
+        "hapus jurnal tidak mengosongkan isi memorinya",
+        [
+            Sunting(
+                f"{MODUL}/memory/repository.py",
+                "    UPDATE memories SET content = '', summary = NULL, deleted_at = now()",
+                "    UPDATE memories SET summary = NULL, deleted_at = now()",
+            )
+        ],
+        _pytest(f"{UJI_MEMORI}::test_jurnal_dihapus_isi_memori_hilang_seketika_lalu_titiknya"),
+        harus_memuat="isi jurnal terhapus tetap di memori sampai penyelaras lewat",
+        kelompok="db",
+    ),
+    Mutasi(
+        "3.5",
+        "payload titik Qdrant memuat isi memori",
+        [
+            Sunting(
+                f"{MODUL}/memory/penyelaras.py",
+                '"kind": b.kind, "model": nama},',
+                '"kind": b.kind, "model": nama, "content": b.content},',
+            )
+        ],
+        _pytest(f"{UJI_MEMORI}::test_penyelaras_menyemat_tanpa_isi_di_payload"),
+        harus_memuat="payload Qdrant memuat lebih dari rujukan",
+        kelompok="db",
+    ),
+    Mutasi(
+        "3.5",
+        "memori penyemat lain tidak disemat ulang (spec/01 DAN migrasi)",
+        [
+            Sunting(
+                "spec/01-DATABASE-SCHEMA.md",
+                "    WHERE m.deleted_at IS NOT NULL OR m.embedding_model IS DISTINCT FROM p_model",
+                "    WHERE m.deleted_at IS NOT NULL OR m.model_version IS NULL",
+            ),
+            Sunting(
+                f"{MIGRASI}/0006_penyelaras_memori.up.sql",
+                "    WHERE m.deleted_at IS NOT NULL OR m.embedding_model IS DISTINCT FROM p_model",
+                "    WHERE m.deleted_at IS NOT NULL OR m.model_version IS NULL",
+            ),
+        ],
+        _pytest(f"{UJI_MEMORI}::test_penyemat_lain_disemat_ulang_bukan_dicampur"),
+        harus_memuat="memori penyemat lama tidak disemat ulang",
+        kelompok="db",
+    ),
+    Mutasi(
+        "3.5",
+        "EXECUTE penyelaras memori tidak dicabut dari PUBLIC (spec/01 DAN migrasi)",
+        [
+            Sunting(
+                "spec/01-DATABASE-SCHEMA.md",
+                "REVOKE ALL ON FUNCTION memori_perlu_diselaraskan(text, integer) FROM PUBLIC;" + NL,
+                "",
+            ),
+            Sunting(
+                f"{MIGRASI}/0006_penyelaras_memori.up.sql",
+                "REVOKE ALL ON FUNCTION memori_perlu_diselaraskan(text, integer) FROM PUBLIC;" + NL,
+                "",
+            ),
+        ],
+        _pytest(
+            "tests/integration/test_kepemilikan_data.py"
+            "::test_fungsi_security_definer_hanya_daftar_izin_terpatok_dan_bukan_untuk_public"
+        ),
+        harus_memuat="memori_perlu_diselaraskan",
+        kelompok="db",
+    ),
+    # ── Sprint 3 · 3.7 pencarian memori — agent tanpa izin scope tidak menerima barisnya ──
+    Mutasi(
+        "3.7",
+        "pencarian mengabaikan keputusan pengguna",
+        [
+            Sunting(
+                f"{MODUL}/memory/pencarian.py",
+                '            keputusan = await self._izin.cek(user_id, subjek, scope, "read", bawaan=_BAWAAN_RISK_0)',
+                '            keputusan = "allow"',
+            )
+        ],
+        _pytest(f"{UJI_MEMORI}::test_agent_tanpa_izin_scope_tidak_menerima_barisnya"),
+        harus_memuat="journal_raw terbuka tanpa izin",
+        kelompok="db",
+    ),
+    Mutasi(
+        "3.7",
+        "manifest tidak membatasi — semua scope resmi dicari",
+        [
+            Sunting(
+                f"{MODUL}/memory/pencarian.py",
+                "        for scope in sorted(diminta):",
+                "        for scope in sorted(identity.SCOPE_RESMI):",
+            )
+        ],
+        _pytest(f"{UJI_MEMORI}::test_agent_tanpa_izin_scope_tidak_menerima_barisnya"),
+        harus_memuat="izin pengguna melebarkan manifest",
+        kelompok="db",
+    ),
+    Mutasi(
+        "3.7",
+        "scope tidak diperiksa ulang di baris PostgreSQL — payload Qdrant basi menang",
+        [
+            Sunting(
+                f"{MODUL}/memory/repository.py",
+                "      AND scope = ANY(CAST(:scope AS text[]))" + NL,
+                "",
+            )
+        ],
+        _pytest(f"{UJI_MEMORI}::test_payload_qdrant_basi_tidak_meloloskan_scope"),
+        harus_memuat="scope di payload Qdrant menang atas scope di baris",
+        kelompok="db",
+    ),
+    Mutasi(
+        "3.7",
+        "memori terhapus diserahkan selama titiknya masih di Qdrant",
+        [
+            Sunting(
+                f"{MODUL}/memory/repository.py",
+                "    WHERE id = ANY(CAST(:ids AS uuid[])) AND deleted_at IS NULL"
+                + NL
+                + "      AND scope",
+                "    WHERE id = ANY(CAST(:ids AS uuid[]))" + NL + "      AND scope",
+            )
+        ],
+        _pytest(f"{UJI_MEMORI}::test_jurnal_dihapus_isi_memori_hilang_seketika_lalu_titiknya"),
+        harus_memuat="memori terhapus diserahkan karena titiknya masih ada",
+        kelompok="db",
+    ),
+    Mutasi(
+        "3.7",
+        "kueri tanpa kata tetap menanyai Qdrant",
+        [
+            Sunting(
+                f"{MODUL}/memory/pencarian.py", "        if not any(vektor):", "        if False:"
+            )
+        ],
+        _pytest(f"{UJI_MEMORI}::test_kueri_tanpa_kata_tidak_menanyai_qdrant"),
+        harus_memuat="Qdrant ditanya padahal jawabannya sudah pasti kosong",
+        kelompok="db",
+    ),
+    Mutasi(
+        "3.7",
+        "kandidat berskor 0 diserahkan sebagai kecocokan",
+        [
+            Sunting(
+                f"{MODUL}/memory/pencarian.py",
+                "            positif = [k for k in kandidat if k.skor > 0]  # kosinus ≤ 0 bukan kemiripan",
+                "            positif = list(kandidat)  # kosinus ≤ 0 bukan kemiripan",
+            )
+        ],
+        _pytest(f"{UJI_MEMORI}::test_kandidat_berskor_nol_bukan_kecocokan"),
+        harus_memuat="kandidat berskor 0 diserahkan sebagai kecocokan",
+        kelompok="db",
+    ),
+    Mutasi(
+        "3.7",
+        "pencarian tidak menolak scope di luar daftar resmi sendiri",
+        [Sunting(f"{MODUL}/memory/pencarian.py", "        if asing:", "        if False:")],
+        _pytest(
+            f"{UJI_MEMORI}::test_permintaan_yang_salah_bentuk_ditolak[manifest0-rapat-5-daftar resmi]"
+        ),
+        harus_memuat="Regex pattern did not match",
+        kelompok="db",
+    ),
+    Mutasi(
+        "3.7",
+        "batas hasil tidak dijaga",
+        [
+            Sunting(
+                f"{MODUL}/memory/pencarian.py",
+                "not 1 <= batas <= MAKS_HASIL:",
+                "not 0 <= batas <= MAKS_HASIL + 1_000:",
+            )
+        ],
+        _pytest(
+            f"{UJI_MEMORI}::test_permintaan_yang_salah_bentuk_ditolak[manifest2-rapat-0-batas]"
+        ),
+        harus_memuat="Qdrant ditanya padahal jawabannya sudah pasti kosong",
+        kelompok="db",
+    ),
+    Mutasi(
+        "3.7",
+        "scope sensitif terbuka karena bawaan risk 0",
+        [
+            Sunting(
+                f"{MODUL}/identity/izin.py",
+                '        if bawaan == "allow" and SCOPE_RESMI[scope].sensitif:',
+                "        if False:",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_izin.py::test_scope_sensitif_tidak_pernah_allow_karena_bawaan"
+        ),
+        harus_memuat="journal_raw terbuka karena bawaan",
+        kelompok="db",
+    ),
+    Mutasi(
+        "3.7",
+        "mesin izin menerima scope di luar daftar resmi",
+        [
+            Sunting(
+                f"{MODUL}/identity/izin.py",
+                "    if scope not in SCOPE_RESMI:",
+                "    if False:",
+            )
+        ],
+        _pytest(
+            "tests/unit/test_izin_masukan.py::test_scope_dan_aksi_tak_dikenal_ditolak[habit-read]"
+        ),
+        harus_memuat="disentuh sebelum masukan divalidasi",
+    ),
+    # ── Sprint 3 · 3.8 activities — `inferred` terpisah dari `manual` ──
+    Mutasi(
+        "3.8",
+        "jalur sistem mencatat tebakannya sebagai manual",
+        [
+            Sunting(
+                f"{MODUL}/activities/service.py",
+                '        source="inferred",',
+                '        source="manual",',
+            )
+        ],
+        _pytest(f"{UJI_AKTIVITAS}::test_jalur_sistem_selalu_inferred_dan_bisa_dipisahkan"),
+        harus_memuat="assert 'manual' == 'inferred'",
+        kelompok="db",
+    ),
+    Mutasi(
+        "3.8",
+        "saringan ?source= diabaikan — tebakan bercampur dengan catatan manusia",
+        [
+            Sunting(
+                f"{MODUL}/activities/repository.py",
+                "      AND (CAST(:source AS text) IS NULL OR source = CAST(:source AS text))" + NL,
+                "",
+            )
+        ],
+        _pytest(f"{UJI_AKTIVITAS}::test_jalur_sistem_selalu_inferred_dan_bisa_dipisahkan"),
+        harus_memuat="tebakan sistem bercampur dengan catatan manusia",
+        kelompok="db",
+    ),
+    Mutasi(
+        "3.8",
+        "klien bisa menyatakan sumber aktivitasnya",
+        [
+            Sunting(
+                f"{MODUL}/activities/schemas.py",
+                "    payload: Payload = Field(default_factory=dict)"
+                + NL
+                + NL
+                + '    @model_validator(mode="after")',
+                "    payload: Payload = Field(default_factory=dict)"
+                + NL
+                + '    source: Sumber = "manual"'
+                + NL
+                + NL
+                + '    @model_validator(mode="after")',
+            )
+        ],
+        _pytest(f"{UJI_AKTIVITAS}::test_klien_hanya_bisa_mencatat_manual"),
+        harus_memuat="klien bisa menyatakan aktivitasnya disimpulkan",
+        kelompok="db",
+    ),
+    # ── Sprint 3 · tinjauan adversarial: keamanan (S1–S5) · kontrak (K2–K8) ──
+    Mutasi(
+        "3.5",
+        "S1: penyemat per pengguna memakai kunci proses — akun biasa bisa menyemat kamus",
+        [
+            Sunting(
+                f"{MODUL}/platform/sematan.py",
+                "        return _SematanHash(turunan, self._dimensi, self._nama)",
+                "        return _SematanHash(self._kunci, self._dimensi, self._nama)",
+            )
+        ],
+        _pytest("tests/unit/test_sematan.py::test_tiap_pengguna_ruang_vektornya_sendiri"),
+        harus_memuat="vektor dua pengguna sebanding",
+    ),
+    Mutasi(
+        "3.5",
+        "S2: penyelaras menyemat di event loop pekerja",
+        [
+            Sunting(
+                f"{MODUL}/memory/penyelaras.py",
+                "        vektor = await asyncio.to_thread("
+                + NL
+                + "            lambda: [penyemat.semat(b.content[:MAKS_TEKS_SEMAT]) for b in semat]"
+                + NL
+                + "        )",
+                "        vektor = [penyemat.semat(b.content) for b in semat]",
+            )
+        ],
+        _pytest(f"{UJI_MEMORI}::test_penyelaras_tidak_menahan_event_loop_pekerja"),
+        harus_memuat="penyelaras menahan event loop pekerja",
+        kelompok="db",
+    ),
+    Mutasi(
+        "3.5",
+        "S2: teks yang disemat tidak dibatasi — biaya satu memori tanpa batas",
+        [
+            Sunting(
+                f"{MODUL}/memory/penyelaras.py",
+                "penyemat.semat(b.content[:MAKS_TEKS_SEMAT])",
+                "penyemat.semat(b.content)",
+            )
+        ],
+        _pytest(f"{UJI_MEMORI}::test_penyelaras_hanya_menyemat_awal_teks_panjang"),
+        harus_memuat="teks yang disemat tidak dibatasi",
+        kelompok="db",
+    ),
+    Mutasi(
+        "3.3",
+        "S3: penanda relay tidak dipangkas — satu penanda per event menumpuk di Redis",
+        [
+            Sunting(
+                f"{MODUL}/events/relay.py",
+                '        await self._r.zremrangebyscore(self._k_terkirim(), "-inf", f"({batas}")'
+                + NL,
+                "",
+            )
+        ],
+        _pytest(f"{UJI_RELAY}::test_penanda_relay_dipangkas_di_luar_jendela_belakang"),
+        harus_memuat="penanda event di luar jendela belakang tidak dipangkas",
+        kelompok="db",
+    ),
+    Mutasi(
+        "3.3",
+        "stream mati tidak pernah dipangkas",
+        [
+            Sunting(
+                f"{MODUL}/events/stream.py",
+                '    return int(await redis.xtrim(kunci_mati(awalan), minid=f"{batas_ms}-0", approximate=False))',
+                "    return 0",
+            )
+        ],
+        _pytest(f"{UJI_RELAY}::test_stream_mati_dipangkas_menurut_umur"),
+        harus_memuat="stream mati tidak dipangkas menurut umur",
+        kelompok="db",
+    ),
+    Mutasi(
+        "3.3",
+        "S4: fungsi relay boleh dipanggil peran api (spec/01 DAN migrasi)",
+        [
+            Sunting(
+                "spec/01-DATABASE-SCHEMA.md",
+                "GRANT EXECUTE ON FUNCTION events_untuk_relay(timestamptz, uuid, integer) TO hvx_pekerja;",
+                "GRANT EXECUTE ON FUNCTION events_untuk_relay(timestamptz, uuid, integer) TO hvx_app;",
+            ),
+            Sunting(
+                f"{MIGRASI}/0005_relay_event.up.sql",
+                "GRANT EXECUTE ON FUNCTION events_untuk_relay(timestamptz, uuid, integer) TO hvx_pekerja;",
+                "GRANT EXECUTE ON FUNCTION events_untuk_relay(timestamptz, uuid, integer) TO hvx_app;",
+            ),
+        ],
+        _pytest(
+            "tests/integration/test_kepemilikan_data.py"
+            "::test_fungsi_security_definer_hanya_daftar_izin_terpatok_dan_bukan_untuk_public"
+        ),
+        harus_memuat="seharusnya ['hvx_pekerja']",
+        kelompok="db",
+    ),
+    Mutasi(
+        "3.3",
+        "S4: api mulai sebagai anggota hvx_pekerja",
+        [
+            Sunting(
+                f"{MODUL}/platform/db.py",
+                "    if not pekerja and peran.anggota_pekerja:",
+                "    if False:",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_aplikasi_hidup.py::test_api_menolak_mulai_sebagai_peran_pekerja"
+        ),
+        harus_memuat="DID NOT RAISE",
+        kelompok="db",
+    ),
+    Mutasi(
+        "3.3",
+        "S4: pekerja mulai tanpa peran hvx_pekerja",
+        [
+            Sunting(
+                f"{MODUL}/platform/db.py",
+                "    if pekerja and not peran.anggota_pekerja:",
+                "    if False:",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_aplikasi_hidup.py::"
+            "test_pekerja_menolak_mulai_dengan_peran_yang_salah[dsn_aplikasi-hvx_pekerja]"
+        ),
+        harus_memuat="DID NOT RAISE",
+        kelompok="db",
+    ),
+    Mutasi(
+        "3.8",
+        "S5: jsonb dari klien tanpa batas kedalaman — tersimpan lalu 500 selamanya",
+        [
+            Sunting(
+                f"{MODUL}/platform/teks.py",
+                "        if _wadah >= KEDALAMAN_JSON_MAKS:",
+                "        if False:",
+            )
+        ],
+        _pytest(f"{UJI_AKTIVITAS}::test_payload_terlalu_dalam_ditolak_sebelum_tersimpan"),
+        harus_memuat="payload terlalu dalam tidak ditolak 400",
+        kelompok="db",
+    ),
+    Mutasi(
+        "3.7",
+        "K2a: pencarian tidak memeriksa kesegaran vektor — kata yang dihapus masih cocok",
+        [Sunting(f"{MODUL}/memory/repository.py", "      AND embedding_model = :model" + NL, "")],
+        _pytest(
+            f"{UJI_MEMORI}::test_kata_yang_dihapus_dari_jurnal_tidak_cocok_sebelum_penyelaras_lewat"
+        ),
+        harus_memuat="kata yang dihapus pemiliknya masih cocok",
+        kelompok="db",
+    ),
+    Mutasi(
+        "3.7",
+        "K2b: kandidat diambil sekali — titik memori terhapus menyingkirkan hasil sah",
+        [Sunting(f"{MODUL}/memory/pencarian.py", "_MAKS_HALAMAN = 5", "_MAKS_HALAMAN = 1")],
+        _pytest(f"{UJI_MEMORI}::test_titik_memori_terhapus_tidak_menyingkirkan_hasil_yang_sah"),
+        harus_memuat="hasil sah tersingkir oleh titik memori terhapus",
+        kelompok="db",
+    ),
+    Mutasi(
+        "3.5",
+        "jangkar mutasi bergeser — mutasi diam-diam tidak mengubah apa pun",
+        [Sunting(f"{MODUL}/memory/pencarian.py", "_MAKS_HALAMAN = 5", "_MAKS_HALAMAN = 6")],
+        _pytest("tests/unit/test_jangkar_mutasi.py"),
+        harus_memuat="jangkar cocok 0x",
+    ),
+    Mutasi(
+        "3.5",
+        "K3: penyelaras menandai tersemat tanpa mencocokkan isi — vektor lama menang",
+        [
+            Sunting(
+                f"{MODUL}/memory/repository.py",
+                "      AND encode(sha256(convert_to(m.content, 'UTF8')), 'hex') = s.cerna" + NL,
+                "",
+            )
+        ],
+        _pytest(f"{UJI_MEMORI}::test_sunting_jurnal_tidak_menunggu_qdrant_yang_lambat"),
+        harus_memuat="vektor isi LAMA ditandai cocok dengan isi yang disunting",
+        kelompok="db",
+    ),
+    Mutasi(
+        "3.5",
+        "K4: penyelaras menimpa model_version (tempat ambang #34)",
+        [
+            Sunting(
+                f"{MODUL}/memory/repository.py",
+                "    SET embedding_id = CAST(m.id AS text), embedding_model = :model" + NL,
+                "    SET embedding_id = CAST(m.id AS text), embedding_model = :model,"
+                + " model_version = :model"
+                + NL,
+            )
+        ],
+        _pytest(f"{UJI_MEMORI}::test_penyelaras_menyemat_tanpa_isi_di_payload"),
+        harus_memuat="penyelaras menimpa model_version (K4)",
+        kelompok="db",
+    ),
+    Mutasi(
+        "3.8",
+        "K5: ended_at masa depan diterima",
+        [
+            Sunting(
+                f"{MODUL}/activities/service.py",
+                "            if badan.ended_at is not None and badan.ended_at > batas:",
+                "            if False:",
+            )
+        ],
+        _pytest(f"{UJI_AKTIVITAS}::test_ended_at_masa_depan_dan_durasi_yang_bertentangan_ditolak"),
+        harus_memuat="ended_at masa depan diterima",
+        kelompok="db",
+    ),
+    Mutasi(
+        "3.8",
+        "K5: duration_seconds yang membantah ended_at diterima",
+        [
+            Sunting(
+                f"{MODUL}/activities/schemas.py",
+                "            if self.duration_seconds is not None and abs(self.duration_seconds - rentang) > 1:",
+                "            if False:",
+            )
+        ],
+        _pytest(f"{UJI_AKTIVITAS}::test_ended_at_masa_depan_dan_durasi_yang_bertentangan_ditolak"),
+        harus_memuat="durasi yang membantah ended_at diterima",
+        kelompok="db",
+    ),
+    Mutasi(
+        "3.1",
+        'K7: uji admisi event mengoersi tipe (True → 1, "3" → 3)',
+        [
+            Sunting(
+                f"{MODUL}/events/kontrak.py",
+                '    model_config = ConfigDict(extra="forbid", frozen=True, strict=True)',
+                '    model_config = ConfigDict(extra="forbid", frozen=True)',
+            )
+        ],
+        _pytest("tests/unit/test_kontrak_event.py::test_payload_di_luar_kontrak_ditolak"),
+        harus_memuat="DID NOT RAISE",
+    ),
+    Mutasi(
+        "3.2",
+        "K8: penerbit jurnal menelan galatnya — jurnal tersimpan tanpa event",
+        [
+            Sunting(
+                f"{MODUL}/journal/service.py",
+                "            await events.terbitkan(",
+                "            await _telan(events.terbitkan)(",
+            ),
+            _sisip(
+                f"{MODUL}/journal/service.py",
+                "def _telan(f: Any) -> Any:"
+                + NL
+                + "    async def g(*a: Any, **k: Any) -> Any:"
+                + NL
+                + "        try:"
+                + NL
+                + "            return await f(*a, **k)"
+                + NL
+                + "        except Exception:"
+                + NL
+                + "            return None"
+                + NL
+                + NL
+                + "    return g",
+            ),
+        ],
+        _pytest(
+            f"{UJI_TERBIT}::test_tiap_baris_peta_batal_bila_eventnya_gagal_terbit[POST /journal]"
+        ),
+        harus_memuat="galat penerbitan ditelan",
+        kelompok="db",
+    ),
+    Mutasi(
+        "3.7",
+        "K8: scope ditambahkan ke kode tanpa spec/05",
+        [
+            Sunting(
+                f"{MODUL}/identity/scope.py",
+                '        "journal_raw": Scope("isi jurnal apa adanya, dan memori episodiknya (3.6)", sensitif=True),',
+                '        "journal_raw": Scope("isi jurnal apa adanya, dan memori episodiknya (3.6)", sensitif=True),'
+                + NL
+                + '        "health": Scope("kesehatan", sensitif=True),',
+            )
+        ],
+        _pytest("tests/unit/test_scope_resmi.py::test_daftar_scope_resmi_spec05_sama_dengan_kode"),
+        harus_memuat="spec/05 ≠ identity.SCOPE_RESMI",
+    ),
+    Mutasi(
+        "3.3",
+        "K8: `python -m hvx.pekerja` tidak menjalankan apa pun",
+        [
+            Sunting(
+                "apps/api/src/hvx/pekerja.py",
+                "def main() -> None:" + NL + "    asyncio.run(_utama())",
+                "def main() -> None:" + NL + "    return None",
+            )
+        ],
+        _pytest(f"{UJI_PEKERJA}::test_python_m_hvx_pekerja_sebagai_proses_sungguhan"),
+        harus_memuat="tidak menyalurkan event",
+        kelompok="db",
+    ),
+    # ── Sprint 3 · tinjauan penegak buta: 68 mutasi dicoba, 49 lolos seluruh suite ──
+    # Tiap mutasi di bawah LOLOS suite sebelum uji pembunuhnya ditulis. M07 · M08
+    # (penanda ber-TTL) dan M19 (FOR UPDATE SKIP LOCKED) tidak berlaku lagi: desain
+    # penanda dan penyelaras sudah diganti tinjauan keamanan/kontrak (S3 · K3).
+    Mutasi(
+        "3.1",
+        "kunci yang sama untuk SUBJEK lain ditelan sebagai kiriman ulang",
+        [
+            Sunting(
+                f"{MODUL}/events/penerbit.py", "        and lama.subject_id == subject_id" + NL, ""
+            )
+        ],
+        _pytest(f"{UJI_EVENT}::test_kunci_sama_untuk_subjek_atau_jenis_lain_ditolak_keras"),
+        harus_memuat="DID NOT RAISE",
+        kelompok="db",
+    ),
+    Mutasi(
+        "3.1",
+        "kunci yang sama untuk JENIS lain (dilewati → dicabut) ditelan",
+        [
+            Sunting(
+                f"{MODUL}/events/penerbit.py",
+                "        lama.event_type == event_type"
+                + NL
+                + "        and lama.subject_type == subject_type"
+                + NL,
+                "        lama.subject_type == subject_type" + NL,
+            )
+        ],
+        _pytest(f"{UJI_EVENT}::test_kunci_sama_untuk_subjek_atau_jenis_lain_ditolak_keras"),
+        harus_memuat="DID NOT RAISE",
+        kelompok="db",
+    ),
+    Mutasi(
+        "3.1",
+        "recorded_at = now() — membeku di awal transaksi, relay melompatinya",
+        [
+            Sunting(
+                f"{MODUL}/events/repository.py",
+                "    VALUES (:user_id, :event_type, :schema_version, :occurred_at, clock_timestamp(),",
+                "    VALUES (:user_id, :event_type, :schema_version, :occurred_at, now(),",
+            )
+        ],
+        _pytest(f"{UJI_EVENT}::test_recorded_at_saat_event_masuk_bukan_awal_transaksinya"),
+        harus_memuat="recorded_at = awal transaksi",
+        kelompok="db",
+    ),
+    Mutasi(
+        "3.1",
+        "kontrak V0 bernomor versi 2 — tidak dikenal satu konsumen pun",
+        [
+            Sunting(
+                f"{MODUL}/events/kontrak.py",
+                '    "mood.logged": (1, MoodDicatat),',
+                '    "mood.logged": (2, MoodDicatat),',
+            )
+        ],
+        _pytest("tests/unit/test_kontrak_event.py::test_tiap_kontrak_v0_schema_version_1"),
+        harus_memuat="kontrak V0 bernomor versi lain",
+    ),
+    Mutasi(
+        "3.1",
+        "valence 0 lolos uji admisi (spec/01: 1–5)",
+        [
+            Sunting(
+                f"{MODUL}/events/kontrak.py",
+                "    valence: Annotated[int, Field(ge=1, le=5)]",
+                "    valence: Annotated[int, Field(ge=0, le=5)]",
+            )
+        ],
+        _pytest("tests/unit/test_kontrak_event.py::test_payload_di_luar_kontrak_ditolak"),
+        harus_memuat="DID NOT RAISE",
+    ),
+    Mutasi(
+        "3.3",
+        "relay tidak menyimpan kursornya — riwayat dikirim ulang tiap putaran",
+        [
+            Sunting(
+                f"{MODUL}/events/relay.py",
+                '            await self._r.set(self._k_posisi(), f"{maju[0].isoformat()}|{maju[1]}")'
+                + NL,
+                "",
+            )
+        ],
+        _pytest(f"{UJI_RELAY}::test_penanda_relay_dipangkas_di_luar_jendela_belakang"),
+        harus_memuat="event lama terkirim",
+        kelompok="db",
+    ),
+    Mutasi(
+        "3.3",
+        "siapkan() melempar BUSYGROUP — pekerja yang dimulai ulang mati",
+        [
+            Sunting(
+                f"{MODUL}/events/stream.py",
+                '            if "BUSYGROUP" not in str(galat):',
+                "            if galat:",
+            )
+        ],
+        _pytest(f"{UJI_RELAY}::test_konsumen_dimulai_ulang_grupnya_tidak_dibuat_ulang"),
+        harus_memuat="BUSYGROUP",
+        kelompok="db",
+    ),
+    Mutasi(
+        "3.3",
+        "bawaan min_idle_ms 0 — pesan yang masih dikerjakan direbut, gagal diulang seketika",
+        [
+            Sunting(
+                f"{MODUL}/events/stream.py",
+                "        min_idle_ms: int = 30_000,",
+                "        min_idle_ms: int = 0,",
+            )
+        ],
+        _pytest(f"{UJI_RELAY}::test_bawaan_konsumen_tidak_mencoba_ulang_sebelum_menganggur_30_dtk"),
+        harus_memuat="tanpa menunggu 30 dtk",
+        kelompok="db",
+    ),
+    Mutasi(
+        "3.3",
+        "bawaan maks_kirim 50 — spec/03: stream mati sesudah 5",
+        [
+            Sunting(
+                f"{MODUL}/events/stream.py",
+                "        maks_kirim: int = 5,",
+                "        maks_kirim: int = 50,",
+            )
+        ],
+        _pytest(f"{UJI_RELAY}::test_bawaan_konsumen_stream_mati_sesudah_5_kali"),
+        harus_memuat="dicoba 8 kali",
+        kelompok="db",
+    ),
+    Mutasi(
+        "3.3",
+        "pesan yang event-nya sudah tidak ada tidak di-ACK — rujukannya ke stream mati",
+        [
+            Sunting(
+                f"{MODUL}/events/stream.py",
+                "        await self._r.xack(self.stream, self.grup, id_pesan)"
+                + NL
+                + "        return 1 if baris is not None else 0",
+                "        if baris is not None:"
+                + NL
+                + "            await self._r.xack(self.stream, self.grup, id_pesan)"
+                + NL
+                + "        return 1 if baris is not None else 0",
+            )
+        ],
+        _pytest(f"{UJI_RELAY}::test_event_akun_yang_dihapus_selesai_bukan_ke_stream_mati"),
+        harus_memuat="akun yang dihapus menumpuk",
+        kelompok="db",
+    ),
+    Mutasi(
+        "3.3",
+        "pangkas membandingkan id pesan sebagai teks — 5-10 < 5-9",
+        [
+            Sunting(
+                f"{MODUL}/events/relay.py",
+                "        paling_awal = min(batas, key=_urutan_id)",
+                "        paling_awal = min(batas)",
+            )
+        ],
+        _pytest(f"{UJI_RELAY}::test_pangkas_membandingkan_id_pesan_sebagai_angka"),
+        harus_memuat="pesan yang belum di-ACK dibuang",
+        kelompok="db",
+    ),
+    Mutasi(
+        "3.3",
+        "pekerja tidak memeriksa perannya — mulai sebagai superuser pemilik (B-40)",
+        [
+            Sunting(
+                "apps/api/src/hvx/pekerja.py",
+                "        await platform.pastikan_peran_aplikasi(engine, pekerja=True)" + NL,
+                "",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_aplikasi_hidup.py::"
+            "test_pekerja_menolak_mulai_dengan_peran_yang_salah[dsn_pemilik-superuser]"
+        ),
+        harus_memuat="DID NOT RAISE",
+        kelompok="db",
+    ),
+    Mutasi(
+        "3.3",
+        "pekerja tidak pernah memangkas stream — Redis noeviction tumbuh selamanya",
+        [
+            Sunting(
+                "apps/api/src/hvx/pekerja.py",
+                "            if putaran % PANGKAS_TIAP == 0:",
+                "            if False:",
+            )
+        ],
+        _pytest(f"{UJI_PEKERJA}::test_pekerja_memangkas_stream_yang_sudah_selesai"),
+        harus_memuat="tidak pernah memangkas",
+        kelompok="db",
+    ),
+    Mutasi(
+        "3.3",
+        "putaran yang gagal diulang tanpa jeda — CPU berputar, log banjir",
+        [
+            Sunting(
+                "apps/api/src/hvx/pekerja.py",
+                "            jeda = max(jeda_s, 1.0)  # galat berulang tidak memutar CPU",
+                "            jeda = jeda_s",
+            )
+        ],
+        _pytest("tests/unit/test_pekerja_ulang.py::test_putaran_yang_gagal_dijeda_sebelum_diulang"),
+        harus_memuat="putaran gagal dalam 0,3 dtk",
+    ),
+    Mutasi(
+        "3.6",
+        "koreksi waktu jurnal tidak menggeser memorinya",
+        [Sunting(f"{MODUL}/memory/repository.py", "      valid_from = :valid_from," + NL, "")],
+        _pytest(f"{UJI_MEMORI}::test_waktu_jurnal_yang_dikoreksi_menggeser_memorinya"),
+        harus_memuat="tidak mengikuti waktu yang dikoreksi",
+        kelompok="db",
+    ),
+    Mutasi(
+        "3.6",
+        "ekstraksi memakai waktu EVENT — koreksi sebelum diekstrak hilang",
+        [
+            Sunting(
+                f"{MODUL}/memory/ekstraksi.py",
+                '        isi, scope, sejak = teks_jurnal(jurnal), "journal_raw", jurnal.occurred_at',
+                '        isi, scope, sejak = teks_jurnal(jurnal), "journal_raw", ev.occurred_at',
+            )
+        ],
+        _pytest(f"{UJI_MEMORI}::test_waktu_jurnal_yang_dikoreksi_menggeser_memorinya"),
+        harus_memuat="tidak mengikuti waktu yang dikoreksi",
+        kelompok="db",
+    ),
+    Mutasi(
+        "3.6",
+        "ubah judul saja tidak menyelaraskan memori — judul lama tertinggal",
+        [
+            Sunting(
+                f"{MODUL}/journal/service.py",
+                "            if jurnal is not None:" + NL + "                for p in pendengar:",
+                '            if jurnal is not None and "body" in perubahan:'
+                + NL
+                + "                for p in pendengar:",
+            )
+        ],
+        _pytest(f"{UJI_MEMORI}::test_ubah_judul_saja_memori_mengikuti"),
+        harus_memuat="judul lama tetap di memori",
+        kelompok="db",
+    ),
+    Mutasi(
+        "3.6",
+        "hapus jurnal tidak mengosongkan ringkasan memorinya",
+        [
+            Sunting(
+                f"{MODUL}/memory/repository.py",
+                "    UPDATE memories SET content = '', summary = NULL, deleted_at = now()",
+                "    UPDATE memories SET content = '', deleted_at = now()",
+            )
+        ],
+        _pytest(f"{UJI_MEMORI}::test_hapus_jurnal_mengosongkan_ringkasan_memorinya"),
+        harus_memuat="ringkasan isi jurnal yang dihapus",
+        kelompok="db",
+    ),
+    Mutasi(
+        "3.6",
+        "event tanpa subjek dilewati diam-diam — tidak pernah ke stream mati",
+        [
+            Sunting(
+                f"{MODUL}/memory/ekstraksi.py",
+                '        raise ValueError(f"{ev.event_type} tanpa subject_id — tidak ada yang bisa diekstrak")',
+                "        return",
+            )
+        ],
+        _pytest(
+            "tests/unit/test_ekstraksi_memori.py::test_event_tanpa_subjek_menjadi_galat_bukan_dilewati"
+        ),
+        harus_memuat="DID NOT RAISE",
+    ),
+    Mutasi(
+        "3.7",
+        "pencarian menyerahkan memori yang masa berlakunya lewat",
+        [
+            Sunting(
+                f"{MODUL}/memory/repository.py",
+                "      AND (valid_until IS NULL OR valid_until > now())" + NL,
+                "",
+            )
+        ],
+        _pytest(f"{UJI_MEMORI}::test_memori_yang_masa_berlakunya_lewat_tidak_diserahkan"),
+        harus_memuat="valid_until-nya lewat",
+        kelompok="db",
+    ),
+    Mutasi(
+        "3.7",
+        "pencarian menyerahkan lebih dari `batas`",
+        [
+            Sunting(
+                f"{MODUL}/memory/pencarian.py",
+                "        return HasilCariMemori(items[:batas], dipakai, perlu_izin)",
+                "        return HasilCariMemori(items, dipakai, perlu_izin)",
+            )
+        ],
+        _pytest(f"{UJI_MEMORI}::test_hasil_dibatasi_dan_terurut_dari_yang_paling_mirip"),
+        harus_memuat="batas 1, diserahkan",
+        kelompok="db",
+    ),
+    Mutasi(
+        "3.7",
+        "hasil terurut dari yang paling TIDAK mirip",
+        [
+            Sunting(
+                f"{MODUL}/memory/pencarian.py",
+                "for k in positif if k.id in baris]",
+                "for k in reversed(positif) if k.id in baris]",
+            )
+        ],
+        _pytest(f"{UJI_MEMORI}::test_hasil_dibatasi_dan_terurut_dari_yang_paling_mirip"),
+        harus_memuat="tidak terurut dari yang paling mirip",
+        kelompok="db",
+    ),
+    Mutasi(
+        "3.7",
+        "Qdrant ditanya tanpa saringan model penyemat",
+        [
+            Sunting(
+                f"{MODUL}/memory/pencarian.py",
+                '                saring={"scope": dipakai, "model": [self._penyemat.nama]},',
+                '                saring={"scope": dipakai},',
+            )
+        ],
+        _pytest(
+            f"{UJI_MEMORI}::test_qdrant_hanya_ditanya_titik_penyemat_ini_di_scope_yang_diizinkan"
+        ),
+        harus_memuat="saringan Qdrant",
+        kelompok="db",
+    ),
+    Mutasi(
+        "3.7",
+        "scope yang DITOLAK pengguna dilaporkan perlu izin — pengguna ditanya lagi",
+        [
+            Sunting(
+                f"{MODUL}/memory/pencarian.py",
+                '            elif keputusan == "ask":',
+                "            else:",
+            )
+        ],
+        _pytest(f"{UJI_MEMORI}::test_agent_tanpa_izin_scope_tidak_menerima_barisnya"),
+        harus_memuat="dilaporkan perlu izin",
+        kelompok="db",
+    ),
+    Mutasi(
+        "3.7",
+        "kandidat per hasil 1× — titik basi menghabiskan seluruh halaman",
+        [
+            Sunting(
+                f"{MODUL}/memory/pencarian.py", "_KANDIDAT_PER_HASIL = 3", "_KANDIDAT_PER_HASIL = 1"
+            )
+        ],
+        _pytest(f"{UJI_MEMORI}::test_titik_memori_terhapus_tidak_menyingkirkan_hasil_yang_sah"),
+        harus_memuat="hasil sah tersingkir",
+        kelompok="db",
+    ),
+    Mutasi(
+        "3.4",
+        "PATCH /journal ke masa depan diterima",
+        [
+            Sunting(
+                f"{MODUL}/journal/service.py",
+                "            await _periksa_waktu(conn, badan.occurred_at)"
+                + NL
+                + '            isi = perubahan.get("body")',
+                '            isi = perubahan.get("body")',
+            )
+        ],
+        _pytest(f"{UJI_JURNAL}::test_jurnal_masa_depan_422"),
+        harus_memuat="PATCH ke masa depan diterima",
+        kelompok="db",
+    ),
+    Mutasi(
+        "3.4",
+        "PATCH menyunting jurnal yang sudah dihapus — isinya hidup lagi di memori",
+        [
+            Sunting(
+                f"{MODUL}/journal/repository.py",
+                "                         ELSE occurred_at END"
+                + NL
+                + "    WHERE id = :id AND deleted_at IS NULL"
+                + NL,
+                "                         ELSE occurred_at END" + NL + "    WHERE id = :id" + NL,
+            )
+        ],
+        _pytest(f"{UJI_JURNAL}::test_jurnal_yang_dihapus_tidak_bisa_diubah_atau_dihapus_lagi"),
+        harus_memuat="PATCH sesudah DELETE: 200",
+        kelompok="db",
+    ),
+    Mutasi(
+        "3.4",
+        "DELETE kedua 204 — pendengarnya berjalan lagi",
+        [
+            Sunting(
+                f"{MODUL}/journal/repository.py",
+                # Tanpa kata kunci UPDATE di jangkar — S608 membaca potongan SQL sebagai kueri.
+                "journal_entries SET deleted_at = now()"
+                + NL
+                + "    WHERE id = :id AND deleted_at IS NULL"
+                + NL,
+                "journal_entries SET deleted_at = now()" + NL + "    WHERE id = :id" + NL,
+            )
+        ],
+        _pytest(f"{UJI_JURNAL}::test_jurnal_yang_dihapus_tidak_bisa_diubah_atau_dihapus_lagi"),
+        harus_memuat="DELETE kedua: 204",
+        kelompok="db",
+    ),
+    Mutasi(
+        "3.4",
+        "GET /journal mengabaikan ?from=",
+        [
+            Sunting(
+                f"{MODUL}/journal/repository.py",
+                "      AND (CAST(:dari AS timestamptz) IS NULL OR occurred_at >= CAST(:dari AS timestamptz))"
+                + NL,
+                "",
+            )
+        ],
+        _pytest(f"{UJI_JURNAL}::test_daftar_terbaru_dulu_dan_rentang_waktu"),
+        harus_memuat="rentang from–to",
+        kelompok="db",
+    ),
+    Mutasi(
+        "3.4",
+        "GET /journal from ≥ to tidak ditolak",
+        [
+            Sunting(
+                f"{MODUL}/journal/service.py",
+                "    if dari is not None and sampai is not None and dari >= sampai:"
+                + NL
+                + '        raise platform.GalatApi(400, "invalid_request", "`from` wajib sebelum `to`.")'
+                + NL,
+                "",
+            )
+        ],
+        _pytest(f"{UJI_JURNAL}::test_daftar_terbaru_dulu_dan_rentang_waktu"),
+        harus_memuat="from sesudah to: 200",
+        kelompok="db",
+    ),
+    Mutasi(
+        "3.4",
+        "GET /journal terurut naik — kursor keyset menggandakan halaman",
+        [
+            Sunting(
+                f"{MODUL}/journal/repository.py",
+                "    ORDER BY occurred_at DESC, id DESC" + NL + "    LIMIT :batas",
+                "    ORDER BY occurred_at, id" + NL + "    LIMIT :batas",
+            )
+        ],
+        _pytest(f"{UJI_JURNAL}::test_daftar_terbaru_dulu_dan_rentang_waktu"),
+        harus_memuat="urutan halaman",
+        kelompok="db",
+    ),
+    Mutasi(
+        "3.4",
+        "PATCH {body: null} tidak ditolak di validasi",
+        [
+            Sunting(
+                f"{MODUL}/journal/schemas.py",
+                '            f for f in self.model_fields_set if f != "title" and getattr(self, f) is None',
+                '            f for f in self.model_fields_set if f == "__tidak_ada__"',
+            )
+        ],
+        _pytest(f"{UJI_JURNAL}::test_ubah_jurnal_berbentuk_salah_400"),
+        harus_memuat="{'body': None} →",
+        kelompok="db",
+    ),
+    Mutasi(
+        "3.4",
+        "PATCH /journal menerima medan yang tidak dikenal",
+        [
+            Sunting(
+                f"{MODUL}/journal/schemas.py",
+                '    """`PATCH /journal/{id}` — medan yang DIKIRIM saja; `title: null` = hapus judul."""'
+                + NL
+                + NL
+                + '    model_config = ConfigDict(extra="forbid")'
+                + NL,
+                '    """`PATCH /journal/{id}` — medan yang DIKIRIM saja; `title: null` = hapus judul."""'
+                + NL,
+            )
+        ],
+        _pytest(f"{UJI_JURNAL}::test_ubah_jurnal_berbentuk_salah_400"),
+        harus_memuat="{'judul': 'x'} → 200",
+        kelompok="db",
+    ),
+    Mutasi(
+        "3.4",
+        "jumlah kata hanya dipisah spasi tunggal — baris baru & tab tidak",
+        [
+            Sunting(
+                f"{MODUL}/journal/schemas.py",
+                "    return len(isi.split())",
+                '    return len(isi.split(" "))',
+            )
+        ],
+        _pytest(f"{UJI_JURNAL}::test_jumlah_kata_dipisah_spasi_apa_pun"),
+        harus_memuat="bukan 4",
+        kelompok="db",
+    ),
+    Mutasi(
+        "3.2",
+        "mood.logged membawa waktu tercatat, bukan waktu kejadiannya",
+        [
+            Sunting(
+                f"{MODUL}/checkins/service.py",
+                "                occurred_at=mood.occurred_at,",
+                "                occurred_at=mood.created_at,",
+            )
+        ],
+        _pytest(f"{UJI_TERBIT}::test_dua_mood_dalam_satu_menit_dua_event"),
+        harus_memuat="occurred_at event mood",
+        kelompok="db",
+    ),
+    Mutasi(
+        "3.2",
+        "jam tidur dibandingkan sebagai Decimal — catatan saja menerbitkan event",
+        [
+            Sunting(
+                f"{MODUL}/checkins/repository.py",
+                "    tidur = float(b.sleep_hours) if b.sleep_hours is not None else None",
+                "    tidur = b.sleep_hours",
+            )
+        ],
+        _pytest(f"{UJI_TERBIT}::test_catatan_saja_tanpa_event_walau_jam_tidur_pecahan"),
+        harus_memuat="catatan saja menerbitkan event",
+        kelompok="db",
+    ),
+    Mutasi(
+        "3.2",
+        "isi check-in sebelum PUT dibaca tanpa kunci — perubahan serentak hilang dari events",
+        [
+            Sunting(
+                f"{MODUL}/checkins/repository.py",
+                "    WHERE user_id = :user_id AND for_date = :for_date"
+                + NL
+                + "    FOR UPDATE"
+                + NL,
+                "    WHERE user_id = :user_id AND for_date = :for_date" + NL,
+            )
+        ],
+        _pytest(f"{UJI_TERBIT}::test_put_serentak_yang_mengubah_baris_selalu_menerbitkan"),
+        harus_memuat="PUT 2 → 3 tidak menerbitkan event",
+        kelompok="db",
+    ),
+    Mutasi(
+        "3.2",
+        "checkin.logged tanpa focus",
+        [Sunting(f"{MODUL}/checkins/service.py", '                    "focus": c.focus,' + NL, "")],
+        _pytest(f"{UJI_TERBIT}::test_event_check_in_membawa_semua_medannya"),
+        harus_memuat="payload check-in",
+        kelompok="db",
+    ),
+    Mutasi(
+        "3.2",
+        "habit.completed tanpa note (kontrak spec/03 hari ini — C-33)",
+        [
+            Sunting(
+                f"{MODUL}/habits/service.py",
+                '        payload = {"status": p.status, "tier_used": p.tier_used, "note": p.note}',
+                '        payload = {"status": p.status, "tier_used": p.tier_used}',
+            )
+        ],
+        _pytest(f"{UJI_TERBIT}::test_event_penyelesaian_membawa_catatannya"),
+        harus_memuat="catatan hilang dari event",
+        kelompok="db",
+    ),
+    Mutasi(
+        "3.2",
+        "days_taken dari .seconds — goal yang berhari-hari tercatat 0 hari",
+        [
+            Sunting(
+                f"{MODUL}/goals/service.py",
+                '                payload={"days_taken": (goal.achieved_at - goal.created_at).days},',
+                '                payload={"days_taken": (goal.achieved_at - goal.created_at).seconds // 86400},',
+            )
+        ],
+        _pytest(f"{UJI_TERBIT}::test_days_taken_goal_yang_berhari_hari"),
+        harus_memuat="days_taken",
+        kelompok="db",
+    ),
+    Mutasi(
+        "3.8",
+        "id aktivitas ganda 500, bukan 409",
+        [
+            Sunting(
+                f"{MODUL}/activities/service.py",
+                '        if p.sqlstate == platform.UNIQUE_VIOLATION and p.constraint == "activities_pkey":',
+                '        if p.sqlstate == platform.UNIQUE_VIOLATION and p.constraint == "activity_pkey":',
+            )
+        ],
+        _pytest(f"{UJI_AKTIVITAS}::test_id_buatan_klien_yang_sudah_ada_409"),
+        harus_memuat="id ganda → 500",
+        kelompok="db",
+    ),
+    Mutasi(
+        "3.8",
+        "GET /activities mengabaikan ?to=",
+        [
+            Sunting(
+                f"{MODUL}/activities/repository.py",
+                "      AND (CAST(:sampai AS timestamptz) IS NULL OR occurred_at < CAST(:sampai AS timestamptz))"
+                + NL,
+                "",
+            )
+        ],
+        _pytest(f"{UJI_AKTIVITAS}::test_saring_rentang_waktu"),
+        harus_memuat="rentang from–to aktivitas",
+        kelompok="db",
+    ),
+    Mutasi(
+        "3.8",
+        "duration_seconds tanpa batas 7 hari",
+        [
+            Sunting(
+                f"{MODUL}/activities/schemas.py",
+                "    duration_seconds: platform.Bulat | None = Field(default=None, ge=0, le=_DURASI_MAKS_S)",
+                "    duration_seconds: platform.Bulat | None = Field(default=None, ge=0)",
+            )
+        ],
+        _pytest(f"{UJI_AKTIVITAS}::test_aktivitas_berbentuk_salah_400"),
+        harus_memuat="691200",
+        kelompok="db",
+    ),
+    Mutasi(
+        "3.5",
+        "kunci API Qdrant dikirim di kepala `api_key` — 401 di tiap panggilan produksi",
+        [
+            Sunting(
+                f"{MODUL}/platform/vektor.py",
+                '        kepala = {"api-key": kunci_api} if kunci_api else {}',
+                '        kepala = {"api_key": kunci_api} if kunci_api else {}',
+            )
+        ],
+        _pytest("tests/unit/test_klien_vektor.py::test_kunci_api_dikirim_di_kepala_api_key"),
+        harus_memuat="kunci tidak di kepala api-key",
+    ),
+    Mutasi(
+        "3.5",
+        "penyemat peka huruf besar — `Rapat` tidak menemukan `rapat`",
+        [
+            Sunting(
+                f"{MODUL}/platform/sematan.py",
+                '        normal = unicodedata.normalize("NFKC", teks).casefold()',
+                '        normal = unicodedata.normalize("NFKC", teks)',
+            )
+        ],
+        _pytest("tests/unit/test_sematan.py::test_huruf_besar_dan_kecil_kata_yang_sama"),
+        harus_memuat="Rapat ≠ rapat",
+    ),
+    Mutasi(
+        "3.5",
+        "jarak koleksi yang sudah ada tidak diperiksa — skor Euclid dibaca sebagai kosinus",
+        [
+            Sunting(
+                f"{MODUL}/platform/vektor.py",
+                '            if not isinstance(vektor, dict) or (vektor.get("size"), vektor.get("distance")) != (',
+                '            if not isinstance(vektor, dict) or (vektor.get("size"), "Cosine") != (',
+            )
+        ],
+        _pytest(f"{UJI_VEKTOR}::test_koleksi_berjarak_lain_ditolak_bukan_dipakai"),
+        harus_memuat="DID NOT RAISE",
+        kelompok="db",
+    ),
+    # ── Sprint 1 · 1.5, ditemukan uji yang berkedip di gerbang penuh Sprint 3 ──
+    Mutasi(
+        "1.5",
+        "umur cache izin sementara RELATIF dari saat dibaca — jeda tulis memperpanjangnya",
+        [
+            Sunting(
+                f"{MODUL}/identity/izin.py",
+                "        return cast(Keputusan, baris.decision), _UmurCache(pxat=habis)",
+                "        return cast(Keputusan, baris.decision), _UmurCache(px=habis - baris.kini_ms)",
+            )
+        ],
+        _pytest(f"{UJI_IZIN}::test_cache_yang_ditulis_terlambat_tidak_melewati_izin_sementaranya"),
+        harus_memuat="cache yang ditulis terlambat melewati izin sementaranya",
+        kelompok="db",
+    ),
+    # ── alat ini sendiri: bytecode mutan tidak tertinggal sesudah dipulihkan ──
+    Mutasi(
+        "alat",
+        "mutasi menulis bytecode — .pyc mutan ukuran-sama dipakai sesudah dipulihkan",
+        [
+            Sunting(
+                "tools/uji_mutasi_kode.py",
+                # Dipotong dua: jangkar yang utuh di sini membuat jangkarnya tidak unik.
+                '"utf-8", "PYTHONDONTWRITEBYTECODE"' + ': "1"}',
+                '"utf-8"}',
+            )
+        ],
+        _pytest(
+            "tests/unit/test_alat_mutasi_bytecode.py::"
+            "test_mutasi_ukuran_sama_tidak_meninggalkan_bytecode_basi"
+        ),
+        harus_memuat="bytecode mutan dipakai sesudah berkasnya dipulihkan",
+    ),
+    Mutasi(
+        "alat",
+        "pemulihan tidak membuang bytecode berkas yang dimutasi",
+        [
+            Sunting(
+                "tools/uji_mutasi_kode.py",
+                '            for pyc in (p.parent / "__pycache__").glob(f"{p.stem}.*.pyc"):' + NL,
+                '            for pyc in (p.parent / "__pycache__").glob(f"{p.stem}.*.tidak-ada"):'
+                + NL,
+            )
+        ],
+        _pytest(
+            "tests/unit/test_alat_mutasi_bytecode.py::"
+            "test_pemulihan_membuang_bytecode_berkas_yang_dimutasi"
+        ),
+        harus_memuat="bytecode berkas yang dimutasi tertinggal",
+    ),
+    # ── alat ini sendiri: mutasi yang menggantung dihentikan beserta turunannya ──
+    Mutasi(
+        "alat",
+        "mutasi yang menggantung: hanya proses langsungnya yang dihentikan",
+        [
+            Sunting(
+                "tools/uji_mutasi_kode.py",
+                '        if os.name == "nt":'
+                + NL
+                + "            subprocess.run("
+                + NL
+                + '                ["taskkill", "/F", "/T", "/PID", str(proses.pid)], capture_output=True, check=False'
+                + NL
+                + "            )"
+                + NL
+                + "        else:"
+                + NL
+                + "            os.killpg(proses.pid, signal.SIGKILL)"
+                + NL,
+                "        proses.kill()" + NL,
+            )
+        ],
+        _pytest(
+            "tests/unit/test_alat_mutasi_terbatas_waktu.py::"
+            "test_proses_turunan_yang_menggantung_ikut_dihentikan"
+        ),
+        harus_memuat="pohon prosesnya tidak dihentikan",
+    ),
 ]
 
 
@@ -3373,6 +5450,12 @@ def _pulihkan(cadangan: dict[Path, bytes | None], dir_baru: list[Path]) -> None:
             p.unlink(missing_ok=True)
         else:
             p.write_bytes(isi)
+        if p.suffix == ".py":
+            # Bytecode yang dikompilasi dari MUTAN — lapis kedua sesudah
+            # PYTHONDONTWRITEBYTECODE: perintah yang tidak mewarisi lingkungannya
+            # (subproses yang menyetel ulang env) tetap tidak meninggalkan .pyc basi.
+            for pyc in (p.parent / "__pycache__").glob(f"{p.stem}.*.pyc"):
+                pyc.unlink(missing_ok=True)
     for d in dir_baru:
         shutil.rmtree(d, ignore_errors=True)
     shutil.rmtree(AKAR / ".import_linter_cache", ignore_errors=True)
@@ -3400,8 +5483,9 @@ def main() -> int:
     else:
         jalan = {"lint", "db", "docker"}
 
-    if "db" in jalan and not os.environ.get("HVX_TEST_DATABASE_URL"):
-        print("🛑 HVX_TEST_DATABASE_URL tidak diisi — mutasi migrasi tidak bisa dibuktikan.")
+    kosong = [v for v in ("HVX_TEST_DATABASE_URL", "HVX_TEST_QDRANT_URL") if not os.environ.get(v)]
+    if "db" in jalan and kosong:
+        print(f"🛑 {' · '.join(kosong)} tidak diisi — mutasi kelompok db tidak bisa dibuktikan.")
         print(
             "   Isi variabelnya, atau jalankan dengan --tanpa-db untuk MENYATAKAN bagian itu dilewati."
         )
@@ -3409,7 +5493,7 @@ def main() -> int:
 
     lemah: list[str] = []
     dilewati: dict[str, int] = {}
-    lingkungan = {**os.environ, "PYTHONIOENCODING": "utf-8"}
+    lingkungan = lingkungan_mutasi()
     for m in MUTASI:
         label = f"{m.kode:4s} {m.maksud:64s}"
         if m.kelompok not in jalan:
@@ -3422,22 +5506,17 @@ def main() -> int:
         try:
             for s in m.suntingan:
                 _terapkan(s, cadangan, dir_baru)
-            r = subprocess.run(
+            kode, keluaran = jalankan_terbatas(
                 m.perintah,
-                cwd=AKAR / m.cwd if m.cwd else AKAR,
-                env={**lingkungan, "TZ": _tz_flutter()} if m.cwd == APLIKASI else lingkungan,
-                capture_output=True,
-                text=True,
-                encoding="utf-8",
-                errors="replace",
+                AKAR / m.cwd if m.cwd else AKAR,
+                {**lingkungan, "TZ": _tz_flutter()} if m.cwd == APLIKASI else lingkungan,
             )
         finally:
             _pulihkan(cadangan, dir_baru)
-        keluaran = r.stdout + r.stderr
-        tertangkap = r.returncode in m.kode_tertangkap and alasan_terbaca(m, keluaran)
+        tertangkap = kode in m.kode_tertangkap and alasan_terbaca(m, keluaran)
         print(
             f"  {'✅' if tertangkap else '🛑'} {label} → "
-            f"{'BERBUNYI' if tertangkap else f'DIAM/SALAH ALASAN (keluar {r.returncode})'}"
+            f"{'BERBUNYI' if tertangkap else f'DIAM/SALAH ALASAN (keluar {kode})'}"
         )
         if not tertangkap:
             lemah.append(m.kode)
