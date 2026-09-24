@@ -529,6 +529,48 @@ sesudahnya.
 
 ---
 
+## K-25 · Relay kotak keluar dan grup konsumen: stream membawa rujukan, angka-angkanya
+
+> Diputuskan 24 September 2026, saat Sprint 3 tugas 3.3 ditulis.
+
+| | |
+|---|---|
+| **Keputusan** | **(1)** Satu stream Redis `{prefix}:events` berisi **rujukan** (id · pemilik · jenis) — isi event dibaca konsumen dari PostgreSQL di bawah RLS pemiliknya, di transaksi yang sama dengan tulisan penangannya; pesan di-ACK **sesudah** commit. **(2)** Relay di proses terpisah (`python -m hvx.pekerja`), kursor `(recorded_at, id)` di Redis, dan **menoleh ke belakang 60 detik** tiap putaran; penanda terkirim per event (`SET NX`, 24 jam) dan `XADD` dalam **satu** skrip Lua. **(3)** Konsumen mengklaim pesan yang menganggur **30 detik** (`XAUTOCLAIM`); sesudah diserahkan **5 kali** pesan pindah ke stream **mati** `{prefix}:events:mati`. **(4)** Stream dipangkas tiap ±1 menit **tepat** (`XTRIM MINID`, bukan `~`) sampai pesan tertua yang masih ditunggu satu pun grup. **(5)** Penyelaras memori → Qdrant berjalan tiap 2 detik di proses yang sama. |
+| **Bukti** | spec/07 3.3 *“consumer mati → event tidak hilang saat hidup lagi”*; spec/03 *Consumer V0* (Redis Streams + consumer group, konsumen “boleh gagal” wajib idempoten). Transaksi yang lebih dulu menyisip bisa lebih akhir commit — relay yang hanya maju melompatinya selamanya (diukur, `test_relay.py`). `XTRIM ~` hanya membuang simpul radix utuh (±100 entri): stream kecil tidak pernah terpangkas (diukur). E-171: data pengguna tidak tinggal di Redis. |
+| **Bacaan yang DITOLAK** | **(a)** *“Payload event di stream”* — ditolak: isi pengguna tinggal di Redis/AOF sesudah akun dihapus, dan konsumen tidak lagi membaca di bawah RLS. **(b)** *“Relay di proses api”* — ditolak: tiap replika api menjalankan relay-nya sendiri, dan `XREADGROUP BLOCK` bersaing dengan permintaan HTTP. **(c)** *“LISTEN/NOTIFY PostgreSQL”* — ditolak: notifikasi hilang saat pendengar mati, jadi tetap butuh kursor — dua mekanisme untuk satu hal. |
+| **Harga yang diakui** | Transaksi yang commit **lebih dari 60 detik** sesudah menyisip event-nya tidak pernah dikirim (tulisan api selesai dalam milidetik). Jendela belakang dibaca paling banyak 1.000 event per putaran. Penyelaras memindai `memories` penuh tiap putaran (`model_version IS DISTINCT FROM`) — cukup untuk V0 (satu pengguna nyata); V1 butuh kolom penanda berindeks. Pesan di stream mati belum punya alat pemutar ulang. |
+| **Cara membalikkan** | Angka: `LIHAT_BELAKANG_S` · `UMUR_PENANDA_S` (`events/relay.py`), `min_idle_ms` · `maks_kirim` (`events/stream.py`), `JEDA_*` · `PANGKAS_TIAP` (`hvx/pekerja.py`) — `test_relay.py` diubah bersamanya. Payload di stream: `_KIRIM` + `KonsumenStream._proses`; `test_relay_menyalin_rujukan_sekali_tanpa_payload` merah dan wajib dihapus bersama alasannya. |
+
+---
+
+## K-26 · Penyemat memori V0: lokal, deterministik, BERKUNCI
+
+> Diputuskan 24 September 2026, saat Sprint 3 tugas 3.5 ditulis.
+
+| | |
+|---|---|
+| **Keputusan** | Memori disemat `hvx-hash-v1-384`: *feature hashing* bertanda atas kata · pasangan kata · trigram huruf, 384 dimensi, dinormalkan — `blake2b` **berkunci** `HVX_SEMATAN_KEY` (wajib bila `HVX_QDRANT_URL` diisi). Sidik kunci ikut di nama penyemat (`memories.model_version` dan payload `model` Qdrant): vektor dari kunci lain tidak pernah dibandingkan, dan penyelaras menyemat ulang memori yang disemat penyemat lain. Qdrant lewat REST (`httpx`, di `platform` — B-2). |
+| **Bukti** | Penyedia model milik pemilik (arch/05 §6, A-6/#18 — tarif & bagi hasil): memilih API sematan berbayar berarti mengambil keputusan itu. CI tanpa tagihan (H-26): uji tidak boleh memanggil layanan berbayar. Rancangan pemilik menyemat jurnal ke basis data vektor (naskah [`84`](84-DATABASE-ARCHITECTURE.md) `journal_embeddings`, [`119`](119-R8-R9-EMBEDDING-REPRESENTASI.md) *Journal → semantic search*) — dan jurnal adalah Level 3 *Sensitive* ([`133`](133-DATA-CLASSIFICATION.md)). *Feature hashing* tanpa kunci bisa **dibalik dengan kamus**: siapa pun yang memegang vektornya menghitung hash tiap kata calon (diuji: `test_tanpa_kunci_yang_sama_kata_tidak_bisa_ditebak_dari_vektor`). Qdrant tidak punya RLS. |
+| **Bacaan yang DITOLAK** | **(a)** *“Model sematan sungguhan (sentence-transformers)”* — ditolak untuk V0: ratusan MB bobot di citra api, PyTorch di rantai pasok, dan unduhan model di CI. **(b)** *“`hash()` Python”* — ditolak: diacak per proses, vektor kemarin tidak cocok dengan kueri hari ini. **(c)** *“Kunci diturunkan dari `HVX_IP_HASH_KEY`”* — ditolak: memutar kunci IP (mis. sesudah bocor) diam-diam menyemat ulang seluruh memori. **(d)** *“`qdrant-client`”* — ditolak: empat panggilan tidak sepadan dengan gRPC dan numpy. |
+| **Harga yang diakui** | ⚠️ Kemiripan **leksikal**, bukan makna: *“lelah”* dan *“capek”* tidak berdekatan. Kunci melindungi vektor dari pembacaan kata, **bukan** dari perbandingan: dua teks sama tetap berjarak nol. Enkripsi sematan itu sendiri — catatan di naskah [`145`](145-DATA-VAULT-ENKRIPSI-PRIVACY-AI.md) — tetap keputusan pemilik (butir C). |
+| **Cara membalikkan** | Kelas penyemat lain dengan `nama` lain di `platform/sematan.py` (antarmuka `Penyemat`); penyelaras menyemat ulang semuanya sendiri karena `model_version` berbeda. |
+
+---
+
+## K-27 · Memori V0 dari jurnal & mood: episodik, keyakinan 1.000, ekstraksinya service
+
+> Diputuskan 24 September 2026, saat Sprint 3 tugas 3.6 ditulis.
+
+| | |
+|---|---|
+| **Keputusan** | **(1)** Tiap `mood.logged` dan `journal.created` melahirkan tepat satu memori `kind='episodic'` — isi yang **dilaporkan** atau **ditulis** pengguna (mood: `"Mood dilaporkan 2/5 (cemas): …"`; jurnal: judul + isi), `valid_from` = waktu kejadiannya, `scope` `mood` / `journal_raw`. **(2)** `confidence = 1.000`, `evidence_count = 1`: yang diyakini adalah **bahwa** pengguna melaporkan atau menulisnya — bukan bahwa isinya benar tentang dirinya. **(3)** Jalur ekstraksi adalah **service** (konsumen stream `memori`), bukan agent: ia selalu menulis dan tidak memilih tool — separuh jawaban [`../arch/08`](../arch/08-AGENT-CONTRACTS.md) §2.2. **(4)** Jurnal yang disunting → memorinya mengikuti; dihapus → isinya dikosongkan di transaksi yang sama, titik Qdrant dan barisnya dibuang penyelaras. |
+| **Bukti** | spec/07 3.6 menuntut lima medan pada tiap memori. Naskah [`15`](15-MEMORY.md): *Episodic = kejadian*; [`163`](163-CONFIDENCE-UNCERTAINTY-EVALUASI-FEEDBACK.md): tiap **inferensi** membawa `confidence` dan `source` — dan catatan laporan sendiri bukan inferensi; spec/01 E-34: mood *dilaporkan*, bukan ditaksir. Naskah [`139`](139-PRIVACY-DELETION-RETENTION.md): hapus tidak boleh berhenti di baris PostgreSQL. |
+| **Bacaan yang DITOLAK** | **(a)** *“Biarkan bawaan kolom 0.500”* — ditolak: angka yang tidak dipilih siapa pun terbaca sebagai keraguan yang tidak ada. **(b)** *“Ekstrak fakta dengan leksikon emosi”* — ditolak: menyimpulkan keadaan batin dari tulisan pribadi dengan daftar kata adalah inferensi tanpa dasar, dan naskah 4 §7 menuntut keluaran asosiatif yang bisa dijelaskan. **(c)** *“Memori jurnal tidak disemat sampai pemilik memutuskan”* — ditolak: rancangan pemilik sudah menyemat jurnal (K-26); yang terbuka adalah enkripsinya. |
+| **Harga yang diakui** | Memori **turunan** (`semantic`, `preference`) belum ada: tanpa model bahasa V0 hanya mengingat kejadian. Isi jurnal kini ada **dua kali** di basis data (jurnal + memorinya) — sama-sama di bawah RLS, retensi, dan hapus yang sama. Ini **bukan** ambang keyakinan untuk bertindak — itu [#34](../../issues/34), milik pemilik. |
+| **Cara membalikkan** | `KEYAKINAN_LAPORAN_SENDIRI` · `teks_mood` · `teks_jurnal` (`memory/ekstraksi.py`); `test_memori.py` diubah bersamanya. Berhenti mengingat jurnal: hapus `journal.created` dari `JENIS_EVENT` — memori yang sudah ada dihapus lewat migrasi. |
+
+---
+
 ## Yang sengaja **tidak** saya putuskan
 
 | Butir | Kenapa |

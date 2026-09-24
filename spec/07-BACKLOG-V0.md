@@ -190,6 +190,21 @@ Tidak ada tugas yang boleh masuk `main` tanpa baris **HUMAN REVIEW**.
 | 3.7 | Pencarian memori (semantik + saring scope) | agent tanpa izin scope **tidak** menerima barisnya |
 | 3.8 | `activities` | `source='inferred'` terpisah dari `manual` |
 
+> 🔨 **Sprint 3 dikodekan 24 Sep 2026** — branch `v0/sprint-3-memory-event` (di
+> atas `v0/sprint-2-human-core`), satu commit per tugas (**K-18**), **menunggu
+> HUMAN REVIEW**. Keadaan tiap "Selesai bila", tanpa dibulatkan:
+>
+> | | Dibuktikan | Yang BELUM |
+> |---|---|---|
+> | 3.1 | kunci yang sama dua kali → satu baris, galatnya ditelan sebagai sukses — juga serentak; kunci sama untuk kejadian **lain** ditolak keras; uji admisi saat terbit menolak jenis di luar tabel padanan, medan payload tak dikenal, sumber di luar `spec/03`, waktu tanpa zona — sebelum menyentuh basis data; event ikut batal bersama tulisannya | — |
+> | 3.2 | tiap baris peta aturan 6 [`06`](06-MODULE-BOUNDARIES.md) lewat HTTP, di transaksi yang sama (galat penerbitan membatalkan tulisannya); kirim ulang tidak menerbitkan apa pun; kunci per **kejadian** (**E-177**); pembatalan penyelesaian punya eventnya (**E-178**) | aturan 6 dipersempit ke fakta perilaku (**E-179**) — event konfigurasi belum ada |
+> | 3.3 | konsumen yang mati sebelum ACK → pesannya diklaim konsumen lain dan diproses (`XAUTOCLAIM`); penangan yang selalu gagal → stream **mati** sesudah 5 kali; event yang commit **di belakang** kursor relay tetap terkirim (jendela 60 dtk); stream membawa **rujukan**, isi dibaca di bawah RLS (**K-25**); pangkas tidak membuang yang masih ditunggu; proses `hvx.pekerja` diuji sebagai proses | transaksi yang commit > 60 dtk sesudah menyisip tidak terkirim; stream mati belum punya alat putar ulang |
+> | 3.4 | `GET /journal` tanpa `body` di tiga lapis — jawaban tiap halaman, kontrak OpenAPI, dan **SQL yang sampai ke PostgreSQL** (**E-181**); isi jurnal tidak masuk event | hapus jurnal = hapus-lunak, isinya tersimpan sampai akun dihapus — **C-31**, milik pemilik |
+> | 3.5 | saringan `user_id` **wajib** di tiap pencarian vektor (Qdrant tanpa RLS); scope kosong ≠ semua; galat Qdrant tanpa isi permintaan; koleksi berdimensi lain ditolak; penyemat lokal **berkunci** (**K-26**) — kata tidak terbaca dari vektor tanpa kunci; penyelaras menyemat, menyemat ulang isi yang berubah, dan membuang titik memori yang dihapus | kemiripan **leksikal**, bukan makna; enkripsi sematan (naskah 145) milik pemilik |
+> | 3.6 | dua mood + satu jurnal → tiga memori, **tiap** memori punya `kind` · `scope` · `confidence` · `evidence_count` · `source_event_id` yang menunjuk event sumbernya; isi dibaca dari barisnya (bukan dari event); event yang diserahkan lagi tidak menggandakan; jurnal dihapus sebelum diekstrak tidak diingat; `PATCH` serentak menunggu ekstraksi yang sedang membaca (**K-27**) | memori **turunan** (fakta, preferensi) — butuh model (4.1) |
+> | 3.7 | agent **tanpa izin scope tidak menerima barisnya** — tiga jalan: scope sensitif tanpa `allow` tersimpan · scope yang pengguna **tolak** · izin pengguna yang **tidak** melebarkan manifest; dan buktinya: dengan manifest **dan** izin, baris yang sama diserahkan. Payload Qdrant yang basi kalah oleh baris PostgreSQL; memori terhapus tidak diserahkan; daftar scope resmi ditulis dan ditegakkan (**E-180**) | pemanggilnya (tool `memory.search`, gerbang risiko) — Sprint 4 |
+> | 3.8 | klien **tidak bisa** mencatat `inferred` (badan dengan `source` → `400`); jalur sistem selalu `inferred`; `?source=` memisahkan keduanya | pemanggil `catat_disimpulkan` — Behavior Engine (5.1) |
+
 ---
 
 ## Sprint 4 — AI

@@ -30,11 +30,110 @@ Diperbarui: 24 September 2026 · Mencakup **dua puluh empat naskah**:
 | [H](#h-sudah-diputuskan--ditutup) | **Sudah diputuskan / ditutup** | 27 |
 | [A](#a-perlu-jawaban-pemilik) | Pertanyaan yang memblokir | 26 |
 | [B](#b-risiko-teknis) | Risiko teknis | 42 |
-| [C](#c-risiko-hukum--kepatuhan) | Risiko hukum & kepatuhan | 30 |
+| [C](#c-risiko-hukum--kepatuhan) | Risiko hukum & kepatuhan | 32 |
 | [D](#d-celah-yang-belum-tertutup) | Celah yang belum tertutup | 5 |
 | [E](#e-ketidakcocokan-antar-naskah) | **Ketidakcocokan antar-naskah** | 162 |
 | [F](#f-yang-sudah-saya-periksa-dan-ternyata-benar) | Sudah diperiksa, ternyata benar | 136 |
 | [G](#g-lubang-di-dalam-naskah-sendiri) | Lubang di dalam naskah sendiri | 21 |
+
+---
+
+## 🔨 Sprint 3 dikodekan (24 Sep 2026) — apa yang berubah bagi berkas ini
+
+Sprint 3 (`spec/07` 3.1–3.8, *Memory & event*) dikerjakan di branch
+`v0/sprint-3-memory-event`, **di atas** branch Sprint 2 (PR #165) yang masih
+menunggu HUMAN REVIEW — satu commit per tugas (**K-18**). Keadaan tiap
+*“Selesai bila”*, tanpa dibulatkan, ada di [`../spec/07`](../spec/07-BACKLOG-V0.md)
+Sprint 3. Tiga keputusan didelegasikan baru: **K-25** (relay & grup konsumen),
+**K-26** (penyemat lokal berkunci), **K-27** (memori episodik) —
+[`KEPUTUSAN-DIDELEGASIKAN.md`](KEPUTUSAN-DIDELEGASIKAN.md).
+
+> 🔑 **Pola E-42 untuk kelima kalinya** — dan kali ini bukan rute, melainkan
+> **daftar**: `spec/05` aturan 2 merujuk *“daftar scope resmi”* sejak versi
+> pertamanya, dan daftar itu tidak pernah ditulis sampai tugas 3.7 harus
+> memeriksanya (E-180).
+
+### 🔴 E-177 — tiga contoh kunci idempotensi `spec/03` menelan koreksi
+
+Kunci harus mengidentifikasi **kejadian**; tiga contoh lama mengidentifikasi
+sesuatu yang lebih kasar — `habit:<habit_id>:<for_date>` (penyelesaian yang
+dibatalkan lalu dicatat lagi), `mood:<user_id>:<menit>` (dua mood dalam satu
+menit), `goal:<goal_id>` (goal yang dibuka lagi lalu tercapai lagi). Aturan
+**D** `spec/02` (*“kalau berbeda, event yang benar”*) lalu membenarkan yang
+salah. ✅ **Dibetulkan** di [`../spec/03`](../spec/03-EVENT-CONTRACTS.md): kunci
+mengikuti **baris** yang lahir (`completion_id`, `mood_id`) atau **keadaan**
+yang lahir (`achieved_at`, `updated_at` check-in).
+
+### 🔴 E-178 — pembatalan penyelesaian habit tidak meninggalkan jejak
+
+`spec/04` punya `DELETE /habits/{id}/completions/{for_date}`, tetapi tidak satu
+event pun mencatat bahwa penyelesaian **dibatalkan**: proyeksi yang dibangun
+ulang dari `events` menghidupkan kembali hari yang tidak pernah dijalankan.
+✅ **Dibetulkan:** `habit.completion_retracted` — event V0 ke-9 (event ke-23), lulus
+uji [`../arch/07`](../arch/07-EVENT-CONTRACTS.md) §7 dengan alasan terbalik:
+pembatalan sebelum event ini ada tidak bisa diterbitkan belakangan, barisnya
+sudah terhapus.
+
+### 🔴 E-179 — `spec/06` aturan 6 menuntut event yang tidak ada
+
+*“Setiap tulisan ke tabel yang punya event padanan”* menuntut event untuk tiap
+`PATCH` judul goal — 23 event `spec/03` tidak punya satu pun jenisnya. ✅
+**Dipersempit:** tidak ada **fakta perilaku** yang lolos tanpa event; tulisan
+konfigurasi (judul, jadwal, hapus-lunak) tidak — peta lengkapnya di
+[`../spec/06`](../spec/06-MODULE-BOUNDARIES.md), ditegakkan
+`test_penerbitan_event.py`.
+
+### 🔴 E-180 — “daftar scope resmi” dirujuk, tidak pernah ditulis
+
+`spec/05` aturan 2 menolak manifest yang meminta scope di luar *daftar resmi*;
+tugas 3.7 (*“agent tanpa izin scope tidak menerima barisnya”*) butuh daftar
+yang sama sebagai pembanding. Daftarnya tidak ada di `spec/`, `arch/`, maupun
+kode — mesin izin 1.5 menerima scope apa pun yang berbentuk `snake_case`. ✅
+**Dibetulkan:** enam scope V0 di [`../spec/05`](../spec/05-AGENT-CONTRACTS.md)
+(*Daftar scope resmi V0*), satu sumber di kode (`identity.SCOPE_RESMI`), mesin
+izin **menolak** scope di luar daftar, dan `journal_raw` **sensitif** — tidak
+pernah `allow` karena bawaan, hanya karena keputusan yang disimpan pengguna.
+Dua koreksi ikut: aturan 6 kini juga menyebut `journal_raw` (larangan untuk
+pihak ketiga semula dilewati dengan meminta scope mentahnya), dan kolom *Memory
+write* `memory-agent` berisi nama **tabel** `memories`, bukan scope.
+
+### 🔴 E-181 — penegak yang buta: kueri daftar jurnal boleh memuat `body`
+
+Ditemukan **uji mutasi**, bukan tinjauan: mengubah kueri `GET /journal`
+supaya memilih `body` **lolos seluruh suite** — skema jawaban
+`RingkasanJurnal` menyaringnya, jadi tidak ada jawaban HTTP yang berubah.
+Tetapi docstring repository menjanjikan lebih: *isi tulisan pribadi tidak
+pernah sampai ke memori proses untuk permintaan yang tidak membutuhkannya*.
+✅ **Ditegakkan:** `test_kueri_daftar_tidak_membaca_body_dari_basis_data`
+membaca SQL yang benar-benar sampai ke PostgreSQL; mutasinya kini merah.
+
+### 🔒 Yang dijaga lebih ketat daripada yang diminta
+
+* **Isi memori tidak pernah ke Redis maupun ke payload Qdrant** — stream membawa
+  rujukan (K-25), titik Qdrant hanya `user_id · scope · kind · model` (diuji).
+* **Vektor tidak bisa dibaca tanpa kunci** (K-26). Rancangan pemilik menyemat
+  jurnal (naskah [`84`](84-DATABASE-ARCHITECTURE.md) `journal_embeddings`);
+  *feature hashing* tanpa kunci bisa dibalik dengan kamus, dan Qdrant tidak
+  punya RLS. Catatan di naskah [`145`](145-DATA-VAULT-ENKRIPSI-PRIVACY-AI.md)
+  bahwa sematan tidak ikut terenkripsi **tetap terbuka** — itu keputusan
+  pemilik (butir C).
+* **Jurnal yang dihapus mengosongkan memorinya SEKETIKA**, di transaksi
+  hapusnya; titik vektor dan barisnya dibuang penyelaras sesudah commit
+  (naskah [`139`](139-PRIVACY-DELETION-RETENTION.md): *tidak boleh hanya
+  menghapus row di PostgreSQL*). Jurnalnya sendiri tetap hapus-lunak — **C-31**.
+* **Tiga saringan pencarian, masing-masing sanggup menahan sendiri** —
+  manifest, keputusan pengguna, dan baris PostgreSQL yang dibaca ulang di bawah
+  RLS (payload Qdrant bisa basi; diuji dengan payload yang sengaja dibuat basi).
+
+### ⚠️ Yang sengaja TIDAK diputuskan di Sprint 3
+
+* **C-31** — hapus jurnal menyimpan isinya sampai akun dihapus.
+* **C-32** — `mood` bukan scope sensitif; pihak ketiga tidak dilarang memintanya.
+* Enkripsi sematan (catatan naskah 145) — butir C.
+* Ambang keyakinan untuk bertindak (#34) — K-27 memilih **nilai** memori
+  episodik, bukan ambangnya.
+* Memori **turunan** (fakta, preferensi) — butuh penyedia model (A-6/#18).
+* Status `memory-agent` di percakapan (4.7) — [`../arch/08`](../arch/08-AGENT-CONTRACTS.md) §2.2.
 
 ---
 
@@ -1006,6 +1105,8 @@ Diurutkan dari yang paling menghambat.
 
 | # | Catatan |
 |---|---|
+| C-32 | 🆕 **`mood` tidak sensitif — dan aturan 6 `spec/05` tidak melarang pihak ketiga memintanya.** Daftar scope resmi V0 (**E-180**) menandai hanya `journal_raw` sensitif, karena `spec/05` memberi `coach-agent` bacaan `mood` **tanpa** izin eksplisit (tool `mood.recent` risk 0 → `allow`). Tetapi mood yang dilaporkan — valensi, label *“cemas”*, catatan bebas — dekat dengan **data kesehatan jiwa**, dan aturan 6 hanya melarang `journal` · `journal_raw` · `finance` · `health`. Yang perlu dijawab pemilik: **(a)** apakah `mood` termasuk `health` bagi aturan 6 (agent pihak ketiga dilarang memintanya), dan **(b)** apakah ia sensitif (coach pun butuh `allow` yang disimpan pengguna). Tidak diputuskan di Sprint 3 — pihak ketiga belum ada di V0, jadi tidak ada yang bocor hari ini. Bertaut **C-3** ([#21](../../issues/21)) dan **C-25**. |
+| C-31 | 🆕 **Menghapus jurnal menyimpan isinya sampai akun dihapus.** `DELETE /journal/{id}` adalah hapus-lunak (`journal_entries.deleted_at`, bentuk `spec/01`), dan retensi tabelnya `until-account-deleted` — `@on-delete: hard` menjawab **hapus akun**, bukan hapus satu baris ([`../arch/06`](../arch/06-DATA-ARCHITECTURE.md) §5). Akibatnya tulisan paling pribadi (Level 3 *Sensitive*, naskah [`133`](133-DATA-CLASSIFICATION.md)) yang dihapus pemiliknya **tetap tersimpan, bisa bertahun-tahun**. Sprint 3 sudah mengosongkan **memori turunannya** seketika (K-27) — tetapi retensi jurnal itu sendiri milik pemilik. Pilihan: **(a)** hapus-keras seketika; **(b)** hapus-lunak dengan jendela batal (mis. 30 hari, seperti hapus akun), lalu dikosongkan; **(c)** tetap seperti sekarang — dan Privacy Center (6.4) wajib menyatakannya. Yang sama berlaku untuk hapus-lunak goal & habit, tetapi isinya bukan tulisan bebas. Bertaut **C-9** ([#22](../../issues/22)). |
 | C-30 | 🆕🛑🛑🛑 **Fungsi utilitas menetapkan harga bagi hal yang ditanggung orang lain — dan *“dikontrol manusia”* tidak menjawab MANUSIA YANG MANA.** §20.9: `Utility = Benefit − Risk − Cost − **Externality** + **Resilience**`. ⭐⭐⭐⭐ Kedua suku yang ditebalkan justru yang paling sering ditinggalkan: eksternalitas tidak muncul di neraca siapa pun, dan `Resilience` bertanda **plus** — ketahanan sebagai nilai, bukan biaya efisiensi. ⭐⭐⭐ Dan *“utility weight harus dapat dikontrol manusia”* tepat sasaran: pada rumus lima suku, **bobotnyalah yang memutuskan**. 🔴 Tetapi lima suku itu **bersatuan berbeda** (uang · peluang×dampak · kerugian pihak ketiga · sifat sistem), sehingga penjumlahannya menuntut nilai tukar — dan **nilai tukar itulah keputusan yang sebenarnya**. 🔴🔴 Pertanyaan yang belum ditanyakan: *“dikontrol manusia”* menjawab **bukan mesin**, bukan **siapa**. Pada skala peradaban, **yang menetapkan bobot dan yang menanggung `Externality` hampir tidak pernah orang yang sama** — itu justru definisi eksternalitas. ⭐ Naskah ini punya dua bahan penutupnya: **§20.17 menaruh `Stakeholders` sebagai gerbang** dan **§20.18 menghasilkan `Affected Stakeholders`** sebagai keluaran; §20.35 bahkan menaruh `IMPACT ASSESSMENT` **sebelum** `HUMAN APPROVAL`, sehingga yang menyetujui melihat daftar terdampak lebih dulu. Usul: **bobot utilitas tidak sah tanpa daftar pihak terdampak, dan pilihan yang memindahkan biaya ke pihak yang tidak menyetel bobotnya memerlukan persetujuan terpisah.** 🔴 **Tiga bentuk lain dari masalah yang sama di naskah ini:** **(a)** §20.6 menjadikan **`Family` tingkat kembaran** — anggota keluarga tidak punya akun, tidak memberi persetujuan, dan sebagian **tidak bisa** memberi persetujuan (anak, orang yang dirawat); enam sumbu kedaulatan §20.13 mengandaikan **satu orang memutuskan untuk dirinya**, dan tidak ada bentuk untuk data yang menyangkut beberapa orang. **(b)** §20.21 menaruh **`Human Labor` di daftar sumber daya yang akan *dioptimalkan*** — bentuk **C-27**/[#122](../../issues/122) pada skala terbesarnya: §8.10 menutup *menilai*, belum menutup *mengoptimalkan*, dan yang kedua lebih jauh. ⭐ Penawarnya ditulis naskah ini sendiri: §20.22 menaruh **`Human Wellbeing` sebagai suku PERTAMA** fungsi tujuannya ⇒ **manusia adalah TUJUAN fungsi itu, bukan suku di dalam masukannya.** **(c)** §20.34 menaruh **`Government / Institution` sebagai simpul setara** sementara graf §20.4 memuat `Human`, `Family`, `Community` — sepuluh pasal Konstitusi mengikat **agent**, tidak ada yang mengikat **penerima** di seberang batas (bentuk **C-26**/[#118](../../issues/118) pada mitra yang jauh lebih kuat). ⚠️ Dan §20.22 adalah **fungsi tujuan KEDUA** di naskah yang sama, beririsan dengan §20.9 **hanya pada `Resilience`** — dua rumus untuk *apa yang dianggap baik*, tanpa satu pun menyatakan hubungannya. Lihat [`268`](268-SIMULATION-SCENARIO-DAN-DECISION-INTELLIGENCE.md) & [`271`](271-IMPACT-RESILIENCE-CRISIS-DAN-RESOURCE-INTELLIGENCE.md). |
 | C-29 | 🆕🛑🛑🛑 **Ethics & Safety dijadwalkan PALING AKHIR untuk naskah KEEMPAT berturut-turut — di fase yang menamai `Biosecurity` dan `Dangerous Capability`, dan yang MENGGERAKKAN MATERI FISIK.** §19.22 menyebut dirinya ***“komponen wajib”***; §19.33 menaruhnya di `S19.10`, terakhir dari sepuluh. Lintasannya tetap: naskah 20 `R16.10` ([#111](../../issues/111)) → naskah 21 `H17.12` di luar MVP ([#116](../../issues/116)) → naskah 22 **nol milestone** ([#121](../../issues/121)) → naskah 23 `S19.10`. 🔴🔴 **Yang menjadikannya kelas tersendiri: §19.15 Digital Laboratory** — `robotic pipette · liquid handler · experiment scheduler`, dengan *“HumanVerse **mengirimkan protocol** ke lab automation”*. Rantainya, disambung dari §19.2: `Hypothesis (mesin) → Experiment Planning (mesin) → protocol → lab automation`. **Ini satu-satunya tempat di 23 naskah di mana HumanVerse menggerakkan materi fisik atas dasar kesimpulannya sendiri**, dan tiga pengaman absen: **`ACTION GATEWAY`/`GOVERNANCE MESH`** (§14.69 wajib — naskah **kelima** berturut-turut tanpanya) · **`Confirmation`** (**H-15**: wajib mulai R3; menjalankan protokol kimia tanpa orang di ruangan adalah kandidat R4 yang lebih jelas daripada membuka kunci pintu §16.13) · **§19.22 sendiri**. 🔴 **Dan §19.22 tidak berdiri di rantai mana pun**: bukan di §19.2, bukan di §19.11, bukan di lini masa §19.27 — sementara `Ethics Agent` §19.16 berdiri **sederet dengan** `Writing Agent`. *Pemeriksa yang menjadi saudara dari yang diperiksanya bukan gerbang, melainkan peserta.* ⭐ Bentuk benarnya sudah tercatat sebagai butir F: **§17.46 menaruh Safety Kernel DI DALAM runtime**, bukan di sampingnya. 🛑 **Ditambah §19.23 mencampur DUA SUMBU**: `Low · Medium · High` (derajat, berurutan) dijejalkan dengan `Human Subjects · Biosecurity · Dangerous Capability` (jenis, sejajar) ⇒ kuesioner anonim dan uji klinis sama-sama *“Human Subjects”* dan tidak bisa dibedakan. Usul: **`severity` × `category`**, bentuk yang §18.24 sudah pakai. ⚠️ Contoh paling konkretnya §19.29: **laboratorium pertama yang dipakai pemiliknya sendiri adalah yang mengumpulkan data TUBUH MANUSIA** (`WiFi CSI → Pose Research`) — menyentuh **C-22** ([#102](../../issues/102), Level 3–4) tanpa menyebutnya. ⭐⭐⭐⭐ **Dan jawabannya ditulis pemilik sendiri DUA BAGIAN sebelumnya**, di §19.23: ***“Semakin tinggi risiko, semakin ketat governance”*** — kalimat yang sama dengan penutup §17.56. ⇒ **Naskah ini memuat aturannya dan pelanggarannya sekaligus**, dan karena prinsip itu kini muncul di **dua naskah terpisah**, ia berhenti menjadi tafsir dan menjadi posisi pemiliknya. Lihat [`260`](260-SIMULATION-MONTE-CARLO-DAN-DIGITAL-LABORATORY.md) & [`263`](263-ETHICS-GOVERNANCE-SAFETY-LAYER-DATASET-DAN-MODEL-REGISTRY.md). |
 | C-28 | 🆕🛑🛑 **Early Warning System §18.25 MENGELUARKAN peringatan tanpa gerbang dan tanpa penerima yang ditentukan — dan dua dari event §18.5 adalah wabah dan gempa.** ⭐⭐ Yang benar lebih dulu: rantai enam langkah (`Signal → Anomaly → Pattern → Acceleration → Risk → Early Warning`) **mensyaratkan penumpukan bukti, bukan satu pemicu**, dan pemilik memberi **kalimat penggantinya** — *“Early warning detected”*, bukan *“This definitely will happen”* — kebiasaan ketiga naskah berturut-turut (§17.7, §17.16), dan larangan dengan pengganti bisa diperiksa. 🔴 Tetapi **peringatan ADALAH tindakan**, bukan informasi netral: peringatan keliru tentang kelangkaan pasokan menyebabkan penimbunan yang **menciptakan** kelangkaan itu; peringatan keliru tentang wabah atau bencana menyebabkan kepanikan, dan yang benar tetapi diabaikan lebih buruk lagi. Di banyak yurisdiksi peringatan bencana dan kesehatan masyarakat adalah **kewenangan yang diatur**, bukan fitur produk — dan §18.5 memberi `DiseaseOutbreakReported` · `EarthquakeDetected` · `StormFormed` berdiri sederet dengan `ProductLaunched`. Yang tidak ada: **siapa penerimanya** (satu pengguna? organisasi? kota?), **ambang mana yang memicu**, **apakah manusia meninjau sebelum keluar**, dan **apa yang terjadi ketika keliru**. ⚠️ Diperberat §18.32: `early warning` cuma sub-butir di dalam `G18.6`, jadi ia akan dibangun sebagai fitur pelaporan, bukan kewenangan yang butuh gerbang. ⭐ Bahannya lengkap dan tinggal disambung: **§17.38 tujuh kategori dengan escalation berjenjang** menjawab *“seberapa keras ini disampaikan dan ke mana diteruskan”*; §18.24 `Confidence`/`Horizon` menentukan ambangnya; **H-15** memberi aturan konfirmasi manusia. Usul minimum: **peringatan yang menyentuh keselamatan atau kesehatan publik tidak pernah keluar tanpa tinjauan manusia, dan tidak pernah melampaui orang yang datanya memicunya.** Lihat [`253`](253-SAFETY-KERNEL-INFORMATION-INTEGRITY-RISK-EARLY-WARNING.md). |

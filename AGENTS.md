@@ -54,6 +54,7 @@ Coding Agent → Implementation → Unit Test → Integration Test
 ```
 apps/api/src/hvx/
 ├── main.py            titik rakit — satu-satunya yang menyambung 12 modul
+├── pekerja.py         proses kedua: relay event → Redis Streams, konsumen, penyelaras memories → Qdrant
 └── modules/           spec/06 — satu tabel dimiliki tepat satu modul
     ├── platform/      config · db · redis · log · galat · batas laju · /health (tanpa aturan domain)
     ├── identity/      users · consents · permissions · audit_logs — sesi · sandi · izin · audit
@@ -96,6 +97,12 @@ tools/                 pemeriksa dokumen, uji mutasi, CI lokal
 | tulisan yang menaut baris lain (goal) mengunci barisnya hidup | `test_batas_dan_balapan.py` (serentak) | `goals.kunci_goal_hidup(conn, id)` — `FOR SHARE` — **sebelum** menulis anak, milestone, atau tautan |
 | daftar yang dibaca utuh dibatasi **saat menulis** (K-24) | `test_batas_dan_balapan.py` | hitung di bawah `pg_advisory_xact_lock` per pemilik → `422 *_limit_reached`; jangan memotong saat membaca |
 | kursor halaman terikat daftar asalnya | `test_halaman.py` | `platform.kursor_waktu("<daftar>", …)` · `baca_kursor_waktu("<daftar>", …)` |
+| tulisan **fakta perilaku** menerbitkan eventnya di transaksi yang sama (`spec/06` aturan 6); kunci per **kejadian** (`spec/03` aturan 1) | `test_penerbitan_event.py` | `events.terbitkan(conn, …)` dengan `conn` tulisannya; baris peta baru di `spec/06` **dan** ujinya |
+| stream Redis membawa **rujukan**, bukan isi; konsumen membaca event di bawah RLS pemiliknya dan ACK **sesudah** commit (K-25) | `test_relay.py` | penangan `(conn, EventMasuk)` yang **idempoten**; jangan menaruh payload di stream |
+| Qdrant tidak punya RLS: tiap pencarian vektor bersaring `user_id`, payload titik **tanpa isi**, hasilnya dibaca ulang di PostgreSQL | `test_vektor.py` · `test_memori.py` | cari lewat `memory.PencariMemori`; tulis ke Qdrant hanya lewat `memory.PenyelarasVektor` — tidak pernah dari jalan permintaan |
+| scope hanya dari **daftar resmi** `spec/05`; scope sensitif tidak pernah `allow` karena bawaan (E-180) | `test_izin_masukan.py` · `test_izin.py` · `test_memori.py` | scope baru: `spec/05` *Daftar scope resmi* **dan** `identity.SCOPE_RESMI`, di PR yang sama |
+| turunan data pribadi mengikuti sumbernya — jurnal disunting/dihapus → memorinya, di transaksi yang sama (K-27) | `test_memori.py` | pendengar lewat titik rakit (`pendengar_jurnal_berubah`); vektornya menyusul lewat penyelaras |
+| penyemat memori **berkunci** — vektor tidak bisa dibalik jadi kata (K-26) | `test_sematan.py` · `test_config.py` | `platform.penyemat_dari(settings)`; jangan `PenyematHash` dengan kunci tetap di kode aplikasi |
 | aplikasi Flutter bersih dan teruji | `ci_lokal.py`: `dart format` · `flutter analyze --fatal-infos` · `flutter test` · layar diketuk lawan api hidup (smoke) | `flutter`/`dart` di PATH, atau `HVX_FLUTTER`/`HVX_DART` |
 
 🔑 **Setiap penegak baru wajib dibuktikan sanggup gagal** — tambahkan
@@ -116,7 +123,7 @@ kebutuhan, di migrasi — **bukan** kebijakan RLS yang dilonggarkan.
 python -m pip install uv          # sekali, kalau belum ada
 uv sync                           # seluruh lingkungan dari uv.lock
 uv run pytest -m "not integration"                  # putaran cepat
-docker compose up -d --wait postgres redis          # layanan untuk uji integrasi
+docker compose up -d --wait postgres redis qdrant   # layanan untuk uji integrasi
 (cd apps/mobile && flutter test)                    # aplikasi — tanpa server
 uv run --locked python tools/ci_lokal.py            # GERBANG PENUH sebelum PR
 git push && uv run --locked python tools/ci_lokal.py --lapor-github   # + status di PR

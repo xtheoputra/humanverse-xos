@@ -7,6 +7,9 @@ ada, dan kenapa bentuknya begitu: [`ARCHITECTURE.md`](../../ARCHITECTURE.md).
 ```bash
 # butuh HVX_ENV, HVX_DATABASE_URL, HVX_REDIS_URL, HVX_IP_HASH_KEY
 uv run --locked uvicorn hvx.main:create_app --factory --reload
+# proses KEDUA, citra yang sama (spec/07 3.3–3.6): relay event → Redis Streams,
+# konsumen `memori`, penyelaras memories → Qdrant (bila HVX_QDRANT_URL diisi)
+uv run --locked python -m hvx.pekerja
 ```
 
 | Variabel | Wajib | Bawaan · catatan |
@@ -30,6 +33,10 @@ uv run --locked uvicorn hvx.main:create_app --factory --reload
 | `HVX_RATE_LIMIT_LOGIN_FAILURES` | | `100/86400` — login gagal per akun: 100 sekaligus (NIST SP 800-63B-4: ≤ 100), lalu satu tiap `detik/jumlah`; berhasil masuk menghapus hitungannya. ⚠️ Batas **laju**, bukan penguncian sesudah 100 kegagalan beruntun — **B-42** · K-22 |
 | `FORWARDED_ALLOW_IPS` | | `127.0.0.1` — dibaca **uvicorn**, bukan `Settings`: hanya dari alamat ini `X-Forwarded-For` dipercaya. Di belakang penyeimbang beban (D1+) wajib diisi alamatnya — kalau tidak, semua klien berbagi satu jatah batas laju |
 | `HVX_CORS_ORIGINS` | | kosong — asal peramban yang boleh memanggil api, dipisah koma (`http://localhost:5000` untuk `apps/mobile` versi web). Kosong = **tanpa CORS**; `*` dan asal berjalur **ditolak saat mulai** |
+| `HVX_QDRANT_URL` | | kosong — basis data vektor memori (3.5). Kosong = memori tetap diekstrak ke PostgreSQL, **tidak** disemat; penyelaras menyusul begitu diisi |
+| `HVX_QDRANT_API_KEY` | | kosong — kunci API Qdrant (wajib di luar D0 lokal) |
+| `HVX_QDRANT_KOLEKSI` | | `memories` — nama koleksi (uji memakai koleksi sekali pakai) |
+| `HVX_SEMATAN_KEY` | bila Qdrant | ≥ 32 karakter — kunci penyemat lokal (**K-26**). Tanpa kunci, vektor di Qdrant bisa **dibalik menjadi kata** isi jurnal; menggantinya = seluruh memori disemat ulang |
 
 Rute yang ada — kontraknya [`spec/04`](../../spec/04-API-CONTRACTS.md):
 
@@ -43,7 +50,14 @@ Rute yang ada — kontraknya [`spec/04`](../../spec/04-API-CONTRACTS.md):
 | `POST /v1/habits/{id}/completions` · `DELETE …/completions/{for_date}` | tugas 2.3 — kirim ulang tanggal sama → `200` |
 | `GET /v1/habits/{id}/streak` | tugas 2.4 — menurut zona profil saat ini |
 | `GET /v1/checkins` · `PUT /v1/checkins/{for_date}` | tugas 2.5 — PUT = ganti, satu baris per tanggal |
-| `GET·POST /v1/moods` | tugas 2.6 |
+| `GET·POST /v1/moods` | tugas 2.6 — tiap mood melahirkan memori episodik (3.6) |
+| `GET·POST /v1/journal` · `GET·PATCH·DELETE /v1/journal/{id}` | tugas 3.4 — daftar **tanpa** `body`; sunting & hapus menjangkau memori jurnal (3.6) |
+| `GET·POST /v1/activities` (`?source=`) | tugas 3.8 — klien hanya mencatat `manual` |
+
+Tiap tulisan fakta perilaku menerbitkan event `spec/03` **di transaksi yang
+sama** (3.2, peta aturan 6 `spec/06`); proses `hvx.pekerja` menyalurkannya.
+Memori tidak punya rute HTTP di V0 — `memory.PencariMemori` (3.7) menunggu tool
+`memory.search` Sprint 4.
 
 Tulisan `POST`/`PATCH` domain menerima `Idempotency-Key` (spec/04, E-165) —
 rute baru menyatakan `idem: platform.Idempoten` **dan** mengakhiri badannya

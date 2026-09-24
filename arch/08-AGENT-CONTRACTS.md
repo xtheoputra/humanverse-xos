@@ -96,6 +96,13 @@ menulis apa pun yang dihasilkan ekstraktor?*
 ⚠️ Yang **tidak** berubah dalam kedua kasus: larangan membaca `journal_raw`.
 Itu aturan scope, bukan aturan agent.
 
+✅ **Separuh pertama dijawab Sprint 3 (24 Sep 2026, K-27):** jalur **ekstraksi**
+V0 selalu menulis keluarannya — satu memori episodik per `mood.logged` /
+`journal.created` — jadi ia **service**: konsumen stream `memori` di proses
+pekerja, tanpa manifest. `memory-agent` di percakapan (`memory.write` atas
+permintaan pengguna, 4.7) masih terbuka: kalau ia menilai kelayakan sebelum
+menulis, ia agent.
+
 ---
 
 ## §3 Manifest v2 — empat medan yang belum ada, dan kenapa masing-masing perlu
