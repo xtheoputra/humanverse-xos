@@ -4,6 +4,9 @@ kind: read
 description: Pencarian memori semantik, hanya di scope manifest pemanggil yang diizinkan (3.7)
 scopes: [habits, goals, checkins, mood, coaching_notes, journal_raw]
 risk_level: 0
+# Mesin izin ditanya PER SCOPE oleh pencariannya sendiri (3.7): scope `deny`/`ask`
+# dikeluarkan dan dilaporkan di `perlu_izin` — gerbang tidak menanyakannya lagi (E-193).
+menyaring_izin: true
 input:
   kueri: { type: string, required: true }
   batas: { type: integer, required: false, min: 1, max: 50 }  # memory.MAKS_HASIL

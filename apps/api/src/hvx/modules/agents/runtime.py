@@ -28,13 +28,15 @@ import re
 import time
 from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass
+from datetime import date, datetime
 from decimal import Decimal
 from typing import Any, Literal, Protocol
 from uuid import UUID, uuid4
+from zoneinfo import ZoneInfo
 
 from sqlalchemy.ext.asyncio import AsyncEngine
 
-from hvx.modules import memory, platform
+from hvx.modules import memory, platform, profile
 
 from . import repository
 from .jalannya import Jalannya, Pemicu
@@ -142,6 +144,13 @@ class KonteksAgent:
         self._runtime = runtime
         self.jalannya = jalannya
         self._pendengar = pendengar
+
+    async def tanggal_lokal(self) -> date:
+        """*Hari ini* pengguna — zona waktu profilnya (spec/01 `profiles.timezone`), bukan
+        jam server: *“tandai lari selesai”* pukul 01.00 WIB adalah hari itu di Jakarta."""
+        async with platform.transaksi_pengguna(self._runtime.engine, self.jalannya.user_id) as c:
+            zona = await profile.zona_waktu(c, self.jalannya.user_id)
+        return datetime.now(ZoneInfo(zona or "UTC")).date()
 
     async def _kabari(self, jenis: str, data: Mapping[str, Any]) -> None:
         if self._pendengar is not None:

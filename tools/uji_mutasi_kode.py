@@ -302,6 +302,7 @@ UJI_KEPUTUSAN = "tests/unit/test_keputusan_agent.py::test_keputusan_rusak_ditola
 UJI_RUNTIME = "tests/integration/test_runtime_agent.py"
 UJI_GERBANG = "tests/integration/test_gerbang_risiko.py"
 UJI_ORKESTRATOR = "tests/integration/test_orkestrator.py"
+UJI_AGENT_V0 = "tests/integration/test_agent_v0.py"
 FK_MILESTONE = (
     "  FOREIGN KEY (goal_id, user_id) REFERENCES goals (id, user_id) ON DELETE CASCADE" + NL + ");"
 )
@@ -6354,6 +6355,211 @@ MUTASI: list[Mutasi] = [
         ],
         _pytest("tests/unit/test_niat.py::test_niat_memilih_agent"),
         harus_memuat="“lewati lari hari ini” dibaca",
+    ),
+    # ── Sprint 4 · 4.7 agent V0: tiap balasan membawa confidence + rationale ──
+    Mutasi(
+        "4.7",
+        "gerbang ikut menanyakan scope memory.search — tiap jawaban coach tertahan (E-193)",
+        [
+            Sunting(
+                f"{MODUL}/agents/gerbang.py",
+                "            if alat.menyaring_izin",
+                "            if False",
+            )
+        ],
+        _pytest(f"{UJI_AGENT_V0}::test_coach_tidak_tertahan_scope_ingatan_yang_belum_diputuskan"),
+        harus_memuat="memory.search menunggu izin pengguna",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.7",
+        "memory.search tidak menyatakan menyaring izinnya sendiri",
+        [Sunting(f"{MODUL}/agents/alat/memory.search.yaml", "menyaring_izin: true\n", "")],
+        _pytest(f"{UJI_AGENT_V0}::test_coach_tanpa_data_mengatakannya"),
+        harus_memuat="memory.search menunggu izin pengguna",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.7",
+        "tulisan boleh menyaring izinnya sendiri — lolos dari gerbang",
+        [
+            Sunting(
+                f"{MODUL}/agents/registri.py",
+                '    if alat.menyaring_izin and (alat.kind != "read" or alat.side_effects != "none"):',
+                "    if False:",
+            )
+        ],
+        _pytest(f"{UJI_REGISTRI}"),
+        harus_memuat="aturan bentuk tidak ditegakkan — tulisan yang menyaring izinnya sendiri",
+    ),
+    Mutasi(
+        "4.7",
+        "coach berhenti saat satu sumber ditolak pengguna",
+        [
+            Sunting(
+                f"{MODUL}/agents/program_v0.py",
+                "        if _baca_ditolak(galat):\n            return None\n",
+                "",
+            )
+        ],
+        _pytest(f"{UJI_AGENT_V0}::test_coach_melewati_sumber_yang_ditolak_dan_mengatakannya"),
+        harus_memuat="ditolak_pengguna",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.7",
+        "coach melewati “tanya aku” pengguna seperti deny",
+        [
+            Sunting(
+                f"{MODUL}/agents/program_v0.py",
+                '    return galat.kode == "ditolak_pengguna"',
+                "    return True",
+            )
+        ],
+        _pytest(f"{UJI_AGENT_V0}::test_coach_bertanya_bila_pengguna_minta_ditanya"),
+        harus_memuat="DID NOT RAISE",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.7",
+        "coach tidak menyatakan sumber yang dilewati",
+        [
+            Sunting(
+                f"{MODUL}/agents/program_v0.py",
+                "    if dilewati:\n        alasan.append(",
+                "    if False:\n        alasan.append(",
+            )
+        ],
+        _pytest(f"{UJI_AGENT_V0}::test_coach_melewati_sumber_yang_ditolak_dan_mengatakannya"),
+        harus_memuat="sumber yang dilewati tidak dinyatakan",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.7",
+        "keyakinan coach tidak mengikuti datanya",
+        [
+            Sunting(
+                f"{MODUL}/agents/program_v0.py",
+                "        KEYAKINAN_SUMBER[sumber],",
+                "        KEYAKINAN_SUMBER[5],",
+            )
+        ],
+        _pytest(f"{UJI_AGENT_V0}::test_coach_menjawab_dari_data_pengguna_tanpa_catatan_bebasnya"),
+        harus_memuat="keyakinan tidak mengikuti datanya",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.7",
+        "alasan coach bukan fakta yang dipakai",
+        [
+            Sunting(
+                f"{MODUL}/agents/program_v0.py",
+                "    alasan = [f[:300] for f in fakta][:9] or [",
+                "    alasan = [",
+            )
+        ],
+        _pytest(f"{UJI_AGENT_V0}::test_coach_menjawab_dari_data_pengguna_tanpa_catatan_bebasnya"),
+        harus_memuat="alasan bukan fakta yang dipakai",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.7",
+        "coach mengarang bahan saat tidak ada data (Pasal 8)",
+        [
+            Sunting(
+                f"{MODUL}/agents/program_v0.py",
+                "        bahan=fakta,\n",
+                '        bahan=fakta or ["Kamu baik-baik saja."],\n',
+            )
+        ],
+        _pytest(f"{UJI_AGENT_V0}::test_coach_tanpa_data_mengatakannya"),
+        harus_memuat="coach mengarang jawaban tanpa data (Pasal 8)",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.7",
+        "habit agent menebak di antara beberapa yang cocok",
+        [Sunting(f"{MODUL}/agents/program_v0.py", "    if len(cocok) > 1:", "    if False:")],
+        _pytest(f"{UJI_AGENT_V0}::test_habit_agent_tidak_menebak"),
+        harus_memuat="menunggu izin pengguna",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.7",
+        "habit agent tidak membedakan judul persis",
+        [
+            Sunting(
+                f"{MODUL}/agents/program_v0.py",
+                "        KEYAKINAN_JUDUL_PERSIS if persis else KEYAKINAN_JUDUL_SEBAGIAN,",
+                "        KEYAKINAN_JUDUL_SEBAGIAN,",
+            )
+        ],
+        _pytest(f"{UJI_AGENT_V0}::test_habit_agent_menandai_setelah_izin_sekali"),
+        harus_memuat="keyakinan tidak membedakan judul yang cocok persis",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.7",
+        "habit agent menandai “lewati” sebagai selesai",
+        [
+            Sunting(
+                f"{MODUL}/agents/program_v0.py",
+                '            "habit.complete", {"habit_id": h["id"], "for_date": hari, "status": niat.status}',
+                '            "habit.complete", {"habit_id": h["id"], "for_date": hari, "status": "done"}',
+            )
+        ],
+        _pytest(f"{UJI_AGENT_V0}::test_habit_agent_menandai_setelah_izin_sekali"),
+        harus_memuat="“lewati” tidak dicatat sebagai dilewati",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.7",
+        "habit agent tidak memeriksa catatan yang sudah ada — minta izin menulis yang tak berubah",
+        [
+            Sunting(
+                f"{MODUL}/agents/program_v0.py",
+                '    tercatat = (h.get("day") or {}).get("status")',
+                "    tercatat = None",
+            )
+        ],
+        _pytest(f"{UJI_AGENT_V0}::test_habit_agent_tidak_mengaku_mengubah_yang_sudah_tercatat"),
+        harus_memuat="menunggu izin pengguna",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.7",
+        "habit agent mengaku mengubah catatan yang tercatat bersamaan",
+        [
+            Sunting(
+                f"{MODUL}/agents/program_v0.py",
+                '        tercatat = hasil["status"] if hasil["status"] != niat.status else None',
+                "        tercatat = None",
+            )
+        ],
+        _pytest(f"{UJI_AGENT_V0}::test_habit_agent_jujur_bila_tanggalnya_tercatat_bersamaan"),
+        harus_memuat="habit agent mengaku melewati habit yang tercatat selesai",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.7",
+        "memory agent mengaku mengingat lagi",
+        [
+            Sunting(
+                f"{MODUL}/agents/program_v0.py",
+                '        if not tulis["baru"]:',
+                "        if False:",
+            )
+        ],
+        _pytest(f"{UJI_AGENT_V0}::test_memory_agent_mengingat_hanya_bila_belum_diingat"),
+        harus_memuat="memory-agent mengaku mengingat lagi",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.7",
+        "agent aktif tanpa program",
+        [Sunting(f"{MODUL}/agents/program_v0.py", '    "memory-agent": memori,\n', "")],
+        _pytest(f"{UJI_AGENT_V0}::test_tiap_agent_aktif_punya_program"),
+        harus_memuat="agent aktif tanpa program",
     ),
     # ── alat ini sendiri: bytecode mutan tidak tertinggal sesudah dipulihkan ──
     Mutasi(

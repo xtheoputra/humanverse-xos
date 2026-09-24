@@ -38,6 +38,14 @@ from .pelaksana_alat import (
     periksa_masukan,
     scope_panggilan,
 )
+from .program_v0 import (
+    KEYAKINAN_INGATAN,
+    KEYAKINAN_JUDUL_PERSIS,
+    KEYAKINAN_JUDUL_SEBAGIAN,
+    KEYAKINAN_PASTI,
+    KEYAKINAN_SUMBER,
+    PROGRAM_V0,
+)
 from .registri import (
     RUANG_ID_AGENT,
     Alat,
@@ -67,7 +75,13 @@ __all__ = [
     "AGENT_UNTUK",
     "CARA_MENGISI_MOOD",
     "IMPLEMENTASI",
+    "KEYAKINAN_INGATAN",
+    "KEYAKINAN_JUDUL_PERSIS",
+    "KEYAKINAN_JUDUL_SEBAGIAN",
+    "KEYAKINAN_PASTI",
+    "KEYAKINAN_SUMBER",
     "KODE_GERBANG",
+    "PROGRAM_V0",
     "RUANG_ID_AGENT",
     "UMUR_TOKEN_S",
     "Alat",

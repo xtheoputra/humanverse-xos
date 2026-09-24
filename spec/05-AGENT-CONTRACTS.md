@@ -94,7 +94,7 @@ aktif, dengan `risk_level` = `max_risk`-nya):
 | `goals` | goal dan milestone | — | coach · memory |
 | `checkins` | check-in harian: energi, fokus, jam tidur | — | coach · memory |
 | `mood` | mood yang dilaporkan, dan memori episodiknya (3.6) | — | coach · memory |
-| `coaching_notes` | catatan yang ditulis `coach-agent` | — | coach · memory |
+| `coaching_notes` | catatan coaching: ditulis `coach-agent`, atau diminta pengguna untuk diingat (`memory-agent`, 4.7) | — | coach · memory |
 | `journal_raw` | isi jurnal apa adanya, dan memori episodiknya (3.6) | ✅ | **tidak satu pun** |
 
 ⁽¹⁾ **Sensitif = tidak pernah `allow` karena bawaan.** Hanya keputusan `allow`
@@ -221,6 +221,9 @@ output:                            # 🔧 = GET /habits/{id}/streak (04, E-176)
   longest:              integer
   completion_rate_30d:  number | null   # null = belum ada periode jatuh tempo
 side_effects: none                 # none | writes_user_data | external_call
+menyaring_izin: false              # 🔧 E-193: true = tool BACA yang menanyai mesin izin
+                                   #   per scope sendiri (memory.search) — gerbang tidak
+                                   #   menanyakannya lagi
 reaches_third_party: false         # 🔧 K-1: true bila akibatnya sampai ke orang
                                    #     selain pemegang akun. true ⇒ risk_level >= 3
 rate_limit:   60/min/user
@@ -330,6 +333,14 @@ Tool V0 — **9 tool + 3 entri `kind: agent`**:
 | `coach-agent` | R1 | habit.list, habit.streak, goal.list, checkin.get, mood.recent, memory.search, recommendation.create | habits, goals, checkins, mood, coaching_notes | coaching_notes |
 | `habit-agent` | R2 | habit.list, habit.streak, habit.complete | habits | — |
 | `memory-agent` | R2 | memory.search, memory.write | semua scope **kecuali** `journal_raw` | semua scope **kecuali** `journal_raw` 🔧 |
+
+> 🔧 **Program V0 tiga agent (tugas 4.7, 24 Sep 2026, K-30).** `coach-agent` menjawab
+> dari lima sumber yang dibaca tool — habit & check-in hari ini (zona waktu profil),
+> mood 7 hari, goal aktif, ingatan yang cocok — sebagai kalimat fakta yang juga
+> menjadi `rationale`-nya; sumber yang ditolak pengguna dilewati dan dinyatakan.
+> `habit-agent` menulis hanya bila tepat satu habit aktif cocok dan tanggalnya belum
+> tercatat. `memory-agent` menulis hanya yang belum diingat (arch/08 §2.2: **agent**).
+> Keyakinan V0 = banyaknya bukti, bukan peluang terkalibrasi; ambang bertindaknya #34.
 
 > 🔧 **`orchestrator-agent` V0 (tugas 4.6, 24 Sep 2026).** Memilih agent dari **niat**
 > (aturan, bukan model — `agents.kenali`): *“tandai/centang/lewati …”* → `agent.habit`,

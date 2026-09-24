@@ -94,6 +94,11 @@ class Alat(BaseModel):
     side_effects: EfekSamping
     reaches_third_party: bool
     rate_limit: str = Field(pattern=r"^[1-9][0-9]{0,4}/(min|hour)/user$")
+    # 🔧 4.7 (E-193): tool BACA yang menanyai mesin izin sendiri, per scope — scope yang
+    # ditolak atau belum diputuskan dikeluarkan dari hasilnya dan dilaporkan
+    # (`memory.search`, 3.7). Gerbang lalu tidak menanyakannya lagi untuk seluruh
+    # pemanggilan: satu scope `ask` tidak boleh menahan jawaban dari scope yang diizinkan.
+    menyaring_izin: bool = False
 
 
 class _Memori(BaseModel):
@@ -211,6 +216,11 @@ def _periksa_alat(
     asing = sorted(set(alat.scopes) - identity.SCOPE_RESMI.keys())
     if asing:
         salah.append(Pelanggaran(alat.name, "2", f"scope di luar daftar resmi: {asing}"))
+    if alat.menyaring_izin and (alat.kind != "read" or alat.side_effects != "none"):
+        # Hanya BACAAN yang boleh menyaring izinnya sendiri: tulisan selalu ditanya gerbang.
+        salah.append(
+            Pelanggaran(alat.name, "bentuk", "menyaring_izin hanya untuk tool baca tanpa efek")
+        )
     return alat, salah
 
 

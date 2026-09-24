@@ -599,6 +599,20 @@ sesudahnya.
 
 ---
 
+## K-30 · Program agent V0: jawaban dari fakta tool, keyakinan = banyaknya bukti
+
+> Diputuskan 24 September 2026, saat Sprint 4 tugas 4.7 ditulis.
+
+| | |
+|---|---|
+| **Keputusan** | **(1)** `coach-agent` membaca lima sumber lewat tool (habit hari ini · check-in hari ini · mood 7 hari · goal aktif · ingatan yang cocok) dan menyerahkan **kalimat fakta** dari sumber itu sebagai `bahan` AI Gateway — tidak ada kalimat lain. Sumber yang **ditolak** pengguna (`deny`) dilewati **dan dinyatakan** di `rationale`; sumber yang pengguna minta **ditanyakan** (`ask`) tidak dilewati — gilirannya ditahan gerbang. **(2)** **Keyakinan V0 = banyaknya bukti, bukan peluang yang dikalibrasi**: coach `0,10 · 0,35 · 0,50 · 0,65 · 0,75 · 0,85` untuk 0–5 sumber berisi; habit `0,95` judul persis · `0,80` judul yang memuat; memory `0,10 · 0,50 · 0,75` untuk 0 · 1 · ≥2 ingatan; hal yang dibaca/ditulis apa adanya `0,95`. Angka ini **dilaporkan**, tidak pernah dipakai memutuskan. **(3)** `habit-agent` menulis hanya bila **tepat satu** habit aktif cocok, dan tidak menulis tanggal yang sudah tercatat — balasannya mengatakan apa yang terjadi, bukan apa yang diminta. **(4)** `memory-agent` menulis ke `coaching_notes` hanya bila isinya belum diingat. |
+| **Bukti** | Konstitusi Pasal 3 & 8 ([`../arch/08`](../arch/08-AGENT-CONTRACTS.md) §4): *tiap keluaran wajib `rationale` + `confidence`*; *dilarang mengarang data*. spec/04 SSE `done` memuat keduanya di **setiap** balasan. Ambang untuk bertindak atas keyakinan = [#34](../../issues/34), **milik pemilik** (butuh data nyata untuk dikalibrasi). |
+| **Bacaan yang DITOLAK** | **(a)** *“Keyakinan tetap 0,7 untuk semua jawaban”* — ditolak: keyakinan yang tidak berubah dengan buktinya tidak memberi tahu pengguna apa pun, dan Confidence Layer (§19) kehilangan artinya sejak baris pertama. **(b)** *“Keyakinan dari model”* — ditolak: V0 tidak punya model yang menalar (K-28), dan keyakinan yang dilaporkan model atas dirinya sendiri tidak dikalibrasi. **(c)** *“Habit agent memilih judul yang paling mirip”* — ditolak: menebak berarti MENULIS sesuatu yang mungkin tidak dimaksud; bertanya murah. **(d)** *“Menjawab ‘ditandai’ karena tulisan tidak gagal”* — ditolak: `POST …/completions` mengembalikan baris LAMA untuk tanggal yang sudah tercatat (spec/04); balasan yang mengaku mengubahnya bohong. |
+| **Harga yang diakui** | Keyakinan V0 bisa tinggi untuk jawaban yang faktanya banyak tetapi tidak relevan dengan pertanyaan — V0 tidak menilai relevansi. Habit agent tidak bisa MENGUBAH catatan yang sudah ada: tidak ada tool pembatalan di 9 tool V0. |
+| **Cara membalikkan** | `agents/program_v0.py` (angka di satu tempat, `KEYAKINAN_*`); `tests/integration/test_agent_v0.py` diubah bersamanya. |
+
+---
+
 ## Yang sengaja **tidak** saya putuskan
 
 | Butir | Kenapa |

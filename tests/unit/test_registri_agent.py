@@ -137,6 +137,11 @@ KASUS: list[tuple[str, str, Callable[[Mentah, Mentah], None]]] = [
     ),
     (
         "bentuk",
+        "tulisan yang menyaring izinnya sendiri",
+        lambda a, m: a["memory.write"].update(menyaring_izin=True),
+    ),
+    (
+        "bentuk",
         "min lebih besar daripada max",
         lambda a, m: a["mood.recent"]["input"]["hari"].update(min=31, max=1),
     ),

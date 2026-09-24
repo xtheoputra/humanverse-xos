@@ -108,9 +108,14 @@ class GerbangRisiko:
         )
         subjek = identity.Subjek("agent", jalannya.agent.name)
         aksi = AKSI_IZIN[alat.kind]
-        keputusan = [
-            await self._izin.cek(jalannya.user_id, subjek, s, aksi, bawaan=bawaan) for s in scopes
-        ]
+        keputusan = (
+            []  # tool menanyai mesin izin sendiri, per scope (memory.search, E-193)
+            if alat.menyaring_izin
+            else [
+                await self._izin.cek(jalannya.user_id, subjek, s, aksi, bawaan=bawaan)
+                for s in scopes
+            ]
+        )
         if "deny" in keputusan:
             raise await self._tolak(jalannya, alat, "ditolak_pengguna")
 
