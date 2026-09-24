@@ -647,6 +647,9 @@ CREATE TABLE ai_messages (
   latency_ms      integer,
   cost_usd        numeric(12,6),
   created_at      timestamptz NOT NULL DEFAULT now(),
+  -- 🔧 0008 (E-194): tiap balasan AI membawa keyakinan & alasannya — juga saat dibaca ulang
+  confidence      numeric(4,3) CHECK (confidence BETWEEN 0 AND 1),
+  rationale       jsonb NOT NULL DEFAULT '[]'::jsonb,
   FOREIGN KEY (conversation_id, user_id) REFERENCES ai_conversations (id, user_id)
     ON DELETE CASCADE
 );

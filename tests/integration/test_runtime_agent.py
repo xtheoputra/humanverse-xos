@@ -153,8 +153,8 @@ async def test_run_yang_ditahan_gerbang_blocked_bukan_failed(api_bersama: ApiUji
 async def test_run_yang_dibatalkan_di_tengah_aliran_tetap_ditutup_dan_dibayar(
     api_bersama: ApiUji,
 ) -> None:
-    """Klien memutus SSE di tengah jawaban: run ditutup `cancelled`, token yang sudah
-    keluar tetap tercatat — sudah dibayar, dan tetap dihitung anggaran (4.9)."""
+    """Api berhenti di tengah jawaban (giliran dibatalkan): run ditutup `cancelled`, token
+    yang sudah keluar tetap tercatat — sudah dibayar, dan tetap dihitung anggaran (4.9)."""
     uid, _token = await api_bersama.pengguna_baru()
     penyedia = PenyediaUji(jeda_s=0.5)
     ids: list[Any] = []

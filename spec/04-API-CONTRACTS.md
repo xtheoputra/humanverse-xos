@@ -247,6 +247,7 @@ POST   /conversations                    { title? }
 GET    /conversations/{id}/messages      ?cursor=
 POST   /conversations/{id}/messages      { content }   → 202, balasan lewat stream
 GET    /conversations/{id}/stream        → SSE: token, tool_call, done
+POST   /conversations/{id}/confirmations { token, decision }   → 202  🔧 E-195
 ```
 
 Balasan `POST /messages`:
@@ -274,6 +275,45 @@ Peristiwa SSE `done`:
 > `confidence` dan `rationale` ikut di **setiap** balasan AI, bukan hanya
 > rekomendasi — itu penerapan Confidence Layer (§19) dan Explainable AI
 > (naskah 4 §29) di lapisan API, bukan sekadar di basis data.
+
+> 🔧 **Diterapkan Sprint 4 (tugas 4.8, 24 Sep 2026) — dan yang ditambahkan.**
+>
+> * **Giliran.** `POST …/messages` menjawab `202` sesudah run akarnya ditulis
+>   (`agent_run_id` sah dirujuk). Perintah berbentuk tetap (*“catat mood 3”*, 4.1)
+>   dijalankan saat itu juga, **tanpa agent dan tanpa model**: `agent_run_id: null`,
+>   `status: "completed"`, `done.cost_usd: 0`. Satu giliran per percakapan —
+>   pesan kedua saat yang pertama masih dijawab → `409 turn_in_progress`.
+> * **`GET …/stream`** — seluruh peristiwa giliran terakhir **dari yang pertama**
+>   (klien boleh menyambung sesudah `POST`), berakhir dengan `done` atau `error {code}`;
+>   `204` bila tidak ada giliran yang sedang atau baru saja berjalan — di SSE, 204
+>   berarti *jangan menyambung ulang* (balasan yang sudah selesai dibaca dari
+>   `GET …/messages`). `tool_call` = `{tool, agent}` — tanpa masukannya. Aliran hidup di
+>   proses api yang menjalankan gilirannya (**K-31**). `done` juga memuat `message_id`;
+>   `cost_usd` = seluruh pohon run giliran itu.
+> * 🔧 **E-194 — riwayat membawa alasannya.** `GET …/messages` (terbaru dulu, kursor
+>   `(created_at, id)`) mengembalikan `confidence`, `rationale`, dan `cost_usd` tiap
+>   balasan — `ai_messages` semula tanpa kedua kolom pertama (migrasi `0008`), jadi
+>   balasan yang dibaca ulang kehilangan alasannya.
+> * 🔧 **E-195 — konfirmasi punya rute.** spec/05 menulis *“`ask` → minta izin”* dan
+>   spec/07 4.5 *“risk 2 minta izin sekali”*, tetapi tidak ada rute untuk MENJAWABNYA.
+>   Giliran yang ditahan gerbang mengalirkan `confirmation_required`:
+>
+>   ```json
+>   {
+>     "token": "…", "kind": "permission", "agent": "habit-agent",
+>     "tool": "habit.complete", "risk_level": 2, "scopes": ["habits"],
+>     "remember_allowed": true, "expires_at": "2026-09-24T10:15:00+00:00"
+>   }
+>   ```
+>
+>   lalu `done` berisi pertanyaannya. `POST …/confirmations { token, decision }` —
+>   `decision` ∈ `allow_always` (hanya bila `remember_allowed`: izin disimpan, tidak
+>   ditanya lagi) · `allow_once` · `reject` — menjawab `202 { agent_run_id, status }`,
+>   dan giliran yang sama diulang dari pesan penggunanya; hasilnya lewat `…/stream`.
+>   `kind: "confirmation"` (R3) tidak bisa diingat. Token bertanda tangan, 15 menit,
+>   milik satu pengguna dan satu percakapan, **sekali pakai**: jawaban kedua →
+>   `409 confirmation_answered`; token rusak, kedaluwarsa, atau milik percakapan lain
+>   → `422 invalid_confirmation` (tanpa membedakan ketiganya).
 
 ---
 

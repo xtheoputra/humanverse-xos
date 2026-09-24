@@ -613,6 +613,20 @@ sesudahnya.
 
 ---
 
+## K-31 · Aliran percakapan di dalam proses, satu giliran per percakapan
+
+> Diputuskan 24 September 2026, saat Sprint 4 tugas 4.8 ditulis.
+
+| | |
+|---|---|
+| **Keputusan** | **(1)** Token SSE mengalir lewat perantara **di dalam proses api** yang menjalankan gilirannya (`agents.AliranPercakapan`), bukan lewat Redis: token adalah kalimat untuk pengguna — isi, bukan rujukan. **(2)** Peristiwa satu giliran disimpan sampai giliran selesai **+ 60 dtk**, jadi klien yang menyambung sesudah `POST …/messages` menerima seluruhnya dari token pertama. **(3)** **Satu giliran per percakapan** — pesan kedua saat yang pertama berjalan → `409 turn_in_progress`. **(4)** Giliran agent berjalan di **tugas latar** proses itu; klien yang memutus SSE tidak membatalkannya — balasannya tetap tersimpan dan terbaca di `GET …/messages`. Api yang berhenti membatalkan giliran yang masih berjalan; run-nya ditutup `cancelled`. |
+| **Bukti** | K-25: *stream Redis membawa rujukan, bukan isi*; spec/04: *`POST /messages` → 202, balasan lewat stream*. V0 = satu proses api (compose). |
+| **Bacaan yang DITOLAK** | **(a)** *“Redis pub/sub untuk token”* — ditolak: isi percakapan pengguna di Redis `noeviction` bersama, dan pub/sub tidak menyimpan apa pun untuk klien yang tersambung terlambat. **(b)** *“Aliran dari `POST` itu sendiri”* — ditolak: spec/04 memisahkan keduanya, dan klien seluler yang putus di tengah `POST` kehilangan jawabannya sama sekali. **(c)** *“Klien yang putus membatalkan giliran”* — ditolak: tulisan yang sudah diizinkan pengguna berhenti di tengah hanya karena sinyal hilang. |
+| **Harga yang diakui** | ⚠️ **Lebih dari satu proses api = klien bisa tersambung ke proses yang salah** dan menerima `204`; balasannya tetap bisa dibaca dari `GET …/messages`. Run yang terputus karena proses MATI (bukan berhenti) tetap `running` — tidak ada penyapu lintas pengguna di V0. |
+| **Cara membalikkan** | `agents/aliran.py` di belakang antarmuka yang sama (`mulai` · `kirim` · `ikuti`); rute tidak berubah. |
+
+---
+
 ## Yang sengaja **tidak** saya putuskan
 
 | Butir | Kenapa |

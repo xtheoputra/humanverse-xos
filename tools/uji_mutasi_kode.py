@@ -303,6 +303,7 @@ UJI_RUNTIME = "tests/integration/test_runtime_agent.py"
 UJI_GERBANG = "tests/integration/test_gerbang_risiko.py"
 UJI_ORKESTRATOR = "tests/integration/test_orkestrator.py"
 UJI_AGENT_V0 = "tests/integration/test_agent_v0.py"
+UJI_PERCAKAPAN = "tests/integration/test_percakapan.py"
 FK_MILESTONE = (
     "  FOREIGN KEY (goal_id, user_id) REFERENCES goals (id, user_id) ON DELETE CASCADE" + NL + ");"
 )
@@ -6560,6 +6561,183 @@ MUTASI: list[Mutasi] = [
         [Sunting(f"{MODUL}/agents/program_v0.py", '    "memory-agent": memori,\n', "")],
         _pytest(f"{UJI_AGENT_V0}::test_tiap_agent_aktif_punya_program"),
         harus_memuat="agent aktif tanpa program",
+    ),
+    # ── Sprint 4 · 4.8 percakapan + SSE: token mengalir; done memuat cost_usd ──
+    Mutasi(
+        "4.8",
+        "done tanpa biaya permintaannya",
+        [
+            Sunting(
+                f"{MODUL}/agents/percakapan.py",
+                '        "cost_usd": float(pesan.cost_usd or 0),',
+                '        "cost_usd": 0.0,',
+            )
+        ],
+        _pytest(
+            f"{UJI_PERCAKAPAN}::test_token_mengalir_lalu_done_membawa_biaya_keyakinan_dan_alasan"
+        ),
+        harus_memuat="done tanpa biaya permintaannya",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.8",
+        "biaya giliran hanya run akar — run anak tidak dihitung",
+        [
+            Sunting(
+                f"{MODUL}/agents/repository.py",
+                "      FROM agent_runs a JOIN pohon p ON a.parent_run_id = p.id",
+                "      FROM agent_runs a JOIN pohon p ON false",
+            )
+        ],
+        _pytest(
+            f"{UJI_PERCAKAPAN}::test_token_mengalir_lalu_done_membawa_biaya_keyakinan_dan_alasan"
+        ),
+        harus_memuat="done tanpa biaya permintaannya",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.8",
+        "peristiwa runtime tidak mengalir ke klien",
+        [
+            Sunting(
+                f"{MODUL}/agents/percakapan.py",
+                "        async def pendengar(jenis: str, data: Mapping[str, Any]) -> None:\n            await self.aliran.kirim(percakapan_id, jenis, data)\n",
+                "        async def pendengar(jenis: str, data: Mapping[str, Any]) -> None:\n            return None\n",
+            )
+        ],
+        _pytest(
+            f"{UJI_PERCAKAPAN}::test_token_mengalir_lalu_done_membawa_biaya_keyakinan_dan_alasan"
+        ),
+        harus_memuat="tool_call tidak mengalir",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.8",
+        "balasan tersimpan tanpa alasannya (E-194)",
+        [
+            Sunting(
+                f"{MODUL}/agents/percakapan.py",
+                "                rationale=alasan,",
+                "                rationale=(),",
+            )
+        ],
+        _pytest(
+            f"{UJI_PERCAKAPAN}::test_token_mengalir_lalu_done_membawa_biaya_keyakinan_dan_alasan"
+        ),
+        harus_memuat="done tanpa alasan",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.8",
+        "klien yang tersambung sesudah POST kehilangan awal aliran",
+        [
+            Sunting(
+                f"{MODUL}/agents/aliran.py",
+                "        i = 0\n        while True:",
+                "        i = len(g.peristiwa)\n        while True:",
+            )
+        ],
+        _pytest(f"{UJI_PERCAKAPAN}::test_klien_yang_tersambung_belakangan_menerima_seluruh_aliran"),
+        harus_memuat="klien yang terlambat kehilangan awal aliran",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.8",
+        "“catat mood” lewat percakapan dijalankan agent",
+        [
+            Sunting(
+                f"{MODUL}/agents/percakapan.py",
+                '            if niat.rute == "deterministic":',
+                "            if False:",
+            )
+        ],
+        _pytest(f"{UJI_PERCAKAPAN}::test_catat_mood_lewat_percakapan_tanpa_model_sama_sekali"),
+        harus_memuat="“catat mood” dijalankan agent",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.8",
+        "dua giliran serentak dalam satu percakapan",
+        [
+            Sunting(
+                f"{MODUL}/agents/aliran.py",
+                "        if self.sibuk(percakapan_id):\n            raise GiliranBerjalan(",
+                "        if False:\n            raise GiliranBerjalan(",
+            )
+        ],
+        _pytest(f"{UJI_PERCAKAPAN}::test_satu_giliran_per_percakapan"),
+        harus_memuat="dua giliran serentak dalam satu percakapan",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.8",
+        "giliran yang ditahan tidak mengalirkan pertanyaannya",
+        [
+            Sunting(
+                f"{MODUL}/agents/percakapan.py",
+                '                await self.aliran.kirim(\n                    percakapan_id, "confirmation_required", _permintaan(galat.konfirmasi)\n                )\n',
+                "                pass\n",
+            )
+        ],
+        _pytest(f"{UJI_PERCAKAPAN}::test_konfirmasi_lewat_percakapan_lalu_giliran_diulang"),
+        harus_memuat="confirmation_required tidak mengalir",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.8",
+        "token konfirmasi percakapan lain diterima",
+        [
+            Sunting(
+                f"{MODUL}/agents/percakapan.py",
+                "                if akar is None or akar[1] != percakapan_id",
+                "                if akar is None",
+            )
+        ],
+        _pytest(f"{UJI_PERCAKAPAN}::test_token_konfirmasi_percakapan_lain_ditolak"),
+        harus_memuat="token konfirmasi percakapan lain diterima",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.8",
+        "penolakan tetap menjalankan giliran",
+        [
+            Sunting(
+                f"{MODUL}/agents/percakapan.py",
+                "            if setuju is None:",
+                "            if False:",
+            )
+        ],
+        _pytest(f"{UJI_PERCAKAPAN}::test_konfirmasi_ditolak_tidak_menjalankan_apa_pun"),
+        harus_memuat="penolakan tetap menjalankan giliran",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.8",
+        "aliran percakapan orang lain terjangkau",
+        [
+            Sunting(
+                f"{MODUL}/agents/routes.py",
+                '    if await layanan.baca(pengguna.user_id, percakapan_id) is None:\n        raise platform.GalatApi(404, "not_found", "Percakapan tidak ditemukan.")\n',
+                "",
+            )
+        ],
+        _pytest(f"{UJI_PERCAKAPAN}::test_percakapan_orang_lain_tidak_terjangkau"),
+        harus_memuat="percakapan orang lain terjangkau",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.8",
+        "aliran tanpa giliran bukan 204 — klien menyambung ulang tanpa akhir",
+        [
+            Sunting(
+                f"{MODUL}/agents/routes.py",
+                "    if not layanan.aliran.ada(percakapan_id):\n        return Response(status_code=204)\n",
+                "",
+            )
+        ],
+        _pytest(f"{UJI_PERCAKAPAN}::test_aliran_tanpa_giliran_204"),
+        harus_memuat="204 berarti jangan menyambung ulang",
+        kelompok="db",
     ),
     # ── alat ini sendiri: bytecode mutan tidak tertinggal sesudah dipulihkan ──
     Mutasi(

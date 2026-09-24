@@ -65,9 +65,46 @@ def create_app(settings: platform.Settings | None = None) -> FastAPI:
             "db": partial(platform.ping_db, engine),
             "redis": partial(platform.ping_redis, redis),
         }
+        # spec/07 4.3–4.8: agent hanya lewat runtime ini — tool lewat pelaksana (registry,
+        # manifest, masukan, batas laju, gerbang risiko), model lewat AI Gateway.
+        mesin_izin = identity.MesinIzin(
+            engine, redis, settings.redis_prefix, settings.permission_cache_ttl_s
+        )
+        tanda = agents.TokenKonfirmasi(partial(platform.sidik, settings, "konfirmasi-agent"))
+        vektor = platform.klien_vektor_dari(settings)
+        pencari = (
+            memory.PencariMemori(
+                engine,
+                mesin_izin,
+                vektor,
+                platform.penyemat_dari(settings),
+                settings.qdrant_koleksi,
+            )
+            if vektor
+            else None
+        )
+        runtime = agents.RuntimeAgent(
+            engine,
+            registri,
+            agents.PROGRAM_V0,
+            agents.PelaksanaAlat(
+                registri,
+                agents.IMPLEMENTASI,
+                agents.GerbangRisiko(engine, mesin_izin, tanda),
+                platform.PembatasLaju(redis, settings.redis_prefix),
+            ),
+            platform.gerbang_model_dari(settings),
+            pencari,
+        )
+        app.state.percakapan = agents.LayananPercakapan(
+            engine, runtime, agents.AliranPercakapan(), mesin_izin, tanda
+        )
         try:
             yield
         finally:
+            await app.state.percakapan.tutup()
+            if vektor:
+                await vektor.tutup()
             await redis.aclose()
             await engine.dispose()
 
@@ -128,4 +165,5 @@ def create_app(settings: platform.Settings | None = None) -> FastAPI:
     app.include_router(checkins.router)
     app.include_router(journal.router)
     app.include_router(activities.router)
+    app.include_router(agents.router)
     return app

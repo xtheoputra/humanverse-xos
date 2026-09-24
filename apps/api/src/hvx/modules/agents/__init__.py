@@ -10,6 +10,7 @@ Berkas ini satu-satunya pintu keluar modul (spec/06 aturan 1).
 """
 
 from .alat_v0 import IMPLEMENTASI
+from .aliran import AliranPercakapan, GiliranBerjalan
 from .deterministik import CARA_MENGISI_MOOD, HasilDeterministik, jalankan_deterministik
 from .gerbang import GerbangRisiko
 from .jalannya import Jalannya, Pemicu
@@ -38,6 +39,7 @@ from .pelaksana_alat import (
     periksa_masukan,
     scope_panggilan,
 )
+from .percakapan import LayananPercakapan
 from .program_v0 import (
     KEYAKINAN_INGATAN,
     KEYAKINAN_JUDUL_PERSIS,
@@ -59,6 +61,7 @@ from .registri import (
     pastikan_katalog,
     validasi_registri,
 )
+from .routes import router
 from .runtime import (
     KODE_GERBANG,
     HasilRun,
@@ -87,8 +90,10 @@ __all__ = [
     "Alat",
     "AlatDitolak",
     "AlatGagal",
+    "AliranPercakapan",
     "Gerbang",
     "GerbangRisiko",
+    "GiliranBerjalan",
     "HasilDeterministik",
     "HasilRun",
     "Jalannya",
@@ -102,6 +107,7 @@ __all__ = [
     "KonteksAgent",
     "KonteksAlat",
     "LayananAlat",
+    "LayananPercakapan",
     "Manifest",
     "MoodDiminta",
     "Niat",
@@ -127,6 +133,7 @@ __all__ = [
     "periksa_keluaran",
     "periksa_keputusan",
     "periksa_masukan",
+    "router",
     "scope_panggilan",
     "sidik_masukan",
     "validasi_registri",
