@@ -38,6 +38,9 @@ class Jalannya:
     token_masuk: int = 0
     token_keluar: int = 0
     biaya_usd: Decimal = field(default_factory=lambda: Decimal("0"))
+    # Biaya run anak yang sudah selesai (K-14) — bukan kolom run ini, tetapi bagian dari
+    # yang dibayar satu permintaan (SSE `done`, spec/04).
+    biaya_turunan_usd: Decimal = field(default_factory=lambda: Decimal("0"))
 
     def catat_alat(self, nama: str, risiko: int) -> None:
         if nama not in self.alat_dipakai:

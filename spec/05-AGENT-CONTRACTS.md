@@ -331,6 +331,15 @@ Tool V0 — **9 tool + 3 entri `kind: agent`**:
 | `habit-agent` | R2 | habit.list, habit.streak, habit.complete | habits | — |
 | `memory-agent` | R2 | memory.search, memory.write | semua scope **kecuali** `journal_raw` | semua scope **kecuali** `journal_raw` 🔧 |
 
+> 🔧 **Runtime V0 (tugas 4.4, 24 Sep 2026).** Program tiap agent hanya memegang
+> `KonteksAgent`: `alat(nama, masukan)` lewat pelaksana tool (4.3) dan
+> `model(tugas, pertanyaan, bahan)` lewat AI Gateway (4.1) — keduanya yang mencatat
+> ke run, jadi jejaknya adalah yang TERJADI, bukan yang dilaporkan program. Tiap
+> keputusan wajib membawa **`confidence` 0–1 dan 1–10 `rationale`** (Konstitusi
+> Pasal 3, [`../arch/08`](../arch/08-AGENT-CONTRACTS.md) §4) — keputusan tanpa
+> keduanya menggagalkan run, bukan dikirim tanpa dasar. Isi kolomnya: spec/01
+> `agent_runs`.
+
 ⁽¹⁾ 🔧 **`orchestrator-agent` naik dari `risk_level: 0` ke `max_risk: R2`**, dan
 itu konsekuensi langsung aturan 3 yang baru: ia memanggil `agent.habit`
 (`risk_level` = `max_risk` `habit-agent` = **R2**), jadi pagu R0 akan

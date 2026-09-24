@@ -33,7 +33,7 @@ from __future__ import annotations
 
 import asyncio
 import time
-from collections.abc import AsyncIterator, Callable, Mapping
+from collections.abc import AsyncGenerator, AsyncIterator, Callable, Mapping
 from dataclasses import dataclass, field
 from decimal import ROUND_HALF_UP, Decimal
 from typing import Literal, Protocol
@@ -139,21 +139,25 @@ class PenyediaLokal:
 
 @dataclass
 class AliranModel:
-    """Satu panggilan model yang mengalir. `jawaban` terisi sesudah aliran habis."""
+    """Satu panggilan model yang mengalir. `jawaban` terisi sesudah aliran habis — ATAU
+    sesudah ditutup di tengah jalan (`aclose`, pembatalan): token yang sudah keluar sudah
+    dibayar, jadi tetap dihitung (spec/07 4.4 · 4.9)."""
 
     _potongan: AsyncIterator[str]
     _selesai: Callable[[str], JawabanModel]
     jawaban: JawabanModel | None = field(default=None, init=False)
 
-    def __aiter__(self) -> AsyncIterator[str]:
+    def __aiter__(self) -> AsyncGenerator[str, None]:
         return self._alir()
 
-    async def _alir(self) -> AsyncIterator[str]:
+    async def _alir(self) -> AsyncGenerator[str, None]:
         bagian: list[str] = []
-        async for p in self._potongan:
-            bagian.append(p)
-            yield p
-        self.jawaban = self._selesai("".join(bagian))
+        try:
+            async for p in self._potongan:
+                bagian.append(p)
+                yield p
+        finally:
+            self.jawaban = self._selesai("".join(bagian))
 
 
 class GerbangModel:

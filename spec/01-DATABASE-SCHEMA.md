@@ -886,6 +886,20 @@ ALTER TABLE recommendations
 >
 > `parent_run_id` merekam Orchestrator yang memanggil agent lain (§13) —
 > satu permintaan pengguna bisa jadi pohon eksekusi yang bisa ditelusuri.
+>
+> 🔧 **Cara runtime V0 mengisinya (tugas 4.4, 24 Sep 2026).** Baris ditulis
+> `running` **sebelum** program agent berjalan — rujukan ke run itu (rekomendasi,
+> run anak) sah sejak langkah pertama — lalu ditutup **sekali**
+> (`WHERE status = 'running'`): `succeeded` · `blocked` (gerbang risiko menahan —
+> menunggu manusia, bukan gagal) · `failed` · `cancelled` (klien pergi di tengah
+> aliran; token yang sudah keluar tetap tercatat dan dibayar). `tools_used` = tool
+> yang melewati gerbang, urut pertama dipakai; `memory_scopes` = scope yang
+> **benar-benar** disentuh; `model_used` = model yang dipakai, dipisah koma bila
+> lebih dari satu (turun kelas di tengah run, 4.9); `decision` = skalar pendek
+> (`action` wajib — `reply` · `delegate` · id yang disentuh), dan run yang tidak
+> berhasil `{"action": "<status>"}`; `error` = `{code, type}` — **tanpa pesan**, sebab
+> pesan galat bisa mengutip tulisan pengguna. `cost_usd` = run itu sendiri; biaya
+> satu permintaan (SSE `done`) = seluruh pohonnya.
 
 ```sql
 -- @retention   : forever

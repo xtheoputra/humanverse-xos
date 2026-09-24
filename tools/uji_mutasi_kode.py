@@ -298,6 +298,8 @@ UJI_REGISTRI = "tests/unit/test_registri_agent.py::test_manifest_yang_melanggar_
 UJI_KATALOG = "tests/integration/test_katalog_agent.py"
 UJI_PELAKSANA = "tests/unit/test_pelaksana_alat.py"
 UJI_ALAT = "tests/integration/test_alat_v0.py"
+UJI_KEPUTUSAN = "tests/unit/test_keputusan_agent.py::test_keputusan_rusak_ditolak"
+UJI_RUNTIME = "tests/integration/test_runtime_agent.py"
 FK_MILESTONE = (
     "  FOREIGN KEY (goal_id, user_id) REFERENCES goals (id, user_id) ON DELETE CASCADE" + NL + ");"
 )
@@ -5701,6 +5703,289 @@ MUTASI: list[Mutasi] = [
         ],
         _pytest(f"{UJI_ALAT}::test_recommendation_create_menyimpan_keyakinan_dan_alasan"),
         harus_memuat="DID NOT RAISE",
+        kelompok="db",
+    ),
+    # ── Sprint 4 · 4.4 agent runtime: tiap run mencatat tools, scope, decision, confidence, cost ──
+    Mutasi(
+        "4.4",
+        "balasan tanpa alasan diterima (Konstitusi Pasal 3)",
+        [
+            Sunting(
+                f"{MODUL}/agents/runtime.py",
+                "    if not 1 <= len(k.rationale) <= ALASAN_MAKS or not all(",
+                "    if len(k.rationale) > ALASAN_MAKS or not all(",
+            )
+        ],
+        _pytest(f"{UJI_KEPUTUSAN}"),
+        harus_memuat="keputusan rusak diterima — tanpa alasan",
+    ),
+    Mutasi(
+        "4.4",
+        "keyakinan di luar 0–1 diterima",
+        [
+            Sunting(
+                f"{MODUL}/agents/runtime.py",
+                "    if not isinstance(k.confidence, Decimal) or not Decimal(0) <= k.confidence <= Decimal(1):",
+                "    if not isinstance(k.confidence, Decimal):",
+            )
+        ],
+        _pytest(f"{UJI_KEPUTUSAN}"),
+        harus_memuat="keputusan rusak diterima — keyakinan di atas 1",
+    ),
+    Mutasi(
+        "4.4",
+        "decision bersarang diterima — penalaran masuk jejak audit",
+        [
+            Sunting(
+                f"{MODUL}/agents/runtime.py",
+                "        if nilai is not None and not isinstance(nilai, str | int | bool):",
+                "        if False:",
+            )
+        ],
+        _pytest(f"{UJI_KEPUTUSAN}"),
+        harus_memuat="keputusan rusak diterima — aksi bersarang — penalaran",
+    ),
+    Mutasi(
+        "4.4",
+        "decision berisi tulisan panjang diterima",
+        [
+            Sunting(
+                f"{MODUL}/agents/runtime.py",
+                "        if isinstance(nilai, str) and len(nilai) > AKSI_NILAI_MAKS:",
+                "        if False:",
+            )
+        ],
+        _pytest(f"{UJI_KEPUTUSAN}"),
+        harus_memuat="keputusan rusak diterima — aksi berisi tulisan panjang",
+    ),
+    Mutasi(
+        "4.4",
+        "keputusan program tidak diperiksa runtime",
+        [Sunting(f"{MODUL}/agents/runtime.py", "            periksa_keputusan(keputusan)\n", "")],
+        _pytest(f"{UJI_RUNTIME}::test_keputusan_tanpa_alasan_menggagalkan_run"),
+        harus_memuat="DID NOT RAISE",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.4",
+        "tools_used tidak dicatat",
+        [
+            Sunting(
+                f"{MODUL}/agents/runtime.py",
+                "                tools_used=j.alat_dipakai,",
+                "                tools_used=[],",
+            )
+        ],
+        _pytest(f"{UJI_RUNTIME}::test_run_mencatat_tools_scope_decision_confidence_cost"),
+        harus_memuat="tool yang dipakai tidak tercatat",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.4",
+        "memory_scopes tidak dicatat",
+        [
+            Sunting(
+                f"{MODUL}/agents/runtime.py",
+                "                memory_scopes=sorted(j.scope_dipakai),",
+                "                memory_scopes=[],",
+            )
+        ],
+        _pytest(f"{UJI_RUNTIME}::test_run_mencatat_tools_scope_decision_confidence_cost"),
+        harus_memuat="scope yang disentuh tidak tercatat",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.4",
+        "decision tidak dicatat",
+        [
+            Sunting(
+                f"{MODUL}/agents/runtime.py",
+                '            dict(keputusan.aksi) if keputusan is not None else {"action": status}',
+                '            {"action": status}',
+            )
+        ],
+        _pytest(f"{UJI_RUNTIME}::test_run_mencatat_tools_scope_decision_confidence_cost"),
+        harus_memuat="keputusan tidak tercatat",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.4",
+        "confidence tidak dicatat",
+        [
+            Sunting(
+                f"{MODUL}/agents/runtime.py",
+                "                confidence=None if keputusan is None else keputusan.confidence,",
+                "                confidence=None,",
+            )
+        ],
+        _pytest(f"{UJI_RUNTIME}::test_run_mencatat_tools_scope_decision_confidence_cost"),
+        harus_memuat="keyakinan tidak tercatat",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.4",
+        "biaya tidak dicatat",
+        [
+            Sunting(
+                f"{MODUL}/agents/runtime.py",
+                "                cost_usd=j.biaya_usd,",
+                "                cost_usd=Decimal(0),",
+            )
+        ],
+        _pytest(f"{UJI_RUNTIME}::test_run_mencatat_tools_scope_decision_confidence_cost"),
+        harus_memuat="biaya tidak tercatat",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.4",
+        "model tidak dicatat",
+        [
+            Sunting(
+                f"{MODUL}/agents/runtime.py",
+                '                model_used=",".join(j.model_dipakai) or None,',
+                "                model_used=None,",
+            )
+        ],
+        _pytest(f"{UJI_RUNTIME}::test_run_mencatat_tools_scope_decision_confidence_cost"),
+        harus_memuat="model tidak tercatat",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.4",
+        "peristiwa tool_call tidak mengalir ke klien",
+        [
+            Sunting(
+                f"{MODUL}/agents/runtime.py",
+                '        await self._kabari("tool_call", {"tool": nama, "agent": self.jalannya.agent.name})\n',
+                "",
+            )
+        ],
+        _pytest(f"{UJI_RUNTIME}::test_run_mencatat_tools_scope_decision_confidence_cost"),
+        harus_memuat="peristiwa tool_call tidak mengalir",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.4",
+        "token model tidak mengalir ke klien",
+        [
+            Sunting(
+                f"{MODUL}/agents/runtime.py",
+                '                await self._kabari("token", {"text": p})',
+                "                pass",
+            )
+        ],
+        _pytest(f"{UJI_RUNTIME}::test_run_mencatat_tools_scope_decision_confidence_cost"),
+        harus_memuat="token tidak mengalir",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.4",
+        "run yang gagal dibiarkan running",
+        [
+            Sunting(
+                f"{MODUL}/agents/runtime.py",
+                '            await self._tutup(\n                j, status, None, {"code": _kode_galat(galat), "type": type(galat).__name__}, mulai\n            )\n',
+                "",
+            )
+        ],
+        _pytest(f"{UJI_RUNTIME}::test_run_yang_gagal_tetap_ditutup_tanpa_isi_galat"),
+        harus_memuat="run yang gagal dibiarkan `running`",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.4",
+        "isi galat (dan pesan pengguna) masuk jejak audit",
+        [
+            Sunting(
+                f"{MODUL}/agents/runtime.py",
+                '{"code": _kode_galat(galat), "type": type(galat).__name__}',
+                '{"code": _kode_galat(galat), "type": type(galat).__name__, "pesan": str(galat)}',
+            )
+        ],
+        _pytest(f"{UJI_RUNTIME}::test_run_yang_gagal_tetap_ditutup_tanpa_isi_galat"),
+        harus_memuat="isi galat — dan pesan pengguna — masuk jejak audit",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.4",
+        "run yang ditahan gerbang tercatat gagal",
+        [
+            Sunting(
+                f"{MODUL}/agents/runtime.py",
+                '            status: StatusRun = (\n                "blocked"\n                if isinstance(galat, AlatDitolak) and galat.kode in KODE_GERBANG\n                else "failed"\n            )',
+                '            status: StatusRun = "failed"',
+            )
+        ],
+        _pytest(f"{UJI_RUNTIME}::test_run_yang_ditahan_gerbang_blocked_bukan_failed"),
+        harus_memuat="run yang menunggu manusia tercatat sebagai kegagalan",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.4",
+        "run yang dibatalkan tidak ditutup",
+        [
+            Sunting(
+                f"{MODUL}/agents/runtime.py",
+                '            await asyncio.shield(self._tutup(j, "cancelled", None, {"code": "cancelled"}, mulai))\n',
+                "",
+            )
+        ],
+        _pytest(
+            f"{UJI_RUNTIME}::test_run_yang_dibatalkan_di_tengah_aliran_tetap_ditutup_dan_dibayar"
+        ),
+        harus_memuat="run yang dibatalkan tidak ditutup",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.4",
+        "aliran yang ditinggal klien tidak ditutup — tokennya tidak tercatat",
+        [Sunting(f"{MODUL}/agents/runtime.py", "            await potongan.aclose()\n", "")],
+        _pytest(f"{UJI_RUNTIME}::test_klien_lambat_yang_dibatalkan_tokennya_tetap_tercatat"),
+        harus_memuat="token aliran yang ditinggal klien tidak tercatat",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.4",
+        "aliran model yang terputus tidak menghitung token yang sudah keluar",
+        [
+            Sunting(
+                f"{MODUL}/platform/model.py",
+                '        try:\n            async for p in self._potongan:\n                bagian.append(p)\n                yield p\n        finally:\n            self.jawaban = self._selesai("".join(bagian))\n',
+                '        async for p in self._potongan:\n            bagian.append(p)\n            yield p\n        self.jawaban = self._selesai("".join(bagian))\n',
+            )
+        ],
+        _pytest(
+            f"{UJI_RUNTIME}::test_run_yang_dibatalkan_di_tengah_aliran_tetap_ditutup_dan_dibayar"
+        ),
+        harus_memuat="token aliran yang terputus tidak tercatat",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.4",
+        "run yang sudah selesai bisa ditutup lagi — jejak ditimpa",
+        [
+            Sunting(
+                f"{MODUL}/agents/repository.py",
+                "    WHERE id = :id AND status = 'running'",
+                "    WHERE id = :id",
+            )
+        ],
+        _pytest(f"{UJI_RUNTIME}::test_run_tidak_bisa_ditutup_dua_kali"),
+        harus_memuat="DID NOT RAISE",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.4",
+        "run anak menunjuk run induk milik pengguna lain",
+        [
+            Sunting(
+                f"{MODUL}/agents/runtime.py",
+                "        if induk is not None and (induk.user_id != user_id or not induk.tersimpan):",
+                "        if False:",
+            )
+        ],
+        _pytest(f"{UJI_RUNTIME}::test_run_anak_tidak_bisa_menunjuk_run_pengguna_lain"),
+        harus_memuat="IntegrityError",
         kelompok="db",
     ),
     # ── alat ini sendiri: bytecode mutan tidak tertinggal sesudah dipulihkan ──
