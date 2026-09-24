@@ -69,3 +69,34 @@ def test_pengecualian_masih_menunjuk_rute_yang_ada() -> None:
     ada = {(m, p) for m, p, _ in _operasi_tulis()}
     basi = sorted(set(TANPA_IDEMPOTENSI) - ada)
     assert not basi, f"pengecualian untuk rute yang tidak ada lagi: {basi}"
+
+
+def test_rute_yang_menyatakan_idempotensi_juga_memanggil_jalankan() -> None:
+    """Menyatakan `idem` saja tidak cukup (tinjauan kontrak Sprint 2, D4): rute yang
+    menerima header lalu tidak memanggil `idem.jalankan` MENERIMA kunci dan
+    mengabaikannya — ulangan menulis baris kedua, dan uji di atas tetap hijau."""
+    import inspect
+
+    from fastapi.routing import APIRoute
+
+    app = create_app(Settings(database_url="postgresql://x", redis_url="redis://x", env="test"))
+    diperiksa: list[str] = []
+    lupa: list[str] = []
+    for r in app.router.routes:
+        induk = getattr(r, "original_router", None)
+        for rute in getattr(induk, "routes", [r]):
+            if not isinstance(rute, APIRoute):
+                continue
+            idem = [
+                nama
+                for nama, p in inspect.signature(rute.endpoint).parameters.items()
+                if "Idempoten" in str(p.annotation)
+            ]
+            if not idem:
+                continue
+            diperiksa.append(rute.path)
+            if f"{idem[0]}.jalankan(" not in inspect.getsource(rute.endpoint):
+                lupa.append(f"{sorted(rute.methods)[0]} {rute.path}")
+
+    assert len(diperiksa) >= 8, f"rute ber-idem yang terbaca: {diperiksa}"
+    assert not lupa, f"rute menyatakan Idempotency-Key tanpa memanggil jalankan: {lupa}"

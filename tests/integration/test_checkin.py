@@ -44,6 +44,22 @@ async def test_put_dua_kali_satu_baris(api_bersama: ApiUji) -> None:
     )
 
 
+async def test_put_identik_tidak_menulis_ulang_baris(api_bersama: ApiUji) -> None:
+    """spec/04: dua PUT yang sama → baris yang SAMA, `updated_at` juga (tinjauan kontrak F11)."""
+    _uid, token = await api_bersama.pengguna_baru()
+
+    pertama = await _put(api_bersama, token, "2026-09-12", energy=3, sleep_hours=7.5, note="n")
+    kedua = await _put(api_bersama, token, "2026-09-12", energy=3, sleep_hours=7.5, note="n")
+    ketiga = await _put(api_bersama, token, "2026-09-12", energy=4, sleep_hours=7.5, note="n")
+
+    assert (pertama.status_code, kedua.status_code, ketiga.status_code) == (201, 200, 200)
+    assert kedua.json()["updated_at"] == pertama.json()["updated_at"], (
+        "PUT identik menggeser updated_at"
+    )
+    assert kedua.json() == pertama.json()
+    assert ketiga.json()["updated_at"] > pertama.json()["updated_at"]
+
+
 async def test_put_mengganti_medan_yang_tidak_dikirim_menjadi_kosong(api_bersama: ApiUji) -> None:
     """PUT = ganti: badan ADALAH check-in tanggal itu, bukan tambalan."""
     uid, token = await api_bersama.pengguna_baru()

@@ -20,6 +20,12 @@ from .schemas import Checkin, Mood
 # PUT = GANTI: tiap kolom diambil dari badan (EXCLUDED), termasuk yang kosong.
 # `xmax = 0` membedakan baris yang baru disisipkan dari yang diperbarui — tanpa
 # kueri kedua, dan tanpa membaca-lalu-menulis yang kalah balapan.
+#
+# `WHERE … IS DISTINCT FROM`: PUT yang IDENTIK tidak menulis apa pun — spec/04
+# *“dua PUT yang sama selalu menghasilkan baris yang sama”*, termasuk
+# `updated_at` (tinjauan kontrak Sprint 2, F11: dulu bergeser tiap PUT). Tanpa
+# pembaruan `RETURNING` kosong; barisnya dibaca `_PADA` — sudah terkunci oleh
+# `ON CONFLICT` di transaksi yang sama.
 _SIMPAN = text(
     """
     INSERT INTO daily_checkins (user_id, for_date, energy, focus, sleep_hours, note)
@@ -30,8 +36,20 @@ _SIMPAN = text(
       focus = EXCLUDED.focus,
       sleep_hours = EXCLUDED.sleep_hours,
       note = EXCLUDED.note
+    WHERE (daily_checkins.energy, daily_checkins.focus, daily_checkins.sleep_hours,
+           daily_checkins.note)
+          IS DISTINCT FROM (EXCLUDED.energy, EXCLUDED.focus, EXCLUDED.sleep_hours,
+                            EXCLUDED.note)
     RETURNING id, for_date, energy, focus, sleep_hours, note, created_at, updated_at,
               (xmax = 0) AS baru
+    """
+)
+
+_PADA = text(
+    """
+    SELECT id, for_date, energy, focus, sleep_hours, note, created_at, updated_at
+    FROM daily_checkins
+    WHERE user_id = :user_id AND for_date = :for_date
     """
 )
 
@@ -94,9 +112,13 @@ async def simpan(
             )
         )
         .mappings()
-        .one()
+        .first()
     )
-    return HasilSimpan(_checkin(baris), baru=bool(baris["baru"]))
+    if baris is not None:
+        return HasilSimpan(_checkin(baris), baru=bool(baris["baru"]))
+    # Isi sama persis dengan yang tersimpan — baris lama, tidak ditulis ulang.
+    lama = (await conn.execute(_PADA, {"user_id": user_id, "for_date": for_date})).mappings().one()
+    return HasilSimpan(_checkin(lama), baru=False)
 
 
 async def rentang(
@@ -132,6 +154,14 @@ _SISIP_MOOD = text(
             COALESCE(CAST(:occurred_at AS timestamptz), now()), :valence,
             CAST(:label AS text), CAST(:note AS text))
     RETURNING id, occurred_at, valence, label, note, created_at
+    """
+)
+
+_MOOD_ID = text(
+    """
+    SELECT id, occurred_at, valence, label, note, created_at
+    FROM mood_entries
+    WHERE id = :id AND deleted_at IS NULL
     """
 )
 
@@ -184,6 +214,11 @@ async def sisip_mood(
         .one()
     )
     return Mood.model_validate(dict(baris))
+
+
+async def mood_id(conn: AsyncConnection, mood_id_: UUID) -> Mood | None:
+    baris = (await conn.execute(_MOOD_ID, {"id": mood_id_})).mappings().first()
+    return Mood.model_validate(dict(baris)) if baris else None
 
 
 async def daftar_mood(

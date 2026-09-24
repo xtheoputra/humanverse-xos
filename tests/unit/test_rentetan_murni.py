@@ -202,3 +202,46 @@ def test_terpanjang_tidak_pernah_kurang_dari_saat_ini(hari_ini: date) -> None:
 def test_riwayat_sangat_lama_tidak_ditelusuri_tanpa_batas() -> None:
     catatan = {date(1, 1, 1): "done", _hari(0): "done"}
     assert _harian(catatan, hari_ini=_hari(0))[:2] == (1, 1)
+
+
+# ─────────────── tinjauan kontrak Sprint 2: F7 (`skipped` per kejadian) · F8 (awal habit) ──
+
+
+def test_mingguan_skipped_memaafkan_satu_kali_dan_tidak_memutus() -> None:
+    """spec/04: `skipped` netral — pada habit mingguan juga, bukan hanya harian (F7)."""
+    catatan = {
+        _hari(-14): "done",
+        _hari(-13): "done",  # minggu -2: 2 ✓
+        _hari(-7): "done",
+        _hari(-6): "skipped",  # minggu -1: 1 + 1 dimaafkan
+    }
+    hasil = _periode("week", 2, catatan, hari_ini=_hari(2))
+    assert hasil == (1, 1, 1.0), f"skipped memutus rentetan mingguan: {hasil}"
+
+
+def test_mingguan_skipped_yang_tidak_mencukupi_target_tetap_memutus() -> None:
+    catatan = {_hari(-14): "done", _hari(-7): "skipped"}  # minggu -1: 0 + 1 < 3
+    assert _periode("week", 3, catatan, hari_ini=_hari(2), mulai=_hari(-14)) == (0, 0, 0.0)
+
+
+def test_bulanan_skipped_netral() -> None:
+    catatan = {date(2026, 7, 5): "done", date(2026, 8, 9): "skipped"}
+    assert _periode("month", 1, catatan, hari_ini=date(2026, 9, 3))[:2] == (1, 1)
+
+
+def test_tingkat_hari_sebelum_habit_dibuat_hanya_dihitung_bila_terpenuhi() -> None:
+    """Habit dibuat hari ini, satu catatan mundur sepuluh hari lalu: dulu 0,1 (F8)."""
+    catatan = {_hari(0): "done"}
+    tingkat = _harian(catatan, hari_ini=_hari(10), mulai=_hari(10))[2]
+    assert tingkat == 1.0, f"hari sebelum habit ada dihitung gagal: {tingkat}"
+
+
+def test_tingkat_minggu_pembuatan_yang_tidak_utuh_tidak_menjadi_gagal() -> None:
+    kamis = _hari(-4)  # habit dibuat Kamis minggu lalu
+    catatan = {_hari(-3): "done"}  # minggu itu 1 dari 2
+    assert _periode("week", 2, catatan, hari_ini=_hari(1), mulai=kamis)[2] is None
+
+
+def test_tingkat_sesudah_habit_ada_tetap_menghitung_yang_terlewat() -> None:
+    catatan = {_hari(8): "done"}
+    assert _harian(catatan, hari_ini=_hari(10), mulai=_hari(5))[2] == round(1 / 5, 3)

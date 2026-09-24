@@ -7,7 +7,20 @@ Satu basis kode untuk seluler **dan** web ([`arch/05`](../../arch/05-TECHNOLOGY-
 | Layar | Isi |
 |---|---|
 | Masuk / Daftar | email + sandi (daftar: nama, zona waktu IANA, persetujuan syarat & privasi **wajib**, pelatihan model **opsional**, bawaannya tidak) |
-| Habit hari ini | tanggal **lokal perangkat** · energi check-in 1–5 · tiap habit: tandai selesai / batalkan, pilih tier (tier yang disarankan dari energi, beserta alasannya — naskah 4 §34) · tambah habit |
+| Habit hari ini | tanggal **lokal perangkat** · energi check-in 1–5 · tiap habit: tandai selesai / batalkan, pilih tier (tier yang disarankan dari energi, beserta alasannya — naskah 4 §34) · habit yang **dilewati** (`skipped`, dari perangkat lain) tampil lain dan bisa dibatalkan · tambah habit |
+
+Klien (`lib/api/klien.dart`) — tiga hal yang dulu salah (tinjauan Sprint 2, E-175):
+
+* **Satu penyegaran token untuk semua.** Permintaan serentak yang sama-sama
+  menerima `401` menunggu penyegaran yang sama; yang sudah disegarkan
+  permintaan lain langsung diulang dengan token baru. Dua penyegaran dengan
+  token segar yang sama dibaca server sebagai pencurian — sesinya dicabut.
+* **Satu tindakan, satu id.** Habit baru membawa id buatan klien (`idBaru()`),
+  yang juga `Idempotency-Key`-nya; "Simpan" yang diketuk lagi dengan isian yang
+  sama sesudah jaringan putus mengirim id yang **sama** — diputar ulang server,
+  bukan habit kedua. `409 already_exists` = percobaan sebelumnya sudah sampai.
+* **Penyelesaian tanpa kunci**: `(habit, tanggal)` unik di server, dan kirim
+  ulang tanggal yang sama menjawab `200` dengan baris lama.
 
 ## Menjalankan
 
@@ -25,12 +38,15 @@ flutter run -d chrome --web-port 5000 --dart-define=HVX_API=http://127.0.0.1:800
 ```bash
 flutter analyze --fatal-infos     # gerbang lint
 flutter test                      # uji klien (MockClient) + uji widget (layanan palsu)
-dart run tool/ujung_ke_ujung.dart http://127.0.0.1:8000   # alur manusia lawan api hidup
+dart run tool/ujung_ke_ujung.dart http://127.0.0.1:8000   # klien asli lawan api hidup
+flutter test test/ujung --dart-define=HVX_API_UJI=http://127.0.0.1:8000   # LAYAR diketuk lawan api hidup
 ```
 
-Ketiganya dijalankan gerbang [`tools/ci_lokal.py`](../../tools/ci_lokal.py) —
-analyze & format di tahap `lint`, `flutter test` di tahap `test`, dan alur ujung
-ke ujung di tahap `build` terhadap tumpukan compose dari citra CI.
+Semuanya dijalankan gerbang [`tools/ci_lokal.py`](../../tools/ci_lokal.py) —
+analyze & format di tahap `lint`, `flutter test` di tahap `test`, dan kedua uji
+lawan api hidup di tahap `build` terhadap tumpukan compose dari citra CI. Tanpa
+`HVX_API_UJI`, `test/ujung/` **dilewati** (bukan lulus diam-diam): `flutter
+test` biasa melaporkannya sebagai `~1`.
 
 ## Yang sengaja belum
 

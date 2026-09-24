@@ -77,7 +77,7 @@ async def test_catatan_serentak_tanggal_sama_satu_baris_tanpa_galat(api_bersama:
     )
 
     kode = sorted(r.status_code for r in hasil)
-    assert kode == [200, 200, 200, 200, 200, 201], kode
+    assert kode == [200, 200, 200, 200, 200, 201], f"catatan serentak tanggal sama: {kode}"
     assert len({r.json()["id"] for r in hasil}) == 1
     assert len(_baris(api_bersama, h["id"])) == 1
 

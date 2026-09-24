@@ -181,6 +181,93 @@ void main() {
     expect(find.text('Lari'), findsOneWidget);
   });
 
+  testWidgets(
+    'Simpan lagi sesudah jaringan putus mengirim id YANG SAMA; isian diubah → id baru',
+    (t) async {
+      final layanan = LayananPalsu();
+      await _pasang(t, layanan);
+      await t.tap(find.byKey(const Key('tambah')));
+      await t.pumpAndSettle();
+      await t.enterText(find.byKey(const Key('judul-habit')), 'Lari');
+
+      layanan.galatBerikutnya = Exception('jaringan putus');
+      await t.tap(find.byKey(const Key('simpan-habit')));
+      await t.pumpAndSettle();
+      expect(find.text('Server tidak terjangkau. Coba lagi.'), findsOneWidget);
+      layanan.galatBerikutnya = Exception('jaringan putus lagi');
+      await t.tap(find.byKey(const Key('simpan-habit')));
+      await t.pumpAndSettle();
+      await t.enterText(find.byKey(const Key('judul-habit')), 'Lari pagi');
+      await t.tap(find.byKey(const Key('simpan-habit')));
+      await t.pumpAndSettle();
+
+      final id = layanan.idHabitDikirim;
+      expect(id, hasLength(3));
+      expect(id[0], id[1], reason: 'percobaan ulang tindakan yang sama');
+      expect(id[2], isNot(id[1]), reason: 'isian lain = tindakan lain');
+      expect(find.text('Lari pagi'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'already_exists saat menyimpan = percobaan sebelumnya sudah sampai',
+    (t) async {
+      final layanan = LayananPalsu();
+      await _pasang(t, layanan);
+      await t.tap(find.byKey(const Key('tambah')));
+      await t.pumpAndSettle();
+      await t.enterText(find.byKey(const Key('judul-habit')), 'Lari');
+      layanan.galatBerikutnya = const GalatApi(
+        409,
+        'already_exists',
+        'Habit dengan id ini sudah ada.',
+      );
+
+      await t.tap(find.byKey(const Key('simpan-habit')));
+      await t.pumpAndSettle();
+
+      expect(find.byKey(const Key('simpan-habit')), findsNothing);
+      expect(find.text('Habit dengan id ini sudah ada.'), findsNothing);
+    },
+  );
+
+  testWidgets('habit yang DILEWATI tampil lain dan ketukan membatalkannya', (
+    t,
+  ) async {
+    final dilewati = Habit(
+      id: 'h1',
+      judul: 'Minum air',
+      periode: 'day',
+      target: 1,
+      tier: const [],
+      hari: const HariHabit(
+        forDate: '2026-09-21',
+        penyelesaian: Penyelesaian(forDate: '2026-09-21', status: 'skipped'),
+      ),
+    );
+    final layanan = LayananPalsu(habit: [dilewati]);
+    await _pasang(t, layanan);
+
+    final kotak = t.widget<CheckboxListTile>(find.byKey(const Key('habit-h1')));
+    expect(
+      kotak.value,
+      isNull,
+      reason: 'skipped bukan selesai dan bukan belum',
+    );
+    expect(find.textContaining('Dilewati'), findsOneWidget);
+
+    await t.tap(find.text('Minum air'));
+    await t.pumpAndSettle();
+
+    expect(layanan.panggilan, contains('batal h1 2026-09-21'));
+    expect(
+      layanan.panggilan.where((p) => p.startsWith('selesai')),
+      isEmpty,
+      reason:
+          'POST "done" ke tanggal yang sudah tercatat tidak mengubah apa pun',
+    );
+  });
+
   testWidgets('galat server tampil sebagai pesan, bukan layar rusak', (
     t,
   ) async {

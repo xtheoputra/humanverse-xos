@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:math';
 
 import 'package:http/http.dart' as http;
 
@@ -42,7 +41,10 @@ abstract interface class LayananHabit {
 
   Future<List<Habit>> habitPada(String tanggal);
 
+  /// `id` dibuat PEMANGGIL sekali per tindakan (`idBaru()`) dan dipakai ulang
+  /// di tiap percobaannya — lihat `KlienApi`.
   Future<Habit> buatHabit({
+    required String id,
     required String judul,
     required String periode,
     required int target,
@@ -70,8 +72,19 @@ abstract interface class LayananHabit {
 ///   mode luring (spec/07 6.6), dengan penyimpanan yang aman per platform.
 /// * Token akses kedaluwarsa (401) disegarkan SEKALI lalu permintaannya
 ///   diulang; token segar berotasi (K-21) — pasangan baru menggantikan yang lama.
-/// * Tiap tulisan `POST` membawa `Idempotency-Key` acak per tindakan (spec/04):
-///   ulangan karena jaringan putus tidak membuat habit atau penyelesaian ganda.
+///   Permintaan SERENTAK yang sama-sama menerima 401 menunggu SATU penyegaran
+///   yang sama. 🔴 Versi pertama menyegarkan per permintaan: yang kedua memakai
+///   token segar yang sudah dirotasi yang pertama — server membacanya sebagai
+///   pencurian token (`session.refresh_reused`) dan mencabut seluruh sesi
+///   (tinjauan keamanan Sprint 2).
+/// * Membuat habit memakai id buatan klien yang SAMA di tiap percobaan satu
+///   tindakan, dan id itu juga `Idempotency-Key`-nya: percobaan ulang sesudah
+///   jaringan putus diputar ulang server, bukan membuat habit kedua; sesudah 24
+///   jam id yang sama menjadi `409 already_exists`, bukan baris kedua.
+///   🔴 Versi pertama mengklaim ini dengan kunci acak BARU per ketukan — yang
+///   tidak melindungi apa pun (tinjauan kontrak Sprint 2, F19).
+/// * Penyelesaian tidak butuh kunci: `(habit, tanggal)` unik di server, dan
+///   kirim ulang tanggal yang sama menjawab `200` dengan baris lama (spec/04).
 class KlienApi implements LayananHabit {
   KlienApi({required this.dasar, http.Client? klien})
     : _http = klien ?? http.Client();
@@ -79,9 +92,9 @@ class KlienApi implements LayananHabit {
   /// Akar API, mis. `http://127.0.0.1:8000`.
   final Uri dasar;
   final http.Client _http;
-  final Random _acak = Random.secure();
   String? _akses;
   String? _segar;
+  Future<void>? _penyegaran;
 
   @override
   bool get sudahMasuk => _akses != null;
@@ -91,11 +104,6 @@ class KlienApi implements LayananHabit {
     queryParameters: kueri,
   );
 
-  String _kunciBaru() => List.generate(
-    16,
-    (_) => _acak.nextInt(256).toRadixString(16).padLeft(2, '0'),
-  ).join();
-
   Future<http.Response> _kirim(
     String metode,
     String jalur, {
@@ -104,11 +112,11 @@ class KlienApi implements LayananHabit {
     String? kunciIdempotensi,
     bool bersesi = true,
   }) async {
-    Future<http.Response> sekali() {
+    Future<http.Response> sekali(String? akses) {
       final kepala = <String, String>{
         'Accept': 'application/json',
         if (badan != null) 'Content-Type': 'application/json',
-        if (bersesi && _akses != null) 'Authorization': 'Bearer $_akses',
+        if (bersesi && akses != null) 'Authorization': 'Bearer $akses',
         'Idempotency-Key': ?kunciIdempotensi,
       };
       final permintaan = http.Request(metode, _uri(jalur, kueri))
@@ -117,10 +125,14 @@ class KlienApi implements LayananHabit {
       return _http.send(permintaan).then(http.Response.fromStream);
     }
 
-    var jawaban = await sekali();
+    final dipakai = _akses;
+    var jawaban = await sekali(dipakai);
     if (jawaban.statusCode == 401 && bersesi && _segar != null) {
-      await _segarkan();
-      jawaban = await sekali();
+      // Token yang ditolak masih token saat ini → segarkan (atau tunggu
+      // penyegaran yang sedang berjalan). Sudah diganti permintaan lain →
+      // langsung ulangi dengan yang baru; menyegarkan lagi tidak perlu.
+      if (_akses == dipakai) await _segarkan();
+      jawaban = await sekali(_akses);
     }
     if (jawaban.statusCode >= 400) {
       if (jawaban.statusCode == 401 && bersesi) {
@@ -164,9 +176,12 @@ class KlienApi implements LayananHabit {
     _segar = null;
   }
 
-  Future<void> _segarkan() async {
+  /// SATU penyegaran untuk semua permintaan yang menunggunya (lihat docstring kelas).
+  Future<void> _segarkan() =>
+      _penyegaran ??= _segarkanSekali().whenComplete(() => _penyegaran = null);
+
+  Future<void> _segarkanSekali() async {
     final segar = _segar;
-    _akses = null;
     if (segar == null) throw const SesiBerakhir();
     final jawaban = await _http.post(
       _uri('/v1/auth/refresh'),
@@ -266,6 +281,7 @@ class KlienApi implements LayananHabit {
 
   @override
   Future<Habit> buatHabit({
+    required String id,
     required String judul,
     required String periode,
     required int target,
@@ -274,8 +290,9 @@ class KlienApi implements LayananHabit {
     final jawaban = await _kirim(
       'POST',
       '/v1/habits',
-      kunciIdempotensi: _kunciBaru(),
+      kunciIdempotensi: id,
       badan: {
+        'id': id,
         'title': judul,
         'period': periode,
         'target_count': target,
@@ -294,7 +311,6 @@ class KlienApi implements LayananHabit {
     final jawaban = await _kirim(
       'POST',
       '/v1/habits/$habitId/completions',
-      kunciIdempotensi: _kunciBaru(),
       badan: {'for_date': tanggal, 'status': 'done', 'tier_used': ?tier},
     );
     return Penyelesaian.dariJson(_json(jawaban) as Map<String, dynamic>);

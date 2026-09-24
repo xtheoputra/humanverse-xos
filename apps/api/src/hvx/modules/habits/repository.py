@@ -18,9 +18,19 @@ from sqlalchemy.ext.asyncio import AsyncConnection
 
 from .schemas import Habit, Penyelesaian
 
-# Batas atas daftar habit — habit bukan aliran data; seribu habit aktif bukan
-# pemakaian yang V0 layani, dan jawaban tanpa batas bukan jawaban.
+# Batas habit hidup per pengguna (K-24) — ditegakkan SAAT MENULIS
+# (`service.buat`), sehingga `GET /habits` tidak pernah memotong daftarnya diam-
+# diam (tinjauan kontrak Sprint 2, F9: habit ke-501 hilang dari daftar).
 DAFTAR_MAKS = 500
+
+# Batas per pengguna diperiksa SERIAL — lihat goals/repository.py `_KUNCI_HITUNG`.
+_KUNCI_HITUNG = text("SELECT pg_advisory_xact_lock(hashtextextended(:kunci, 0))")
+_JUMLAH = text("SELECT count(*) FROM habits WHERE user_id = :user_id AND deleted_at IS NULL")
+
+# Goal yang menaut dihapus (lunak) — tautannya dilepas, sama dengan hapus-keras
+# spec/01 `ON DELETE SET NULL (goal_id)`. Dipanggil lewat pendengar titik rakit
+# (K-23) di transaksi penghapus goal.
+_LEPAS_GOAL = text("UPDATE habits SET goal_id = NULL WHERE goal_id = :goal_id")
 
 _SISIP = text(
     """
@@ -124,6 +134,17 @@ _SELESAI_PADA = text(
     """
 )
 
+# Penyelesaian menurut id — hanya selama habit-nya belum dihapus.
+_SELESAI_ID = text(
+    """
+    SELECT c.id, c.habit_id, c.for_date, c.status, c.tier_used, c.note, c.source,
+           c.completed_at, c.created_at
+    FROM habit_completions c
+    JOIN habits h ON h.id = c.habit_id
+    WHERE c.id = :id AND h.deleted_at IS NULL
+    """
+)
+
 _SELESAI_TANGGAL = text(
     """
     SELECT id, habit_id, for_date, status, tier_used, note, source, completed_at, created_at
@@ -149,12 +170,15 @@ _MULAI_LOKAL = text(
 )
 
 # `for_date`, tidak pernah `completed_at`: tanggal lokal saat habit DIJALANKAN
-# (spec/01) — lihat rentetan.py.
+# (spec/01) — lihat rentetan.py. Hanya sejak `:sejak`: rentetan menelusuri paling
+# jauh `RIWAYAT_MAKS_HARI` ke belakang, dan membaca SEMUA baris — satu per
+# tanggal, sampai tahun 1900 — adalah biaya yang tidak dibatasi apa pun
+# (tinjauan keamanan Sprint 2).
 _RIWAYAT = text(
     """
     SELECT for_date, status
     FROM habit_completions
-    WHERE habit_id = :habit_id
+    WHERE habit_id = :habit_id AND for_date >= :sejak
     ORDER BY for_date
     """
 )
@@ -245,6 +269,16 @@ async def hapus(conn: AsyncConnection, habit_id: UUID) -> bool:
     return (await conn.execute(_HAPUS, {"id": habit_id})).first() is not None
 
 
+async def jumlah_serial(conn: AsyncConnection, user_id: UUID) -> int:
+    """Habit hidup pengguna — sesudah mengambil kunci hitung habit miliknya."""
+    await conn.execute(_KUNCI_HITUNG, {"kunci": f"habits:{user_id}"})
+    return int((await conn.execute(_JUMLAH, {"user_id": user_id})).scalar_one())
+
+
+async def lepas_goal(conn: AsyncConnection, goal_id: UUID) -> None:
+    await conn.execute(_LEPAS_GOAL, {"goal_id": goal_id})
+
+
 def _penyelesaian(baris: RowMapping) -> Penyelesaian:
     return Penyelesaian.model_validate(dict(baris))
 
@@ -294,6 +328,11 @@ async def selesai_pada(
     return _penyelesaian(baris) if baris else None
 
 
+async def selesai_id(conn: AsyncConnection, completion_id: UUID) -> Penyelesaian | None:
+    baris = (await conn.execute(_SELESAI_ID, {"id": completion_id})).mappings().first()
+    return _penyelesaian(baris) if baris else None
+
+
 async def hapus_selesai(conn: AsyncConnection, habit_id: UUID, for_date: date) -> None:
     await conn.execute(_HAPUS_SELESAI, {"habit_id": habit_id, "for_date": for_date})
 
@@ -303,8 +342,8 @@ async def mulai_lokal(conn: AsyncConnection, habit_id: UUID, zona: str) -> date 
     return nilai if isinstance(nilai, date) else None
 
 
-async def riwayat(conn: AsyncConnection, habit_id: UUID) -> dict[date, str]:
-    hasil = await conn.execute(_RIWAYAT, {"habit_id": habit_id})
+async def riwayat(conn: AsyncConnection, habit_id: UUID, sejak: date) -> dict[date, str]:
+    hasil = await conn.execute(_RIWAYAT, {"habit_id": habit_id, "sejak": sejak})
     return {b.for_date: str(b.status) for b in hasil}
 
 

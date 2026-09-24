@@ -24,8 +24,18 @@ tanggal `done`/`partial` di dalamnya ≥ `target_count`.
 * `partial` dan tier yang lebih ringan **memenuhi** — *Consistency >
   Perfection* (naskah 4 §34).
 * `skipped` **netral**: tidak menambah, tidak memutus (*“Bukan menyalahkan
-  user”*, naskah 4 §33), dan tidak masuk penyebut tingkat penyelesaian.
+  user”*, naskah 4 §33), dan tidak masuk penyebut tingkat penyelesaian. Netral
+  PER KEJADIAN: tiap `skipped` memaafkan satu kali dari target periodenya —
+  minggu bertarget 2 dengan satu `done` dan satu `skipped` dimaafkan, bukan
+  gagal. 🔴 Versi pertama hanya menetralkan `skipped` pada habit harian; pada
+  habit mingguan/bulanan ia diabaikan, dan minggu itu memutus rentetan
+  (tinjauan kontrak Sprint 2, F7).
 * Hari di luar `schedule.weekdays` bukan hari habit itu — dilewati.
+* **Periode yang dimulai sebelum habit dibuat hanya dihitung bila terpenuhi**
+  (spec/04: tingkat penyelesaian *“tidak lebih awal dari awal habit”*).
+  Catatan mundur tetap dihargai; hari-hari sebelum habit ada tidak menjadi
+  "gagal" di penyebut. 🔴 Versi pertama menghitungnya: habit yang dibuat hari
+  ini dengan satu catatan sepuluh hari lalu bertingkat 0,1 (F8).
 
 ⚠️ Batas yang diakui: penyeberangan garis tanggal ke TIMUR melompati satu
 tanggal kalender; rentetan harian putus di sana kecuali tanggal itu dicatat
@@ -58,6 +68,14 @@ class Rentetan:
     current: int
     longest: int
     completion_rate_30d: float | None
+
+
+def awal_riwayat(hari_ini: date) -> date:
+    """Tanggal paling awal yang bisa memengaruhi hasil — batas bawah kueri riwayat.
+
+    Periode terpanjang sebulan: awal bulan dari `RIWAYAT_MAKS_HARI` lalu.
+    """
+    return awal_periode("month", hari_ini - timedelta(days=RIWAYAT_MAKS_HARI))
 
 
 def awal_periode(period: str, d: date) -> date:
@@ -96,6 +114,9 @@ def hitung_rentetan(
     penuh_per_periode = Counter(
         awal_periode(period, d) for d, status in penyelesaian.items() if status in MEMENUHI
     )
+    maaf_per_periode = Counter(
+        awal_periode(period, d) for d, status in penyelesaian.items() if status == "skipped"
+    )
 
     def keadaan(p: date) -> Keadaan:
         if period == "day":
@@ -106,8 +127,12 @@ def hitung_rentetan(
                 return "penuh"
             if status == "skipped":
                 return "dimaafkan"
-        elif penuh_per_periode[p] >= target_count:
-            return "penuh"
+        else:
+            penuh = penuh_per_periode[p]
+            if penuh >= target_count:
+                return "penuh"
+            if maaf_per_periode[p] and penuh + maaf_per_periode[p] >= target_count:
+                return "dimaafkan"
         # Periode yang belum berakhir — hari ini, minggu ini, atau sesudahnya —
         # belum gagal; ia hanya belum terpenuhi.
         return "belum" if p >= periode_kini else "kosong"
@@ -126,21 +151,21 @@ def hitung_rentetan(
             beruntun = 0
         p = _berikut(period, p)
 
-    # Tingkat penyelesaian 30 hari: periode yang BERSINGGUNGAN dengan jendela,
-    # tidak lebih awal dari awal habit. Penyebutnya hanya periode yang sudah
-    # jatuh tempo (berakhir, atau sudah terpenuhi) — `dimaafkan`, `luar`, dan
-    # yang `belum` tidak dihitung.
+    # Tingkat penyelesaian 30 hari: periode yang BERSINGGUNGAN dengan jendela.
+    # Penyebutnya hanya periode yang sudah jatuh tempo (berakhir, atau sudah
+    # terpenuhi) — `dimaafkan`, `luar`, dan yang `belum` tidak dihitung — dan
+    # periode `kosong` hanya bila habit sudah ada sepanjang periode itu.
     dari = max(hari_ini - timedelta(days=JENDELA_HARI - 1), awal)
-    penuh = jatuh_tempo = 0
+    terpenuhi = jatuh_tempo = 0
     p = awal_periode(period, dari)
     while p <= periode_kini:
         k = keadaan(p)
         if k == "penuh":
-            penuh += 1
+            terpenuhi += 1
             jatuh_tempo += 1
-        elif k == "kosong":
+        elif k == "kosong" and p >= mulai:
             jatuh_tempo += 1
         p = _berikut(period, p)
-    tingkat = round(penuh / jatuh_tempo, 3) if jatuh_tempo else None
+    tingkat = round(terpenuhi / jatuh_tempo, 3) if jatuh_tempo else None
 
     return Rentetan(current=beruntun, longest=terpanjang, completion_rate_30d=tingkat)

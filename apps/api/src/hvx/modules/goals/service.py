@@ -13,17 +13,25 @@ Selesai bila: pohon goal 3 tingkat terbaca dalam satu query.
   satunya lingkaran yang mungkin, goal yang menjadi induk dirinya sendiri,
   ditolak skema DAN CHECK basis data.
 * **Hapus = hapus-lunak** (spec/04 `204 (soft delete)`); anaknya naik menjadi
-  akar — sama dengan hapus-keras spec/01 (`ON DELETE SET NULL (parent_id)`).
+  akar — sama dengan hapus-keras spec/01 (`ON DELETE SET NULL (parent_id)`) —
+  dan habit yang menautnya dilepas lewat pendengar yang dipasang titik rakit
+  (`pendengar_goal_dihapus`, K-23): `habits.goal_id` juga `ON DELETE SET NULL`.
+* **Induk dan goal milestone dikunci berbagi** sebelum anak/milestone ditulis
+  (`repository.kunci_hidup`) — hapus-lunak serentak tidak meninggalkan yatim.
+* **Batas per pengguna** (K-24): `MAKS_GOAL` goal hidup dan `MAKS_MILESTONE`
+  milestone per goal — `GET …/tree` dan `GET /goals/{id}` membaca SEMUANYA dalam
+  satu jawaban, jadi ukurannya dibatasi SAAT MENULIS (tinjauan keamanan Sprint 2:
+  20 ribu goal = 86 MB dan event loop tertahan), sama seperti kedalaman.
 """
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Awaitable, Callable, Mapping, Sequence
 from typing import Any
 from uuid import UUID
 
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.ext.asyncio import AsyncEngine
+from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine
 
 from hvx.modules import platform
 
@@ -43,6 +51,14 @@ from .schemas import (
 # Akar = kedalaman 0 → paling banyak sepuluh tingkat. Naskah 4 §9 menggambar
 # lima (LIFE GOAL → Career → Skills → Learning → Habit, dan habit bukan goal).
 MAKS_KEDALAMAN = 9
+# K-24 — seribu goal hidup dan seratus milestone per goal jauh di atas rencana
+# hidup satu orang; di atasnya, satu jawaban `…/tree` bukan lagi jawaban.
+MAKS_GOAL = 1_000
+MAKS_MILESTONE = 100
+
+# (koneksi penghapus, goal_id) — dipasang titik rakit (K-23): modul yang menaut
+# goal melepas tautannya di transaksi hapus yang sama.
+PendengarGoalDihapus = Callable[[AsyncConnection, UUID], Awaitable[None]]
 
 
 def _tidak_ditemukan() -> platform.GalatApi:
@@ -65,7 +81,7 @@ async def daftar(
     batas: int,
     kursor: str | None,
 ) -> HalamanGoal:
-    sesudah = platform.baca_kursor_waktu(kursor)
+    sesudah = platform.baca_kursor_waktu("goals", kursor)
     async with platform.transaksi_pengguna(engine, user_id) as conn:
         goal = await repository.daftar(
             conn, user_id=user_id, status=status, batas=batas + 1, sesudah=sesudah
@@ -73,13 +89,21 @@ async def daftar(
     lanjut = None
     if len(goal) > batas:
         goal = goal[:batas]
-        lanjut = platform.kursor_waktu(goal[-1].created_at, goal[-1].id)
+        lanjut = platform.kursor_waktu("goals", goal[-1].created_at, goal[-1].id)
     return HalamanGoal(items=goal, next_cursor=lanjut)
 
 
 async def buat(engine: AsyncEngine, user_id: UUID, badan: BuatGoal) -> Goal:
     try:
         async with platform.transaksi_pengguna(engine, user_id) as conn:
+            if badan.parent_id is not None and not await repository.kunci_hidup(
+                conn, badan.parent_id
+            ):
+                raise _induk_tidak_ditemukan()
+            if await repository.jumlah_goal_serial(conn, user_id) >= MAKS_GOAL:
+                raise platform.GalatApi(
+                    422, "goal_limit_reached", f"Paling banyak {MAKS_GOAL} goal."
+                )
             if badan.parent_id is not None:
                 jarak = await repository.kedalaman(conn, badan.parent_id, MAKS_KEDALAMAN + 1)
                 if jarak is None:
@@ -110,6 +134,19 @@ async def buat(engine: AsyncEngine, user_id: UUID, badan: BuatGoal) -> Goal:
             # induk dihapus-keras di antara pemeriksaan dan INSERT
             raise _induk_tidak_ditemukan() from None
         raise
+
+
+async def baca_goal(engine: AsyncEngine, user_id: UUID, goal_id: UUID) -> Goal | None:
+    """Goal itu SEKARANG — pemutaran ulang Idempotency-Key (platform.idempotensi, E-171)."""
+    async with platform.transaksi_pengguna(engine, user_id) as conn:
+        return await repository.ambil(conn, goal_id)
+
+
+async def baca_milestone(
+    engine: AsyncEngine, user_id: UUID, milestone_id: UUID
+) -> Milestone | None:
+    async with platform.transaksi_pengguna(engine, user_id) as conn:
+        return await repository.ambil_milestone(conn, milestone_id)
 
 
 async def ambil(engine: AsyncEngine, user_id: UUID, goal_id: UUID) -> GoalRinci:
@@ -157,24 +194,59 @@ async def ubah(engine: AsyncEngine, user_id: UUID, goal_id: UUID, badan: UbahGoa
     return hasil.goal
 
 
-async def hapus(engine: AsyncEngine, user_id: UUID, goal_id: UUID) -> None:
+async def hapus(
+    engine: AsyncEngine,
+    user_id: UUID,
+    goal_id: UUID,
+    *,
+    pendengar: Sequence[PendengarGoalDihapus],
+) -> None:
     async with platform.transaksi_pengguna(engine, user_id) as conn:
         if not await repository.hapus(conn, goal_id):
             raise _tidak_ditemukan()
+        for dengar in pendengar:
+            await dengar(conn, goal_id)
+
+
+async def kunci_goal_hidup(conn: AsyncConnection, goal_id: UUID) -> bool:
+    """Pintu keluar untuk modul yang MENAUT goal (habits) — dipasang titik rakit (K-23).
+
+    True bila goal ada, belum dihapus, dan terlihat oleh pengguna transaksi ini
+    (RLS) — dan goal itu kini terkunci berbagi sampai transaksi pemanggil selesai,
+    sehingga hapus-lunak serentak menunggu lalu melepas tautan barunya.
+    """
+    return await repository.kunci_hidup(conn, goal_id)
 
 
 async def buat_milestone(
     engine: AsyncEngine, user_id: UUID, goal_id: UUID, badan: BuatMilestone
 ) -> Milestone:
-    async with platform.transaksi_pengguna(engine, user_id) as conn:
-        milestone = await repository.sisip_milestone(
-            conn,
-            goal_id=goal_id,
-            title=badan.title,
-            position=badan.position,
-            due_date=badan.due_date,
-        )
-    if milestone is None:
+    try:
+        async with platform.transaksi_pengguna(engine, user_id) as conn:
+            if not await repository.kunci_hidup(conn, goal_id):
+                raise _tidak_ditemukan()
+            if await repository.jumlah_milestone_serial(conn, goal_id) >= MAKS_MILESTONE:
+                raise platform.GalatApi(
+                    422,
+                    "milestone_limit_reached",
+                    f"Paling banyak {MAKS_MILESTONE} milestone per goal.",
+                )
+            milestone = await repository.sisip_milestone(
+                conn,
+                id_=badan.id,
+                goal_id=goal_id,
+                title=badan.title,
+                position=badan.position,
+                due_date=badan.due_date,
+            )
+    except IntegrityError as galat:
+        p = platform.rincian_pelanggaran(galat)
+        if p.sqlstate == platform.UNIQUE_VIOLATION and p.constraint == "goal_milestones_pkey":
+            raise platform.GalatApi(
+                409, "already_exists", "Milestone dengan id ini sudah ada."
+            ) from None
+        raise
+    if milestone is None:  # pragma: no cover - goal terkunci hidup di transaksi yang sama
         raise _tidak_ditemukan()
     return milestone
 

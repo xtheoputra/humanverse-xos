@@ -3,9 +3,13 @@
 * **2.2** habit + jadwal + `adaptive_tiers` — *“tier turun saat energi rendah”*
   (`tier.py`). `period` × `target_count` × `schedule` diperiksa bersama —
   juga saat `PATCH` mengubah salah satunya saja, terhadap baris yang tersimpan.
-* Tautan ke goal dijaga FK komposit `(goal_id, user_id)` (B-41): `habits`
-  tidak boleh membaca tabel `goals` (spec/06 aturan 5), jadi goal yang tidak
-  ada — atau milik pengguna lain — dikenali dari penolakan basis data.
+* Tautan ke goal: `habits` tidak boleh membaca tabel `goals` (spec/06 aturan
+  5), jadi titik rakit menyerahkan `goals.kunci_goal_hidup` (K-23). FK komposit
+  `(goal_id, user_id)` (B-41) saja tidak cukup: FK tidak melihat `deleted_at`,
+  dan goal yang dihapus-lunak dulu tetap bisa ditaut (tinjauan kontrak Sprint 2,
+  F2). Goal dikunci SEBELUM baris habit — urutan kunci yang sama dengan hapus
+  goal (goal, lalu habits lewat `lepas_goal`), jadi keduanya tidak saling kunci.
+* Paling banyak `repository.DAFTAR_MAKS` habit hidup per pengguna (K-24).
 * Hapus = hapus-lunak (spec/01 `deleted_at`); penyelesaiannya tetap tersimpan.
 * **2.3** penyelesaian idempoten per tanggal: kirim ulang `for_date` yang sama
   → `200` dengan baris yang sudah ada, bukan baris kedua dan bukan `409`
@@ -33,7 +37,7 @@ from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine
 from hvx.modules import platform
 
 from . import repository
-from .rentetan import hitung_rentetan
+from .rentetan import awal_riwayat, hitung_rentetan
 from .schemas import (
     BuatHabit,
     CatatPenyelesaian,
@@ -53,6 +57,8 @@ from .tier import tier_untuk_energi
 PembacaZonaWaktu = Callable[[AsyncConnection, UUID], Awaitable[str | None]]
 # (koneksi pemanggil, user_id, tanggal lokal) → energi check-in 1–5, atau None — K-23.
 PembacaEnergi = Callable[[AsyncConnection, UUID, date], Awaitable[int | None]]
+# (koneksi pemanggil, goal_id) → goal hidup & kini terkunci berbagi? — K-23.
+PembacaGoalHidup = Callable[[AsyncConnection, UUID], Awaitable[bool]]
 ZONA_BAWAAN = "UTC"  # spec/01 profiles.timezone DEFAULT 'UTC'
 
 
@@ -60,13 +66,17 @@ def _tidak_ditemukan() -> platform.GalatApi:
     return platform.GalatApi(404, "not_found", "Habit tidak ditemukan.")
 
 
+def _goal_tidak_ditemukan() -> platform.GalatApi:
+    return platform.GalatApi(422, "goal_not_found", "Goal tidak ditemukan.")
+
+
 def _galat_integritas(galat: IntegrityError) -> platform.GalatApi | None:
     p = platform.rincian_pelanggaran(galat)
     if p.sqlstate == platform.UNIQUE_VIOLATION and p.constraint == "habits_pkey":
         return platform.GalatApi(409, "already_exists", "Habit dengan id ini sudah ada.")
     if p.sqlstate == platform.FOREIGN_KEY_VIOLATION:
-        # FK komposit ke goals: goal tidak ada ATAU milik pengguna lain — jawabannya sama.
-        return platform.GalatApi(422, "goal_not_found", "Goal tidak ditemukan.")
+        # FK komposit ke goals: goal dihapus-keras di antara pemeriksaan dan tulisan.
+        return _goal_tidak_ditemukan()
     return None
 
 
@@ -105,9 +115,30 @@ async def daftar(
     )
 
 
-async def buat(engine: AsyncEngine, user_id: UUID, badan: BuatHabit) -> Habit:
+async def baca_habit(engine: AsyncEngine, user_id: UUID, habit_id: UUID) -> Habit | None:
+    """Habit itu SEKARANG — pemutaran ulang Idempotency-Key (platform.idempotensi, E-171)."""
+    async with platform.transaksi_pengguna(engine, user_id) as conn:
+        return await repository.ambil(conn, habit_id)
+
+
+async def baca_penyelesaian(
+    engine: AsyncEngine, user_id: UUID, completion_id: UUID
+) -> Penyelesaian | None:
+    async with platform.transaksi_pengguna(engine, user_id) as conn:
+        return await repository.selesai_id(conn, completion_id)
+
+
+async def buat(
+    engine: AsyncEngine, user_id: UUID, badan: BuatHabit, *, goal_hidup: PembacaGoalHidup
+) -> Habit:
     try:
         async with platform.transaksi_pengguna(engine, user_id) as conn:
+            if badan.goal_id is not None and not await goal_hidup(conn, badan.goal_id):
+                raise _goal_tidak_ditemukan()
+            if await repository.jumlah_serial(conn, user_id) >= repository.DAFTAR_MAKS:
+                raise platform.GalatApi(
+                    422, "habit_limit_reached", f"Paling banyak {repository.DAFTAR_MAKS} habit."
+                )
             return await repository.sisip(
                 conn,
                 user_id=user_id,
@@ -138,10 +169,21 @@ def _perubahan(badan: UbahHabit) -> dict[str, Any]:
     return perubahan
 
 
-async def ubah(engine: AsyncEngine, user_id: UUID, habit_id: UUID, badan: UbahHabit) -> Habit:
+async def ubah(
+    engine: AsyncEngine,
+    user_id: UUID,
+    habit_id: UUID,
+    badan: UbahHabit,
+    *,
+    goal_hidup: PembacaGoalHidup,
+) -> Habit:
     perubahan = _perubahan(badan)
+    goal_baru = perubahan.get("goal_id")
     try:
         async with platform.transaksi_pengguna(engine, user_id) as conn:
+            # Goal lebih dulu, baru baris habit — urutan kunci hapus goal (lihat docstring).
+            if goal_baru is not None and not await goal_hidup(conn, goal_baru):
+                raise _goal_tidak_ditemukan()
             kini = await repository.ambil_untuk_ubah(conn, habit_id)
             if kini is None:
                 raise _tidak_ditemukan()
@@ -171,6 +213,15 @@ async def hapus(engine: AsyncEngine, user_id: UUID, habit_id: UUID) -> None:
             raise _tidak_ditemukan()
 
 
+async def lepas_goal(conn: AsyncConnection, goal_id: UUID) -> None:
+    """Pendengar `goals` (K-23): goal yang dihapus-lunak tidak ditaut habit mana pun lagi.
+
+    Berjalan di transaksi PENGHAPUS goal — RLS-nya sama, dan habit yang ditaut
+    sesudah goal itu dikunci hidup sudah terlihat (READ COMMITTED).
+    """
+    await repository.lepas_goal(conn, goal_id)
+
+
 # ── spec/07 2.3 — penyelesaian ───────────────────────────────────────────────
 
 
@@ -187,6 +238,13 @@ async def catat(
         habit = await repository.ambil_untuk_catat(conn, habit_id)
         if habit is None:
             raise _tidak_ditemukan()
+        # Tanggal yang sudah tercatat → baris LAMA, sebelum aturan apa pun diperiksa
+        # ulang (spec/04: kirim ulang selalu aman). Dulu tier diperiksa lebih dulu:
+        # ulangan identik sesudah tier habit dikurangi menjadi 422 (tinjauan
+        # kontrak Sprint 2, F3) — perangkat luring tidak bisa menuntaskan antreannya.
+        ada = await repository.selesai_pada(conn, habit_id, badan.for_date)
+        if ada is not None:
+            return HasilCatat(ada, baru=False)
         if badan.tier_used is not None and badan.tier_used >= len(habit.adaptive_tiers):
             raise platform.GalatApi(
                 422, "invalid_tier", "tier_used di luar adaptive_tiers habit ini."
@@ -237,7 +295,7 @@ async def rentetan(
         zona = await pembaca_zona_waktu(conn, user_id) or ZONA_BAWAAN
         hari_ini = await platform.hari_ini_di(conn, zona)
         mulai = await repository.mulai_lokal(conn, habit_id, zona) or hari_ini
-        riwayat = await repository.riwayat(conn, habit_id)
+        riwayat = await repository.riwayat(conn, habit_id, sejak=awal_riwayat(hari_ini))
     hasil = hitung_rentetan(
         period=habit.period,
         target_count=habit.target_count,

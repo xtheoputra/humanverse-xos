@@ -20,18 +20,18 @@ manusia + agent + data + knowledge + simulation + automation**.
 
 | Hal | Keadaan |
 |---|---|
-| Tahap | 🔨 **Sprint 0 + Sprint 1 dikodekan** (16–17 Sep 2026) — branch `v0/sprint-0-foundation` dan, di atasnya, `v0/sprint-1-identity` — **menunggu HUMAN REVIEW pemilik** |
-| Berkas **kode produksi** | **0 di `master`** · **Sprint 0 + 1 (15 dari 51 tugas `spec/07`) di branch** — [#3](../../issues/3) dijawab pemilik untuk memulai (**H-25**): AI coding agent di branch + PR, pemilik yang menggabungkan |
+| Tahap | 🔨 **Sprint 0 + Sprint 1 + Sprint 2 dikodekan** (16–24 Sep 2026) — branch `v0/sprint-0-foundation`, di atasnya `v0/sprint-1-identity`, di atasnya `v0/sprint-2-human-core` — **menunggu HUMAN REVIEW pemilik** |
+| Berkas **kode produksi** | **0 di `master`** · **Sprint 0 + 1 + 2 (22 dari 51 tugas `spec/07`) di branch** — api Python + aplikasi Flutter pertama (`apps/mobile`) — [#3](../../issues/3) dijawab pemilik untuk memulai (**H-25**): AI coding agent di branch + PR, pemilik yang menggabungkan |
 | Berkas **perkakas** | **4** — [`tools/`](tools/README.md): `periksa_dokumen.py` · `uji_mutasi.py` · 🆕 `uji_mutasi_kode.py` · 🆕 `ci_lokal.py`. Di branch Sprint 0: **19 dari 26** pemeriksaan [`arch/11`](arch/11-PENEGAKAN.md) jalan (di `master`: 12) |
 | Repo git | privat `xtheoputra/humanverse-xos`, branch `master` |
 | Dokumen | **272 berkas** di `docs/` + **8 berkas** di `spec/` + **12 berkas** di [`arch/`](arch/README.md) |
 | Gerbang yang **sudah dijalankan** | **14 ✅ · R-1 🛑 7 temuan** (keputusan cakupan pemilik) · **15 kontrak `import-linter`** · CI lokal **lint → typecheck → test → build → scan hijau** — `uv run python tools/ci_lokal.py`, **manual** |
-| Merahnya **terbukti bisa terjadi** | **19 dari 19** — 25 mutasi dokumen (tiap mutasi wajib melahirkan temuan **baru**) + 108 mutasi kode (tiap mutasi wajib gagal dengan **alasan yang dimaksud**, dibaca dari baris galatnya — bukan dari mana pun di keluaran) · **tiap kontrak `import-linter` punya mutasinya sendiri** |
+| Merahnya **terbukti bisa terjadi** | **19 dari 19** — 25 mutasi dokumen (tiap mutasi wajib melahirkan temuan **baru**) + 175 mutasi kode (tiap mutasi wajib gagal dengan **alasan yang dimaksud**, dibaca dari baris galatnya — bukan dari mana pun di keluaran) · **tiap kontrak `import-linter` punya mutasinya sendiri** |
 | Gerbang di PR | ✅ **gratis** — `tools/ci_lokal.py --lapor-github` menempelkan status **`ci-lokal`** ke commit PR; GitHub Actions **dimatikan** atas keputusan pemilik (**H-26** — tanpa tagihan, [#160](../../issues/160)) |
 | Naskah pemilik | **24** — terakhir: **Phase 20 Civilization Platform** (39 bagian) — **fase TERAKHIR** |
 | Keputusan tertutup | **27 butir H** — 🆕 **H-27 data tiap pengguna milik pribadinya** · 🆕 **H-26 CI tanpa tagihan** · **H-25 siapa mengerjakan V0** · nama · MVP · struktur repo · ambang konfirmasi · model memory · memory meluruh · gerbang policy · context package · dua tangga R/L · manifest dipulihkan · **model transisi belajar dari galat sendiri** · **monetisasi punya fase (Phase 14)**. ✅ **H-20 (peta fase) DIPULIHKAN sebagai [`arch/01`](arch/01-PETA-20-FASE.md) — peta versi 3, 20 baris TERTUTUP, dan peta kini BERNOMOR VERSI** sehingga *“roadmap yang sudah kita tetapkan”* selalu punya rujukan yang bisa dibuka ([#101](../../issues/101) · [#108](../../issues/108) · [#132](../../issues/132) · [#133](../../issues/133) · [#142](../../issues/142)). ✅ **H-13 ([#72](../../issues/72)) DISELESAIKAN:** `Phase` dan `V0–V6` bukan dua rencana yang bersaing melainkan **dua sumbu** — `Phase` menghitung dokumen, `V` menghitung rilis. ⚠️ **H-11** ([#78](../../issues/78)) masih perlu ditinjau ulang |
-| Keputusan terbuka | **26 pertanyaan A** · **39 risiko B** · **158 ketidakcocokan E** · **20 lubang G** — dan **22 butir K** sudah saya putuskan sendiri |
-| Tanggal dokumen | 17 September 2026 |
+| Keputusan terbuka | **26 pertanyaan A** · **39 risiko B** · **167 ketidakcocokan E** · **20 lubang G** — dan **24 butir K** sudah saya putuskan sendiri |
+| Tanggal dokumen | 24 September 2026 |
 
 > ⚠️ **Nol baris kode di `master` itu disengaja sampai 16 Sep 2026 — dan kini
 > tinggal menunggu HUMAN REVIEW Sprint 0.**
@@ -199,6 +199,45 @@ Tiap penjaga baru terbukti sanggup gagal — **108 mutasi kode** (66 baru), **27
 
 ---
 
+## 🔨 Sprint 2 — Human Core (24 Sep 2026)
+
+Pemilik: *“kerjakan semua tugas yang belum terselesaikan dengan sempurna”*.
+Sprint 2 [`spec/07`](spec/07-BACKLOG-V0.md) dikerjakan penuh di branch
+`v0/sprint-2-human-core`, di atas Sprint 1 — satu commit per tugas (**K-18**),
+lalu satu commit untuk seluruh perbaikan tinjauan.
+
+| | Yang dibangun | Bukti mesin |
+|---|---|---|
+| 2.1 | `goals` + milestone + `parent_id`; `GET /v1/goals/{id}/tree` (**E-168**) | pohon 3 tingkat = **satu** pernyataan SQL, dihitung di driver — `test_goals.py` |
+| 2.2 | `habits` + jadwal + `adaptive_tiers`; `GET /v1/habits?for_date=` membawa tier yang disarankan **beserta alasannya** (**E-169**, **K-23**) | tier turun saat energi rendah — `test_tier.py` · `test_habit_hari_ini.py` |
+| 2.3 | `habit_completions`, `for_date` = tanggal lokal **perangkat** | kirim ulang → `200` + baris lama, juga enam serentak — `test_penyelesaian.py` |
+| 2.4 | rentetan & tingkat penyelesaian per hari · minggu ISO · bulan | pengguna yang pindah **Pago Pago → Kiritimati** (UTC−11 → UTC+14) lewat HTTP — `test_rentetan.py` |
+| 2.5 | `daily_checkins`, `PUT` = ganti | `PUT` dua kali → satu baris — `test_checkin.py` |
+| 2.6 | `mood_entries` — dilaporkan pengguna, waktu wajib berzona | kontrak `spec/04` — `test_mood.py` |
+| 2.7 | **aplikasi Flutter pertama** — masuk/daftar, habit hari ini, energi, tandai selesai dengan tier | **layar diketuk terhadap api hidup** di tahap smoke — `apps/mobile/test/ujung/` |
+
+🔴 **Menulisnya menemukan dua rute yang `spec/07` tuntut tetapi `spec/04` tidak
+punya** — **E-168** pohon goal · **E-169** habit pada tanggal tertentu — dan
+satu pola baru di titik rakit: bacaan lintas modul domain yang harus satu
+transaksi (**K-23**).
+
+🔍 **Tinjauan adversarial sebelum PR — tiga lensa serentak** (keamanan ·
+kontrak · penegak buta), tiap temuan dibuktikan **merah dulu** lewat HTTP atau
+basis data. Yang paling mahal kalau lolos: **FastAPI memvalidasi dalam mode
+longgar** — `true` diterima sebagai valensi mood terburuk, detik Unix sebagai
+`for_date` **UTC**, dan persetujuan pelatihan model tercatat dari string
+`"on"` (**E-170**); **goal anak yang dibuat serentak dengan hapus induknya
+menjadi yatim, 40 dari 40** (**E-172**); dan **cache `Idempotency-Key`
+menyimpan isi jawaban 24 jam** di Redis yang sama dengan sesi — memori yang
+murah dihabiskan, dan catatan pengguna yang tinggal sesudah dihapus
+(**E-171**, kini rujukan + kuota, **K-24**). Rinciannya:
+[`docs/99-CATATAN-AUDIT.md`](docs/99-CATATAN-AUDIT.md).
+
+Tiap penjaga baru terbukti sanggup gagal — **175 mutasi kode** (34 baru),
+**549 uji Python + 31 uji Flutter**.
+
+---
+
 ## 📌 Pekerjaan terbuka = GitHub Issues
 
 **157 issue** dalam 3 milestone — **59 ditutup, 98 terbuka**. Baca issue-nya,
@@ -333,7 +372,7 @@ di antaranya*), §16.5 (*tujuan manusia langsung ke kendali sendi*), §16.7
 (*punya `Collision Check`, tetapi itu menjawab "aman secara fisik", bukan
 "boleh dilakukan"*).
 
-## 🔧 Dua puluh keputusan yang diambil sendiri — [`docs/KEPUTUSAN-DIDELEGASIKAN.md`](docs/KEPUTUSAN-DIDELEGASIKAN.md)
+## 🔧 Dua puluh empat keputusan yang diambil sendiri — [`docs/KEPUTUSAN-DIDELEGASIKAN.md`](docs/KEPUTUSAN-DIDELEGASIKAN.md)
 
 Atas permintaan pemilik (*"beri keputusan sendiri sesuai aturan"*, 9 Sep 2026),
 **dua puluh** pertanyaan **engineering** diputuskan dan ditegakkan di `spec/`
@@ -361,7 +400,11 @@ membalikkannya**:
 | **K-17** | **Arah IMPOR modul V0: `events` di bawah modul domain** — gambar `spec/06` arah data; aturan 6 (tiap tulisan domain menerbitkan event) menentukan arah impor | `pyproject.toml` kontrak `m1-m3-lapisan` |
 | **K-18** | **Satu commit per tugas; PR boleh satu per sprint** — harga yang diakui: hanya commit terakhir yang dijamin lulus gerbang penuh | `spec/07` · `CONTRIBUTING.md` |
 | **K-19** 🆕 | **Kepemilikan data dijaga basis data** — RLS berbasis pengguna-transaksi · FK komposit · api menolak mulai sebagai pemilik tabel | `spec/01` §10–§11 · `test_kepemilikan_data.py` |
-| **K-20** 🆕 | **CI tanpa tagihan** — gerbang lokal menempelkan status `ci-lokal`; alur Actions hanya manual | `tools/ci_lokal.py` · `test_rantai_pasok.py` |
+| **K-20** | **CI tanpa tagihan** — gerbang lokal menempelkan status `ci-lokal`; alur Actions hanya manual | `tools/ci_lokal.py` · `test_rantai_pasok.py` |
+| **K-21** | **Sesi: token opak di Redis, bukan JWT** — sidik saja di Redis; token segar berotasi, pemakaian ulang mencabut seluruh sesi | `identity/sesi.py` · `test_sesi.py` |
+| **K-22** | **Sandi dan batas laju: angka yang dipilih** — 15–128 + daftar tolak + NFKC; GCRA per IP · pengguna · kredensial · akun (batas laju, bukan penguncian — **B-42**) | `identity/sandi.py` · `test_batas_laju.py` |
+| **K-23** 🆕 | **Bacaan lintas modul domain lewat titik rakit** — pembaca/pendengar di `app.state`, satu transaksi, bukan impor; energi check-in → tier adaptif | `hvx/main.py` · `test_main.py` |
+| **K-24** 🆕 | **Ukuran dibatasi saat menulis; `Idempotency-Key` mengingat rujukan** — 1.000 goal · 100 milestone · 500 habit · badan 1 MiB · 1.000 kunci/hari | `test_batas_dan_balapan.py` · `test_idempotensi.py` |
 
 🛑 **Yang sengaja TIDAK saya putuskan:** [#139](../../issues/139) (waktu pemilik) ·
 [#3](../../issues/3) (orang) · [#20](../../issues/20) (merek) · **seluruh butir C**

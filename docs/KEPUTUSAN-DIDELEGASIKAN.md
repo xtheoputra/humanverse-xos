@@ -515,6 +515,20 @@ sesudahnya.
 
 ---
 
+## K-24 · Ukuran yang dibatasi saat menulis, dan `Idempotency-Key` yang mengingat rujukan
+
+> Diputuskan 24 September 2026, saat temuan tinjauan Sprint 2 dibetulkan (E-171, E-172).
+
+| | |
+|---|---|
+| **Keputusan** | **(1)** Batas yang ditegakkan **saat menulis** — diperiksa serial dengan kunci penasihat per pemilik, jadi tulisan serentak tidak bisa bersama melewatinya: **1.000** goal hidup per pengguna · **100** milestone per goal · **500** habit hidup per pengguna (`422 goal_limit_reached` · `milestone_limit_reached` · `habit_limit_reached`). **(2)** Badan permintaan paling besar **1 MiB** → `413 payload_too_large`, sebelum autentikasi dan sebelum badan dibaca. **(3)** `Idempotency-Key` mengingat **rujukan** selama 24 jam — sidik HMAC permintaan, status, id sumber daya — **bukan isi jawaban**; ulangan membaca ulang sumber daya itu di bawah RLS pengguna yang sama. Paling banyak **1.000 kunci baru per pengguna per 24 jam** (`429 rate_limited`); ulangan kunci lama tidak memakai kuota. |
+| **Bukti** | Tinjauan keamanan Sprint 2, diukur: `GET /goals/{id}/tree` atas 20 ribu goal = jawaban 86 MB dan event loop tertahan; badan jawaban ~5,2 KiB tersimpan untuk permintaan 19 byte, di Redis `noeviction` yang sama dengan sesi — batas laju per pengguna `300/60` (K-22) berarti 432 ribu entri sehari per akun; catatan pengguna tinggal di Redis dan AOF-nya 24 jam sesudah hapus-keras; FastAPI membaca badan utuh sebelum dependensi autentikasi berjalan. Tinjauan kontrak: `GET /habits` memotong di 500 tanpa tanda (F9). |
+| **Bacaan yang DITOLAK** | **(a)** *“Beri halaman pada pohon dan daftar habit”* — ditolak: pohon adalah satu jawaban dengan sengaja (E-168), dan layar hari ini butuh semua habit hari itu. **(b)** *“Potong saat membaca”* — ditolak: itu tepat pemotongan diam-diam yang E-168 larang. **(c)** *“Simpan isi jawaban, dengan batas ukuran”* — ditolak: isi pengguna tetap tinggal di Redis sesudah dihapus, dan batas per entri tetap berlipat per permintaan. **(d)** *“Batas laju saja cukup”* — ditolak: batas laju menghitung permintaan, bukan memori yang ditinggalkannya. **(e)** *“Redis cache tersendiri berkebijakan eviction”* — ditunda: tambah satu layanan untuk masalah yang kuota + rujukan sudah batasi. |
+| **Harga yang diakui** | Ulangan menerima keadaan **sekarang**: `PATCH` lain di antaranya ikut terlihat, dan sumber daya yang sudah dihapus menjawab `404`. Draf IETF membolehkan server menyimpan jawaban; yang ini memilih tidak menyimpan isi pengguna di luar PostgreSQL. Pengguna yang sungguh butuh lebih dari 500 habit atau 1.000 goal ditolak; jurnal lebih dari 1 MiB teks (±500 halaman) ditolak; antrean luring lebih dari 1.000 tulisan berkunci sehari menerima `429` sampai jendelanya lewat. Kunci penasihat menyerialkan pembuatan goal/habit **satu** pengguna — bukan antarpengguna. |
+| **Cara membalikkan** | Angka: `MAKS_GOAL` · `MAKS_MILESTONE` (`goals/service.py`), `DAFTAR_MAKS` (`habits/repository.py`), `MAKS_BADAN_BYTE` (`platform/batas_badan.py`), `KUOTA_KUNCI` (`platform/idempotensi.py`) — `test_batas_dan_balapan.py`, `test_masukan_ketat.py`, `test_idempotensi.py` diubah bersamanya. Menyimpan isi jawaban lagi: `Idempotensi.jalankan` — `test_redis_hanya_menyimpan_rujukan_tanpa_isi_tulisan` merah dan wajib dihapus bersama alasannya. |
+
+---
+
 ## Yang sengaja **tidak** saya putuskan
 
 | Butir | Kenapa |

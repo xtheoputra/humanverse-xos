@@ -116,34 +116,104 @@ void main() {
     },
   );
 
-  test('tiap tindakan tulis membawa Idempotency-Key yang BERBEDA', () async {
-    final kunci = <String?>[];
+  test('membuat habit: id buatan pemanggil = id badan = Idempotency-Key, SAMA di tiap percobaan', () async {
+    final dikirim = <(String?, Object?)>[];
     final klien = KlienApi(
       dasar: dasar,
       klien: MockClient((r) async {
         if (r.url.path == '/v1/auth/login') return _json(_akun('1'));
-        kunci.add(r.headers['Idempotency-Key']);
         final badan = jsonDecode(r.body) as Map<String, dynamic>;
-        expect(badan, {
-          'for_date': '2026-09-24',
-          'status': 'done',
-          'tier_used': 1,
-        });
-        return _json({
-          'for_date': '2026-09-24',
-          'status': 'done',
-          'tier_used': 1,
-        }, 201);
+        dikirim.add((r.headers['Idempotency-Key'], badan['id']));
+        return _json({..._habit(), 'id': badan['id']}, 201);
+      }),
+    );
+    await klien.masuk(email: 'a@uji.id', sandi: 'x');
+    final id = idBaru();
+
+    // Percobaan kedua satu tindakan (jawaban pertama hilang di jaringan).
+    await klien.buatHabit(id: id, judul: 'Lari', periode: 'day', target: 1);
+    await klien.buatHabit(id: id, judul: 'Lari', periode: 'day', target: 1);
+
+    expect(dikirim, [(id, id), (id, id)]);
+  });
+
+  test('idBaru: UUID v4 yang berbeda tiap tindakan', () {
+    final a = idBaru();
+    final b = idBaru();
+    final pola = RegExp(
+      r'^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$',
+    );
+
+    expect(pola.hasMatch(a), isTrue, reason: a);
+    expect(a, isNot(b));
+  });
+
+  test(
+    'penyelesaian tanpa Idempotency-Key — (habit, tanggal) unik di server',
+    () async {
+      final kunci = <String?>[];
+      final klien = KlienApi(
+        dasar: dasar,
+        klien: MockClient((r) async {
+          if (r.url.path == '/v1/auth/login') return _json(_akun('1'));
+          kunci.add(r.headers['Idempotency-Key']);
+          expect(jsonDecode(r.body), {
+            'for_date': '2026-09-24',
+            'status': 'done',
+            'tier_used': 1,
+          });
+          return _json({
+            'for_date': '2026-09-24',
+            'status': 'done',
+            'tier_used': 1,
+          }, 201);
+        }),
+      );
+      await klien.masuk(email: 'a@uji.id', sandi: 'x');
+
+      await klien.tandaiSelesai('h1', '2026-09-24', tier: 1);
+
+      expect(kunci, [null]);
+    },
+  );
+
+  test('401 SERENTAK → SATU penyegaran; token segar yang sudah dirotasi tidak dipakai ulang', () async {
+    final segarDipakai = <Object?>[];
+    final klien = KlienApi(
+      dasar: dasar,
+      klien: MockClient((r) async {
+        switch (r.url.path) {
+          case '/v1/auth/login':
+            return _json(_akun('1'));
+          case '/v1/auth/refresh':
+            final badan = jsonDecode(r.body) as Map<String, dynamic>;
+            segarDipakai.add(badan['refresh_token']);
+            // Penyegaran lambat: permintaan kedua menerima 401 SEBELUM selesai.
+            await Future<void>.delayed(const Duration(milliseconds: 20));
+            return _json({'tokens': _token('${segarDipakai.length + 1}')});
+        }
+        if (r.headers['Authorization'] == 'Bearer hvxa_akses1') {
+          return _json({
+            'error': {'code': 'unauthenticated', 'message': 'x'},
+          }, 401);
+        }
+        expect(r.headers['Authorization'], 'Bearer hvxa_akses2');
+        return _json({'items': <Object>[]});
       }),
     );
     await klien.masuk(email: 'a@uji.id', sandi: 'x');
 
-    await klien.tandaiSelesai('h1', '2026-09-24', tier: 1);
-    await klien.tandaiSelesai('h1', '2026-09-24', tier: 1);
+    final hasil = await Future.wait([
+      klien.habitPada('2026-09-24'),
+      klien.checkinPada('2026-09-24'),
+      klien.habitPada('2026-09-25'),
+    ]);
 
-    expect(kunci, hasLength(2));
-    expect(kunci.every((k) => k != null && k.length == 32), isTrue);
-    expect(kunci.toSet(), hasLength(2));
+    expect(segarDipakai, [
+      'hvxr_segar1',
+    ], reason: 'token segar dipakai dua kali');
+    expect(hasil, hasLength(3));
+    expect(klien.sudahMasuk, isTrue);
   });
 
   test(
@@ -237,7 +307,7 @@ void main() {
         forDate: '2026-09-24',
         energi: 4,
         fokus: 3,
-        jamTidur: '6.5',
+        jamTidur: 6.5,
       );
 
       await klien.simpanEnergi('2026-09-24', 2, lama: lama);
@@ -245,6 +315,22 @@ void main() {
       expect(badan, {'energy': 2, 'focus': 3, 'sleep_hours': 6.5});
     },
   );
+
+  test('sleep_hours dibaca sebagai angka JSON (spec/04, E-170)', () {
+    final c = Checkin.dariJson({
+      'for_date': '2026-09-24',
+      'energy': 3,
+      'sleep_hours': 7.5,
+    });
+    final bulat = Checkin.dariJson({
+      'for_date': '2026-09-24',
+      'sleep_hours': 8,
+    });
+
+    expect(c.jamTidur, 7.5);
+    expect(bulat.jamTidur, 8.0);
+    expect(c.keJsonDenganEnergi(2), {'energy': 2, 'sleep_hours': 7.5});
+  });
 
   test('tanggal lokal perangkat, bukan tanggal UTC', () {
     final senin = DateTime(2026, 9, 21, 6, 30); // waktu LOKAL

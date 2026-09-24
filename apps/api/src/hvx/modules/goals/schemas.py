@@ -85,7 +85,7 @@ class BuatGoal(BaseModel):
     description: Uraian | None = None
     domain: Domain | None = None
     parent_id: UUID | None = None
-    target_date: date | None = None
+    target_date: platform.Tanggal | None = None
 
     @model_validator(mode="after")
     def _bukan_induk_dirinya(self) -> BuatGoal:
@@ -104,7 +104,7 @@ class UbahGoal(BaseModel):
 
     title: Judul | None = None
     status: StatusGoal | None = None
-    target_date: date | None = None  # null = hapus tanggal target
+    target_date: platform.Tanggal | None = None  # null = hapus tanggal target
 
     @model_validator(mode="after")
     def _yang_dikirim_tidak_null(self) -> UbahGoal:
@@ -113,11 +113,15 @@ class UbahGoal(BaseModel):
 
 
 class BuatMilestone(BaseModel):
+    """`POST /goals/{id}/milestones` — `id` boleh dibuat klien, seperti goal (spec/04:
+    dukungan luring; tinjauan kontrak Sprint 2, F13)."""
+
     model_config = ConfigDict(extra="forbid")
 
+    id: UUID | None = None
     title: Judul
-    position: int | None = Field(default=None, ge=0, le=10_000)
-    due_date: date | None = None
+    position: platform.Bulat | None = Field(default=None, ge=0, le=10_000)
+    due_date: platform.Tanggal | None = None
 
 
 class UbahMilestone(BaseModel):
@@ -127,7 +131,7 @@ class UbahMilestone(BaseModel):
 
     status: StatusMilestone | None = None
     title: Judul | None = None
-    due_date: date | None = None  # null = hapus tanggal
+    due_date: platform.Tanggal | None = None  # null = hapus tanggal
 
     @model_validator(mode="after")
     def _yang_dikirim_tidak_null(self) -> UbahMilestone:

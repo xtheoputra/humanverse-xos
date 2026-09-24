@@ -162,6 +162,18 @@ UJI_RENTETAN = "tests/integration/test_rentetan.py"
 UJI_CHECKIN = "tests/integration/test_checkin.py"
 UJI_HARI = "tests/integration/test_habit_hari_ini.py"
 UJI_MOOD = "tests/integration/test_mood.py"
+UJI_KETAT = "tests/integration/test_masukan_ketat.py"
+_UJI_SERENTAK = (
+    "401 SERENTAK → SATU penyegaran; token segar yang sudah dirotasi tidak dipakai ulang"
+)
+_UJI_DIALOG_ID = "Simpan lagi sesudah jaringan putus mengirim id YANG SAMA; isian diubah → id baru"
+_UJI_DILEWATI = "habit yang DILEWATI tampil lain dan ketukan membatalkannya"
+_UJI_ID_SAMA = (
+    "membuat habit: id buatan pemanggil = id badan = Idempotency-Key, SAMA di tiap percobaan"
+)
+UJI_KETAT_RUTE = "tests/unit/test_masukan_ketat_semua_rute.py"
+UJI_BALAPAN = "tests/integration/test_batas_dan_balapan.py"
+UJI_BADAN = "tests/unit/test_batas_badan.py"
 FK_MILESTONE = (
     "  FOREIGN KEY (goal_id, user_id) REFERENCES goals (id, user_id) ON DELETE CASCADE" + NL + ");"
 )
@@ -1667,8 +1679,8 @@ MUTASI: list[Mutasi] = [
         [
             Sunting(
                 f"{MODUL}/platform/halaman.py",
-                "    if saat.utcoffset() is None:" + NL + "        raise _kursor_rusak()" + NL,
-                "",
+                "        if saat.utcoffset() is None or not WAKTU_MIN",
+                "        if saat.utcoffset() is not None and not WAKTU_MIN",
             )
         ],
         _pytest("tests/unit/test_halaman.py::test_kursor_rusak_menjadi_galat_400"),
@@ -1696,8 +1708,8 @@ MUTASI: list[Mutasi] = [
         [
             Sunting(
                 f"{MODUL}/platform/idempotensi.py",
-                '        return f"{self._awalan}:idem:{user_id}:{sidik}"',
-                '        return f"{self._awalan}:idem:{sidik}"',
+                '        return f"{self._awalan}:idem:{user_id}:{sidik_kunci}"',
+                '        return f"{self._awalan}:idem:{sidik_kunci}"',
             )
         ],
         _pytest(f"{UJI_IDEM}::test_kunci_yang_sama_milik_dua_pengguna_tidak_saling_memutar_ulang"),
@@ -1710,7 +1722,7 @@ MUTASI: list[Mutasi] = [
         [
             Sunting(
                 f"{MODUL}/platform/idempotensi.py",
-                '        if tersimpan.get("sidik") != self._sidik:'
+                '        if tersimpan.get("s") != self._sidik:'
                 + NL
                 + "            raise _dipakai_ulang()"
                 + NL,
@@ -1723,12 +1735,12 @@ MUTASI: list[Mutasi] = [
     ),
     Mutasi(
         "E-165",
-        "penanda 'sedang berjalan' tanpa NX — permintaan serentak semuanya menulis",
+        "penanda 'sedang berjalan' tidak diperiksa — permintaan serentak semuanya menulis",
         [
             Sunting(
                 f"{MODUL}/platform/idempotensi.py",
-                "        if not await self._r.set(k, penanda, nx=True, ex=_UMUR_PROSES_S):",
-                "        if not await self._r.set(k, penanda, ex=_UMUR_PROSES_S):",
+                "local ada = redis.call('GET', KEYS[1])",
+                "local ada = false",
             )
         ],
         _pytest(f"{UJI_IDEM}::test_permintaan_serentak_dengan_kunci_sama_hanya_satu_yang_jalan"),
@@ -1749,7 +1761,7 @@ MUTASI: list[Mutasi] = [
                 + NL,
                 "        except GalatApi as g:"
                 + NL
-                + '            await self._r.set(k, json.dumps({"sidik": self._sidik, "status": g.status, "badan": {}}))'
+                + '            await self._r.set(k, json.dumps({"s": self._sidik, "st": g.status, "id": "00000000-0000-0000-0000-000000000000"}))'
                 + NL
                 + "            raise"
                 + NL,
@@ -1799,7 +1811,9 @@ MUTASI: list[Mutasi] = [
     # ── Sprint 2 · 2.3 habit_completions + idempotensi tanggal ───────────
     Mutasi(
         "2.3",
-        "INSERT penyelesaian tanpa ON CONFLICT — kirim ulang tanggal sama menjadi galat",
+        # Kirim ulang BERURUTAN kini menemukan baris lamanya sebelum INSERT (E-173);
+        # yang dijaga ON CONFLICT tinggal dua catatan SERENTAK di celah keduanya.
+        "INSERT penyelesaian tanpa ON CONFLICT — catatan serentak tanggal sama menjadi galat",
         [
             Sunting(
                 f"{MODUL}/habits/repository.py",
@@ -1807,8 +1821,8 @@ MUTASI: list[Mutasi] = [
                 "",
             )
         ],
-        _pytest(f"{UJI_SELESAI}::test_kirim_ulang_tanggal_sama_200_bukan_baris_kedua"),
-        harus_memuat="kirim ulang for_date yang sama bukan 200",
+        _pytest(f"{UJI_SELESAI}::test_catatan_serentak_tanggal_sama_satu_baris_tanpa_galat"),
+        harus_memuat="catatan serentak tanggal sama:",
         kelompok="db",
     ),
     Mutasi(
@@ -1957,6 +1971,14 @@ MUTASI: list[Mutasi] = [
                 + "      sleep_hours = EXCLUDED.sleep_hours,"
                 + NL
                 + "      note = EXCLUDED.note"
+                + NL
+                + "    WHERE (daily_checkins.energy, daily_checkins.focus, daily_checkins.sleep_hours,"
+                + NL
+                + "           daily_checkins.note)"
+                + NL
+                + "          IS DISTINCT FROM (EXCLUDED.energy, EXCLUDED.focus, EXCLUDED.sleep_hours,"
+                + NL
+                + "                            EXCLUDED.note)"
                 + NL,
                 "",
             )
@@ -2055,21 +2077,16 @@ MUTASI: list[Mutasi] = [
     # ── Sprint 2 · 2.7 layar V0 pertama (Flutter, apps/mobile) ───────────
     Mutasi(
         "2.7",
-        "penyelesaian dari layar dikirim TANPA Idempotency-Key",
+        "pembuatan habit dengan Idempotency-Key acak BARU per percobaan (F19)",
         [
             Sunting(
                 f"{APLIKASI}/lib/api/klien.dart",
-                "      '/v1/habits/$habitId/completions',"
-                + NL
-                + "      kunciIdempotensi: _kunciBaru(),"
-                + NL,
-                "      '/v1/habits/$habitId/completions'," + NL,
+                "      kunciIdempotensi: id,",
+                "      kunciIdempotensi: idBaru(),",
             )
         ],
-        _flutter_uji(
-            "test/api/klien_test.dart", "tiap tindakan tulis membawa Idempotency-Key yang BERBEDA"
-        ),
-        harus_memuat="tiap tindakan tulis membawa Idempotency-Key yang BERBEDA [E]",
+        _flutter_uji("test/api/klien_test.dart", _UJI_ID_SAMA),
+        harus_memuat=_UJI_ID_SAMA + " [E]",
         cwd=APLIKASI,
     ),
     Mutasi(
@@ -2105,6 +2122,516 @@ MUTASI: list[Mutasi] = [
         ),
         harus_memuat="medan lama ikut [E]",
         cwd=APLIKASI,
+    ),
+    # ── Tinjauan Sprint 2 · E-170 masukan ketat (F4 · F5 · F6 · rentang S5/S6) ─
+    Mutasi(
+        "E-170",
+        "platform.Bulat longgar — `true` diterima sebagai 1",
+        [
+            Sunting(
+                f"{MODUL}/platform/masukan.py", "Bulat = Annotated[int, Strict()]", "Bulat = int"
+            )
+        ],
+        _pytest(f"{UJI_KETAT_RUTE}::test_badan_kueri_dan_jalur_tidak_mengoersi_diam_diam"),
+        harus_memuat="masukan yang dikoersi diam-diam",
+    ),
+    Mutasi(
+        "E-170",
+        "platform.Benar longgar — persetujuan dari string 'on'",
+        [
+            Sunting(
+                f"{MODUL}/platform/masukan.py", "Benar = Annotated[bool, Strict()]", "Benar = bool"
+            )
+        ],
+        _pytest(f"{UJI_KETAT_RUTE}::test_badan_kueri_dan_jalur_tidak_mengoersi_diam_diam"),
+        harus_memuat="consents.terms",
+    ),
+    Mutasi(
+        "E-170",
+        "medan skala check-in kembali `int` biasa",
+        [
+            Sunting(
+                f"{MODUL}/checkins/schemas.py",
+                "Skala = Annotated[platform.Bulat, Field(ge=1, le=5)]",
+                "Skala = Annotated[int, Field(ge=1, le=5)]",
+            )
+        ],
+        _pytest(f"{UJI_KETAT_RUTE}::test_badan_kueri_dan_jalur_tidak_mengoersi_diam_diam"),
+        harus_memuat="badan.energy",
+    ),
+    Mutasi(
+        "E-170",
+        "platform.Tanggal tanpa penjaga ISO — detik Unix menjadi tanggal UTC",
+        [
+            Sunting(
+                f"{MODUL}/platform/masukan.py",
+                "Tanggal = Annotated[date, BeforeValidator(_tanggal_iso), "
+                "AfterValidator(_tanggal_dalam_rentang)]",
+                "Tanggal = Annotated[date, AfterValidator(_tanggal_dalam_rentang)]",
+            )
+        ],
+        _pytest(f"{UJI_KETAT_RUTE}::test_badan_kueri_dan_jalur_tidak_mengoersi_diam_diam"),
+        harus_memuat="tanpa platform.Tanggal/WaktuBerzona",
+    ),
+    Mutasi(
+        "E-170",
+        "rentang tanggal tidak diperiksa — 0001-01-01 tersimpan sebagai -infinity",
+        [
+            Sunting(
+                f"{MODUL}/platform/masukan.py",
+                "    if not TANGGAL_MIN <= nilai <= TANGGAL_MAKS:",
+                "    if False:",
+            )
+        ],
+        _pytest(f"{UJI_KETAT_RUTE}::test_tanggal_hanya_string_iso_dalam_rentang"),
+        harus_memuat="diterima: '0001-01-01'",
+    ),
+    Mutasi(
+        "E-170",
+        "tier_used dibatasi skema lagi — tier 7 menjadi 400, tier 3 menjadi 422 (F5)",
+        [
+            Sunting(
+                f"{MODUL}/habits/schemas.py",
+                "    tier_used: platform.Bulat | None = Field(default=None, ge=0)",
+                "    tier_used: platform.Bulat | None = Field(default=None, ge=0, le=TIER_MAKS - 1)",
+            )
+        ],
+        _pytest(f"{UJI_KETAT}::test_tier_di_luar_adaptive_tiers_selalu_422_invalid_tier"),
+        harus_memuat="tier di luar adaptive_tiers dijawab",
+        kelompok="db",
+    ),
+    Mutasi(
+        "E-170",
+        "sleep_hours keluar sebagai string desimal lagi (F6)",
+        [
+            Sunting(
+                f"{MODUL}/checkins/schemas.py",
+                "from datetime import date, datetime" + NL,
+                "from datetime import date, datetime" + NL + "from decimal import Decimal" + NL,
+            ),
+            Sunting(
+                f"{MODUL}/checkins/schemas.py",
+                "    sleep_hours: float | None",
+                "    sleep_hours: Decimal | None",
+            ),
+        ],
+        _pytest(f"{UJI_KETAT}::test_jam_tidur_angka_json_masuk_dan_keluar"),
+        harus_memuat="'7.5' == 7.5",
+        kelompok="db",
+    ),
+    # ── E-171 Idempotency-Key: rujukan, kuota, sf-string · batas badan ────────
+    Mutasi(
+        "E-171",
+        "badan jawaban utuh disimpan di Redis lagi (S1 · S3)",
+        [
+            Sunting(
+                f"{MODUL}/platform/idempotensi.py",
+                '            rujukan = {"s": self._sidik, "st": hasil.status, "id": str(hasil.rujukan)}',
+                '            rujukan = {"s": self._sidik, "st": hasil.status, "id": str(hasil.rujukan),'
+                ' "badan": jsonable_encoder(hasil.isi)}',
+            )
+        ],
+        _pytest(f"{UJI_IDEM}::test_redis_hanya_menyimpan_rujukan_tanpa_isi_tulisan"),
+        harus_memuat="Rahasia",
+        kelompok="db",
+    ),
+    Mutasi(
+        "E-171",
+        "kuota kunci per pengguna tidak ditegakkan",
+        [
+            Sunting(
+                f"{MODUL}/platform/idempotensi.py",
+                "if n > tonumber(ARGV[3]) then",
+                "if false then",
+            )
+        ],
+        _pytest(f"{UJI_IDEM}::test_kuota_kunci_per_pengguna_429_dan_ulangan_tetap_jalan"),
+        harus_memuat="kuota kunci tidak ditegakkan",
+        kelompok="db",
+    ),
+    Mutasi(
+        "E-171",
+        "ulangan kunci lama ikut memakai kuota — tulisan yang sudah terjadi ditolak 429",
+        [
+            Sunting(
+                f"{MODUL}/platform/idempotensi.py",
+                "local ada = redis.call('GET', KEYS[1])" + NL + "if ada then" + NL,
+                "local ada = redis.call('GET', KEYS[1])"
+                + NL
+                + "local n0 = redis.call('INCR', KEYS[2])"
+                + NL
+                + "if ada and n0 <= tonumber(ARGV[3]) then"
+                + NL,
+            )
+        ],
+        _pytest(f"{UJI_IDEM}::test_kuota_kunci_per_pengguna_429_dan_ulangan_tetap_jalan"),
+        harus_memuat="ulangan kunci LAMA ikut terhitung kuota",
+        kelompok="db",
+    ),
+    Mutasi(
+        "E-171",
+        "kunci sf-string bertanda kutip tidak dinormalkan (F12)",
+        [
+            Sunting(
+                f"{MODUL}/platform/idempotensi.py",
+                "    if kunci is not None and len(kunci) >= 2 and kunci[0] == kunci[-1] == '\"':",
+                "    if False:",
+            )
+        ],
+        _pytest(f"{UJI_IDEM}::test_kunci_sf_string_bertanda_kutip_sama_dengan_telanjang"),
+        harus_memuat="kunci bertanda kutip dan telanjang dianggap kunci berbeda",
+        kelompok="db",
+    ),
+    Mutasi(
+        "E-171",
+        "RecursionError JSON bersarang tidak ditangkap saat menyidik — 500",
+        [
+            Sunting(
+                f"{MODUL}/platform/idempotensi.py",
+                "    except (ValueError, UnicodeDecodeError, RecursionError):",
+                "    except (ValueError, UnicodeDecodeError):",
+            )
+        ],
+        _pytest(f"{UJI_IDEM}::test_badan_bersarang_dalam_bukan_json_tidak_500"),
+        harus_memuat="badan bersarang dalam dijawab 500",
+        kelompok="db",
+    ),
+    Mutasi(
+        "E-171",
+        "batas ukuran badan tidak dipasang titik rakit — 1 MiB+ dibaca sebelum autentikasi",
+        [
+            Sunting(
+                "apps/api/src/hvx/main.py",
+                "    app.add_middleware(platform.BatasBadanMiddleware)" + NL,
+                "",
+            )
+        ],
+        _pytest(f"{UJI_KETAT}::test_badan_terlalu_besar_413_sebelum_autentikasi"),
+        harus_memuat="badan 1 MiB+ tidak ditolak 413",
+        kelompok="db",
+    ),
+    Mutasi(
+        "E-171",
+        "badan chunked tidak dihitung — batas ukuran dilewati tanpa Content-Length",
+        [
+            Sunting(
+                f"{MODUL}/platform/batas_badan.py",
+                "            if terbaca > self.maks:",
+                "            if False:",
+            )
+        ],
+        _pytest(f"{UJI_BADAN}::test_chunked_di_atas_batas_413"),
+        harus_memuat="badan chunked di atas batas dijawab",
+    ),
+    Mutasi(
+        "E-171",
+        "rute menyatakan Idempotency-Key tetapi tidak memanggil jalankan (D4)",
+        [
+            Sunting(
+                f"{MODUL}/goals/routes.py",
+                "    return await idem.jalankan("
+                + NL
+                + "        pengguna.user_id, kerja, partial(service.baca_goal, engine, pengguna.user_id)"
+                + NL
+                + "    )"
+                + NL
+                + NL
+                + NL
+                + '@router.get("/goals/{goal_id}"',
+                "    hasil = await kerja()"
+                + NL
+                + "    return JSONResponse(status_code=hasil.status, content=hasil.isi.model_dump(mode='json'))"
+                + NL
+                + NL
+                + NL
+                + '@router.get("/goals/{goal_id}"',
+            )
+        ],
+        _pytest(f"{UJI_IDEM_RUTE}::test_rute_yang_menyatakan_idempotensi_juga_memanggil_jalankan"),
+        harus_memuat="rute menyatakan Idempotency-Key tanpa memanggil jalankan",
+    ),
+    # ── E-172 balapan & batas (F1 · F2 · F9 · F13 · S2) ────────────────────────
+    Mutasi(
+        "E-172",
+        "induk/goal tidak dikunci FOR SHARE — anak yang dibuat serentak dengan hapus induk yatim",
+        [
+            Sunting(
+                f"{MODUL}/goals/repository.py",
+                '_KUNCI_HIDUP = text("SELECT id FROM goals WHERE id = :id AND deleted_at IS NULL FOR SHARE")',
+                '_KUNCI_HIDUP = text("SELECT id FROM goals WHERE id = :id AND deleted_at IS NULL")',
+            )
+        ],
+        _pytest(f"{UJI_BALAPAN}::test_anak_yang_dibuat_serentak_dengan_hapus_induk_tidak_yatim"),
+        harus_memuat="goal hidup berinduk goal terhapus",
+        kelompok="db",
+    ),
+    Mutasi(
+        "E-172",
+        "habit menaut goal tanpa memeriksa hidupnya — FK tidak melihat hapus-lunak (F2)",
+        [
+            Sunting(
+                f"{MODUL}/habits/service.py",
+                "            if badan.goal_id is not None and not await goal_hidup(conn, badan.goal_id):",
+                "            if False:",
+            )
+        ],
+        _pytest(
+            f"{UJI_BALAPAN}::test_goal_terhapus_tidak_bisa_ditaut_dan_hapus_goal_melepas_habitnya"
+        ),
+        harus_memuat="habit baru ditaut ke goal yang sudah dihapus",
+        kelompok="db",
+    ),
+    Mutasi(
+        "E-172",
+        "hapus goal tidak melepas habit yang menautnya (K-23)",
+        [
+            Sunting(
+                "apps/api/src/hvx/main.py",
+                "    app.state.pendengar_goal_dihapus = (habits.lepas_goal,)",
+                "    app.state.pendengar_goal_dihapus = ()",
+            )
+        ],
+        _pytest("tests/unit/test_main.py::test_titik_rakit_memasang_pembaca_lintas_modul"),
+        harus_memuat="hapus goal tidak melepas habit yang menautnya",
+    ),
+    Mutasi(
+        "E-172",
+        "batas goal per pengguna tidak ditegakkan (K-24)",
+        [
+            Sunting(
+                f"{MODUL}/goals/service.py",
+                "            if await repository.jumlah_goal_serial(conn, user_id) >= MAKS_GOAL:",
+                "            if False:",
+            )
+        ],
+        _pytest(f"{UJI_BALAPAN}::test_batas_goal_per_pengguna_ditegakkan_serial"),
+        harus_memuat="batas goal dilewati",
+        kelompok="db",
+    ),
+    Mutasi(
+        "E-172",
+        "batas habit dihitung tanpa kunci — tulisan serentak bersama melewatinya (F9)",
+        [
+            Sunting(
+                f"{MODUL}/habits/repository.py",
+                '    await conn.execute(_KUNCI_HITUNG, {"kunci": f"habits:{user_id}"})' + NL,
+                "",
+            )
+        ],
+        _pytest(f"{UJI_BALAPAN}::test_batas_habit_per_pengguna_dan_daftar_tidak_terpotong"),
+        harus_memuat="batas habit dilewati",
+        kelompok="db",
+    ),
+    Mutasi(
+        "E-172",
+        "batas milestone per goal tidak ditegakkan",
+        [
+            Sunting(
+                f"{MODUL}/goals/service.py",
+                "            if await repository.jumlah_milestone_serial(conn, goal_id) >= MAKS_MILESTONE:",
+                "            if False:",
+            )
+        ],
+        _pytest(f"{UJI_BALAPAN}::test_batas_milestone_per_goal"),
+        harus_memuat="batas milestone dilewati",
+        kelompok="db",
+    ),
+    Mutasi(
+        "E-172",
+        "id milestone buatan klien diabaikan (F13)",
+        [
+            Sunting(
+                f"{MODUL}/goals/repository.py",
+                "    SELECT COALESCE(CAST(:id AS uuid), gen_random_uuid()), g.id, g.user_id, :title,",
+                "    SELECT gen_random_uuid(), g.id, g.user_id, :title,",
+            )
+        ],
+        _pytest(f"{UJI_BALAPAN}::test_milestone_dengan_id_buatan_klien_dan_id_sama_409"),
+        harus_memuat="id milestone buatan klien diabaikan",
+        kelompok="db",
+    ),
+    # ── E-173 arti rentetan & kirim ulang (F3 · F7 · F8) ──────────────────────
+    Mutasi(
+        "E-173",
+        "skipped diabaikan pada habit mingguan — minggu yang dimaafkan memutus (F7)",
+        [
+            Sunting(
+                f"{MODUL}/habits/rentetan.py",
+                "            if maaf_per_periode[p] and penuh + maaf_per_periode[p] >= target_count:",
+                "            if False:",
+            )
+        ],
+        _pytest(
+            "tests/unit/test_rentetan_murni.py"
+            "::test_mingguan_skipped_memaafkan_satu_kali_dan_tidak_memutus"
+        ),
+        harus_memuat="skipped memutus rentetan mingguan",
+    ),
+    Mutasi(
+        "E-173",
+        "hari sebelum habit dibuat masuk penyebut sebagai gagal (F8)",
+        [
+            Sunting(
+                f"{MODUL}/habits/rentetan.py",
+                '        elif k == "kosong" and p >= mulai:',
+                '        elif k == "kosong":',
+            )
+        ],
+        _pytest(
+            "tests/unit/test_rentetan_murni.py"
+            "::test_tingkat_hari_sebelum_habit_dibuat_hanya_dihitung_bila_terpenuhi"
+        ),
+        harus_memuat="hari sebelum habit ada dihitung gagal",
+    ),
+    Mutasi(
+        "E-173",
+        "tier diperiksa sebelum baris lama dicari — kirim ulang ditolak 422 (F3)",
+        [
+            Sunting(
+                f"{MODUL}/habits/service.py",
+                "        ada = await repository.selesai_pada(conn, habit_id, badan.for_date)"
+                + NL
+                + "        if ada is not None:"
+                + NL
+                + "            return HasilCatat(ada, baru=False)"
+                + NL
+                + "        if badan.tier_used",
+                "        if badan.tier_used",
+            )
+        ],
+        _pytest(
+            f"{UJI_BALAPAN}::test_kirim_ulang_sesudah_tier_habit_dikurangi_tetap_200_baris_lama"
+        ),
+        harus_memuat="kirim ulang sesudah tier dikurangi",
+        kelompok="db",
+    ),
+    # ── E-174 galat validasi · kursor · zona waktu ───────────────────────────
+    Mutasi(
+        "E-174",
+        "pesan galat pydantic diteruskan apa adanya — uuid_parsing mengutip masukan",
+        [
+            Sunting(
+                f"{MODUL}/platform/galat.py",
+                '                "msg": g.get("msg") if jenis in _PESAN_AMAN else _PESAN_TETAP,',
+                '                "msg": g.get("msg"),',
+            )
+        ],
+        _pytest("tests/unit/test_galat.py::test_uuid_salah_tidak_mengutip_karakter_masukan"),
+        harus_memuat="pesan galat mengutip masukan",
+    ),
+    Mutasi(
+        "E-174",
+        "loc galat memuat nama kunci dari klien",
+        [
+            Sunting(
+                f"{MODUL}/platform/galat.py",
+                '            bagian if isinstance(bagian, int) or bagian in dikenal else "*"',
+                "            bagian",
+            )
+        ],
+        _pytest("tests/unit/test_galat.py::test_kunci_tak_dikenal_tidak_dipantulkan_di_loc"),
+        harus_memuat="loc galat memantulkan nama kunci dari klien",
+    ),
+    Mutasi(
+        "E-174",
+        "bentuk kursor tidak diperiksa — id angka menjadi AttributeError 500",
+        [
+            Sunting(
+                f"{MODUL}/platform/halaman.py",
+                "    if not (isinstance(isi, list) and len(isi) == 3 and all(isinstance(x, str) for x in isi)):",
+                "    if not isinstance(isi, list) or len(isi) != 3:",
+            )
+        ],
+        _pytest("tests/unit/test_halaman.py::test_kursor_rusak_menjadi_galat_400"),
+        harus_memuat="AttributeError",
+    ),
+    Mutasi(
+        "E-174",
+        "kursor daftar lain diterima (D5)",
+        [Sunting(f"{MODUL}/platform/halaman.py", "    if jenis_kursor != jenis:", "    if False:")],
+        _pytest("tests/unit/test_halaman.py::test_kursor_daftar_lain_ditolak"),
+        harus_memuat="DID NOT RAISE",
+    ),
+    Mutasi(
+        "E-174",
+        "zona semu `Factory` diterima sebagai zona waktu pengguna",
+        [
+            Sunting(
+                f"{MODUL}/platform/zona_waktu.py",
+                "    return frozenset(daftar.split()) - _BUKAN_ZONA_PENGGUNA",
+                "    return frozenset(daftar.split())",
+            )
+        ],
+        _pytest(
+            "tests/unit/test_zona_waktu.py"
+            "::test_bukan_nama_iana_ditolak_tanpa_memantulkan_masukan[Factory]"
+        ),
+        harus_memuat="DID NOT RAISE",
+    ),
+    # ── E-175 klien Flutter (S4 · S8/F19 · D5) ─────────────────────────────────
+    Mutasi(
+        "E-175",
+        "penyegaran token per permintaan — 401 serentak memakai token segar yang sudah dirotasi",
+        [
+            Sunting(
+                f"{APLIKASI}/lib/api/klien.dart",
+                "      _penyegaran ??= _segarkanSekali().whenComplete(() => _penyegaran = null);",
+                "      _segarkanSekali();",
+            )
+        ],
+        _flutter_uji("test/api/klien_test.dart", _UJI_SERENTAK),
+        harus_memuat=_UJI_SERENTAK + " [E]",
+        cwd=APLIKASI,
+    ),
+    Mutasi(
+        "E-175",
+        "dialog membuat id habit baru tiap ketukan Simpan — coba lagi membuat habit kedua",
+        [
+            Sunting(
+                f"{APLIKASI}/lib/layar/habit_hari_ini.dart",
+                "        id: _idUntuk(jsonEncode(isi)),",
+                "        id: idBaru() + jsonEncode(isi).substring(0, 0),",
+            )
+        ],
+        _flutter_uji("test/layar/habit_hari_ini_test.dart", _UJI_DIALOG_ID),
+        harus_memuat=_UJI_DIALOG_ID + " [E]",
+        cwd=APLIKASI,
+    ),
+    Mutasi(
+        "E-175",
+        "habit yang dilewati diketuk → POST done yang tidak mengubah apa pun (D5)",
+        [
+            Sunting(
+                f"{APLIKASI}/lib/layar/habit_hari_ini.dart",
+                "    if (h.tercatatHariItu) {",
+                "    if (h.selesaiHariItu) {",
+            )
+        ],
+        _flutter_uji("test/layar/habit_hari_ini_test.dart", _UJI_DILEWATI),
+        harus_memuat=_UJI_DILEWATI + " [E]",
+        cwd=APLIKASI,
+    ),
+    # ── E-176 kontrak kecil (F11) ─────────────────────────────────────────────
+    Mutasi(
+        "E-176",
+        "PUT check-in identik menulis ulang baris — updated_at bergeser (F11)",
+        [
+            Sunting(
+                f"{MODUL}/checkins/repository.py",
+                "    WHERE (daily_checkins.energy, daily_checkins.focus, daily_checkins.sleep_hours,"
+                + NL
+                + "           daily_checkins.note)"
+                + NL
+                + "          IS DISTINCT FROM (EXCLUDED.energy, EXCLUDED.focus, EXCLUDED.sleep_hours,"
+                + NL
+                + "                            EXCLUDED.note)"
+                + NL,
+                "",
+            )
+        ],
+        _pytest(f"{UJI_CHECKIN}::test_put_identik_tidak_menulis_ulang_baris"),
+        harus_memuat="PUT identik menggeser updated_at",
+        kelompok="db",
     ),
 ]
 

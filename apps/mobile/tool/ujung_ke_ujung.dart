@@ -47,6 +47,7 @@ Future<void> main(List<String> argumen) async {
   _pastikan(checkin?.energi == 2, 'check-in energi 2 tersimpan untuk $hariIni');
 
   final habit = await klien.buatHabit(
+    id: idBaru(),
     judul: 'Workout',
     periode: 'day',
     target: 1,

@@ -1,5 +1,22 @@
 // Bentuk data API V0 — spec/04. Hanya medan yang dipakai layar; medan lain
 // diabaikan (spec/03 aturan 3: pembaca mengabaikan medan yang tidak dikenalnya).
+import 'dart:math';
+
+/// UUID v4 buatan klien — spec/04: klien boleh membuat id sendiri (dukungan luring).
+///
+/// Id yang dibuat SEKALI per tindakan dan dipakai ulang di tiap percobaan
+/// tindakan itu membuat "coba lagi" sesudah jaringan putus aman: server yang
+/// sudah menerima percobaan pertama memutar ulang jawabannya, bukan membuat
+/// habit kedua (tinjauan Sprint 2).
+String idBaru([Random? acak]) {
+  final r = acak ?? Random.secure();
+  final b = List<int>.generate(16, (_) => r.nextInt(256));
+  b[6] = (b[6] & 0x0f) | 0x40; // versi 4
+  b[8] = (b[8] & 0x3f) | 0x80; // varian RFC 4122
+  final hex = b.map((x) => x.toRadixString(16).padLeft(2, '0')).join();
+  return '${hex.substring(0, 8)}-${hex.substring(8, 12)}-'
+      '${hex.substring(12, 16)}-${hex.substring(16, 20)}-${hex.substring(20)}';
+}
 
 /// Tanggal LOKAL perangkat sebagai `YYYY-MM-DD` (spec/04: tanggal lokal pengguna).
 ///
@@ -118,6 +135,13 @@ class Habit {
   final HariHabit? hari;
 
   bool get selesaiHariItu => hari?.penyelesaian?.dijalankan ?? false;
+
+  /// Tanggal itu sudah punya catatan APA PUN — termasuk `skipped`. Mengganti
+  /// status = batalkan lalu catat lagi (spec/04): `POST` ke tanggal yang sudah
+  /// tercatat mengembalikan baris lama, bukan menggantinya.
+  bool get tercatatHariItu => hari?.penyelesaian != null;
+
+  bool get dilewatiHariItu => hari?.penyelesaian?.status == 'skipped';
 }
 
 class Checkin {
@@ -133,22 +157,22 @@ class Checkin {
     forDate: json['for_date'] as String,
     energi: json['energy'] as int?,
     fokus: json['focus'] as int?,
-    // numeric → JSON sebagai string desimal (pydantic Decimal)
-    jamTidur: json['sleep_hours']?.toString(),
+    // spec/04: angka JSON (E-170 — dulu string desimal "7.5").
+    jamTidur: (json['sleep_hours'] as num?)?.toDouble(),
     catatan: json['note'] as String?,
   );
 
   final String forDate;
   final int? energi;
   final int? fokus;
-  final String? jamTidur;
+  final double? jamTidur;
   final String? catatan;
 
   /// Badan `PUT` — PUT = GANTI (spec/04): medan lama ikut dikirim supaya tidak hilang.
   Map<String, dynamic> keJsonDenganEnergi(int energiBaru) => {
     'energy': energiBaru,
     if (fokus != null) 'focus': fokus,
-    if (jamTidur != null) 'sleep_hours': double.parse(jamTidur!),
+    'sleep_hours': ?jamTidur,
     if (catatan != null) 'note': catatan,
   };
 }

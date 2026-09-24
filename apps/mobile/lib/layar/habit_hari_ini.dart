@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 
 import '../api/klien.dart';
@@ -88,7 +90,11 @@ class _LayarHabitHariIniState extends State<LayarHabitHariIni> {
   }
 
   Future<void> _ketuk(Habit h) async {
-    if (h.selesaiHariItu) {
+    // Catatan APA PUN — termasuk `skipped` dari perangkat lain — dibatalkan
+    // dulu: POST ke tanggal yang sudah tercatat mengembalikan baris lama, dan
+    // layar yang mengirim "done" untuk habit yang dilewati tidak berubah apa-apa
+    // (tinjauan kontrak Sprint 2, D5).
+    if (h.tercatatHariItu) {
       return _ubah(h.id, () => widget.layanan.batalkanSelesai(h.id, _tanggal));
     }
     int? tier;
@@ -165,6 +171,7 @@ class _LayarHabitHariIniState extends State<LayarHabitHariIni> {
   String? _keterangan(Habit h) {
     final hari = h.hari;
     final selesai = hari?.penyelesaian;
+    if (h.dilewatiHariItu) return 'Dilewati hari ini — ketuk untuk membatalkan';
     if (selesai != null && selesai.dijalankan) {
       final t = selesai.tierDipakai;
       return t != null && t < h.tier.length
@@ -258,7 +265,9 @@ class _LayarHabitHariIniState extends State<LayarHabitHariIni> {
               for (final h in _habit)
                 CheckboxListTile(
                   key: Key('habit-${h.id}'),
-                  value: h.selesaiHariItu,
+                  // `skipped` bukan selesai dan bukan belum: tanda setrip.
+                  tristate: true,
+                  value: h.dilewatiHariItu ? null : h.selesaiHariItu,
                   onChanged: _sedangDiubah.contains(h.id)
                       ? null
                       : (_) => _ketuk(h),
@@ -289,6 +298,19 @@ class _DialogTambahHabitState extends State<_DialogTambahHabit> {
   int _target = 1;
   bool _sibuk = false;
   String? _galat;
+  // Satu tindakan = satu id: "Simpan" yang diketuk lagi dengan isian yang SAMA
+  // (sesudah jaringan putus) mengirim id yang sama; isian yang diubah adalah
+  // tindakan baru → id baru.
+  String? _id;
+  String? _isiTerakhir;
+
+  String _idUntuk(String isi) {
+    if (isi != _isiTerakhir || _id == null) {
+      _isiTerakhir = isi;
+      _id = idBaru();
+    }
+    return _id!;
+  }
 
   @override
   void dispose() {
@@ -312,14 +334,23 @@ class _DialogTambahHabitState extends State<_DialogTambahHabit> {
       _galat = null;
     });
     try {
+      final target = _periode == 'day' ? 1 : _target;
+      final isi = [judul, _periode, target, ...tier.map((t) => t.label)];
       await widget.layanan.buatHabit(
+        id: _idUntuk(jsonEncode(isi)),
         judul: judul,
         periode: _periode,
-        target: _periode == 'day' ? 1 : _target,
+        target: target,
         tier: tier,
       );
       if (mounted) Navigator.of(context).pop(true);
     } on GalatApi catch (g) {
+      if (g.kode == 'already_exists') {
+        // Percobaan sebelumnya SAMPAI (lebih dari 24 jam lalu, atau kuncinya
+        // sudah dilupakan server): habit ini sudah ada — itu berhasil.
+        if (mounted) Navigator.of(context).pop(true);
+        return;
+      }
       setState(() => _galat = g.pesan);
     } on Exception {
       setState(() => _galat = 'Server tidak terjangkau. Coba lagi.');

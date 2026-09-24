@@ -76,9 +76,15 @@ def create_app(settings: platform.Settings | None = None) -> FastAPI:
     app.state.pembaca_zona_waktu = profile.zona_waktu
     # …dan energi check-in untuk tier habit yang disarankan (spec/07 2.2, naskah 4 §34).
     app.state.pembaca_energi = checkins.energi_pada
+    # …dan goal yang HIDUP saat habit menautnya (FK tidak melihat hapus-lunak);
+    # goal yang dihapus melepas habit yang menautnya, di transaksi hapus yang sama.
+    app.state.pembaca_goal_hidup = goals.kunci_goal_hidup
+    app.state.pendengar_goal_dihapus = (habits.lepas_goal,)
     platform.pasang_penangan_galat(app)
     # Yang ditambahkan TERAKHIR paling luar: 429 batas laju tetap membawa
-    # X-Request-ID dan tercatat di baris `request.completed`.
+    # X-Request-ID dan tercatat di baris `request.completed`. Batas ukuran badan
+    # di DALAM batas laju — banjir permintaan ditolak sebelum badannya dibaca.
+    app.add_middleware(platform.BatasBadanMiddleware)
     app.add_middleware(platform.BatasLajuIpMiddleware)
     app.add_middleware(platform.RequestContextMiddleware)
     if settings.asal_cors:

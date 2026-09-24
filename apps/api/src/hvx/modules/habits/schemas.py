@@ -47,7 +47,7 @@ class Jadwal(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    weekdays: list[Annotated[int, Field(ge=1, le=7)]] | None = Field(
+    weekdays: list[Annotated[platform.Bulat, Field(ge=1, le=7)]] | None = Field(
         default=None, min_length=1, max_length=7
     )
     time: str | None = Field(default=None, pattern=r"^([01][0-9]|2[0-3]):[0-5][0-9]$")
@@ -66,7 +66,7 @@ class Tier(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     label: Annotated[platform.TeksBerisi, Field(min_length=1, max_length=100)]
-    minutes: int | None = Field(default=None, ge=1, le=1440)
+    minutes: platform.Bulat | None = Field(default=None, ge=1, le=1440)
 
 
 class Habit(BaseModel):
@@ -92,7 +92,7 @@ class BuatHabit(BaseModel):
     id: UUID | None = None
     title: Judul
     period: Periode
-    target_count: int
+    target_count: platform.Bulat
     schedule: Jadwal = Field(default_factory=Jadwal)
     goal_id: UUID | None = None
     adaptive_tiers: list[Tier] = Field(default_factory=list, max_length=TIER_MAKS)
@@ -112,7 +112,7 @@ class UbahHabit(BaseModel):
 
     title: Judul | None = None
     period: Periode | None = None
-    target_count: int | None = None
+    target_count: platform.Bulat | None = None
     schedule: Jadwal | None = None
     goal_id: UUID | None = None  # null = lepas dari goal
     adaptive_tiers: list[Tier] | None = Field(default=None, max_length=TIER_MAKS)
@@ -150,9 +150,11 @@ class CatatPenyelesaian(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    for_date: date
+    for_date: platform.Tanggal
     status: StatusSelesai
-    tier_used: int | None = Field(default=None, ge=0, le=TIER_MAKS - 1)
+    # Tanpa batas atas di sini: tier di luar adaptive_tiers habit-nya SELALU
+    # `422 invalid_tier` (spec/04) — bukan 400 untuk 7 dan 422 untuk 3 (E-170).
+    tier_used: platform.Bulat | None = Field(default=None, ge=0)
     note: Catatan | None = None
 
     @model_validator(mode="after")

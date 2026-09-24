@@ -39,7 +39,7 @@ class PersetujuanPelatihan(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    granted: bool = False
+    granted: platform.Benar = False
     data_scopes: list[Annotated[str, Field(pattern=_POLA_SNAKE)]] = Field(
         default_factory=list, max_length=32
     )
@@ -55,8 +55,8 @@ class PersetujuanPendaftaran(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     policy_version: platform.TeksTanpaNul = Field(min_length=1, max_length=64)
-    terms: bool
-    privacy: bool
+    terms: platform.Benar
+    privacy: platform.Benar
     model_training: PersetujuanPelatihan = Field(default_factory=PersetujuanPelatihan)
 
 

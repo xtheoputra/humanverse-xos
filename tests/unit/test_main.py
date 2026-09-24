@@ -44,7 +44,7 @@ def test_titik_rakit_memasang_pembaca_lintas_modul() -> None:
     Rute rentetan MENOLAK berjalan tanpa pembaca ini (bukan jatuh ke UTC diam-diam),
     jadi titik rakit yang lupa memasangnya akan terlihat di sini dulu.
     """
-    from hvx.modules import checkins, profile
+    from hvx.modules import checkins, goals, habits, profile
 
     app = _app("test")
     assert getattr(app.state, "pembaca_zona_waktu", None) is profile.zona_waktu, (
@@ -52,4 +52,11 @@ def test_titik_rakit_memasang_pembaca_lintas_modul() -> None:
     )
     assert getattr(app.state, "pembaca_energi", None) is checkins.energi_pada, (
         "hvx.main tidak memasang pembaca_energi dari checkins"
+    )
+    # Tinjauan kontrak Sprint 2 (F2): FK tidak melihat hapus-lunak goal.
+    assert getattr(app.state, "pembaca_goal_hidup", None) is goals.kunci_goal_hidup, (
+        "hvx.main tidak memasang pembaca_goal_hidup dari goals"
+    )
+    assert habits.lepas_goal in getattr(app.state, "pendengar_goal_dihapus", ()), (
+        "hapus goal tidak melepas habit yang menautnya"
     )

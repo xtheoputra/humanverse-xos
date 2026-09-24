@@ -93,8 +93,10 @@ async def test_kunci_yang_sama_milik_dua_pengguna_tidak_saling_memutar_ulang(
         "/v1/goals", json={"title": "Sama"}, headers=_kunci(api_bersama, token_b, "bersama")
     )
 
-    assert ra.status_code == rb.status_code == 201
+    # Dulu jawaban A yang diputar ulang (isinya tersimpan); kini rujukannya dibaca ulang
+    # di bawah RLS B — tetap salah (404 untuk tulisan yang tidak pernah B buat).
     assert "Idempotent-Replayed" not in rb.headers, "jawaban pengguna A diputar ulang untuk B"
+    assert ra.status_code == rb.status_code == 201
     assert ra.json()["id"] != rb.json()["id"]
     assert _jumlah_goal(api_bersama, a) == _jumlah_goal(api_bersama, b) == 1
 
@@ -131,8 +133,8 @@ async def test_galat_tidak_disimpan_sebagai_jawaban(api_bersama: ApiUji) -> None
         "/v1/goals", json={"title": "X", "parent_id": induk_hilang}, headers=h
     )
 
-    assert pertama.status_code == kedua.status_code == 422
     assert "Idempotent-Replayed" not in kedua.headers, "galat disimpan sebagai jawaban"
+    assert pertama.status_code == kedua.status_code == 422
 
 
 @pytest.mark.parametrize("kunci", ["", "a b", "x" * 129, "k/garis-miring"])
@@ -146,3 +148,129 @@ async def test_kunci_berbentuk_salah_400(api_bersama: ApiUji, kunci: str) -> Non
     )
 
     assert r.status_code == 400, r.text
+
+
+# ── Tinjauan keamanan Sprint 2 (E-171): rujukan, bukan isi — dan berkuota ─────
+
+
+async def _nilai_redis(api: ApiUji, user_id: Any) -> list[str]:
+    r = api.app.state.redis
+    kunci = [k async for k in r.scan_iter(match=f"{api.awalan_redis}:idem:{user_id}:*")]
+    return [await r.get(k) for k in kunci]
+
+
+async def test_redis_hanya_menyimpan_rujukan_tanpa_isi_tulisan(api_bersama: ApiUji) -> None:
+    """Dulu badan jawaban utuh disimpan 24 jam — ~5 KiB per permintaan 19 byte, dan
+    catatan pengguna yang tinggal di Redis sesudah hapus-keras."""
+    uid, token = await api_bersama.pengguna_baru()
+    rahasia = "catatan-pribadi-" + "x" * 3000
+
+    r = await api_bersama.klien.post(
+        "/v1/goals",
+        json={"title": "Rahasia", "description": rahasia},
+        headers=_kunci(api_bersama, token, "rujukan-saja"),
+    )
+    nilai = await _nilai_redis(api_bersama, uid)
+
+    assert r.status_code == 201, r.text
+    assert len(nilai) == 1
+    assert "Rahasia" not in nilai[0]
+    assert "catatan-pribadi" not in nilai[0]
+    assert len(nilai[0]) < 200, f"yang disimpan {len(nilai[0])} byte — bukan rujukan"
+
+
+async def test_ulangan_membaca_ulang_keadaan_sekarang(api_bersama: ApiUji) -> None:
+    _uid, token = await api_bersama.pengguna_baru()
+    h = _kunci(api_bersama, token, "baca-ulang")
+    k = api_bersama.klien
+
+    pertama = await k.post("/v1/goals", json={"title": "Awal"}, headers=h)
+    goal_id = pertama.json()["id"]
+    await k.patch(f"/v1/goals/{goal_id}", json={"title": "Sesudah"}, headers=auth(token))
+    ulang = await k.post("/v1/goals", json={"title": "Awal"}, headers=h)
+
+    assert ulang.status_code == 201
+    assert ulang.headers.get("Idempotent-Replayed") == "true"
+    assert ulang.json()["id"] == goal_id
+    assert ulang.json()["title"] == "Sesudah", "ulangan memutar isi lama yang tersimpan"
+
+
+async def test_ulangan_sesudah_sumber_dayanya_dihapus_404(api_bersama: ApiUji) -> None:
+    _uid, token = await api_bersama.pengguna_baru()
+    h = _kunci(api_bersama, token, "sudah-dihapus")
+    k = api_bersama.klien
+
+    pertama = await k.post("/v1/goals", json={"title": "Hilang"}, headers=h)
+    await k.delete(f"/v1/goals/{pertama.json()['id']}", headers=auth(token))
+    ulang = await k.post("/v1/goals", json={"title": "Hilang"}, headers=h)
+
+    assert ulang.status_code == 404, ulang.text
+    assert ulang.headers.get("Idempotent-Replayed") == "true"
+
+
+async def test_kuota_kunci_per_pengguna_429_dan_ulangan_tetap_jalan(api_bersama: ApiUji) -> None:
+    """Batas laju per pengguna 300/60 = 432 ribu tulisan sehari; tanpa kuota, tiap
+    tulisan berkunci satu entri Redis 24 jam (Redis `noeviction`, bersama sesi)."""
+    from hvx.modules.platform import KUOTA_KUNCI
+
+    uid, token = await api_bersama.pengguna_baru()
+    k = api_bersama.klien
+    lama = await k.post("/v1/goals", json={"title": "L"}, headers=_kunci(api_bersama, token, "l"))
+    r = api_bersama.app.state.redis
+    await r.set(f"{api_bersama.awalan_redis}:idem-kuota:{uid}", KUOTA_KUNCI, ex=3600)
+
+    baru = await k.post("/v1/goals", json={"title": "B"}, headers=_kunci(api_bersama, token, "b"))
+    ulang = await k.post("/v1/goals", json={"title": "L"}, headers=_kunci(api_bersama, token, "l"))
+    tanpa_kunci = await k.post("/v1/goals", json={"title": "T"}, headers=auth(token))
+
+    assert lama.status_code == 201
+    assert baru.status_code == 429, f"kuota kunci tidak ditegakkan: {baru.status_code}"
+    assert baru.json()["error"]["code"] == "rate_limited"
+    assert 3000 < int(baru.headers["Retry-After"]) <= 3600
+    assert ulang.status_code == 201, "ulangan kunci LAMA ikut terhitung kuota"
+    assert ulang.headers.get("Idempotent-Replayed") == "true"
+    assert tanpa_kunci.status_code == 201
+    assert _jumlah_goal(api_bersama, uid) == 2
+
+
+async def test_kunci_sf_string_bertanda_kutip_sama_dengan_telanjang(api_bersama: ApiUji) -> None:
+    """Draf IETF: `Idempotency-Key: "8e03978e-…"` (sf-string) — dulu 400."""
+    uid, token = await api_bersama.pengguna_baru()
+    k = api_bersama.klien
+
+    kutip = await k.post(
+        "/v1/goals", json={"title": "Q"}, headers=_kunci(api_bersama, token, '"8e03978e-40d5"')
+    )
+    telanjang = await k.post(
+        "/v1/goals", json={"title": "Q"}, headers=_kunci(api_bersama, token, "8e03978e-40d5")
+    )
+
+    assert kutip.status_code == telanjang.status_code == 201, kutip.text
+    assert telanjang.headers.get("Idempotent-Replayed") == "true", (
+        "kunci bertanda kutip dan telanjang dianggap kunci berbeda"
+    )
+    assert _jumlah_goal(api_bersama, uid) == 1
+
+
+@pytest.mark.parametrize("kunci", ['"', '""', '"a', 'a"', '"a"b"'])
+async def test_kutip_yang_tidak_seimbang_400(api_bersama: ApiUji, kunci: str) -> None:
+    _uid, token = await api_bersama.pengguna_baru()
+
+    r = await api_bersama.klien.post(
+        "/v1/goals", json={"title": "X"}, headers=_kunci(api_bersama, token, kunci)
+    )
+
+    assert r.status_code == 400, r.text
+
+
+async def test_badan_bersarang_dalam_bukan_json_tidak_500(api_bersama: ApiUji) -> None:
+    """`json.loads` melempar RecursionError, bukan ValueError — dulu 500 (tinjauan keamanan)."""
+    _uid, token = await api_bersama.pengguna_baru()
+
+    r = await api_bersama.klien.post(
+        "/v1/goals",
+        content=b"[" * 100_000,
+        headers={**_kunci(api_bersama, token, "dalam"), "Content-Type": "text/plain"},
+    )
+
+    assert r.status_code == 400, f"badan bersarang dalam dijawab {r.status_code}"

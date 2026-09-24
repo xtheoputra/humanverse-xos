@@ -43,7 +43,7 @@ di fase berikutnya.
 |---|---|
 | Nama tabel | `snake_case`, **jamak** |
 | Kunci utama | `id uuid PRIMARY KEY DEFAULT gen_random_uuid()` |
-| Waktu | `timestamptz`, disimpan UTC. Kolom tanggal lokal pengguna pakai `date` + `profiles.timezone` |
+| Waktu | `timestamptz`, disimpan UTC. Kolom tanggal lokal pengguna (`for_date`) pakai `date`: tanggal lokal **perangkat** saat hal itu terjadi — tidak pernah diturunkan dari cap waktu UTC, dan **tidak** dari `profiles.timezone` (perangkat yang bepergian bisa berada di zona lain). `profiles.timezone` menjawab *“hari ini”* pengguna — rentetan 2.4 (🔧 E-176: semula *“`date` + `profiles.timezone`”*, terbaca seolah tanggalnya dihitung dari zona profil) |
 | Jejak baris | setiap tabel punya `created_at`, dan `updated_at` bila barisnya bisa berubah |
 | Hapus | `deleted_at timestamptz` pada tabel berisi tulisan pengguna; sisanya hapus keras |
 | Uang | `numeric(12,6)` — jangan `float` |

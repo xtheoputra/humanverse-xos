@@ -124,9 +124,18 @@ def _smoke_compose() -> int:
 
 
 def _ujung_ke_ujung(dasar: str) -> int:
-    """Alur manusia layar V0 pertama lawan api hidup — lihat `_smoke_compose`."""
+    """Alur manusia layar V0 pertama lawan api hidup — lihat `_smoke_compose`.
+
+    Dua bukti: klien asli TANPA layar (`tool/ujung_ke_ujung.dart`), lalu LAYAR
+    yang diketuk seperti manusia (`test/ujung/`, spec/07 2.7 — tinjauan kontrak
+    Sprint 2: tidak ada yang menjalankan layar terhadap api nyata).
+    """
     print(f"  ujung ke ujung (apps/mobile) → {dasar}", flush=True)
-    return _flutter("run", "tool/ujung_ke_ujung.dart", dasar, biner=_DART)()
+    klien = _flutter("run", "tool/ujung_ke_ujung.dart", dasar, biner=_DART)()
+    if klien != 0:
+        return klien
+    print(f"  layar diketuk lawan api hidup (apps/mobile/test/ujung) → {dasar}", flush=True)
+    return _flutter("test", "test/ujung", f"--dart-define=HVX_API_UJI={dasar}")()
 
 
 def _flutter(*argumen: str, biner: str | None = None) -> Callable[[], int]:

@@ -6,13 +6,12 @@ menjanjikan `Idempotency-Key` untuk `POST`/`PATCH`, bukan `PUT`.
 
 from __future__ import annotations
 
-from datetime import date
+from functools import partial
 from typing import Annotated
 
 from fastapi import APIRouter, Query, Request
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
-from pydantic import AwareDatetime
 
 from hvx.modules import identity, platform
 
@@ -22,11 +21,11 @@ from .schemas import CatatMood, Checkin, DaftarCheckin, HalamanMood, IsiCheckin,
 router = APIRouter(prefix="/v1", tags=["checkins"])
 
 # `from` kata kunci Python — namanya di URL tetap `from` (spec/04).
-Dari = Annotated[date | None, Query(alias="from")]
-Sampai = Annotated[date | None, Query(alias="to")]
+Dari = Annotated[platform.Tanggal | None, Query(alias="from")]
+Sampai = Annotated[platform.Tanggal | None, Query(alias="to")]
 # Mood bercap waktu — `from`/`to` ISO-8601 berzona (spec/04: waktu UTC dengan `Z`).
-DariWaktu = Annotated[AwareDatetime | None, Query(alias="from")]
-SampaiWaktu = Annotated[AwareDatetime | None, Query(alias="to")]
+DariWaktu = Annotated[platform.WaktuBerzona | None, Query(alias="from")]
+SampaiWaktu = Annotated[platform.WaktuBerzona | None, Query(alias="to")]
 
 
 @router.get("/checkins", response_model=DaftarCheckin)
@@ -47,7 +46,10 @@ async def daftar_checkin(
     responses={201: {"model": Checkin, "description": "check-in tanggal itu baru dibuat"}},
 )
 async def simpan_checkin(
-    request: Request, for_date: date, badan: IsiCheckin, pengguna: identity.PenggunaDiperlukan
+    request: Request,
+    for_date: platform.Tanggal,
+    badan: IsiCheckin,
+    pengguna: identity.PenggunaDiperlukan,
 ) -> JSONResponse:
     hasil = await service.simpan(platform.engine_dari(request), pengguna.user_id, for_date, badan)
     return JSONResponse(
@@ -81,8 +83,12 @@ async def catat_mood(
     pengguna: identity.PenggunaDiperlukan,
     idem: platform.Idempoten,
 ) -> JSONResponse:
-    async def kerja() -> platform.Jawaban:
-        mood = await service.catat_mood(platform.engine_dari(request), pengguna.user_id, badan)
-        return platform.Jawaban(201, mood)
+    engine = platform.engine_dari(request)
 
-    return await idem.jalankan(pengguna.user_id, kerja)
+    async def kerja() -> platform.Jawaban:
+        mood = await service.catat_mood(engine, pengguna.user_id, badan)
+        return platform.Jawaban(201, mood, mood.id)
+
+    return await idem.jalankan(
+        pengguna.user_id, kerja, partial(service.baca_mood, engine, pengguna.user_id)
+    )

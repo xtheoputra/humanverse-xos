@@ -46,8 +46,17 @@ Rute yang ada — kontraknya [`spec/04`](../../spec/04-API-CONTRACTS.md):
 | `GET·POST /v1/moods` | tugas 2.6 |
 
 Tulisan `POST`/`PATCH` domain menerima `Idempotency-Key` (spec/04, E-165) —
-rute baru menyatakan `idem: platform.Idempoten`; `tests/unit/test_idempotensi_terpasang.py`
-membaca skema OpenAPI dan menolak rute tulis yang tidak menerimanya.
+rute baru menyatakan `idem: platform.Idempoten` **dan** mengakhiri badannya
+dengan `return await idem.jalankan(user_id, kerja, baca_ulang)`:
+`tests/unit/test_idempotensi_terpasang.py` menolak rute tulis yang tidak
+menerimanya atau tidak memanggilnya. Redis hanya mengingat **rujukan**
+(sidik · status · id) — `baca_ulang` membaca sumber dayanya lagi saat diputar
+ulang (E-171, K-24).
+
+Masukan **ketat** (spec/04, E-170): medan angka/boolean/tanggal/waktu memakai
+`platform.Bulat` · `Benar` · `Tanggal` · `WaktuBerzona` · `AngkaJson` —
+`tests/unit/test_masukan_ketat_semua_rute.py` menelusuri skema inti tiap rute.
+Badan lebih dari 1 MiB → `413` sebelum autentikasi (`platform.BatasBadanMiddleware`).
 
 Galat selalu beramplop `{"error": {"code", "message", "details"?}}`; yang tak
 tertangani dijawab `500` dengan `X-Request-ID`, tanpa rincian galat.

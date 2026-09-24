@@ -125,9 +125,19 @@ async def test_pengguna_pindah_negara_riwayat_utuh_dan_hari_ini_ikut_zona_baru(
     assert (akhir["current"], akhir["longest"]) == (panjang, panjang), akhir
 
 
+def _mundurkan_pembuatan(api: ApiUji, habit_id: str, hari: int) -> None:
+    """Habit "dibuat" `hari` lalu — API tidak bisa memundurkan `created_at`, pemilik skema bisa."""
+    with psycopg.connect(psycopg_dsn(api.db.dsn_pemilik), autocommit=True) as k:
+        k.execute(
+            "UPDATE habits SET created_at = created_at - make_interval(days => %s) WHERE id = %s",
+            (hari, habit_id),
+        )
+
+
 async def test_tingkat_penyelesaian_mengabaikan_skip_dan_hari_ini(api_bersama: ApiUji) -> None:
     _uid, token = await api_bersama.pengguna_baru(timezone="Asia/Jakarta")
     h = await buat_habit(api_bersama, token)
+    _mundurkan_pembuatan(api_bersama, h["id"], 10)  # hari yang terlewat SESUDAH habit ada
     hari_ini = _hari_ini_di(api_bersama, "Asia/Jakarta")
 
     await _catat(api_bersama, token, h["id"], hari_ini - timedelta(days=5))
@@ -138,7 +148,21 @@ async def test_tingkat_penyelesaian_mengabaikan_skip_dan_hari_ini(api_bersama: A
 
     r = await _rentetan(api_bersama, token, h["id"])
     assert (r["current"], r["longest"]) == (1, 2), r
-    assert r["completion_rate_30d"] == 0.75, r  # 3 terpenuhi / 4 jatuh tempo
+    # 3 terpenuhi / 9 jatuh tempo: hari −10…−6 dan −2 terlewat sesudah habit ada;
+    # −3 `skipped` dan hari ini tidak masuk penyebut.
+    assert r["completion_rate_30d"] == round(3 / 9, 3), r
+
+
+async def test_tingkat_tidak_menyalahkan_hari_sebelum_habit_dibuat(api_bersama: ApiUji) -> None:
+    """Tinjauan kontrak Sprint 2, F8 — habit dibuat hari ini + satu catatan mundur."""
+    _uid, token = await api_bersama.pengguna_baru(timezone="Asia/Jakarta")
+    h = await buat_habit(api_bersama, token)
+    hari_ini = _hari_ini_di(api_bersama, "Asia/Jakarta")
+
+    await _catat(api_bersama, token, h["id"], hari_ini - timedelta(days=10))
+
+    r = await _rentetan(api_bersama, token, h["id"])
+    assert r["completion_rate_30d"] == 1.0, r  # dulu 0,1: sembilan hari sebelum habit ada
 
 
 async def test_rentetan_mingguan_menurut_minggu_iso_zona_profil(api_bersama: ApiUji) -> None:

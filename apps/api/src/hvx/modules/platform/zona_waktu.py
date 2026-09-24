@@ -4,11 +4,18 @@ Kenapa di `platform`: ini bentuk data, bukan aturan domain — `identity`
 (pendaftaran) dan `profile` sama-sama menerimanya, dan `identity` tidak boleh
 mengimpor `profile` (K-17).
 
-Daftar nama diambil dari paket `tzdata`, bukan dari sistem operasi: di Windows
-`zoneinfo` tidak punya basis data sendiri, dan di citra Linux isinya bergantung
-pada paket Debian hari itu. Satu sumber membuat uji di kedua tempat menjawab
-hal yang sama. Peka huruf besar-kecil, seperti IANA: `asia/jakarta` DITOLAK —
-tanggal lokal pengguna (`habit_completions.for_date`) dihitung dari nama ini,
+Daftar nama diambil dari paket `tzdata` — daftar `zones`-nya, bukan dari sistem
+operasi: di Windows `zoneinfo` tidak punya basis data sendiri, dan di citra
+Linux isinya bergantung pada paket Debian hari itu. Satu sumber membuat uji di
+kedua tempat menjawab hal yang sama. 🔴 Versi pertama memakai
+`zoneinfo.available_timezones()`, yang JUGA menelusuri `/usr/share/zoneinfo`
+sistem: di kontainer Debian `localtime` ikut diterima (tinjauan keamanan
+Sprint 2) — nama yang artinya "zona server". `Factory` (zona semu IANA,
+singkatan `-00`) juga bukan zona tempat orang tinggal. Tiap nama yang diterima
+di sini dikenal PostgreSQL (`tests/integration/test_zona_waktu_pg.py`).
+
+Peka huruf besar-kecil, seperti IANA: `asia/jakarta` DITOLAK — tanggal lokal
+pengguna (`habit_completions.for_date`) dihitung dari nama ini,
 dan nama yang "hampir benar" tidak pernah diterima diam-diam.
 """
 
@@ -16,8 +23,8 @@ from __future__ import annotations
 
 from datetime import date
 from functools import cache
+from importlib.resources import files
 from typing import Annotated
-from zoneinfo import available_timezones
 
 from pydantic import AfterValidator
 from sqlalchemy import text
@@ -30,9 +37,14 @@ ZONA_PALING_MAJU = "Pacific/Kiritimati"
 _HARI_INI_DI = text("SELECT (now() AT TIME ZONE :zona)::date")
 
 
+# Nama di daftar IANA yang bukan zona tempat orang tinggal.
+_BUKAN_ZONA_PENGGUNA = frozenset({"Factory"})
+
+
 @cache
-def _nama_sah() -> frozenset[str]:
-    return frozenset(available_timezones())
+def nama_zona_sah() -> frozenset[str]:
+    daftar = files("tzdata").joinpath("zones").read_text(encoding="utf-8")
+    return frozenset(daftar.split()) - _BUKAN_ZONA_PENGGUNA
 
 
 async def hari_ini_di(conn: AsyncConnection, zona: str) -> date:
@@ -62,7 +74,7 @@ async def tanggal_paling_maju(conn: AsyncConnection) -> date:
 
 
 def zona_waktu_sah(nama: str) -> bool:
-    return nama in _nama_sah()
+    return nama in nama_zona_sah()
 
 
 def _periksa(nama: str) -> str:

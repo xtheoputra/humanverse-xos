@@ -3,15 +3,17 @@
 from __future__ import annotations
 
 from datetime import date, datetime
-from decimal import Decimal
 from typing import Annotated
 from uuid import UUID
 
-from pydantic import AwareDatetime, BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from hvx.modules import platform
 
-Skala = Annotated[int, Field(ge=1, le=5)]
+Skala = Annotated[platform.Bulat, Field(ge=1, le=5)]
+# numeric(3,1) spec/01: satu angka desimal — 7,25 DITOLAK, tidak dibulatkan diam-diam;
+# dan angka JSON, bukan string `"7.5"`.
+JamTidur = Annotated[platform.AngkaJson, Field(ge=0, le=24, decimal_places=1)]
 Catatan = Annotated[platform.TeksTanpaNul, Field(max_length=4000)]
 
 
@@ -22,7 +24,8 @@ class Checkin(BaseModel):
     for_date: date
     energy: int | None
     focus: int | None
-    sleep_hours: Decimal | None
+    # Angka JSON, bukan string: `Decimal` diserialkan pydantic sebagai "7.5" (E-170).
+    sleep_hours: float | None
     note: str | None
     created_at: datetime
     updated_at: datetime
@@ -44,8 +47,7 @@ class IsiCheckin(BaseModel):
 
     energy: Skala | None = None
     focus: Skala | None = None
-    # numeric(3,1) spec/01: satu angka desimal — 7,25 DITOLAK, tidak dibulatkan diam-diam.
-    sleep_hours: Decimal | None = Field(default=None, ge=0, le=24, decimal_places=1)
+    sleep_hours: JamTidur | None = None
     note: Catatan | None = None
 
 
@@ -79,4 +81,4 @@ class CatatMood(BaseModel):
     note: Catatan | None = None
     # Wajib berzona waktu: `2026-09-24T06:30` tanpa zona adalah jam yang berbeda di
     # tiap negara, dan menebak zonanya berarti menebak kapan perasaan itu terjadi.
-    occurred_at: AwareDatetime | None = None
+    occurred_at: platform.WaktuBerzona | None = None

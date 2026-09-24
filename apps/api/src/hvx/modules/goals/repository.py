@@ -55,6 +55,22 @@ _DAFTAR = text(
     """
 )
 
+# Goal HIDUP dikunci BERBAGI sampai transaksi pemanggil selesai. Hapus-lunak
+# (`UPDATE … deleted_at`, kunci FOR NO KEY UPDATE) menunggu; pernyataan
+# berikutnya di transaksi penghapus — `_LEPAS_ANAK`, pendengar habits — sudah
+# melihat anak/milestone/tautan yang baru ditulis (READ COMMITTED). Sebaliknya,
+# pengunci yang datang SESUDAH hapus-lunak memeriksa ulang barisnya dan tidak
+# menemukannya. Tanpa kunci ini (tinjauan kontrak Sprint 2, F1): 40 dari 40
+# goal anak yang dibuat serentak dengan hapus induknya menjadi yatim.
+_KUNCI_HIDUP = text("SELECT id FROM goals WHERE id = :id AND deleted_at IS NULL FOR SHARE")
+
+# Batas per pengguna/per goal diperiksa SERIAL: dua tulisan serentak yang sama-
+# sama melihat 999 tidak boleh bersama menjadi 1001. Kunci penasihat per
+# (tabel, pemilik), berumur transaksi.
+_KUNCI_HITUNG = text("SELECT pg_advisory_xact_lock(hashtextextended(:kunci, 0))")
+_JUMLAH_GOAL = text("SELECT count(*) FROM goals WHERE user_id = :user_id AND deleted_at IS NULL")
+_JUMLAH_MILESTONE = text("SELECT count(*) FROM goal_milestones WHERE goal_id = :goal_id")
+
 # Jarak goal `:id` dari akarnya — NULL bila goal itu tidak ada atau terhapus.
 # `:batas` menghentikan rekursi apa pun yang terjadi pada datanya.
 _KEDALAMAN = text(
@@ -151,8 +167,8 @@ _AMBIL_MILESTONE = text(
 # pernah sempat dicoba.
 _SISIP_MILESTONE = text(
     """
-    INSERT INTO goal_milestones (goal_id, user_id, title, position, due_date)
-    SELECT g.id, g.user_id, :title,
+    INSERT INTO goal_milestones (id, goal_id, user_id, title, position, due_date)
+    SELECT COALESCE(CAST(:id AS uuid), gen_random_uuid()), g.id, g.user_id, :title,
            COALESCE(CAST(:position AS integer),
                     (SELECT COALESCE(max(m.position) + 1, 0)
                      FROM goal_milestones m WHERE m.goal_id = g.id)),
@@ -251,6 +267,22 @@ async def daftar(
     return [_goal(b) for b in hasil.mappings()]
 
 
+async def kunci_hidup(conn: AsyncConnection, goal_id: UUID) -> bool:
+    """True bila goal ada dan belum dihapus — dan kini terkunci berbagi (lihat `_KUNCI_HIDUP`)."""
+    return (await conn.execute(_KUNCI_HIDUP, {"id": goal_id})).first() is not None
+
+
+async def jumlah_goal_serial(conn: AsyncConnection, user_id: UUID) -> int:
+    """Goal hidup pengguna — sesudah mengambil kunci hitung goal miliknya."""
+    await conn.execute(_KUNCI_HITUNG, {"kunci": f"goals:{user_id}"})
+    return int((await conn.execute(_JUMLAH_GOAL, {"user_id": user_id})).scalar_one())
+
+
+async def jumlah_milestone_serial(conn: AsyncConnection, goal_id: UUID) -> int:
+    await conn.execute(_KUNCI_HITUNG, {"kunci": f"milestones:{goal_id}"})
+    return int((await conn.execute(_JUMLAH_MILESTONE, {"goal_id": goal_id})).scalar_one())
+
+
 async def kedalaman(conn: AsyncConnection, goal_id: UUID, batas: int) -> int | None:
     nilai = (await conn.execute(_KEDALAMAN, {"id": goal_id, "batas": batas})).scalar_one()
     return int(nilai) if nilai is not None else None
@@ -292,6 +324,7 @@ async def milestone_goal(conn: AsyncConnection, goal_id: UUID) -> list[Milestone
 async def sisip_milestone(
     conn: AsyncConnection,
     *,
+    id_: UUID | None,
     goal_id: UUID,
     title: str,
     position: int | None,
@@ -301,7 +334,13 @@ async def sisip_milestone(
         (
             await conn.execute(
                 _SISIP_MILESTONE,
-                {"goal_id": goal_id, "title": title, "position": position, "due_date": due_date},
+                {
+                    "id": id_,
+                    "goal_id": goal_id,
+                    "title": title,
+                    "position": position,
+                    "due_date": due_date,
+                },
             )
         )
         .mappings()

@@ -6,7 +6,7 @@ E-165) — dijaga `tests/unit/test_idempotensi_terpasang.py`.
 
 from __future__ import annotations
 
-from datetime import date
+from functools import partial
 from uuid import UUID
 
 from fastapi import APIRouter, Request, Response
@@ -41,6 +41,17 @@ def _pembaca_zona_waktu(request: Request) -> service.PembacaZonaWaktu:
     return pembaca  # type: ignore[no-any-return]
 
 
+def _pembaca_goal_hidup(request: Request) -> service.PembacaGoalHidup:
+    """Dipasang titik rakit `hvx.main` (K-23): goal milik `goals`.
+
+    Tanpa jatuh-balik ke "percaya FK saja": FK tidak melihat `deleted_at` (F2).
+    """
+    pembaca = getattr(request.app.state, "pembaca_goal_hidup", None)
+    if pembaca is None:
+        raise RuntimeError("hvx.main tidak memasang app.state.pembaca_goal_hidup (K-23)")
+    return pembaca  # type: ignore[no-any-return]
+
+
 def _pembaca_energi(request: Request) -> service.PembacaEnergi:
     """Dipasang titik rakit `hvx.main` (K-23): energi check-in milik `checkins`."""
     pembaca = getattr(request.app.state, "pembaca_energi", None)
@@ -54,7 +65,7 @@ async def daftar_habit(
     request: Request,
     pengguna: identity.PenggunaDiperlukan,
     status: StatusHabit | None = None,
-    for_date: date | None = None,
+    for_date: platform.Tanggal | None = None,
 ) -> DaftarHabit:
     return await service.daftar(
         platform.engine_dari(request),
@@ -72,11 +83,17 @@ async def buat_habit(
     pengguna: identity.PenggunaDiperlukan,
     idem: platform.Idempoten,
 ) -> JSONResponse:
-    async def kerja() -> platform.Jawaban:
-        habit = await service.buat(platform.engine_dari(request), pengguna.user_id, badan)
-        return platform.Jawaban(201, habit)
+    engine = platform.engine_dari(request)
 
-    return await idem.jalankan(pengguna.user_id, kerja)
+    async def kerja() -> platform.Jawaban:
+        habit = await service.buat(
+            engine, pengguna.user_id, badan, goal_hidup=_pembaca_goal_hidup(request)
+        )
+        return platform.Jawaban(201, habit, habit.id)
+
+    return await idem.jalankan(
+        pengguna.user_id, kerja, partial(service.baca_habit, engine, pengguna.user_id)
+    )
 
 
 @router.patch("/habits/{habit_id}", response_model=Habit)
@@ -87,11 +104,17 @@ async def ubah_habit(
     pengguna: identity.PenggunaDiperlukan,
     idem: platform.Idempoten,
 ) -> JSONResponse:
-    async def kerja() -> platform.Jawaban:
-        habit = await service.ubah(platform.engine_dari(request), pengguna.user_id, habit_id, badan)
-        return platform.Jawaban(200, habit)
+    engine = platform.engine_dari(request)
 
-    return await idem.jalankan(pengguna.user_id, kerja)
+    async def kerja() -> platform.Jawaban:
+        habit = await service.ubah(
+            engine, pengguna.user_id, habit_id, badan, goal_hidup=_pembaca_goal_hidup(request)
+        )
+        return platform.Jawaban(200, habit, habit.id)
+
+    return await idem.jalankan(
+        pengguna.user_id, kerja, partial(service.baca_habit, engine, pengguna.user_id)
+    )
 
 
 @router.delete("/habits/{habit_id}", status_code=204, response_class=Response)
@@ -115,20 +138,27 @@ async def catat_penyelesaian(
     pengguna: identity.PenggunaDiperlukan,
     idem: platform.Idempoten,
 ) -> JSONResponse:
-    async def kerja() -> platform.Jawaban:
-        hasil = await service.catat(
-            platform.engine_dari(request), pengguna.user_id, habit_id, badan
-        )
-        return platform.Jawaban(201 if hasil.baru else 200, hasil.penyelesaian)
+    engine = platform.engine_dari(request)
 
-    return await idem.jalankan(pengguna.user_id, kerja)
+    async def kerja() -> platform.Jawaban:
+        hasil = await service.catat(engine, pengguna.user_id, habit_id, badan)
+        return platform.Jawaban(
+            201 if hasil.baru else 200, hasil.penyelesaian, hasil.penyelesaian.id
+        )
+
+    return await idem.jalankan(
+        pengguna.user_id, kerja, partial(service.baca_penyelesaian, engine, pengguna.user_id)
+    )
 
 
 @router.delete(
     "/habits/{habit_id}/completions/{for_date}", status_code=204, response_class=Response
 )
 async def hapus_penyelesaian(
-    request: Request, habit_id: UUID, for_date: date, pengguna: identity.PenggunaDiperlukan
+    request: Request,
+    habit_id: UUID,
+    for_date: platform.Tanggal,
+    pengguna: identity.PenggunaDiperlukan,
 ) -> Response:
     await service.hapus_catatan(platform.engine_dari(request), pengguna.user_id, habit_id, for_date)
     return Response(status_code=204)

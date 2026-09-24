@@ -6,6 +6,7 @@ E-165) — dijaga `tests/unit/test_idempotensi_terpasang.py`.
 
 from __future__ import annotations
 
+from functools import partial
 from uuid import UUID
 
 from fastapi import APIRouter, Request, Response
@@ -30,6 +31,18 @@ from .schemas import (
 router = APIRouter(prefix="/v1", tags=["goals"])
 
 
+def _pendengar_hapus(request: Request) -> tuple[service.PendengarGoalDihapus, ...]:
+    """Dipasang titik rakit `hvx.main` (K-23) — `goals` tidak tahu siapa yang menautnya.
+
+    Tidak ada bawaan "tanpa pendengar" kalau titik rakit lupa: habit yang tetap
+    menaut goal terhapus adalah tepat cacat yang pendengar ini tutup.
+    """
+    pendengar = getattr(request.app.state, "pendengar_goal_dihapus", None)
+    if pendengar is None:
+        raise RuntimeError("hvx.main tidak memasang app.state.pendengar_goal_dihapus (K-23)")
+    return tuple(pendengar)
+
+
 @router.get("/goals", response_model=HalamanGoal)
 async def daftar_goal(
     request: Request,
@@ -50,11 +63,15 @@ async def buat_goal(
     pengguna: identity.PenggunaDiperlukan,
     idem: platform.Idempoten,
 ) -> JSONResponse:
-    async def kerja() -> platform.Jawaban:
-        goal = await service.buat(platform.engine_dari(request), pengguna.user_id, badan)
-        return platform.Jawaban(201, goal)
+    engine = platform.engine_dari(request)
 
-    return await idem.jalankan(pengguna.user_id, kerja)
+    async def kerja() -> platform.Jawaban:
+        goal = await service.buat(engine, pengguna.user_id, badan)
+        return platform.Jawaban(201, goal, goal.id)
+
+    return await idem.jalankan(
+        pengguna.user_id, kerja, partial(service.baca_goal, engine, pengguna.user_id)
+    )
 
 
 @router.get("/goals/{goal_id}", response_model=GoalRinci)
@@ -79,18 +96,27 @@ async def ubah_goal(
     pengguna: identity.PenggunaDiperlukan,
     idem: platform.Idempoten,
 ) -> JSONResponse:
-    async def kerja() -> platform.Jawaban:
-        goal = await service.ubah(platform.engine_dari(request), pengguna.user_id, goal_id, badan)
-        return platform.Jawaban(200, goal)
+    engine = platform.engine_dari(request)
 
-    return await idem.jalankan(pengguna.user_id, kerja)
+    async def kerja() -> platform.Jawaban:
+        goal = await service.ubah(engine, pengguna.user_id, goal_id, badan)
+        return platform.Jawaban(200, goal, goal.id)
+
+    return await idem.jalankan(
+        pengguna.user_id, kerja, partial(service.baca_goal, engine, pengguna.user_id)
+    )
 
 
 @router.delete("/goals/{goal_id}", status_code=204, response_class=Response)
 async def hapus_goal(
     request: Request, goal_id: UUID, pengguna: identity.PenggunaDiperlukan
 ) -> Response:
-    await service.hapus(platform.engine_dari(request), pengguna.user_id, goal_id)
+    await service.hapus(
+        platform.engine_dari(request),
+        pengguna.user_id,
+        goal_id,
+        pendengar=_pendengar_hapus(request),
+    )
     return Response(status_code=204)
 
 
@@ -102,13 +128,15 @@ async def buat_milestone(
     pengguna: identity.PenggunaDiperlukan,
     idem: platform.Idempoten,
 ) -> JSONResponse:
-    async def kerja() -> platform.Jawaban:
-        milestone = await service.buat_milestone(
-            platform.engine_dari(request), pengguna.user_id, goal_id, badan
-        )
-        return platform.Jawaban(201, milestone)
+    engine = platform.engine_dari(request)
 
-    return await idem.jalankan(pengguna.user_id, kerja)
+    async def kerja() -> platform.Jawaban:
+        milestone = await service.buat_milestone(engine, pengguna.user_id, goal_id, badan)
+        return platform.Jawaban(201, milestone, milestone.id)
+
+    return await idem.jalankan(
+        pengguna.user_id, kerja, partial(service.baca_milestone, engine, pengguna.user_id)
+    )
 
 
 @router.patch("/milestones/{milestone_id}", response_model=Milestone)
@@ -119,10 +147,12 @@ async def ubah_milestone(
     pengguna: identity.PenggunaDiperlukan,
     idem: platform.Idempoten,
 ) -> JSONResponse:
-    async def kerja() -> platform.Jawaban:
-        milestone = await service.ubah_milestone(
-            platform.engine_dari(request), pengguna.user_id, milestone_id, badan
-        )
-        return platform.Jawaban(200, milestone)
+    engine = platform.engine_dari(request)
 
-    return await idem.jalankan(pengguna.user_id, kerja)
+    async def kerja() -> platform.Jawaban:
+        milestone = await service.ubah_milestone(engine, pengguna.user_id, milestone_id, badan)
+        return platform.Jawaban(200, milestone, milestone.id)
+
+    return await idem.jalankan(
+        pengguna.user_id, kerja, partial(service.baca_milestone, engine, pengguna.user_id)
+    )

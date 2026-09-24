@@ -164,11 +164,10 @@ scopes:      [ habits ]            # scope memory/data yang disentuh
 risk_level:  0
 input:
   habit_id:  { type: uuid, required: true }
-  window:    { type: integer, default: 30 }
-output:
-  current:            integer
-  longest:            integer
-  completion_rate:    number
+output:                            # 🔧 = GET /habits/{id}/streak (04, E-176)
+  current:              integer
+  longest:              integer
+  completion_rate_30d:  number | null   # null = belum ada periode jatuh tempo
 side_effects: none                 # none | writes_user_data | external_call
 reaches_third_party: false         # 🔧 K-1: true bila akibatnya sampai ke orang
                                    #     selain pemegang akun. true ⇒ risk_level >= 3

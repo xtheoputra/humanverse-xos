@@ -10,6 +10,7 @@ class LayananPalsu implements LayananHabit {
   bool masukDipanggil = false;
   Map<String, Object?>? daftarDengan;
   final List<String> panggilan = [];
+  final List<String> idHabitDikirim = [];
   Exception? galatBerikutnya;
 
   @override
@@ -67,6 +68,7 @@ class LayananPalsu implements LayananHabit {
 
   @override
   Future<Habit> buatHabit({
+    required String id,
     required String judul,
     required String periode,
     required int target,
@@ -75,8 +77,10 @@ class LayananPalsu implements LayananHabit {
     panggilan.add(
       'buat $judul $periode $target ${tier.map((t) => t.label).join('|')}',
     );
+    idHabitDikirim.add(id);
+    _mungkinGagal();
     final baru = Habit(
-      id: 'h${habit.length + 1}',
+      id: id,
       judul: judul,
       periode: periode,
       target: target,

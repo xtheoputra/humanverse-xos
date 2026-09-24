@@ -101,6 +101,12 @@ async def catat_mood(engine: AsyncEngine, user_id: UUID, badan: CatatMood) -> Mo
         raise
 
 
+async def baca_mood(engine: AsyncEngine, user_id: UUID, mood_id: UUID) -> Mood | None:
+    """Mood itu SEKARANG — pemutaran ulang Idempotency-Key (platform.idempotensi, E-171)."""
+    async with platform.transaksi_pengguna(engine, user_id) as conn:
+        return await repository.mood_id(conn, mood_id)
+
+
 async def daftar_mood(
     engine: AsyncEngine,
     user_id: UUID,
@@ -112,7 +118,7 @@ async def daftar_mood(
 ) -> HalamanMood:
     if dari is not None and sampai is not None and dari >= sampai:
         raise platform.GalatApi(400, "invalid_request", "`from` wajib sebelum `to`.")
-    sesudah = platform.baca_kursor_waktu(kursor)
+    sesudah = platform.baca_kursor_waktu("moods", kursor)
     async with platform.transaksi_pengguna(engine, user_id) as conn:
         mood = await repository.daftar_mood(
             conn, user_id=user_id, dari=dari, sampai=sampai, sesudah=sesudah, batas=batas + 1
@@ -120,5 +126,5 @@ async def daftar_mood(
     lanjut = None
     if len(mood) > batas:
         mood = mood[:batas]
-        lanjut = platform.kursor_waktu(mood[-1].occurred_at, mood[-1].id)
+        lanjut = platform.kursor_waktu("moods", mood[-1].occurred_at, mood[-1].id)
     return HalamanMood(items=mood, next_cursor=lanjut)

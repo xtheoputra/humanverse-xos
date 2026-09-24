@@ -109,10 +109,10 @@ dengan SQL — harus lewat `__init__.py` pemiliknya.
 |---|---|---|
 | 1 | Modul hanya boleh mengimpor `__init__.py` modul lain, tidak pernah berkas dalamnya | `import-linter` kontrak `protected`, satu per modul (`m2-*`) |
 | 2 | Tidak ada impor melingkar | `import-linter` kontrak `layers` (`m1-m3-lapisan`, antarmodul) + `acyclic_siblings` (`m1-siklus-dalam`, di dalam modul) |
-| 3 | Modul domain (`goals`…`activities`, `profile`) **tidak boleh** saling mengimpor — komunikasinya lewat event | `import-linter` lapisan independen di `m1-m3-lapisan` |
+| 3 | Modul domain (`goals`…`activities`, `profile`) **tidak boleh** saling mengimpor — komunikasinya lewat event, atau lewat **pembaca/pendengar yang disambung titik rakit** `hvx.main` di transaksi pemanggil (K-17, **K-23** — lihat catatan di bawah) | `import-linter` lapisan independen di `m1-m3-lapisan` · sambungannya: `tests/unit/test_main.py` |
 | 4 | `agents` boleh membaca modul lain; **tidak ada** modul yang mengimpor `agents` | `import-linter` — `agents` lapisan teratas `m1-m3-lapisan`, `exhaustive = true` |
 | 5 | `repository.py` hanya boleh menyebut tabel milik modulnya | `tests/unit/test_batas_tabel.py` — tabel kepemilikan dibaca **dari berkas ini**; SQL **tiap berkas `.py`** modul dipindai, bukan hanya `repository.py` · mutasi `06.5` |
-| 6 | Setiap tulisan ke tabel domain **yang punya event padanan** di [`03`](03-EVENT-CONTRACTS.md) **wajib** menerbitkan event | uji integrasi per modul — ⏳ belum ada tulisan tabel ber-event (Sprint 2–3) |
+| 6 | Setiap tulisan ke tabel domain **yang punya event padanan** di [`03`](03-EVENT-CONTRACTS.md) **wajib** menerbitkan event | uji integrasi per modul — ⏳ **dilanggar sejak Sprint 2, dengan sengaja dan tercatat**: `goals` · `goal_milestones` · `habits` · `habit_completions` · `daily_checkins` · `mood_entries` ditulis TANPA event, sebab tabel `events` dan penerbitnya tugas 3.1–3.2 (**E-176**) |
 
 > 🔧 **Aturan 6 semula: *“setiap tulisan ke tabel domain”* — dan `profile` modul
 > domain (aturan 3).** Sprint 1 menulis `profiles` (pendaftaran · `PATCH
@@ -123,6 +123,28 @@ dengan SQL — harus lewat `__init__.py` pemiliknya.
 > penegaknya masih menulis *“belum ada tulisan domain”* (**E-166**, tinjauan
 > Sprint 1). Event profil yang dibutuhkan kelak masuk lewat `03` dulu, baru
 > aturan ini mengikatnya.
+
+> 🔧 **Aturan 3 dan bacaan yang harus satu transaksi (K-17, K-23).** Event
+> menjawab *“beri tahu yang lain bahwa sesuatu terjadi”*, bukan *“baca keadaan
+> modul lain di transaksi ini”*. Sprint 1–2 butuh yang kedua: profil awal dibuat
+> di transaksi pendaftaran; rentetan habit butuh zona waktu profil; tier habit
+> butuh energi check-in; habit hanya boleh menaut goal yang hidup; goal yang
+> dihapus melepas habit yang menautnya. Tidak satu modul pun mengimpor yang
+> lain untuk itu — **titik rakit `hvx.main`** memasang fungsi pintu keluar satu
+> modul di `app.state`, dan modul lain memanggilnya dengan koneksinya sendiri
+> (RLS dan transaksinya sama). Yang terpasang: `pendengar_pendaftaran`
+> (identity → profile) · `pembaca_zona_waktu` (habits ← profile) ·
+> `pembaca_energi` (habits ← checkins) · `pembaca_goal_hidup` (habits ← goals) ·
+> `pendengar_goal_dihapus` (goals → habits). Rute yang butuh sambungan MENOLAK
+> berjalan tanpanya (`RuntimeError`), bukan jatuh ke bawaan diam-diam, dan
+> `tests/unit/test_main.py` memeriksa kelimanya terpasang.
+>
+> ⏳ **Aturan 6 dan Sprint 2 (E-176).** Keenam tabel di atas punya event
+> padanan di [`03`](03-EVENT-CONTRACTS.md), dan Sprint 2 menulisnya sebelum
+> tabel `events` ada (3.1). Menunggu 3.2 dicatat, bukan disembunyikan — sampai
+> 3.2, aturan **D** [`02-ERD.md`](02-ERD.md) tidak berlaku untuk tabel itu.
+> Tidak ada *backfill*: tidak ada data produksi sebelum 3.2 (V0 belum
+> dipasang di mana pun — D0 lokal), dan basis data pengembang dibuat ulang.
 
 > Tiap kontrak di atas **terbukti sanggup gagal** — `tools/uji_mutasi_kode.py`
 > memiliki satu mutasi per id kontrak, dan `tests/unit/test_penegak.py`

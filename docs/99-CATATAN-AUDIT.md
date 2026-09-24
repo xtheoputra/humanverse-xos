@@ -19,7 +19,7 @@
 > [`../arch/`](../arch/README.md) (**Master Architecture v2.0**, Phase 1–20) —
 > keduanya **bukan kata pemilik**, dan sengaja di luar `docs/`.
 
-Diperbarui: 17 September 2026 · Mencakup **dua puluh empat naskah**:
+Diperbarui: 24 September 2026 · Mencakup **dua puluh empat naskah**:
 **1 HumanOS** · **2 HumanVerse X** · **3 Phase 2 Enterprise Blueprint** ·
 **4 Phase 3 AI-Native Human Ecosystem** · **5 Blueprint Engineering v1.0** ·
 **6 Peta 14 lapisan engineering** · **7 Phase 4 Enterprise OS (Layer 21–50)** · **8 Peta Phase 5–12** · **9 Phase 5 Research Lab** · **10 Phase 6 Developer Platform** ·
@@ -32,11 +32,153 @@ Diperbarui: 17 September 2026 · Mencakup **dua puluh empat naskah**:
 | [B](#b-risiko-teknis) | Risiko teknis | 42 |
 | [C](#c-risiko-hukum--kepatuhan) | Risiko hukum & kepatuhan | 30 |
 | [D](#d-celah-yang-belum-tertutup) | Celah yang belum tertutup | 5 |
-| [E](#e-ketidakcocokan-antar-naskah) | **Ketidakcocokan antar-naskah** | 153 |
+| [E](#e-ketidakcocokan-antar-naskah) | **Ketidakcocokan antar-naskah** | 162 |
 | [F](#f-yang-sudah-saya-periksa-dan-ternyata-benar) | Sudah diperiksa, ternyata benar | 136 |
 | [G](#g-lubang-di-dalam-naskah-sendiri) | Lubang di dalam naskah sendiri | 21 |
 
 ---
+
+## 🔨 Sprint 2 dikodekan (24 Sep 2026) — apa yang berubah bagi berkas ini
+
+Sprint 2 (`spec/07` 2.1–2.7, *Human Core*) dikerjakan di branch
+`v0/sprint-2-human-core`, **di atas** branch Sprint 1 yang masih menunggu HUMAN
+REVIEW — satu commit per tugas (**K-18**), lalu satu commit untuk seluruh
+perbaikan tinjauan. Keadaan tiap *“Selesai bila”*, tanpa dibulatkan, ada di
+[`../spec/07`](../spec/07-BACKLOG-V0.md) Sprint 2.
+
+> 🔑 **Pola E-42 untuk keempat kalinya:** dua rute yang `spec/07` tuntut tidak
+> ada di `spec/04` sampai kodenya harus memanggilnya.
+
+### 🔴 E-168 — `spec/07` 2.1 menuntut pohon goal satu kueri; `spec/04` tidak punya rute pohon
+
+*“Pohon goal 3 tingkat terbaca dalam satu query”* — tetapi `GET /goals/{id}`
+hanya memuat milestone, dan tidak ada rute lain yang mengembalikan pohon: klien
+terpaksa meminta goal satu per satu (N+1 lewat jaringan). ✅ **Dibetulkan:**
+`GET /goals/{id}/tree`, satu CTE rekursif; kedalaman paling banyak 10 tingkat,
+ditegakkan **saat menulis** (`422 goal_tree_too_deep`) — pohon tidak pernah
+dipotong diam-diam saat dibaca.
+
+### 🔴 E-169 — tier 2.2 dan layar 2.7 butuh *“habit pada tanggal ini”*; `spec/04` tidak menjawabnya
+
+2.2 *“tier turun saat energi rendah”*, 2.7 menandai habit selesai **hari ini** —
+tidak ada rute yang menjawab *“habit mana yang sudah selesai tanggal ini, dan
+tier mana yang disarankan”* tanpa N+1 permintaan. ✅ **Dibetulkan:** `GET
+/habits?for_date=` — tiap habit membawa `day: { for_date, completion, energy,
+suggested_tier }`; `energy` ikut sebagai **alasan** (naskah 4 §29). Pemetaan
+energi → tier: **K-23**.
+
+### 🔍 Tinjauan adversarial sebelum PR — dua lensa, 28 temuan terbukti
+
+Keamanan (9 terbukti, 4 dugaan) dan kontrak (19 terbukti, 5 dugaan), tiap
+temuan dibuktikan lewat HTTP ke api hidup atau kueri basis data. Tiap temuan
+kode di bawah dibuktikan **merah dulu**, lalu dijaga mutasi di
+`tools/uji_mutasi_kode.py` (kelompok `E-170` … `E-176`).
+
+#### 🔴 E-170 — masukan dikoersi diam-diam: `true` menjadi valensi mood terburuk
+
+FastAPI memvalidasi badan dalam mode **python** pydantic, dan mode itu longgar.
+Semuanya dijawab `201`: `valence: true` → 1 · `target_count: "3"` → 3 ·
+`tier_used: false` → 0 · `for_date: 1758672000` → **tanggal UTC** (tepat yang
+`spec/01` larang) · `target_date: "2026-09-24T00:00:00Z"` → tanggal ·
+persetujuan pelatihan model `granted: "on"` → **tercatat `true`**. Juga:
+`sleep_hours` masuk angka, keluar string `"7.5"`; `tier_used` 3 → `422` tetapi
+7 → `400` untuk aturan yang sama; `0001-01-01` tersimpan sebagai `-infinity`
+dan `0001-01-01T00:00+14:00` meluap saat diubah ke UTC — keduanya 500 di
+pembacaan berikutnya. ✅ **Dibetulkan:** `platform.Bulat` · `Benar` ·
+`Tanggal` · `WaktuBerzona` · `AngkaJson` (rentang 1900–2999), dipakai tiap
+badan, kueri, dan jalur; `tests/unit/test_masukan_ketat_semua_rute.py`
+menelusuri **skema inti** tiap rute yang dirakit dan menolak node
+`int`/`bool`/`date`/`datetime` yang tidak memakainya. `spec/04` *Bentuk
+masukan*.
+
+#### 🔴 E-171 — cache `Idempotency-Key`: memori murah untuk dihabiskan, dan isi yang tinggal sesudah dihapus
+
+Badan jawaban utuh disimpan 24 jam — ~5,2 KiB per permintaan 19 byte — di
+Redis `noeviction` yang sama dengan sesi; batas laju per pengguna meloloskan
+432 ribu tulisan sehari. Catatan pengguna tinggal di Redis dan AOF-nya sesudah
+hapus-keras. Badan JSON bersarang ribuan tingkat → `RecursionError` → 500.
+Kunci sf-string bertanda kutip (bentuk draf IETF) → `400`. FastAPI membaca
+badan tanpa batas ukuran sebelum autentikasi. ✅ **Dibetulkan:** Redis hanya
+menyimpan **rujukan** (sidik HMAC · status · id) — ulangan membaca ulang
+sumber dayanya di bawah RLS; kuota 1.000 kunci baru per pengguna per 24 jam;
+kunci bertanda kutip dinormalkan; badan > 1 MiB → `413` (**K-24**); rute yang
+menyatakan `idem` wajib memanggil `idem.jalankan` (dugaan kontrak D4 — penjaga
+lama hanya memeriksa deklarasinya).
+
+#### 🔴 E-172 — balapan hapus/tulis dan batas yang tidak ada
+
+**F1** — `DELETE /goals/P` dan `POST /goals {parent_id: P}` serentak: **40
+dari 40** anak menjadi yatim (hidup, induk terhapus, tak terjangkau dari pohon
+mana pun) — janji E-168 dilanggar. **F2** — habit bisa ditaut ke goal yang
+sudah dihapus-lunak (FK tidak melihat `deleted_at`), dan tautannya bertahan
+sesudah goal dihapus. **F9** — `GET /habits` memotong di 500 tanpa tanda.
+Keamanan — `…/tree` atas 20 ribu goal = 86 MB; milestone dan riwayat rentetan
+dibaca tanpa batas. ✅ **Dibetulkan:** goal hidup dikunci `FOR SHARE` sebelum
+anak, milestone, atau tautan habit ditulis; hapus goal melepas habit yang
+menautnya lewat pendengar titik rakit (**K-23**); batas saat menulis, serial
+(**K-24**); riwayat rentetan dibaca sejak awal jendelanya. Milestone kini
+menerima id buatan klien (**F13** — `spec/04` menjanjikannya untuk semua `id`).
+
+#### 🔴 E-173 — arti rentetan: `skipped` mingguan dan hari sebelum habit ada
+
+**F7** — `skipped` netral hanya pada habit harian; pada habit mingguan ia
+diabaikan dan minggunya memutus rentetan. **F8** — habit yang dibuat hari ini
+dengan satu catatan mundur sepuluh hari lalu bertingkat penyelesaian **0,1**:
+sembilan hari sebelum habit ada dihitung gagal. **F3** — kirim ulang
+penyelesaian yang sama sesudah tier habit dikurangi → `422`, padahal `spec/04`
+menjanjikan kirim ulang *selalu aman*. ✅ **Dibetulkan:** `skipped` memaafkan
+satu kali per kejadian; periode yang dimulai sebelum habit dibuat hanya
+dihitung bila terpenuhi; baris lama dikembalikan **sebelum** aturan apa pun
+diperiksa ulang. Masa `paused` tetap dihitung seperti hari biasa — riwayat
+jeda tidak disimpan; kini tertulis di `spec/04`.
+
+#### 🔴 E-174 — galat validasi memantulkan masukan
+
+`msg` bawaan pydantic `uuid_parsing` mengutip karakter masukan (``found `z` at
+1``), dan `loc` memuat nama kunci yang dikirim klien
+(`["body","kata_sandi_saya_Hunter2"]`) — `spec/04`: *masukan tidak pernah
+dipantulkan*. Kursor yang dirakit tangan (id berupa angka) → `AttributeError`
+→ 500; kursor `/goals` diterima `/moods`. Zona `localtime` diterima di
+kontainer Debian (`available_timezones()` ikut menelusuri sistem operasi). ✅
+**Dibetulkan:** `msg` bawaan hanya untuk jenis galat yang tidak mengutip
+masukan; `loc` hanya nama yang dinyatakan api; kursor diperiksa bentuknya dan
+terikat daftar asalnya; daftar zona dari berkas `tzdata/zones` saja, tanpa
+`Factory` — dan tiap nama yang diterima dikenal PostgreSQL
+(`test_zona_waktu_pg.py`).
+
+#### 🔴 E-175 — klien Flutter: penyegaran serentak dan klaim yang tidak benar
+
+Dua permintaan yang serentak menerima 401 masing-masing menyegarkan: yang
+kedua memakai token segar yang sudah dirotasi yang pertama — server
+membacanya sebagai pencurian (`session.refresh_reused`) dan mencabut sesi.
+Komentar klien mengklaim ulangan sesudah jaringan putus tidak membuat habit
+ganda, padahal tiap ketukan membuat `Idempotency-Key` baru. Habit yang
+`skipped` tidak bisa diubah dari layar (POST mengembalikan baris lama). ✅
+**Dibetulkan:** satu penyegaran bersama; id habit buatan klien = kuncinya,
+sama di tiap percobaan satu tindakan; catatan apa pun dibatalkan dulu. Dan
+untuk 2.7 sendiri: `test/ujung/` kini mengetuk **layar** terhadap api hidup di
+tahap smoke — dulu uji widget memakai layanan palsu dan uji ujung-ke-ujung
+memakai klien tanpa layar.
+
+#### 🔴 E-176 — dokumen yang tertinggal dari kodenya
+
+`spec/06` aturan 6 masih *“belum ada tulisan tabel ber-event”* sementara
+Sprint 2 menulis enam tabel ber-event — pola **E-166** terulang (kini tertulis
+apa adanya: ditunda sampai 3.2, tanpa *backfill*); aturan 3 tidak menyebut
+pembaca titik rakit **K-23**; `spec/05` `habit.streak` masih `window` dan
+`completion_rate: number`; `spec/01` *“`date` + `profiles.timezone`”* terbaca
+seolah `for_date` dihitung dari zona profil; `PUT` check-in identik menggeser
+`updated_at` padahal `spec/04` menjanjikan *baris yang sama*; `ARCHITECTURE.md`
+tanpa migrasi `0004` dan aplikasi Flutter. ✅ Semuanya dibetulkan. Entri
+**E-165** di bawah semula masih *“⏳ belum ada tugas”* — kini diterapkan.
+
+#### Yang TIDAK dibetulkan di Sprint 2
+
+| Temuan | Kenapa | Ke mana |
+|---|---|---|
+| Kunci event `mood.logged` per menit bertabrakan (F14); pembatalan penyelesaian tanpa event (F15); `occurred_at` amplop tanpa sumber untuk catatan mundur (D1) | milik `spec/03` dan penerbitnya — tugas 3.1–3.2 | Sprint 3 |
+| Id buatan klien membocorkan **ada-tidaknya** id milik pengguna lain (`409`) | ruang uuid v4 122 bit: menebak id orang lain sama dengan menebak kuncinya; id tetap global. Dicatat di [`../SECURITY.md`](../SECURITY.md) | diterima |
+| Penyelesaian habit yang dihapus-lunak tidak bisa dihapus lewat API | habitnya sendiri tidak ada bagi API; baris ikut terhapus saat habit dihapus-keras (penyapuan hapus akun) | 6.5 |
 
 ## 🔨 Sprint 1 dikodekan (17 Sep 2026) — apa yang berubah bagi berkas ini
 
@@ -79,8 +221,9 @@ yang ditolak **K-21**. Tidak ada kode yang membaca header itu, dan tidak ada
 tugas `spec/07` yang menerapkannya (3.1 = idempotensi **event**). Diukur
 peninjau kontrak: kunci yang sama → `201` lalu `409`; `200` lalu `401` dan sesi
 dicabut. ✅ **Dibetulkan di `spec/04`:** berlaku untuk tulisan **domain**, tidak
-untuk `/auth/*`; `PATCH /me/profile` idempoten dengan sendirinya. ⏳ Tugas yang
-menerapkannya untuk tulisan domain belum ada — dicatat di barisnya.
+untuk `/auth/*`; `PATCH /me/profile` idempoten dengan sendirinya. ✅
+**Diterapkan Sprint 2** (`platform.Idempoten`) — dan sesudah tinjauan Sprint 2
+mengingat **rujukan**, bukan isi jawaban (**E-171**).
 
 ### 🔴 E-166 — `spec/06` aturan 6 dilanggar `profiles` sejak tulisan pertama
 
