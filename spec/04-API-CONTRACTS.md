@@ -21,8 +21,8 @@ REST, JSON, awalan **`/v1`**. Autentikasi `Authorization: Bearer <access_token>`
 |---|---|
 | Waktu | ISO-8601 UTC dengan `Z`. Tanggal lokal pengguna sebagai `YYYY-MM-DD`. |
 | Id | uuid string. **Klien boleh membuat id sendiri** (dukungan luring). |
-| Tulis | `POST`/`PATCH` **domain** menerima header `Idempotency-Key`; kunci yang sama mengembalikan hasil yang sama. **Tidak** untuk `/auth/*`: jawabannya memuat token, dan memutar ulang jawaban berarti menyimpan token mentah ([K-21](../docs/KEPUTUSAN-DIDELEGASIKAN.md)) — `refresh` yang diulang dengan token yang sama tetap **pemakaian ulang**. `PATCH /me/profile` idempoten dengan sendirinya. ⏳ Belum diterapkan: tulisan domain yang tidak idempoten dengan sendirinya baru datang di Sprint 2, dan belum ada tugas [`07`](07-BACKLOG-V0.md) yang menerapkannya (**E-165**) |
-| Halaman | `?limit=` (maks 100) + `?cursor=`; balasan memuat `next_cursor`. |
+| Tulis | `POST`/`PATCH` **domain** menerima header `Idempotency-Key`; kunci yang sama mengembalikan hasil yang sama — status dan badan jawaban **pertama**, bertanda `Idempotent-Replayed: true`. Kunci yang sama dengan permintaan **lain** → `422 idempotency_key_reused`; saat permintaan pertama masih berjalan → `409 idempotency_in_progress` + `Retry-After`. Hanya jawaban 2xx yang disimpan (24 jam), dan kuncinya **milik pengguna** — kunci yang sama dari dua pengguna tidak saling memutar ulang. **Tidak** untuk `/auth/*`: jawabannya memuat token, dan memutar ulang jawaban berarti menyimpan token mentah ([K-21](../docs/KEPUTUSAN-DIDELEGASIKAN.md)) — `refresh` yang diulang dengan token yang sama tetap **pemakaian ulang**. `PATCH /me/profile` idempoten dengan sendirinya. ✅ **Diterapkan Sprint 2 (E-165)**: `platform.Idempoten`, dan `tests/unit/test_idempotensi_terpasang.py` menolak rute tulis domain yang tidak menerimanya |
+| Halaman | `?limit=` (maks 100, bawaan 50) + `?cursor=`; balasan `{ items, next_cursor }` — `next_cursor` `null` di halaman terakhir. Kursor **keyset** `(waktu, id)`, opak bagi klien; kursor rusak → `400 invalid_cursor`. Daftar tanpa `?cursor=` di bawah ini membalas `{ items }` |
 | Galat | `{ "error": { "code", "message", "details"? } }` |
 | Kode | `400` bentuk salah · `401` belum masuk · `403` izin ditolak · `404` · `409` bentrok · `422` aturan bisnis · `429` batas laju |
 | Batas laju | `429 rate_limited` **selalu** dengan header `Retry-After` (detik bulat). Empat kunci: per IP di seluruh `/v1/*` (IPv6 per /64) · per pengguna di rute bersesi · `register` + `login` per IP · `login` **gagal** per akun (batas laju, bukan penguncian — **B-42**). Angkanya variabel `HVX_RATE_LIMIT_*` — [`../apps/api`](../apps/api/README.md) |
@@ -78,13 +78,14 @@ POST   /me/restore                               → 200   (batal hapus, dalam 3
 ## Goals & habits
 
 ```
-GET    /goals                ?status=active&cursor=
-POST   /goals                { id?, title, description?, domain?, parent_id?, target_date? }
+GET    /goals                ?status=active&limit=&cursor=      → { items, next_cursor }
+POST   /goals                { id?, title, description?, domain?, parent_id?, target_date? }   → 201
 GET    /goals/{id}                            → memuat milestones[]
+GET    /goals/{id}/tree                       → goal + children[] bersarang — satu kueri   🔧 2.1
 PATCH  /goals/{id}           { title?, status?, target_date? }
 DELETE /goals/{id}                            → 204 (soft delete)
 
-POST   /goals/{id}/milestones { title, position?, due_date? }
+POST   /goals/{id}/milestones { title, position?, due_date? }   → 201
 PATCH  /milestones/{id}       { status?, title?, due_date? }
 
 GET    /habits               ?status=active
@@ -96,6 +97,22 @@ POST   /habits/{id}/completions  { for_date, status, tier_used?, note? }   → 2
 DELETE /habits/{id}/completions/{for_date}                                 → 204
 GET    /habits/{id}/streak       → { current, longest, completion_rate_30d }
 ```
+
+> 🔧 **`GET /goals/{id}/tree` ditambahkan 24 Sep 2026 (E-168), saat tugas 2.1
+> ditulis.** [`07`](07-BACKLOG-V0.md) 2.1 menuntut *“pohon goal 3 tingkat terbaca
+> dalam satu query”*, tetapi tidak satu rute pun di atas yang mengembalikan
+> pohon — `GET /goals/{id}` hanya memuat milestone, dan klien yang ingin pohon
+> terpaksa meminta goal satu per satu (N+1 lewat jaringan, bukan lewat basis
+> data). Kini satu rute, satu CTE rekursif; kedalaman paling banyak **10
+> tingkat**, ditegakkan **saat menulis** (`422 goal_tree_too_deep`) supaya
+> pohon tidak pernah dipotong diam-diam saat dibaca.
+>
+> | Rute | Galat yang dijanjikan |
+> |---|---|
+> | `POST /goals` | `409 already_exists` (`id` buatan klien yang sudah ada) · `422 parent_not_found` (induk tidak ada, terhapus, atau milik pengguna lain — ketiganya sama) · `422 goal_tree_too_deep` · `400` bila `parent_id == id` |
+> | `PATCH /goals/{id}` | `400` untuk medan di luar tiga di atas — **`parent_id` tidak bisa diubah**, jadi lingkaran tidak bisa terbentuk · `status: achieved` mengisi `achieved_at`, status lain mengosongkannya |
+> | `DELETE /goals/{id}` | anak goal naik menjadi **akar** — sama dengan hapus-keras `spec/01` (`ON DELETE SET NULL (parent_id)`) |
+> | `…/milestones` · `/milestones/{id}` | `404` untuk goal terhapus; `status: done` mengisi `completed_at` |
 
 > `POST .../completions` memakai `UNIQUE (habit_id, for_date)`. Kirim ulang
 > tanggal yang sama mengembalikan **200 dengan baris yang sudah ada**, bukan

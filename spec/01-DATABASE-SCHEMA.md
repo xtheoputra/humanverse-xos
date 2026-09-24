@@ -244,7 +244,10 @@ CREATE TABLE goals (
   -- B-41: baris anak hanya boleh menunjuk induk milik pengguna yang SAMA.
   UNIQUE (id, user_id),
   FOREIGN KEY (parent_id, user_id) REFERENCES goals (id, user_id)
-    ON DELETE SET NULL (parent_id)
+    ON DELETE SET NULL (parent_id),
+  -- spec/07 2.1 — FK diperiksa SESUDAH barisnya ada: tanpa ini goal bisa menjadi
+  -- induk dirinya sendiri, dan pohonnya lingkaran (migrasi 0004).
+  CONSTRAINT goals_parent_not_self CHECK (parent_id <> id)
 );
 CREATE INDEX goals_user_status_idx ON goals (user_id, status) WHERE deleted_at IS NULL;
 CREATE INDEX goals_parent_idx      ON goals (parent_id) WHERE parent_id IS NOT NULL;
@@ -284,6 +287,13 @@ CREATE INDEX goal_milestones_goal_idx ON goal_milestones (goal_id, position);
 > `UNIQUE (id, user_id)` dan tiap anak menunjuknya dengan **pasangan**
 > kolom, sehingga basis data sendiri yang menolak. `ON DELETE SET NULL
 > (kolom)` (PostgreSQL 15+) mengosongkan hanya kolom induk, bukan `user_id`.
+>
+> 🔧 **`goals_parent_not_self` — 24 Sep 2026, migrasi 0004 (spec/07 2.1).** FK
+> komposit di atas diperiksa **sesudah** barisnya ada, jadi goal yang menunjuk
+> **dirinya sendiri** lolos — dan pohon goal menjadi lingkaran yang tidak pernah
+> berakhir. Lingkaran yang lebih panjang tidak bisa terbentuk: `parent_id` tidak
+> bisa diubah lewat API ([`04`](04-API-CONTRACTS.md)), dan goal baru hanya bisa
+> menunjuk goal yang sudah ada.
 
 ```sql
 -- @retention   : until-account-deleted

@@ -139,6 +139,9 @@ UJI_PERSETUJUAN = "tests/integration/test_persetujuan.py"
 UJI_GALAT_DB = "tests/integration/test_galat_basis_data.py"
 UJI_SANDI = "tests/unit/test_sandi.py"
 UJI_CONFIG = "tests/unit/test_config.py"
+UJI_GOALS = "tests/integration/test_goals.py"
+UJI_IDEM = "tests/integration/test_idempotensi.py"
+UJI_IDEM_RUTE = "tests/unit/test_idempotensi_terpasang.py"
 FK_MILESTONE = (
     "  FOREIGN KEY (goal_id, user_id) REFERENCES goals (id, user_id) ON DELETE CASCADE" + NL + ");"
 )
@@ -1566,6 +1569,174 @@ MUTASI: list[Mutasi] = [
             f"{UJI_KEPEMILIKAN}::test_transaksi_pengguna_membatasi_kueri_dan_tidak_bocor_ke_koneksi_berikutnya"
         ),
         harus_memuat="bocor ke koneksi berikutnya dari pool",
+        kelompok="db",
+    ),
+    # ── Sprint 2 · 2.1 goals + Idempotency-Key tulisan domain (E-165) ─────
+    Mutasi(
+        "2.1",
+        "pohon goal dibaca DUA kueri — akar dulu, baru keturunannya",
+        [
+            Sunting(
+                f"{MODUL}/goals/service.py",
+                "        baris = await repository.pohon(conn, goal_id, MAKS_KEDALAMAN)" + NL,
+                "        await repository.ambil(conn, goal_id)"
+                + NL
+                + "        baris = await repository.pohon(conn, goal_id, MAKS_KEDALAMAN)"
+                + NL,
+            )
+        ],
+        _pytest(f"{UJI_GOALS}::test_pohon_goal_tiga_tingkat_terbaca_dalam_satu_kueri"),
+        harus_memuat="pohon goal tidak terbaca dalam satu kueri",
+        kelompok="db",
+    ),
+    Mutasi(
+        "2.1",
+        "CHECK goals_parent_not_self dicabut (spec/01 DAN migrasi 0004)",
+        [
+            Sunting(
+                "spec/01-DATABASE-SCHEMA.md",
+                "    ON DELETE SET NULL (parent_id)," + NL,
+                "    ON DELETE SET NULL (parent_id)" + NL,
+            ),
+            Sunting(
+                "spec/01-DATABASE-SCHEMA.md",
+                "  CONSTRAINT goals_parent_not_self CHECK (parent_id <> id)" + NL,
+                "",
+            ),
+            Sunting(
+                f"{MIGRASI}/0004_goal_bukan_induk_dirinya.up.sql",
+                "  ADD CONSTRAINT goals_parent_not_self CHECK (parent_id <> id);",
+                "  ALTER COLUMN title SET NOT NULL;",
+            ),
+        ],
+        _pytest(f"{UJI_GOALS}::test_basis_data_menolak_goal_yang_menjadi_induk_dirinya"),
+        harus_memuat="DID NOT RAISE",
+        kelompok="db",
+    ),
+    Mutasi(
+        "2.1",
+        "kedalaman pohon tidak diperiksa saat menulis — tingkat ke-11 diterima",
+        [
+            Sunting(
+                f"{MODUL}/goals/service.py",
+                "                if jarak + 1 > MAKS_KEDALAMAN:",
+                "                if jarak + 1 > MAKS_KEDALAMAN * 100:",
+            )
+        ],
+        _pytest(f"{UJI_GOALS}::test_pohon_lebih_dari_sepuluh_tingkat_ditolak_saat_menulis"),
+        harus_memuat="goal tingkat ke-11 diterima",
+        kelompok="db",
+    ),
+    Mutasi(
+        "2.1",
+        "hapus-lunak tidak menaikkan anak menjadi akar",
+        [
+            Sunting(
+                f"{MODUL}/goals/repository.py",
+                '        await conn.execute(_LEPAS_ANAK, {"id": goal_id})' + NL,
+                "        pass" + NL,
+            )
+        ],
+        _pytest(f"{UJI_GOALS}::test_hapus_lunak_menaikkan_anak_menjadi_akar"),
+        harus_memuat="anak goal yang dihapus tidak naik menjadi akar",
+        kelompok="db",
+    ),
+    Mutasi(
+        "2.1",
+        "kursor bertanggal tanpa zona diterima",
+        [
+            Sunting(
+                f"{MODUL}/platform/halaman.py",
+                "    if saat.utcoffset() is None:" + NL + "        raise _kursor_rusak()" + NL,
+                "",
+            )
+        ],
+        _pytest("tests/unit/test_halaman.py::test_kursor_rusak_menjadi_galat_400"),
+        harus_memuat="DID NOT RAISE",
+    ),
+    Mutasi(
+        "E-165",
+        "rute tulis domain BARU tanpa `idem: platform.Idempoten`",
+        [
+            _sisip(
+                f"{MODUL}/goals/routes.py",
+                '@router.post("/goals/{goal_id}/mutasi", status_code=204)'
+                + NL
+                + "async def _mutasi(goal_id: UUID) -> None:"
+                + NL
+                + "    return None",
+            )
+        ],
+        _pytest(f"{UJI_IDEM_RUTE}::test_tiap_rute_tulis_domain_menerima_idempotency_key"),
+        harus_memuat="POST /v1/goals/{goal_id}/mutasi",
+    ),
+    Mutasi(
+        "E-165",
+        "kunci idempotensi tanpa user_id — jawaban A diputar ulang untuk B",
+        [
+            Sunting(
+                f"{MODUL}/platform/idempotensi.py",
+                '        return f"{self._awalan}:idem:{user_id}:{sidik}"',
+                '        return f"{self._awalan}:idem:{sidik}"',
+            )
+        ],
+        _pytest(f"{UJI_IDEM}::test_kunci_yang_sama_milik_dua_pengguna_tidak_saling_memutar_ulang"),
+        harus_memuat="jawaban pengguna A diputar ulang untuk B",
+        kelompok="db",
+    ),
+    Mutasi(
+        "E-165",
+        "kunci yang sama dengan badan lain diputar ulang diam-diam",
+        [
+            Sunting(
+                f"{MODUL}/platform/idempotensi.py",
+                '        if tersimpan.get("sidik") != self._sidik:'
+                + NL
+                + "            raise _dipakai_ulang()"
+                + NL,
+                "",
+            )
+        ],
+        _pytest(f"{UJI_IDEM}::test_kunci_sama_dengan_badan_lain_422_bukan_diputar_ulang"),
+        harus_memuat="kunci yang sama dengan badan lain diputar ulang",
+        kelompok="db",
+    ),
+    Mutasi(
+        "E-165",
+        "penanda 'sedang berjalan' tanpa NX — permintaan serentak semuanya menulis",
+        [
+            Sunting(
+                f"{MODUL}/platform/idempotensi.py",
+                "        if not await self._r.set(k, penanda, nx=True, ex=_UMUR_PROSES_S):",
+                "        if not await self._r.set(k, penanda, ex=_UMUR_PROSES_S):",
+            )
+        ],
+        _pytest(f"{UJI_IDEM}::test_permintaan_serentak_dengan_kunci_sama_hanya_satu_yang_jalan"),
+        harus_memuat="serentak:",
+        kelompok="db",
+    ),
+    Mutasi(
+        "E-165",
+        "galat 4xx disimpan sebagai jawaban — ulangan tidak pernah dijalankan lagi",
+        [
+            Sunting(
+                f"{MODUL}/platform/idempotensi.py",
+                "        except BaseException:"
+                + NL
+                + "            await self._hapus(keys=[k], args=[penanda])"
+                + NL
+                + "            raise"
+                + NL,
+                "        except GalatApi as g:"
+                + NL
+                + '            await self._r.set(k, json.dumps({"sidik": self._sidik, "status": g.status, "badan": {}}))'
+                + NL
+                + "            raise"
+                + NL,
+            )
+        ],
+        _pytest(f"{UJI_IDEM}::test_galat_tidak_disimpan_sebagai_jawaban"),
+        harus_memuat="galat disimpan sebagai jawaban",
         kelompok="db",
     ),
 ]

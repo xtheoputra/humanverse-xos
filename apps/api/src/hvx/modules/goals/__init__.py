@@ -6,8 +6,10 @@ Dikerjakan: Sprint 2 (2.1) — spec/07.
 Modul domain: tidak boleh mengimpor modul domain lain — komunikasinya lewat
 event (spec/06 aturan 3).
 
-Berkas ini satu-satunya pintu keluar modul (spec/06 aturan 1). Masih kosong:
-belum ada yang diekspor.
+Berkas ini satu-satunya pintu keluar modul (spec/06 aturan 1).
 """
 
-__all__: list[str] = []
+from .routes import router
+from .schemas import Goal, GoalRinci, Milestone, SimpulPohon
+
+__all__ = ["Goal", "GoalRinci", "Milestone", "SimpulPohon", "router"]

@@ -106,3 +106,34 @@ class ApiUji:
         assert isinstance(uid, UUID)
         token = await self.penyimpan_sesi().buat(uid)
         return uid, token.access_token
+
+
+def auth(token: str) -> dict[str, str]:
+    return {"Authorization": f"Bearer {token}"}
+
+
+class PenghitungKueri:
+    """Menghitung pernyataan SQL yang dikirim engine aplikasi — tanpa `set_config` RLS.
+
+    Dipakai untuk bukti *"terbaca dalam satu query"* (spec/07 2.1): jumlah
+    kueri DATA yang benar-benar sampai ke PostgreSQL, bukan jumlah panggilan
+    fungsi di kode.
+    """
+
+    def __init__(self, app: Any) -> None:
+        from sqlalchemy import event
+
+        self._event = event
+        self._engine = app.state.engine.sync_engine
+        self.pernyataan: list[str] = []
+
+    def _catat(self, _conn: Any, _cursor: Any, sql: str, *_: Any) -> None:
+        if "set_config('hvx.user_id'" not in sql:
+            self.pernyataan.append(" ".join(sql.split()))
+
+    def __enter__(self) -> PenghitungKueri:
+        self._event.listen(self._engine, "before_cursor_execute", self._catat)
+        return self
+
+    def __exit__(self, *_: object) -> None:
+        self._event.remove(self._engine, "before_cursor_execute", self._catat)

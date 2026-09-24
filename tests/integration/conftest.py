@@ -122,3 +122,31 @@ async def api_uji(
         httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://uji") as klien,
     ):
         yield ApiUji(app=app, klien=klien, db=db, awalan_redis=awalan)
+
+
+@pytest.fixture(scope="module")
+async def api_bersama(v0_bersama: BasisDataV0, url_redis_uji: str) -> AsyncIterator[ApiUji]:
+    """SATU aplikasi utuh untuk seluruh uji satu berkas — tiap uji memakai pengguna baru.
+
+    Untuk uji fitur domain (Sprint 2+) yang tidak menguji skema itu sendiri:
+    memigrasikan basis data baru per uji membuat ratusan uji menunggu migrasi,
+    sementara pemisahnya — pengguna berbeda di bawah RLS — sudah yang diuji
+    `test_kepemilikan_data.py`. Batas laju dilonggarkan: satu klien uji mengirim
+    ratusan permintaan dari satu IP; batasnya sendiri diuji `test_batas_laju.py`.
+    """
+    awalan = f"uji-{uuid.uuid4().hex[:12]}"
+    app = create_app(
+        Settings(
+            env="test",
+            database_url=v0_bersama.dsn_aplikasi,
+            redis_url=url_redis_uji,
+            redis_prefix=awalan,
+            rate_limit_ip="100000/60",
+            rate_limit_user="100000/60",
+        )
+    )
+    async with (
+        LifespanManager(app),
+        httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://uji") as klien,
+    ):
+        yield ApiUji(app=app, klien=klien, db=v0_bersama, awalan_redis=awalan)
