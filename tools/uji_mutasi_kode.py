@@ -27,6 +27,13 @@ keluar 1: bagian yang tidak dijalankan tidak boleh terbaca sebagai lulus.
 Tiap mutasi dihentikan — beserta seluruh proses turunannya — sesudah
 `BATAS_DETIK_MUTASI`, dan terhitung DIAM: kerusakan yang membuat ujinya
 menggantung tidak menahan gerbang tanpa batas.
+
+Mutasi tidak meninggalkan **bytecode basi**: perintahnya berjalan tanpa menulis
+`__pycache__`, dan pemulihan membuang bytecode tiap berkas yang dimutasi. 🔴 Tanpa
+itu, mutasi berukuran SAMA (`ge=1` → `ge=0`) yang dipulihkan di DETIK yang sama
+meninggalkan `.pyc` yang cocok dengan berkas aslinya (Python memeriksa detik mtime
+dan ukuran) — dan tahap `pytest` berikutnya menjalankan kode mutan (gerbang penuh
+Sprint 3: `valence 0` lolos uji admisi di tahap uji, kode sumbernya benar).
 """
 
 from __future__ import annotations
@@ -116,6 +123,11 @@ def jalankan_terbatas(
         keluaran, _ = proses.communicate()
         return -1, f"{keluaran or ''}\nMENGGANTUNG — dihentikan sesudah {batas_s:g} dtk"
     return proses.returncode, keluaran or ""
+
+
+def lingkungan_mutasi() -> dict[str, str]:
+    """Lingkungan perintah tiap mutasi — tanpa menulis bytecode (lihat docstring modul)."""
+    return {**os.environ, "PYTHONIOENCODING": "utf-8", "PYTHONDONTWRITEBYTECODE": "1"}
 
 
 def _lint(kontrak: str) -> list[str]:
@@ -5326,6 +5338,41 @@ MUTASI: list[Mutasi] = [
         harus_memuat="cache yang ditulis terlambat melewati izin sementaranya",
         kelompok="db",
     ),
+    # ── alat ini sendiri: bytecode mutan tidak tertinggal sesudah dipulihkan ──
+    Mutasi(
+        "alat",
+        "mutasi menulis bytecode — .pyc mutan ukuran-sama dipakai sesudah dipulihkan",
+        [
+            Sunting(
+                "tools/uji_mutasi_kode.py",
+                # Dipotong dua: jangkar yang utuh di sini membuat jangkarnya tidak unik.
+                '"utf-8", "PYTHONDONTWRITEBYTECODE"' + ': "1"}',
+                '"utf-8"}',
+            )
+        ],
+        _pytest(
+            "tests/unit/test_alat_mutasi_bytecode.py::"
+            "test_mutasi_ukuran_sama_tidak_meninggalkan_bytecode_basi"
+        ),
+        harus_memuat="bytecode mutan dipakai sesudah berkasnya dipulihkan",
+    ),
+    Mutasi(
+        "alat",
+        "pemulihan tidak membuang bytecode berkas yang dimutasi",
+        [
+            Sunting(
+                "tools/uji_mutasi_kode.py",
+                '            for pyc in (p.parent / "__pycache__").glob(f"{p.stem}.*.pyc"):' + NL,
+                '            for pyc in (p.parent / "__pycache__").glob(f"{p.stem}.*.tidak-ada"):'
+                + NL,
+            )
+        ],
+        _pytest(
+            "tests/unit/test_alat_mutasi_bytecode.py::"
+            "test_pemulihan_membuang_bytecode_berkas_yang_dimutasi"
+        ),
+        harus_memuat="bytecode berkas yang dimutasi tertinggal",
+    ),
     # ── alat ini sendiri: mutasi yang menggantung dihentikan beserta turunannya ──
     Mutasi(
         "alat",
@@ -5403,6 +5450,12 @@ def _pulihkan(cadangan: dict[Path, bytes | None], dir_baru: list[Path]) -> None:
             p.unlink(missing_ok=True)
         else:
             p.write_bytes(isi)
+        if p.suffix == ".py":
+            # Bytecode yang dikompilasi dari MUTAN — lapis kedua sesudah
+            # PYTHONDONTWRITEBYTECODE: perintah yang tidak mewarisi lingkungannya
+            # (subproses yang menyetel ulang env) tetap tidak meninggalkan .pyc basi.
+            for pyc in (p.parent / "__pycache__").glob(f"{p.stem}.*.pyc"):
+                pyc.unlink(missing_ok=True)
     for d in dir_baru:
         shutil.rmtree(d, ignore_errors=True)
     shutil.rmtree(AKAR / ".import_linter_cache", ignore_errors=True)
@@ -5440,7 +5493,7 @@ def main() -> int:
 
     lemah: list[str] = []
     dilewati: dict[str, int] = {}
-    lingkungan = {**os.environ, "PYTHONIOENCODING": "utf-8"}
+    lingkungan = lingkungan_mutasi()
     for m in MUTASI:
         label = f"{m.kode:4s} {m.maksud:64s}"
         if m.kelompok not in jalan:

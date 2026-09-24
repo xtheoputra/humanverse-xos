@@ -17,7 +17,7 @@ sesi yang sama dengan Sesi 31, berlanjut ke Sprint 3.
 | Temuan ditutup | 🆕 **E-177 … E-181** (menulis Sprint 3) · 🆕 **E-182 … E-188** (tinjauan sebelum PR) · 🆕 **E-189** (cacat Sprint 1 yang ketahuan lewat uji yang berkedip di gerbang penuh) |
 | Butir pemilik | 🆕 **C-33** teks bebas di payload event · **C-31** · **C-32** baru di sprint ini, diperluas tinjauan |
 | `spec/` diubah | `01` (`embedding_model` · fungsi relay & penyelaras · peran `hvx_pekerja`) · `03` (kunci per kejadian · `habit.completion_retracted` · `for_date` & `completion_id` · bentuk konsumen V0 · 23 event) · `04` (`journal` · `activities`: `?source=`, `ended_at`) · `05` (daftar scope resmi · aturan 6 `journal_raw`) · `06` (aturan 6 dipersempit ke fakta perilaku · tiga tulisan tanpa event · pendengar jurnal) · `07` (status Sprint 3) |
-| Kode | 🔨 **Sprint 3 — 3.1–3.8 seluruhnya**, branch `v0/sprint-3-memory-event`: `events` · relay & konsumen di **proses pekerja** · `journal` · Qdrant + penyemat · `memory` · `activities`, migrasi 0005–0006 — **765 uji Python + 40 uji Flutter**, **125 mutasi baru, semuanya berbunyi** (kode: 217 → 342) |
+| Kode | 🔨 **Sprint 3 — 3.1–3.8 seluruhnya**, branch `v0/sprint-3-memory-event`: `events` · relay & konsumen di **proses pekerja** · `journal` · Qdrant + penyemat · `memory` · `activities`, migrasi 0005–0006 — **767 uji Python + 40 uji Flutter**, **127 mutasi baru, semuanya berbunyi** (kode: 217 → 344) |
 | Tinjauan sebelum PR | 🔍 **tiga lensa serentak** — keamanan (5 terbukti) · kontrak (9 terbukti) · penegak buta (**49 dari 68 kerusakan lolos seluruh suite**, kini tiap kerusakan punya uji dan mutasi). Yang paling mahal: satu kunci penyemat untuk semua pengguna — akun biasa membaca vektor orang lain dengan kamusnya sendiri |
 
 ---

@@ -269,6 +269,15 @@ terlalu lebar: mutasi 3.7 *“manifest tidak membatasi”* ikut merah di sana de
 alasan yang salah. Kini `"mood" not in perlu_izin`, dan kedua mutasi merah pada
 alasannya masing-masing.
 
+🔴 **Dan gerbang berikutnya menemukan cacat di alat ukurnya sendiri.** Tahap
+`pytest` merah di satu kasus yang lulus bila dijalankan sendiri — `valence 0`
+lolos uji admisi — padahal sumbernya `ge=1`. Penyebabnya bytecode: mutasi
+`ge=1` → `ge=0` berukuran **sama**, dan dipulihkan di **detik yang sama**, jadi
+`.pyc` mutannya cocok dengan berkas aslinya (Python hanya memeriksa detik mtime
+dan ukuran) — tahap uji sesudahnya menjalankan kode mutan. ✅ Perintah mutasi kini
+berjalan tanpa menulis bytecode (`PYTHONDONTWRITEBYTECODE=1`), dan pemulihan
+membuang `.pyc` tiap berkas yang dimutasi; keduanya dibuktikan uji dan mutasi `alat`.
+
 #### Yang TIDAK dibetulkan di Sprint 3
 
 | Temuan | Kenapa | Ke mana |
