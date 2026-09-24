@@ -14,13 +14,16 @@ Berkas ini satu-satunya pintu keluar modul (spec/06 aturan 1).
 from .repository import energi_pada
 from .routes import router
 from .schemas import CatatMood, Checkin, Mood
-from .service import catat_mood, mood_untuk_ekstraksi
+from .service import catat_mood, daftar_mood, mood_untuk_ekstraksi
+from .service import daftar as daftar_checkin  # tool checkin.get (spec/07 4.3)
 
 __all__ = [
     "CatatMood",
     "Checkin",
     "Mood",
     "catat_mood",
+    "daftar_checkin",
+    "daftar_mood",
     "energi_pada",
     "mood_untuk_ekstraksi",
     "router",

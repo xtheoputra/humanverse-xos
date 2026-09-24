@@ -5,10 +5,10 @@ description: Simpan satu rekomendasi coach beserta keyakinan dan alasannya (reco
 scopes: [coaching_notes]
 risk_level: 1
 input:
-  domain: { type: string, required: true }
+  domain: { type: string, required: true, enum: [habit, goal, wellbeing] }
   title: { type: string, required: true }
   body: { type: string, required: false }
-  confidence: { type: number, required: true }
+  confidence: { type: number, required: true, min: 0, max: 1 }
   rationale: { type: array, required: true }
 output:
   id: uuid

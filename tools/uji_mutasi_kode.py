@@ -296,6 +296,8 @@ UJI_GERBANG_MODEL = "tests/unit/test_gerbang_model.py"
 UJI_RUTE = "tests/integration/test_rute_model.py"
 UJI_REGISTRI = "tests/unit/test_registri_agent.py::test_manifest_yang_melanggar_ditolak"
 UJI_KATALOG = "tests/integration/test_katalog_agent.py"
+UJI_PELAKSANA = "tests/unit/test_pelaksana_alat.py"
+UJI_ALAT = "tests/integration/test_alat_v0.py"
 FK_MILESTONE = (
     "  FOREIGN KEY (goal_id, user_id) REFERENCES goals (id, user_id) ON DELETE CASCADE" + NL + ");"
 )
@@ -5341,6 +5343,364 @@ MUTASI: list[Mutasi] = [
         ],
         _pytest(f"{UJI_IZIN}::test_cache_yang_ditulis_terlambat_tidak_melewati_izin_sementaranya"),
         harus_memuat="cache yang ditulis terlambat melewati izin sementaranya",
+        kelompok="db",
+    ),
+    # ── Sprint 4 · 4.3 tool registry: di luar registry tak bisa dipanggil; agent lewat gerbang ──
+    Mutasi(
+        "4.3",
+        "registry ≠ implementasi diterima — tool berimplementasi tanpa risk_level",
+        [
+            Sunting(
+                f"{MODUL}/agents/pelaksana_alat.py",
+                "        if tanpa_impl or tanpa_daftar:",
+                "        if tanpa_impl:",
+            )
+        ],
+        _pytest(f"{UJI_PELAKSANA}::test_registry_dan_implementasi_satu_lawan_satu"),
+        harus_memuat="DID NOT RAISE",
+    ),
+    Mutasi(
+        "4.3",
+        "tool di luar registry tidak ditolak sebagai tidak_terdaftar",
+        [
+            Sunting(
+                f"{MODUL}/agents/pelaksana_alat.py", "        if alat is None:", "        if False:"
+            )
+        ],
+        _pytest(f"{UJI_PELAKSANA}::test_tool_di_luar_registry_tidak_bisa_dipanggil"),
+        harus_memuat="tool di luar registry dijalankan",
+    ),
+    Mutasi(
+        "4.3",
+        "agent memanggil tool yang tidak dinyatakan manifest-nya",
+        [
+            Sunting(
+                f"{MODUL}/agents/pelaksana_alat.py",
+                "        if nama not in jalannya.agent.tools:",
+                "        if False:",
+            )
+        ],
+        _pytest(f"{UJI_PELAKSANA}::test_agent_hanya_memanggil_tool_manifestnya"),
+        harus_memuat="DID NOT RAISE",
+    ),
+    Mutasi(
+        "4.3",
+        "medan masukan tak dikenal diterima",
+        [
+            Sunting(
+                f"{MODUL}/agents/pelaksana_alat.py",
+                '        raise _salah(alat.name, f"medan tak dikenal: {asing}")',
+                "        pass",
+            )
+        ],
+        _pytest(f"{UJI_PELAKSANA}::test_masukan_yang_salah_ditolak_sebelum_gerbang"),
+        harus_memuat="'lain': 1} diterima",
+    ),
+    Mutasi(
+        "4.3",
+        "medan masukan wajib boleh hilang",
+        [
+            Sunting(
+                f"{MODUL}/agents/pelaksana_alat.py",
+                "            if medan.required:",
+                "            if False:",
+            )
+        ],
+        _pytest(f"{UJI_PELAKSANA}::test_masukan_yang_salah_ditolak_sebelum_gerbang"),
+        harus_memuat="habit.streak {} diterima",
+    ),
+    Mutasi(
+        "4.3",
+        "tanggal bentuk dasar ISO (20260901) diterima — hanya fromisoformat",
+        [
+            Sunting(
+                f"{MODUL}/agents/pelaksana_alat.py",
+                "        if not isinstance(nilai, str) or not _TANGGAL.fullmatch(nilai):",
+                "        if not isinstance(nilai, str):",
+            )
+        ],
+        _pytest(f"{UJI_PELAKSANA}::test_masukan_yang_salah_ditolak_sebelum_gerbang"),
+        harus_memuat="'20260901'} diterima",
+    ),
+    Mutasi(
+        "4.3",
+        "boolean diterima sebagai bilangan bulat (E-170 di sisi agent)",
+        [
+            Sunting(
+                f"{MODUL}/agents/pelaksana_alat.py",
+                "        if isinstance(nilai, bool) or not isinstance(nilai, int):",
+                "        if not isinstance(nilai, int):",
+            )
+        ],
+        _pytest(f"{UJI_PELAKSANA}::test_masukan_yang_salah_ditolak_sebelum_gerbang"),
+        harus_memuat="{'hari': True} diterima",
+    ),
+    Mutasi(
+        "4.3",
+        "pemanggilan tool tidak menanyai gerbang — agent memanggil agent tanpa gerbang",
+        [
+            Sunting(
+                f"{MODUL}/agents/pelaksana_alat.py",
+                "        await self._gerbang.periksa(jalannya, alat, bersih)\n",
+                "",
+            )
+        ],
+        _pytest(f"{UJI_PELAKSANA}::test_pemanggilan_agent_ikut_melewati_gerbang"),
+        harus_memuat="DID NOT RAISE",
+    ),
+    Mutasi(
+        "4.3",
+        "keluaran tool tidak diperiksa skemanya — medan tak dinyatakan lolos",
+        [
+            Sunting(
+                f"{MODUL}/agents/pelaksana_alat.py",
+                "        periksa_keluaran(alat, keluaran)\n",
+                "",
+            )
+        ],
+        _pytest(f"{UJI_PELAKSANA}::test_keluaran_di_luar_skema_adalah_cacat"),
+        harus_memuat="DID NOT RAISE",
+    ),
+    Mutasi(
+        "4.3",
+        "batas laju tool tidak ditegakkan",
+        [
+            Sunting(
+                f"{MODUL}/agents/pelaksana_alat.py",
+                "        await self._batasi(jalannya, alat)\n",
+                "",
+            )
+        ],
+        _pytest(f"{UJI_ALAT}::test_batas_laju_tool_per_pengguna"),
+        harus_memuat="DID NOT RAISE",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.3",
+        "checkin.get membocorkan catatan bebas pengguna (C-32)",
+        [
+            Sunting(
+                f"{MODUL}/agents/alat_v0.py",
+                '            "sleep_hours": c.sleep_hours,\n',
+                '            "sleep_hours": c.sleep_hours,\n            "note": c.note,\n',
+            )
+        ],
+        _pytest(f"{UJI_ALAT}::test_alat_baca_coach_tanpa_catatan_bebas_pengguna"),
+        harus_memuat="catatan bebas pengguna keluar",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.3",
+        "mood.recent membocorkan catatan bebas pengguna (C-32)",
+        [
+            Sunting(
+                f"{MODUL}/agents/alat_v0.py",
+                '{"valence": x.valence, "label": x.label, "occurred_at": x.occurred_at.isoformat()}',
+                '{"valence": x.valence, "label": x.label, "note": x.note, "occurred_at": x.occurred_at.isoformat()}',
+            )
+        ],
+        _pytest(f"{UJI_ALAT}::test_alat_baca_coach_tanpa_catatan_bebas_pengguna"),
+        harus_memuat="catatan bebas pengguna keluar",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.3",
+        "pagu scope tidak diperiksa — memory.write ke journal_raw sampai ke gerbang",
+        [
+            Sunting(
+                f"{MODUL}/agents/pelaksana_alat.py",
+                "        _periksa_pagu_scope(jalannya, alat, bersih)\n",
+                "",
+            )
+        ],
+        _pytest(f"{UJI_PELAKSANA}::test_scope_memory_write_di_luar_pagu_ditolak_sebelum_gerbang"),
+        harus_memuat="memory.write ke journal_raw diterima — DENY naskah 5 §15",
+    ),
+    Mutasi(
+        "4.3",
+        "pagu manifest tidak membatasi scope memory.write — hanya scopes tool",
+        [
+            Sunting(
+                f"{MODUL}/agents/pelaksana_alat.py",
+                "        if scope not in alat.scopes or scope not in pagu:",
+                "        if scope not in alat.scopes:",
+            )
+        ],
+        _pytest(f"{UJI_PELAKSANA}::test_scope_memory_write_di_luar_pagu_ditolak_sebelum_gerbang"),
+        harus_memuat="memory.write ke habits diterima — pagu manifest sempit",
+    ),
+    Mutasi(
+        "4.3",
+        "scopes tool tidak membatasi scope memory.write — manifest melebar menang",
+        [
+            Sunting(
+                f"{MODUL}/agents/pelaksana_alat.py",
+                "        if scope not in alat.scopes or scope not in pagu:",
+                "        if scope not in pagu:",
+            )
+        ],
+        _pytest(f"{UJI_PELAKSANA}::test_scope_memory_write_di_luar_pagu_ditolak_sebelum_gerbang"),
+        harus_memuat="memory.write ke journal_raw diterima — manifest melebar",
+    ),
+    Mutasi(
+        "4.3",
+        "enum skema tool tidak ditegakkan — status habit sembarang sampai ke gerbang R2",
+        [
+            Sunting(
+                f"{MODUL}/agents/pelaksana_alat.py",
+                "        if medan.enum is not None and nilai not in medan.enum:",
+                "        if False:",
+            )
+        ],
+        _pytest(f"{UJI_PELAKSANA}::test_masukan_yang_salah_ditolak_sebelum_gerbang"),
+        harus_memuat="'status': 'x'} diterima",
+    ),
+    Mutasi(
+        "4.3",
+        "min/max skema tool tidak ditegakkan",
+        [
+            Sunting(
+                f"{MODUL}/agents/pelaksana_alat.py",
+                "        if (medan.min is not None and nilai < medan.min) or (",
+                "        if False and (",
+            )
+        ],
+        _pytest(f"{UJI_PELAKSANA}::test_masukan_yang_salah_ditolak_sebelum_gerbang"),
+        harus_memuat="'tier_used': -1} diterima",
+    ),
+    Mutasi(
+        "4.3",
+        "enum pada medan bilangan diterima registry",
+        [
+            Sunting(
+                f"{MODUL}/agents/registri.py",
+                '        if self.enum is not None and (self.type != "string" or not self.enum):',
+                "        if False:",
+            )
+        ],
+        _pytest(f"{UJI_REGISTRI}"),
+        harus_memuat="aturan bentuk tidak ditegakkan — enum pada medan bilangan",
+    ),
+    Mutasi(
+        "4.3",
+        "min/max pada medan teks diterima registry",
+        [
+            Sunting(
+                f"{MODUL}/agents/registri.py",
+                '        if berbatas and self.type not in ("integer", "number"):',
+                "        if False:",
+            )
+        ],
+        _pytest(f"{UJI_REGISTRI}"),
+        harus_memuat="aturan bentuk tidak ditegakkan — min pada medan teks",
+    ),
+    Mutasi(
+        "4.3",
+        "min > max diterima registry — medan yang tak pernah sah",
+        [
+            Sunting(
+                f"{MODUL}/agents/registri.py",
+                "        if self.min is not None and self.max is not None and self.min > self.max:",
+                "        if False:",
+            )
+        ],
+        _pytest(f"{UJI_REGISTRI}"),
+        harus_memuat="aturan bentuk tidak ditegakkan — min lebih besar daripada max",
+    ),
+    Mutasi(
+        "4.3",
+        "skema tool menyimpang dari modul pemiliknya (status habit)",
+        [
+            Sunting(
+                f"{MODUL}/agents/alat/habit.complete.yaml",
+                "enum: [done, skipped, partial]",
+                "enum: [done, skipped]",
+            )
+        ],
+        _pytest(f"{UJI_PELAKSANA}::test_batas_nilai_tool_sama_dengan_modul_pemiliknya"),
+        harus_memuat="habit.complete.status",
+    ),
+    Mutasi(
+        "4.3",
+        "mood.recent memotong diam-diam",
+        [
+            Sunting(
+                f"{MODUL}/agents/alat_v0.py",
+                '    return {  # tanpa `note` (C-32)\n        "terpotong": halaman.next_cursor is not None,',
+                '    return {  # tanpa `note` (C-32)\n        "terpotong": False,',
+            )
+        ],
+        _pytest(f"{UJI_ALAT}::test_daftar_yang_terpotong_mengatakannya"),
+        harus_memuat="mood terpotong diam-diam",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.3",
+        "goal.list memotong diam-diam",
+        [
+            Sunting(
+                f"{MODUL}/agents/alat_v0.py",
+                '(K-24)\n        "terpotong": halaman.next_cursor is not None,',
+                '(K-24)\n        "terpotong": False,',
+            )
+        ],
+        _pytest(f"{UJI_ALAT}::test_daftar_yang_terpotong_mengatakannya"),
+        harus_memuat="goal terpotong diam-diam",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.3",
+        "memory.search mencatat scope yang DIMINTA, bukan yang diizinkan",
+        [
+            Sunting(
+                f"{MODUL}/agents/alat_v0.py",
+                "    k.jalannya.catat_scope(*hasil.scope_dipakai)",
+                "    k.jalannya.catat_scope(*k.jalannya.agent.memory.read)",
+            )
+        ],
+        _pytest(f"{UJI_ALAT}::test_memory_search_hanya_scope_manifest_yang_diizinkan"),
+        harus_memuat="scope yang dicatat run",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.3",
+        "agent.coach memanggil agent yang salah",
+        [
+            Sunting(
+                f"{MODUL}/agents/alat_v0.py",
+                '    "agent.coach": _agent("coach-agent"),',
+                '    "agent.coach": _agent("habit-agent"),',
+            )
+        ],
+        _pytest(f"{UJI_PELAKSANA}::test_pemanggilan_agent_ikut_melewati_gerbang"),
+        harus_memuat="agent yang ditolak tetap dipanggil",
+    ),
+    Mutasi(
+        "4.3",
+        "memory.write mengingat hal yang sama dua kali",
+        [
+            Sunting(
+                f"{MODUL}/memory/repository.py",
+                "    if ada is not None:\n        return ada.id, False\n",
+                "",
+            )
+        ],
+        _pytest(f"{UJI_ALAT}::test_memory_write_hanya_bila_belum_diingat_dan_di_scope_manifestnya"),
+        harus_memuat="diingat dua kali",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.3",
+        "rekomendasi tanpa alasan disimpan",
+        [
+            Sunting(
+                f"{MODUL}/intelligence/rekomendasi.py",
+                "        not rationale\n        or len(rationale) > ALASAN_MAKS",
+                "        len(rationale) > ALASAN_MAKS",
+            )
+        ],
+        _pytest(f"{UJI_ALAT}::test_recommendation_create_menyimpan_keyakinan_dan_alasan"),
+        harus_memuat="DID NOT RAISE",
         kelompok="db",
     ),
     # ── alat ini sendiri: bytecode mutan tidak tertinggal sesudah dipulihkan ──

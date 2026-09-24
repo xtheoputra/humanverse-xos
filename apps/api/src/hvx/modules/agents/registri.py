@@ -32,7 +32,7 @@ from typing import Any, Literal
 from uuid import UUID, uuid5
 
 import yaml
-from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine
 
@@ -59,6 +59,22 @@ class _Medan(BaseModel):
     model_config = _KETAT
     type: TipeMedan
     required: bool
+    # 🔧 4.3 — batas NILAI ikut kontrak tool, supaya pemanggilan yang pasti gagal ditolak
+    # pelaksana SEBELUM gerbang: tidak ada konfirmasi R2 untuk aksi yang lalu ditolak.
+    enum: list[str] | None = None  # hanya `string`
+    min: int | None = None  # hanya `integer` · `number`
+    max: int | None = None
+
+    @model_validator(mode="after")
+    def _batas_sesuai_tipe(self) -> _Medan:
+        if self.enum is not None and (self.type != "string" or not self.enum):
+            raise ValueError("enum hanya untuk string, dan tidak kosong")
+        berbatas = self.min is not None or self.max is not None
+        if berbatas and self.type not in ("integer", "number"):
+            raise ValueError("min/max hanya untuk integer dan number")
+        if self.min is not None and self.max is not None and self.min > self.max:
+            raise ValueError("min lebih besar daripada max")
+        return self
 
 
 class Alat(BaseModel):

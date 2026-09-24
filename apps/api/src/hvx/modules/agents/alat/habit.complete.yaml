@@ -7,8 +7,8 @@ risk_level: 2               # aksi reversibel — izin diminta sekali, lalu bole
 input:
   habit_id: { type: uuid, required: true }
   for_date: { type: date, required: true }
-  status: { type: string, required: true }
-  tier_used: { type: integer, required: false }
+  status: { type: string, required: true, enum: [done, skipped, partial] }
+  tier_used: { type: integer, required: false, min: 0 }
 output:
   id: uuid
   status: string

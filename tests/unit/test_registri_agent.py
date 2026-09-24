@@ -124,6 +124,22 @@ KASUS: list[tuple[str, str, Callable[[Mentah, Mentah], None]]] = [
         "tangga R dipakai untuk otonomi L",
         lambda a, m: m["coach-agent"]["autonomy"].update(max_level="R2"),
     ),
+    # Batas nilai masukan (4.3) — batas yang salah tempat diam-diam tidak pernah berlaku.
+    (
+        "bentuk",
+        "enum pada medan bilangan",
+        lambda a, m: a["mood.recent"]["input"]["hari"].update(enum=["7"]),
+    ),
+    (
+        "bentuk",
+        "min pada medan teks",
+        lambda a, m: a["goal.list"]["input"]["status"].update(min=1),
+    ),
+    (
+        "bentuk",
+        "min lebih besar daripada max",
+        lambda a, m: a["mood.recent"]["input"]["hari"].update(min=31, max=1),
+    ),
 ]
 
 
@@ -143,7 +159,9 @@ def test_manifest_yang_melanggar_ditolak(
     else:
         dilanggar = set()  # diterima utuh
 
-    assert aturan in dilanggar, f"aturan {aturan} tidak ditegakkan — yang terbaca: {dilanggar}"
+    assert aturan in dilanggar, (
+        f"aturan {aturan} tidak ditegakkan — {_maksud} — yang terbaca: {dilanggar}"
+    )
 
 
 def test_semua_pelanggaran_dilaporkan_sekaligus() -> None:

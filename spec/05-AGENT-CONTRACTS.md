@@ -215,6 +215,7 @@ scopes:      [ habits ]            # scope memory/data yang disentuh
 risk_level:  0
 input:
   habit_id:  { type: uuid, required: true }
+  # 🔧 4.3: batas nilai opsional — `enum: [..]` (string) · `min`/`max` (integer, number)
 output:                            # 🔧 = GET /habits/{id}/streak (04, E-176)
   current:              integer
   longest:              integer
@@ -253,6 +254,45 @@ Tool V0 — **9 tool + 3 entri `kind: agent`**:
 > pernah menyebutnya, jadi gerbang risiko (4.5) tidak punya scope untuk ditanyakan
 > ke mesin izin. `checkin.get` dan `mood.recent` sengaja **tanpa catatan bebas**
 > (`note`): coach membaca angka dan label, bukan tulisan pengguna (C-32).
+
+> 🔧 **Pelaksana tool V0 (tugas 4.3, 24 Sep 2026).** Satu jalan untuk tiap
+> pemanggilan — `agents.PelaksanaAlat`, urutannya tetap: **(1)** terdaftar di registry
+> *dan* berimplementasi (keduanya satu lawan satu, diperiksa saat pelaksana dirakit —
+> implementasi tanpa baris registry adalah tool tanpa `risk_level`); **(2)** tercantum
+> di `tools:` manifest pemanggil; **(3)** masukan tepat skema `input` — medan tak
+> dikenal, wajib yang hilang, tipe yang salah, dan nilai di luar `enum`/`min`/`max`-nya
+> **ditolak, tidak dikoersi** (E-170 di sisi agent: `true` bukan `1`, `20260901` bukan
+> tanggal); medan bernama **`scope`** (`memory.write`) wajib ada di `scopes` tool
+> **dan** di pagu manifest pemanggil; **(4)** `rate_limit` per pengguna; **(5)** gerbang
+> risiko (4.5); **(6)** keluaran diperiksa terhadap skema `output` — medan yang tidak
+> dinyatakan adalah **cacat implementasi**, bukan fitur. Yang ditolak di (1)–(3) tidak
+> memakai jatah dan tidak pernah sampai ke gerbang — tidak ada konfirmasi R2 untuk aksi
+> yang pasti gagal. Batas nilai skema **menyalin** modul pemiliknya (status habit dan
+> goal, domain rekomendasi, batas pencarian), dan salinannya diuji sama.
+>
+> Tiap implementasi memanggil **pintu keluar modul pemilik datanya** — layanan yang
+> sama dengan rute HTTP-nya, di bawah RLS pengguna yang dilayani run itu:
+> `habit.complete` menerbitkan `habit.completed`-nya sendiri, dan kiriman ulangnya
+> tidak melahirkan baris kedua. Yang dicatat ke run (`agent_runs.memory_scopes`,
+> 4.4) adalah scope yang **benar-benar** disentuh — untuk `memory.search`, yang
+> **diizinkan** pengguna, bukan yang diminta manifest.
+>
+> * **`memory.write`** — memori yang pengguna *minta diingat*: `kind='semantic'`,
+>   keyakinan 1.000 dengan alasan K-27 (yang diyakini: *bahwa* pengguna
+>   menyatakannya), `model_version` = `<agent>@<versi>` penulisnya. Ditulis **hanya
+>   bila belum diingat** — isi yang sama (spasi dirapikan) di scope yang sama
+>   mengembalikan baris lama (`baru: false`), dikunci per (pengguna, scope) supaya
+>   dua permintaan serentak tidak melahirkan dua baris. Scope di luar
+>   `memory.write` manifest ditolak **sebelum** gerbang: izin pengguna tidak
+>   melebarkan manifest (aturan 2).
+> * **`recommendation.create`** — `confidence` 0–1 dan `rationale` 1–10 alasan
+>   berisi **wajib**; `domain` ∈ `habit · goal · wellbeing` (contoh kolom spec/01).
+>   `score` sengaja **kosong**: skor adalah keluaran mesin rekomendasi (5.5), bukan
+>   angka yang dikarang agent.
+> * **`mood.recent`** — `hari` 1–30 (bawaan 7), paling banyak 50 baris;
+>   **`goal.list`** — paling banyak 100 goal, `status` hanya dari `spec/04`. Keduanya
+>   menyatakan **`terpotong: true`** bila ada lebih banyak: daftar yang dipotong
+>   diam-diam adalah jawaban yang salah (K-24).
 
 > 🔧 **Tiga baris terakhir ditambahkan 11 September 2026 — menerapkan
 > [K-14](../docs/KEPUTUSAN-DIDELEGASIKAN.md), yang sudah diputuskan

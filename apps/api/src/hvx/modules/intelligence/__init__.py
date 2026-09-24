@@ -3,8 +3,11 @@
 Memiliki tabel: recommendations · recommendation_feedback (spec/06).
 Dikerjakan: Sprint 5 (5.1–5.6) — spec/07.
 
-Berkas ini satu-satunya pintu keluar modul (spec/06 aturan 1). Masih kosong:
-belum ada yang diekspor.
+Sejak spec/07 4.3: `buat_rekomendasi` — jalur tool `recommendation.create`.
+
+Berkas ini satu-satunya pintu keluar modul (spec/06 aturan 1).
 """
 
-__all__: list[str] = []
+from .rekomendasi import DOMAIN, buat_rekomendasi
+
+__all__ = ["DOMAIN", "buat_rekomendasi"]

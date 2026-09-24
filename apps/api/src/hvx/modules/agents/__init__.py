@@ -9,8 +9,22 @@ Boleh membaca modul lain; TIDAK ADA modul yang boleh mengimpor `agents`
 Berkas ini satu-satunya pintu keluar modul (spec/06 aturan 1).
 """
 
+from .alat_v0 import IMPLEMENTASI
 from .deterministik import CARA_MENGISI_MOOD, HasilDeterministik, jalankan_deterministik
+from .jalannya import Jalannya, Pemicu
 from .niat import MoodDiminta, Niat, kenali
+from .pelaksana_alat import (
+    AlatDitolak,
+    AlatGagal,
+    Gerbang,
+    KonteksAlat,
+    LayananAlat,
+    PelaksanaAgent,
+    PelaksanaAlat,
+    periksa_keluaran,
+    periksa_masukan,
+    scope_panggilan,
+)
 from .registri import (
     RUANG_ID_AGENT,
     Alat,
@@ -27,14 +41,24 @@ from .registri import (
 
 __all__ = [
     "CARA_MENGISI_MOOD",
+    "IMPLEMENTASI",
     "RUANG_ID_AGENT",
     "Alat",
+    "AlatDitolak",
+    "AlatGagal",
+    "Gerbang",
     "HasilDeterministik",
+    "Jalannya",
     "KatalogBerbeda",
+    "KonteksAlat",
+    "LayananAlat",
     "Manifest",
     "MoodDiminta",
     "Niat",
+    "PelaksanaAgent",
+    "PelaksanaAlat",
     "Pelanggaran",
+    "Pemicu",
     "RegistriAgent",
     "RegistriTidakSah",
     "jalankan_deterministik",
@@ -42,5 +66,8 @@ __all__ = [
     "manifest_json",
     "muat_registri",
     "pastikan_katalog",
+    "periksa_keluaran",
+    "periksa_masukan",
+    "scope_panggilan",
     "validasi_registri",
 ]
