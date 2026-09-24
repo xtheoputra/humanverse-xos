@@ -70,6 +70,9 @@ def create_app(settings: platform.Settings | None = None) -> FastAPI:
     # Titik rakit menyambung modul yang tidak boleh saling impor (K-17): identity
     # mengumumkan pendaftaran, profile membuat profil — di transaksi yang sama.
     app.state.pendengar_pendaftaran = (profile.buat_profil_awal,)
+    # K-23: bacaan lintas modul domain di transaksi pemanggil — habits butuh zona
+    # waktu profil untuk "hari ini" rentetan (spec/07 2.4) tanpa mengimpor profile.
+    app.state.pembaca_zona_waktu = profile.zona_waktu
     platform.pasang_penangan_galat(app)
     # Yang ditambahkan TERAKHIR paling luar: 429 batas laju tetap membawa
     # X-Request-ID dan tercatat di baris `request.completed`.

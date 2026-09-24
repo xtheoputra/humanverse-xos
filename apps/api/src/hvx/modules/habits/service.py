@@ -13,31 +13,42 @@
   hanya bila belum terjadi di tempat mana pun di Bumi
   (`platform.tanggal_paling_maju`), sebab perangkat yang sedang bepergian bisa
   berada di zona lain dari `profiles.timezone`.
+* **2.4** rentetan & tingkat penyelesaian — `rentetan.py`. "Hari ini" butuh
+  zona waktu pengguna, milik `profile`: `habits` tidak boleh mengimpornya
+  (aturan 3) maupun membaca tabelnya (aturan 5), jadi titik rakit `hvx.main`
+  menyerahkan pembacanya (**K-23**, pola pendengar pendaftaran K-17).
 """
 
 from __future__ import annotations
 
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from datetime import date
 from typing import Any
 from uuid import UUID
 
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.ext.asyncio import AsyncEngine
+from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine
 
 from hvx.modules import platform
 
 from . import repository
+from .rentetan import hitung_rentetan
 from .schemas import (
     BuatHabit,
     CatatPenyelesaian,
     DaftarHabit,
     Habit,
+    JawabanRentetan,
     Penyelesaian,
     UbahHabit,
     periksa_jadwal,
     periksa_target,
 )
+
+# (koneksi pemanggil, user_id) → zona IANA dari profil, atau None — K-23.
+PembacaZonaWaktu = Callable[[AsyncConnection, UUID], Awaitable[str | None]]
+ZONA_BAWAAN = "UTC"  # spec/01 profiles.timezone DEFAULT 'UTC'
 
 
 def _tidak_ditemukan() -> platform.GalatApi:
@@ -173,3 +184,36 @@ async def hapus_catatan(engine: AsyncEngine, user_id: UUID, habit_id: UUID, for_
         if await repository.ambil_untuk_catat(conn, habit_id) is None:
             raise _tidak_ditemukan()
         await repository.hapus_selesai(conn, habit_id, for_date)
+
+
+# ── spec/07 2.4 — rentetan ───────────────────────────────────────────────────
+
+
+async def rentetan(
+    engine: AsyncEngine,
+    user_id: UUID,
+    habit_id: UUID,
+    *,
+    pembaca_zona_waktu: PembacaZonaWaktu,
+) -> JawabanRentetan:
+    async with platform.transaksi_pengguna(engine, user_id) as conn:
+        habit = await repository.ambil(conn, habit_id)
+        if habit is None:
+            raise _tidak_ditemukan()
+        zona = await pembaca_zona_waktu(conn, user_id) or ZONA_BAWAAN
+        hari_ini = await platform.hari_ini_di(conn, zona)
+        mulai = await repository.mulai_lokal(conn, habit_id, zona) or hari_ini
+        riwayat = await repository.riwayat(conn, habit_id)
+    hasil = hitung_rentetan(
+        period=habit.period,
+        target_count=habit.target_count,
+        weekdays=habit.schedule.get("weekdays"),
+        mulai=mulai,
+        hari_ini=hari_ini,
+        penyelesaian=riwayat,
+    )
+    return JawabanRentetan(
+        current=hasil.current,
+        longest=hasil.longest,
+        completion_rate_30d=hasil.completion_rate_30d,
+    )

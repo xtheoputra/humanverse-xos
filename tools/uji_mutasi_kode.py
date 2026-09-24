@@ -144,6 +144,7 @@ UJI_IDEM = "tests/integration/test_idempotensi.py"
 UJI_IDEM_RUTE = "tests/unit/test_idempotensi_terpasang.py"
 UJI_HABITS = "tests/integration/test_habits.py"
 UJI_SELESAI = "tests/integration/test_penyelesaian.py"
+UJI_RENTETAN = "tests/integration/test_rentetan.py"
 FK_MILESTONE = (
     "  FOREIGN KEY (goal_id, user_id) REFERENCES goals (id, user_id) ON DELETE CASCADE" + NL + ");"
 )
@@ -1834,6 +1835,94 @@ MUTASI: list[Mutasi] = [
         _pytest(f"{UJI_SELESAI}::test_tanggal_yang_belum_terjadi_di_mana_pun_ditolak"),
         harus_memuat="tanggal hari ini di UTC+14 ditolak untuk pengguna UTC−11",
         kelompok="db",
+    ),
+    # ── Sprint 2 · 2.4 rentetan melintasi zona waktu ─────────────────────
+    Mutasi(
+        "2.4",
+        "hari ini dihitung di UTC, bukan di zona profil",
+        [
+            Sunting(
+                f"{MODUL}/habits/service.py",
+                "        hari_ini = await platform.hari_ini_di(conn, zona)",
+                '        hari_ini = await platform.hari_ini_di(conn, "UTC")',
+            )
+        ],
+        _pytest(f"{UJI_RENTETAN}::test_hari_ini_menurut_zona_profil_bukan_utc"),
+        harus_memuat="hari ini bukan menurut zona profil",
+        kelompok="db",
+    ),
+    Mutasi(
+        "2.4",
+        "rentetan dari tanggal completed_at (UTC), bukan for_date",
+        [
+            Sunting(
+                f"{MODUL}/habits/repository.py",
+                "    SELECT for_date, status\n",
+                "    SELECT (completed_at AT TIME ZONE 'UTC')::date AS for_date, status\n",
+            )
+        ],
+        _pytest(f"{UJI_RENTETAN}::test_rentetan_dari_for_date_bukan_dari_waktu_dicatat"),
+        harus_memuat="rentetan dihitung dari waktu catat",
+        kelompok="db",
+    ),
+    Mutasi(
+        "2.4",
+        "skipped memutus rentetan",
+        [
+            Sunting(
+                f"{MODUL}/habits/rentetan.py",
+                '            if status == "skipped":' + NL + '                return "dimaafkan"',
+                '            if status == "skipped":' + NL + '                return "kosong"',
+            )
+        ],
+        _pytest(
+            "tests/unit/test_rentetan_murni.py::test_skipped_netral_tidak_menambah_dan_tidak_memutus"
+        ),
+        harus_memuat="skipped memutus rentetan",
+    ),
+    Mutasi(
+        "2.4",
+        "hari ini yang belum dijalankan dihitung terlewat",
+        [
+            Sunting(
+                f"{MODUL}/habits/rentetan.py",
+                '        return "belum" if p >= periode_kini else "kosong"',
+                '        return "belum" if p > periode_kini else "kosong"',
+            )
+        ],
+        _pytest(
+            "tests/unit/test_rentetan_murni.py"
+            "::test_hari_ini_yang_belum_dijalankan_tidak_memutus_rentetan"
+        ),
+        harus_memuat="hari ini yang belum berakhir memutus rentetan",
+    ),
+    Mutasi(
+        "2.4",
+        "schedule.weekdays diabaikan — hari tak terjadwal ikut dihitung",
+        [
+            Sunting(
+                f"{MODUL}/habits/rentetan.py",
+                "            if terjadwal is not None and p.isoweekday() not in terjadwal:",
+                "            if False:",
+            )
+        ],
+        _pytest(
+            "tests/unit/test_rentetan_murni.py::test_jadwal_hari_terjadwal_yang_terlewat_memutus"
+        ),
+        harus_memuat="penyelesaian hari Selasa menutupi Rabu yang terlewat",
+    ),
+    Mutasi(
+        "2.4",
+        "titik rakit tidak memasang pembaca zona waktu profil (K-23)",
+        [
+            Sunting(
+                "apps/api/src/hvx/main.py",
+                "    app.state.pembaca_zona_waktu = profile.zona_waktu" + NL,
+                "",
+            )
+        ],
+        _pytest("tests/unit/test_main.py::test_titik_rakit_memasang_pembaca_lintas_modul"),
+        harus_memuat="hvx.main tidak memasang pembaca_zona_waktu dari profile",
     ),
 ]
 

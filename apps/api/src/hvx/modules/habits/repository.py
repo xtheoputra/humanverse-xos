@@ -128,6 +128,29 @@ _HAPUS_SELESAI = text(
     "DELETE FROM habit_completions WHERE habit_id = :habit_id AND for_date = :for_date"
 )
 
+# ── spec/07 2.4 — rentetan ───────────────────────────────────────────────────
+
+# Tanggal LOKAL habit dibuat, menurut zona profil saat ini — satu-satunya tempat
+# cap waktu diubah menjadi tanggal, dan hanya untuk awal habit (hari pertama).
+_MULAI_LOKAL = text(
+    """
+    SELECT (created_at AT TIME ZONE :zona)::date
+    FROM habits
+    WHERE id = :id AND deleted_at IS NULL
+    """
+)
+
+# `for_date`, tidak pernah `completed_at`: tanggal lokal saat habit DIJALANKAN
+# (spec/01) — lihat rentetan.py.
+_RIWAYAT = text(
+    """
+    SELECT for_date, status
+    FROM habit_completions
+    WHERE habit_id = :habit_id
+    ORDER BY for_date
+    """
+)
+
 _BISA_DIUBAH = (
     "title",
     "period",
@@ -265,3 +288,13 @@ async def selesai_pada(
 
 async def hapus_selesai(conn: AsyncConnection, habit_id: UUID, for_date: date) -> None:
     await conn.execute(_HAPUS_SELESAI, {"habit_id": habit_id, "for_date": for_date})
+
+
+async def mulai_lokal(conn: AsyncConnection, habit_id: UUID, zona: str) -> date | None:
+    nilai = (await conn.execute(_MULAI_LOKAL, {"id": habit_id, "zona": zona})).scalar_one_or_none()
+    return nilai if isinstance(nilai, date) else None
+
+
+async def riwayat(conn: AsyncConnection, habit_id: UUID) -> dict[date, str]:
+    hasil = await conn.execute(_RIWAYAT, {"habit_id": habit_id})
+    return {b.for_date: str(b.status) for b in hasil}

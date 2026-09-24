@@ -20,12 +20,25 @@ from .schemas import (
     CatatPenyelesaian,
     DaftarHabit,
     Habit,
+    JawabanRentetan,
     Penyelesaian,
     StatusHabit,
     UbahHabit,
 )
 
 router = APIRouter(prefix="/v1", tags=["habits"])
+
+
+def _pembaca_zona_waktu(request: Request) -> service.PembacaZonaWaktu:
+    """Dipasang titik rakit `hvx.main` (K-23) — `habits` tidak tahu siapa pemiliknya.
+
+    Tidak ada jatuh-balik diam-diam ke UTC kalau titik rakit lupa memasangnya:
+    "hari ini" yang salah zona memutus rentetan orang tanpa ada yang tahu.
+    """
+    pembaca = getattr(request.app.state, "pembaca_zona_waktu", None)
+    if pembaca is None:
+        raise RuntimeError("hvx.main tidak memasang app.state.pembaca_zona_waktu (K-23)")
+    return pembaca  # type: ignore[no-any-return]
 
 
 @router.get("/habits", response_model=DaftarHabit)
@@ -104,3 +117,15 @@ async def hapus_penyelesaian(
 ) -> Response:
     await service.hapus_catatan(platform.engine_dari(request), pengguna.user_id, habit_id, for_date)
     return Response(status_code=204)
+
+
+@router.get("/habits/{habit_id}/streak", response_model=JawabanRentetan)
+async def rentetan_habit(
+    request: Request, habit_id: UUID, pengguna: identity.PenggunaDiperlukan
+) -> JawabanRentetan:
+    return await service.rentetan(
+        platform.engine_dari(request),
+        pengguna.user_id,
+        habit_id,
+        pembaca_zona_waktu=_pembaca_zona_waktu(request),
+    )

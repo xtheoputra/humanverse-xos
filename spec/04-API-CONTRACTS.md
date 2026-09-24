@@ -137,6 +137,23 @@ GET    /habits/{id}/streak       → { current, longest, completion_rate_30d }
 > bila **belum terjadi di mana pun di Bumi** (UTC+14). `tier_used` wajib di
 > dalam `adaptive_tiers` habit itu (`422 invalid_tier`) dan tidak boleh
 > menyertai `skipped` (`400`).
+>
+> 🔧 **Arti `GET /habits/{id}/streak` (spec/07 2.4, 24 Sep 2026)** — semula
+> hanya nama medan:
+>
+> | | |
+> |---|---|
+> | satuan | **periode** habit: hari · minggu ISO (Senin–Minggu) · bulan kalender. Periode **terpenuhi** bila tanggal `done`/`partial` di dalamnya ≥ `target_count` |
+> | tanggal | **`for_date`** apa adanya — tidak pernah diturunkan dari `completed_at`, dan tidak digeser saat pengguna pindah zona |
+> | hari ini | menurut `profiles.timezone` **saat ini**, dari jam basis data; periode yang belum berakhir tidak memutus rentetan; `for_date` sesudah hari ini (perangkat di zona lebih timur) tetap dihitung |
+> | `skipped` | netral — tidak menambah, tidak memutus, tidak masuk penyebut |
+> | `schedule.weekdays` | hari di luarnya bukan hari habit itu — dilewati |
+> | `current` · `longest` | periode terpenuhi berturut-turut — yang masih hidup · yang terpanjang |
+> | `completion_rate_30d` | periode terpenuhi ÷ periode jatuh tempo yang bersinggungan dengan 30 hari terakhir, tidak lebih awal dari awal habit — **`null`** bila belum ada satu pun yang jatuh tempo |
+>
+> ⚠️ Menyeberang garis tanggal ke timur melompati satu tanggal kalender;
+> rentetan harian putus di sana kecuali tanggal itu dicatat mundur (`for_date`
+> boleh tanggal lampau).
 
 ---
 

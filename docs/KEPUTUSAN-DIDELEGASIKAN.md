@@ -501,6 +501,20 @@ sesudahnya.
 
 ---
 
+## K-23 · Bacaan lintas modul domain lewat titik rakit; energi check-in ke tier adaptif
+
+> Diputuskan 24 September 2026, saat Sprint 2 tugas 2.2 dan 2.4 ditulis.
+
+| | |
+|---|---|
+| **Keputusan** | **(1)** Modul domain yang butuh MEMBACA data modul domain lain di transaksi yang sama menerima **fungsi pembaca** dari titik rakit `hvx.main` lewat `app.state` — bukan impor, bukan SQL ke tabel milik modul lain. Pertama: `habits` menerima `profile.zona_waktu` (*“hari ini”* rentetan, 2.4) dan `checkins.energi_pada` (tier yang disarankan, 2.2/2.5). Pembaca berjalan di koneksi pemanggil — satu transaksi, satu RLS. Rute yang butuh pembaca **menolak berjalan** bila titik rakit lupa memasangnya (tidak jatuh ke UTC atau "tanpa energi" diam-diam). **(2)** Energi check-in 1–5 dipetakan ke tiga kondisi naskah 4 §34: **3–5 atau belum check-in** = normal (tier 0) · **2** = rendah (tier 1) · **1** = sangat rendah (tier paling ringan). |
+| **Bukti** | `spec/06` aturan 3 (domain tidak saling impor) dan aturan 5 (SQL hanya tabel sendiri) — keduanya ditegakkan mesin. Tetapi event (jalur yang aturan 3 sebut) melayani **tulisan**, bukan **bacaan**: tidak ada event `profile.*` di 22 event V0 (E-166), dan zona waktu dibutuhkan pada saat membaca. Preseden: **K-17** — pendengar pendaftaran yang dipasang titik rakit. Pemetaan energi: naskah 4 §34 menyebut *rendah* dan *sangat rendah* tanpa skala; skala `daily_checkins.energy` 1–5 dengan 3 sebagai titik tengah. |
+| **Bacaan yang DITOLAK** | **(a)** *“Klien mengirim `?today=` dan `?energy=`”* — ditolak: agent (Sprint 4, tool `habit.streak`) tidak punya perangkat, dan aturan bisnis pindah ke klien. **(b)** *“`habits` membaca `profiles.timezone` langsung”* — ditolak: melanggar aturan 5, dan pemisahan layanan V2 menjadi penulisan ulang. **(c)** *“Proyeksi zona waktu di tabel `habits`”* — ditolak: menambah kolom demi menyalin data milik modul lain, dan butuh event profil yang belum ada. **(d)** *“Belum check-in = energi rendah”* — ditolak: sistem tidak menurunkan target seseorang karena ia belum menjawab (*“Bukan menyalahkan user”*, naskah 4 §33). |
+| **Harga yang diakui** | Ketergantungan antarmodul yang **tidak terlihat** oleh `import-linter`: ia hidup di `hvx.main`, dan pemisahan layanan V2 mengganti tiap pembaca dengan panggilan jaringan. Karena itu tiap pembaca dijaga uji titik rakit (`test_main.py`) — dan jumlahnya kecil dengan sengaja. |
+| **Cara membalikkan** | Hapus baris `app.state.pembaca_*` di `hvx.main` dan parameternya di `habits/service.py`; `test_main.py` dan uji rentetan/tier merah dan wajib diubah bersamanya. Pemetaan energi: `habits/tier.py`. |
+
+---
+
 ## Yang sengaja **tidak** saya putuskan
 
 | Butir | Kenapa |

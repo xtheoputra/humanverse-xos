@@ -36,3 +36,17 @@ def test_dokumentasi_memakai_daftar_izin_bukan_daftar_tolak() -> None:
     """Lingkungan baru yang lupa ditambahkan jatuh ke sisi TERTUTUP."""
     assert "production" not in DOKUMENTASI_TERBUKA
     assert DOKUMENTASI_TERBUKA.issubset({"local", "test", "ci"})
+
+
+def test_titik_rakit_memasang_pembaca_lintas_modul() -> None:
+    """K-23 — `habits` membaca zona waktu profil lewat titik rakit, bukan lewat impor.
+
+    Rute rentetan MENOLAK berjalan tanpa pembaca ini (bukan jatuh ke UTC diam-diam),
+    jadi titik rakit yang lupa memasangnya akan terlihat di sini dulu.
+    """
+    from hvx.modules import profile
+
+    app = _app("test")
+    assert getattr(app.state, "pembaca_zona_waktu", None) is profile.zona_waktu, (
+        "hvx.main tidak memasang pembaca_zona_waktu dari profile"
+    )

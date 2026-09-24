@@ -37,6 +37,8 @@ _UBAH = text(
 )
 _BISA_DIUBAH = ("display_name", "timezone", "locale", "preferences")
 
+_ZONA_WAKTU = text("SELECT timezone FROM profiles WHERE user_id = :user_id")
+
 
 async def ambil_profil(conn: AsyncConnection, user_id: UUID) -> Profil | None:
     baris = (await conn.execute(_AMBIL, {"user_id": user_id})).mappings().first()
@@ -72,3 +74,15 @@ async def ubah_profil(
         nilai[k] = json.dumps(v) if k == "preferences" and k in perubahan else v
     baris = (await conn.execute(_UBAH, nilai)).mappings().first()
     return Profil.model_validate(dict(baris)) if baris else None
+
+
+async def zona_waktu(conn: AsyncConnection, user_id: UUID) -> str | None:
+    """Zona waktu IANA pengguna — dipasang `hvx.main` sebagai `pembaca_zona_waktu` (K-23).
+
+    Modul domain lain (habits: "hari ini" untuk rentetan, spec/07 2.4) tidak
+    boleh mengimpor `profile` (spec/06 aturan 3) dan tidak boleh membaca
+    `profiles` (aturan 5); titik rakit menyerahkan fungsi ini kepada mereka.
+    Berjalan di koneksi PEMANGGIL — transaksi dan RLS-nya sama.
+    """
+    nilai = (await conn.execute(_ZONA_WAKTU, {"user_id": user_id})).scalar_one_or_none()
+    return str(nilai) if nilai is not None else None
