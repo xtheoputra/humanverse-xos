@@ -124,6 +124,29 @@ services:
       retries: 12
       start_period: 5s
 
+  # Relay kotak keluar event → Redis Streams, dan grup konsumen (spec/07 3.3).
+  # Citra yang sama dengan api, proses terpisah (`hvx/pekerja.py`): tanpa port —
+  # ia hanya berbicara ke PostgreSQL dan Redis, sebagai anggota hvx_app.
+  pekerja:
+    <<: *api-image
+    command: ["python", "-m", "hvx.pekerja"]
+    environment:
+      HVX_ENV: ${HVX_ENV:-local}
+      HVX_DATABASE_URL: postgresql://${HVX_API_DB_USER:-hvx_api}:${HVX_API_DB_PASSWORD:-hvx-api-dev-only}@postgres:5432/${HVX_POSTGRES_DB:-hvx}
+      HVX_REDIS_URL: redis://redis:6379/0
+      HVX_LOG_LEVEL: ${HVX_LOG_LEVEL:-INFO}
+      HVX_IP_HASH_KEY: ${HVX_IP_HASH_KEY:-hvx-dev-only-ip-hash-key-0123456789abcdef}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+      db-roles:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
 volumes:
   postgres-data:
   redis-data:

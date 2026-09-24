@@ -201,7 +201,13 @@ def test_hak_akses_peran_aplikasi_sesempit_yang_dinyatakan(v0_bersama: BasisData
 
 # Tiap fungsi SECURITY DEFINER melewati RLS atas nama pemiliknya — satu per
 # kebutuhan, dengan alasannya di spec/01 §12. Nama baru di sini = keputusan baru.
-DEFINER_DIIZINKAN = frozenset({"auth_lookup_for_login"})
+# Tiap fungsi SECURITY DEFINER: satu kebutuhan lintas RLS, alasannya di spec/01 §12.
+DEFINER_DIIZINKAN = frozenset(
+    {
+        "auth_lookup_for_login",  # login: mencari akun per email sebelum pengguna dikenali
+        "events_untuk_relay",  # relay 3.3: RUJUKAN event semua pengguna, tanpa payload
+    }
+)
 NL = chr(10)
 
 

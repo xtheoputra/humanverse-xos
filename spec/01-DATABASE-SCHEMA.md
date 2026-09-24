@@ -1100,6 +1100,25 @@ CREATE FUNCTION auth_lookup_for_login(p_email citext)
   $$;
 REVOKE ALL ON FUNCTION auth_lookup_for_login(citext) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION auth_lookup_for_login(citext) TO hvx_app;
+
+-- Relay event (spec/07 3.3): kotak keluar `events` → Redis Streams. Relay
+-- membaca event SEMUA pengguna, urut waktu masuk — RLS `events` (§11) tidak
+-- meloloskannya. Sempit: hanya-baca, lima kolom RUJUKAN (payload TIDAK ikut —
+-- konsumen membacanya di bawah RLS pemiliknya), paling banyak 1000 baris.
+CREATE FUNCTION events_untuk_relay(p_sesudah timestamptz, p_sesudah_id uuid, p_batas integer)
+  RETURNS TABLE (id uuid, user_id uuid, event_type text, recorded_at timestamptz,
+                 occurred_at timestamptz)
+  LANGUAGE sql STABLE SECURITY DEFINER
+  SET search_path = pg_catalog, public, pg_temp
+  AS $$
+    SELECT e.id, e.user_id, e.event_type, e.recorded_at, e.occurred_at
+    FROM public.events e
+    WHERE (e.recorded_at, e.id) > (p_sesudah, p_sesudah_id)
+    ORDER BY e.recorded_at, e.id
+    LIMIT least(greatest(p_batas, 1), 1000)
+  $$;
+REVOKE ALL ON FUNCTION events_untuk_relay(timestamptz, uuid, integer) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION events_untuk_relay(timestamptz, uuid, integer) TO hvx_app;
 ```
 
 > 🔑 **Kenapa fungsi, bukan kebijakan RLS yang lebih longgar** (17 Sep 2026,
@@ -1114,6 +1133,13 @@ GRANT EXECUTE ON FUNCTION auth_lookup_for_login(citext) TO hvx_app;
 > `SECURITY DEFINER` di skema `public` ada di **daftar izin** uji itu, punya
 > `search_path` terpatok, dan **tidak** bisa dieksekusi `PUBLIC`. Fungsi ke-2
 > berarti baris baru di daftar itu — dan alasan di bagian ini.
+>
+> 🔧 **Fungsi ke-2: `events_untuk_relay` (24 Sep 2026, spec/07 3.3).** Relay
+> kotak keluar menerbitkan event semua pengguna ke Redis Streams. Yang
+> dikembalikannya hanya **rujukan** — id, pemilik, jenis, dua waktu — bukan
+> `payload`: konsumen membaca isi event di transaksi PEMILIKNYA
+> (`transaksi_pengguna`), jadi RLS tetap menjaga isi, dan Redis tidak pernah
+> menyimpan data pengguna (prinsip yang sama dengan `Idempotency-Key`, E-171).
 
 ---
 

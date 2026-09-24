@@ -3523,6 +3523,143 @@ MUTASI: list[Mutasi] = [
         harus_memuat="mood kedua dalam menit yang sama gagal",
         kelompok="db",
     ),
+    # ── Sprint 3 · 3.3 relay kotak keluar → Redis Streams + grup konsumen ──
+    Mutasi(
+        "3.3",
+        "relay tanpa penanda per event — pindaian ulang jendela belakang menggandakan",
+        [
+            Sunting(
+                f"{MODUL}/events/relay.py",
+                "if redis.call('SET', KEYS[1], '1', 'NX', 'EX', ARGV[1]) then",
+                "if true then",
+            )
+        ],
+        _pytest(f"{UJI_RELAY}::test_relay_menyalin_rujukan_sekali_tanpa_payload"),
+        harus_memuat="event terkirim 2 kali",
+        kelompok="db",
+    ),
+    Mutasi(
+        "3.3",
+        "relay hanya maju — event yang commit di belakang kursor hilang selamanya",
+        [
+            Sunting(
+                f"{MODUL}/events/relay.py",
+                "        if posisi is not None:"
+                + NL
+                + "            belakang = (posisi[0] - timedelta(seconds=LIHAT_BELAKANG_S), _NOL)",
+                "        if False:"
+                + NL
+                + "            belakang = (posisi[0] - timedelta(seconds=LIHAT_BELAKANG_S), _NOL)",
+            )
+        ],
+        _pytest(f"{UJI_RELAY}::test_event_yang_commit_belakangan_tetap_terkirim"),
+        harus_memuat="event yang commit di belakang kursor tidak pernah terkirim",
+        kelompok="db",
+    ),
+    Mutasi(
+        "3.3",
+        "konsumen tidak mengklaim pesan yang menggantung — milik konsumen mati hilang",
+        [
+            Sunting(
+                f"{MODUL}/events/stream.py",
+                "            for id_pesan, isi in pesan:"
+                + NL
+                + "                selesai += await self._proses(str(id_pesan), isi, diklaim=True)",
+                "            for id_pesan, isi in pesan[:0]:"
+                + NL
+                + "                selesai += await self._proses(str(id_pesan), isi, diklaim=True)",
+            )
+        ],
+        _pytest(f"{UJI_RELAY}::test_konsumen_mati_event_tidak_hilang_saat_hidup_lagi"),
+        harus_memuat="event milik konsumen yang mati hilang",
+        kelompok="db",
+    ),
+    Mutasi(
+        "3.3",
+        "tanpa stream mati — event yang selalu gagal dicoba tanpa akhir",
+        [
+            Sunting(
+                f"{MODUL}/events/stream.py",
+                "        if diklaim and await self._kali_diserahkan(id_pesan) > self._maks_kirim:",
+                "        if False:",
+            )
+        ],
+        _pytest(f"{UJI_RELAY}::test_penangan_yang_selalu_gagal_pindah_ke_stream_mati"),
+        harus_memuat="dead letter: []",
+        kelompok="db",
+    ),
+    Mutasi(
+        "3.3",
+        "event jenis lain tidak di-ACK — menggantung di grup selamanya",
+        [
+            Sunting(
+                f"{MODUL}/events/stream.py",
+                '        if isi.get("event_type") not in self._jenis:'
+                + NL
+                + "            await self._r.xack(self.stream, self.grup, id_pesan)"
+                + NL,
+                '        if isi.get("event_type") not in self._jenis:' + NL,
+            )
+        ],
+        _pytest(f"{UJI_RELAY}::test_penangan_menerima_isi_dari_postgresql_dan_jenis_lain_dilewati"),
+        harus_memuat="goal.created tidak di-ACK",
+        kelompok="db",
+    ),
+    Mutasi(
+        "3.3",
+        "pangkas mengabaikan pesan yang belum di-ACK — event yang sedang diproses dibuang",
+        [
+            Sunting(
+                f"{MODUL}/events/relay.py",
+                '            if int(ringkas["pending"]) > 0:'
+                + NL
+                + '                batas.append(str(ringkas["min"]))'
+                + NL,
+                "",
+            )
+        ],
+        _pytest(f"{UJI_RELAY}::test_pangkas_tidak_membuang_yang_masih_ditunggu"),
+        harus_memuat="pesan yang belum di-ACK dibuang dari stream",
+        kelompok="db",
+    ),
+    Mutasi(
+        "3.3",
+        "pekerja tidak menyalakan relay",
+        [
+            Sunting(
+                "apps/api/src/hvx/pekerja.py",
+                '        tugas = [asyncio.create_task(_ulang("relay", relay_sekali, JEDA_RELAY_S, berhenti))]',
+                "        tugas: list[asyncio.Task[None]] = []",
+            )
+        ],
+        _pytest(f"{UJI_PEKERJA}::test_pekerja_menyalurkan_event_lalu_berhenti_bersih"),
+        harus_memuat="pekerja tidak menyalurkan event dalam 10 detik",
+        kelompok="db",
+    ),
+    Mutasi(
+        "3.3",
+        "EXECUTE fungsi relay tidak dicabut dari PUBLIC (spec/01 DAN migrasi)",
+        [
+            Sunting(
+                "spec/01-DATABASE-SCHEMA.md",
+                "REVOKE ALL ON FUNCTION events_untuk_relay(timestamptz, uuid, integer) FROM PUBLIC;"
+                + NL,
+                "",
+            ),
+            Sunting(
+                f"{MIGRASI}/0005_relay_event.up.sql",
+                "REVOKE ALL ON FUNCTION events_untuk_relay(timestamptz, uuid, integer) FROM PUBLIC;"
+                + NL,
+                "",
+            ),
+        ],
+        _pytest(
+            "tests/integration/test_kepemilikan_data.py"
+            "::test_fungsi_security_definer_hanya_daftar_izin_terpatok_dan_bukan_untuk_public"
+        ),
+        harus_memuat="events_untuk_relay",
+        kelompok="db",
+    ),
 ]
 
 

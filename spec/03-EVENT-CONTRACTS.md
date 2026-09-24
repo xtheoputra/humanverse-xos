@@ -160,6 +160,18 @@ menyusul — supaya nama dan bentuknya tidak berubah nanti.
 > Di V0 antreannya Redis Streams dengan consumer group; Kafka baru bila
 > skalanya menuntut (naskah 5 §5).
 
+> 🔧 **Bentuk V0-nya (spec/07 3.3 · 3.6, K-25).** Tabel `events` adalah kotak
+> keluar: relay di proses pekerja (`hvx/pekerja.py`) menyalin **rujukan** tiap event yang
+> sudah commit — `id` · `user_id` · `event_type`, **bukan** `payload` — ke satu
+> stream Redis. Tiap consumer adalah satu **grup**; ia membaca isi event dari
+> PostgreSQL di transaksi **pemiliknya** (RLS berlaku) dan meng-ACK **sesudah**
+> commit. Pesan yang menganggur 30 dtk diklaim anggota grup lain; sesudah 5 kali
+> diserahkan ia pindah ke stream **mati**. Yang terpasang di V0: **Memory
+> extractor** (grup `memori`, 3.6). Behavior projector, Habit streak,
+> Recommendation trigger, dan Analytics menyusul bersama tugasnya (5.1, 5.5) —
+> grup baru membaca stream **dari awal**, jadi tidak ada event yang terlewat
+> selama stream belum dipangkas melewatinya.
+
 ---
 
 ## 🔧 Padanan nama event naskah → `domain.verb` (K-3)
