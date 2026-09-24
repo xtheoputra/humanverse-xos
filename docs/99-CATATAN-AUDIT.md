@@ -38,6 +38,108 @@ Diperbarui: 24 September 2026 · Mencakup **dua puluh empat naskah**:
 
 ---
 
+## 🔨 Sprint 4 dikodekan (24 Sep 2026) — apa yang berubah bagi berkas ini
+
+Sprint 4 (`spec/07` 4.1–4.9, *AI*) dikerjakan di branch `v0/sprint-4-ai`, **di
+atas** branch Sprint 3 (PR #166) yang masih menunggu HUMAN REVIEW — satu commit per
+tugas (**K-18**). Keadaan tiap *“Selesai bila”*, tanpa dibulatkan, ada di
+[`../spec/07`](../spec/07-BACKLOG-V0.md) Sprint 4. Lima keputusan didelegasikan
+baru: **K-28** (AI Gateway V0), **K-29** (katalog agent), **K-30** (program agent &
+keyakinan V0), **K-31** (aliran percakapan), **K-32** (anggaran biaya) —
+[`KEPUTUSAN-DIDELEGASIKAN.md`](KEPUTUSAN-DIDELEGASIKAN.md).
+
+> 🔑 **Pola E-42 untuk keenam kalinya — dan kini di sebuah RUTE yang tidak pernah
+> ditulis.** spec/05 *“`ask` → minta izin”* dan spec/07 4.5 *“risk 2 minta izin
+> sekali”* menuntut jawaban pengguna, tetapi spec/04 tidak punya satu rute pun
+> untuk menjawabnya (**E-195**).
+
+### 🔴 E-190 — manifest agent di `tools/`, folder yang kini milik perkakas
+
+spec/05 menulis `agents/<name>/manifest.yaml` dan `tools/<name>.yaml` sebelum repo
+punya `tools/` — kini folder pemeriksa dokumen dan gerbang CI. ✅ **Dibetulkan:**
+registry V0 tinggal di paket api (`agents/manifest/`, `agents/alat/`), dibaca saat
+api dibuat; katalog basis data diisi migrasi (**K-29**).
+
+### 🔴 E-191 — skema tool menuntut `scopes`, tabel tool V0 tidak pernah menyebutnya
+
+Tanpa kolom itu gerbang risiko (4.5) tidak punya scope untuk ditanyakan ke mesin
+izin. ✅ **Dibetulkan** di [`../spec/05`](../spec/05-AGENT-CONTRACTS.md): kolom
+*Scope* tiap tool V0.
+
+### 🔴 E-192 — K-14 + *“risk 2 minta izin”* dibaca harfiah = satu permintaan ditanya dua kali
+
+*“Tandai lari selesai”* → orchestrator memanggil `agent.habit` (R2 — pemanggilan
+agent ADALAH tool, K-14) → habit-agent memanggil `habit.complete` (R2). Diuji
+dengan gerbang sungguhan: pengguna ditanya untuk delegasinya, lalu untuk
+tulisannya. ✅ **Dibetulkan:** pemanggilan `kind: agent` berbawaan `allow` dan
+tanpa konfirmasi R3 — yang berisiko adalah tool di dalamnya, yang ditanyakan di run
+agent itu; R4, `deny`, dan `ask` yang **disetel** pengguna untuk delegasinya tetap
+berlaku.
+
+### 🔴 E-193 — `memory.search` menahan SETIAP jawaban coach pada izin `journal_raw`
+
+Kolom *Scope* `memory.search` (E-191) = semua scope resmi, termasuk `journal_raw`
+yang sensitif — tidak pernah `allow` karena bawaan. Gerbang yang menanyakan tiap
+scope pemanggilan menahan tiap jawaban coach menunggu izin atas scope yang bahkan
+tidak diminta manifest coach. Ditemukan uji program V0 (4.7), bukan tinjauan.
+Padahal pencarian 3.7 sudah menanyai mesin izin **per scope sendiri** (menyisihkan
+yang ditolak atau belum diputuskan, dan melaporkannya). ✅ **Dibetulkan:** tool baca
+yang menyaring izinnya sendiri menyatakannya (`menyaring_izin`), gerbang tidak
+menanyakannya lagi — dan hanya bacaan tanpa efek yang boleh (validator).
+
+### 🔴 E-194 — riwayat percakapan kehilangan alasan balasannya
+
+spec/04 menjanjikan `confidence` + `rationale` di **setiap** balasan AI, tetapi
+`ai_messages` tidak punya kolom untuk keduanya: hanya SSE `done` yang membawanya.
+✅ **Dibetulkan:** migrasi `0008` + spec/01; `GET …/messages` mengembalikannya.
+
+### 🔴 E-195 — izin diminta, tetapi tidak ada rute untuk menjawabnya
+
+✅ **Dibetulkan** di [`../spec/04`](../spec/04-API-CONTRACTS.md): SSE
+`confirmation_required` + `POST /conversations/{id}/confirmations`. Pemanggilan yang
+ditahan **tidak disimpan** — pengguna menerima permintaan bertanda tangan (agent,
+tool, risiko, scope, **sidik** masukan; tanpa masukannya), jawabannya sekali pakai,
+dan giliran yang sama diulang dengan persetujuan itu.
+
+### 🔴 Dan satu balasan yang BOHONG, ditemukan uji sebelum sampai ke siapa pun
+
+*“Lewati X”* sesudah X tercatat selesai: `POST …/completions` mengembalikan baris
+LAMA untuk tanggal yang sudah tercatat (spec/04), tetapi habit agent pertama
+menjawab *“X ditandai dilewati”*. Kini balasannya mengatakan apa yang terjadi —
+juga saat perangkat lain mencatat di antara baca dan tulis — dan tidak meminta izin
+untuk tulisan yang tidak akan terjadi (**K-30**).
+
+#### Yang TIDAK dibetulkan di Sprint 4
+
+| Temuan | Kenapa | Ke mana |
+|---|---|---|
+| Catatan bebas mood sampai ke coach lewat memori episodiknya (`memory.search`, 3.6), walau `mood.recent` tidak mengembalikannya | apakah `mood` sensitif — hukum & privasi | **C-32** (diperluas) |
+| Run yang prosesnya MATI (bukan berhenti) tetap `running` | penyapu lintas pengguna butuh fungsi `SECURITY DEFINER` baru — hapus akun 6.5 lebih dulu | **K-31** |
+| Aliran SSE hanya di proses api yang menjalankan gilirannya | V0 satu proses api | **K-31** |
+| Habit agent tidak bisa MENGUBAH catatan yang sudah ada | tidak ada tool pembatalan di 9 tool V0 | spec/05 — tool baru butuh baris registry |
+| Keyakinan V0 tidak dikalibrasi | butuh data nyata | **#34** |
+| Penyedia model yang menalar | tarif dan ke mana data pengguna boleh dikirim | **A-6/#18** |
+
+### 🔒 Yang dijaga lebih ketat daripada yang diminta
+
+* **Agent menyentuh data hanya lewat tool** — dan tiap tool lewat satu jalan:
+  registry → manifest → masukan ketat → batas laju → gerbang → keluaran = skema.
+* **Jejak audit bukan penalaran**: `decision` hanya skalar pendek, `error` hanya
+  `{code, type}` — pesan galat bisa mengutip tulisan pengguna.
+* **Tulisan pengguna tidak keluar dari tempatnya**: token konfirmasi memuat sidik
+  masukan, bukan masukannya; token percakapan tidak ke Redis.
+* **Aliran yang diputus tetap dibayar**: token yang sudah keluar dicatat, dan
+  dihitung anggaran.
+
+### ⚠️ Yang sengaja TIDAK diputuskan di Sprint 4
+
+* **A-6/#18** — penyedia model sungguhan (tarif, dan ke mana isi percakapan dikirim).
+* **#34** — ambang keyakinan untuk bertindak.
+* Angka anggaran biaya harian yang sebenarnya — uang.
+* **C-32** — `mood` sensitif atau tidak (kini juga: catatan mood lewat memori).
+
+---
+
 ## 🔨 Sprint 3 dikodekan (24 Sep 2026) — apa yang berubah bagi berkas ini
 
 Sprint 3 (`spec/07` 3.1–3.8, *Memory & event*) dikerjakan di branch

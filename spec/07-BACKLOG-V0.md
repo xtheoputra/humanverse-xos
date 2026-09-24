@@ -242,6 +242,22 @@ Tidak ada tugas yang boleh masuk `main` tanpa baris **HUMAN REVIEW**.
 > **4.9 sering dilupakan sampai tagihan pertama datang.** Batasnya boleh
 > longgar; yang penting jalurnya ada sejak awal.
 
+> 🔨 **Sprint 4 dikodekan 24 Sep 2026** — branch `v0/sprint-4-ai` (di atas
+> `v0/sprint-3-memory-event`), satu commit per tugas (**K-18**), **menunggu HUMAN
+> REVIEW**. Keadaan tiap "Selesai bila", tanpa dibulatkan:
+>
+> | | Dibuktikan | Yang BELUM |
+> |---|---|---|
+> | 4.1 | *“catat mood 3”* dirutekan `deterministic` oleh pengenal **aturan** dan dijalankan layanan biasa — jalurnya tidak memegang gerbang model sama sekali; **ujung-ke-ujung lewat percakapan (4.8): penyedia model tidak disentuh**, `done.cost_usd = 0`, tanpa run; `simple`/`reasoning` → model kelasnya dengan token, latensi, dan biaya tiap panggilan; model tanpa harga ditolak saat mulai (**K-28**) | penyedia sungguhan — milik pemilik (A-6/#18); penyedia lokal V0 **tidak menalar** |
+> | 4.2 | 9 aturan spec/05 + A-1 + K-14 — satu kasus per aturan, **semua** pelanggaran sekaligus; katalog `agents` dikelola **migrasi** `0007`, api menolak mulai bila berbeda (**K-29**); letak manifest (**E-190**) dan kolom *Scope* tool (**E-191**) | — |
+> | 4.3 | tool di luar registry `tidak_terdaftar`; di luar manifest `bukan_alat_agent`; masukan **ketat** (tanpa koersi, `enum`/`min`/`max` skema, medan `scope` di pagu manifest **dan** `scopes` tool) ditolak **sebelum** gerbang dan tanpa memakai jatah; batas laju per pengguna; keluaran = skema persis; **pemanggilan agent lewat gerbang yang sama** (K-14); tool coach tanpa catatan bebas check-in & mood | catatan mood masih sampai lewat memori episodiknya (`memory.search`) — **C-32** |
+> | 4.4 | tiap run menulis `tools_used` · `memory_scopes` (yang **benar-benar** disentuh) · `decision` (skalar, bukan penalaran) · `confidence` · `cost_usd` · token · model · latensi — juga run yang **gagal**, **ditahan** gerbang (`blocked`), dan **dibatalkan** di tengah aliran (token yang sudah keluar tetap dibayar); ditutup sekali; galat hanya `{code, type}` | run yang prosesnya MATI (bukan berhenti) tetap `running` — **K-31** |
+> | 4.5 | **R2 ditanya sekali** lalu diingat (`allow_always`), atau sekali pakai; **R3 ditanya setiap kali**, bahkan bila izinnya `allow`; R4 ditolak; `deny` ditolak & dicatat **sebelum** konfirmasi; persetujuan hanya untuk pemanggilan yang agent, tool, **dan sidik masukannya** sama, diwarisi run anak; token bertanda tangan, sekali pakai, milik satu pengguna; delegasi tidak ditanya dua kali (**E-192**) | tool V0 paling tinggi R2 — R3/R4 dibuktikan dengan registry yang menaikkannya |
+> | 4.6 | satu permintaan = **satu pohon** `agent_runs`, ditelusuri rekursif dari akarnya; orchestrator memilih agent dari niat (aturan), `trigger='agent'`, biaya permintaan = seluruh pohon | — |
+> | 4.7 | tiap balasan membawa `confidence` + `rationale` (ditegakkan runtime); coach dari fakta tool — sumber yang ditolak dilewati **dan dinyatakan**, “tanya aku” ditanyakan; habit agent tidak menebak dan tidak mengaku mengubah catatan yang sudah ada; memory agent hanya menulis yang belum diingat — arch/08 §2.2: **agent** (**K-30**); `memory.search` tidak lagi menahan tiap jawaban coach pada izin `journal_raw` (**E-193**) | keyakinan V0 = banyaknya bukti, bukan peluang terkalibrasi (#34) |
+> | 4.8 | token **mengalir** (`tool_call` · `token` · `done`), klien yang tersambung sesudah `POST` menerima semuanya dari token pertama; **`done` memuat `cost_usd`** seluruh pohon; riwayat membawa `confidence` + `rationale` (**E-194**, migrasi `0008`); konfirmasi punya rute (**E-195**); satu giliran per percakapan; isi percakapan tidak ke Redis (**K-31**) | lebih dari satu proses api — klien bisa tersambung ke proses yang salah (**K-31**) |
+> | 4.9 | biaya **hari lokal** pengguna (run yang sudah ditutup + run pohon ini yang masih berjalan) ≥ anggaran → **turun ke `simple`**, jawaban tetap ada, tercatat `decision.model_downgraded` (**K-32**); dirakit dari `HVX_AI_ANGGARAN_HARIAN_USD` | angka anggaran sebenarnya — milik pemilik (uang) |
+
 ---
 
 ## Sprint 5 — Intelligence

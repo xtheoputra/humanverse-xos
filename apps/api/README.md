@@ -59,6 +59,7 @@ Rute yang ada — kontraknya [`spec/04`](../../spec/04-API-CONTRACTS.md):
 | `GET·POST /v1/moods` | tugas 2.6 — tiap mood melahirkan memori episodik (3.6) |
 | `GET·POST /v1/journal` · `GET·PATCH·DELETE /v1/journal/{id}` | tugas 3.4 — daftar **tanpa** `body`; sunting & hapus menjangkau memori jurnal (3.6) |
 | `GET·POST /v1/activities` (`?source=`) | tugas 3.8 — klien hanya mencatat `manual` |
+| `GET·POST /v1/conversations` · `GET·POST /v1/conversations/{id}/messages` · `GET …/stream` (SSE) · `POST …/confirmations` | tugas 4.8 — *“catat mood 3”* tanpa agent & tanpa model; giliran agent di latar; `done` memuat `cost_usd` (**K-31**, **E-194**, **E-195**) |
 
 Tiap tulisan fakta perilaku menerbitkan event `spec/03` **di transaksi yang
 sama** (3.2, peta aturan 6 `spec/06`); proses `hvx.pekerja` menyalurkannya.

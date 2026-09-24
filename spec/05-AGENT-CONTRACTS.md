@@ -256,7 +256,9 @@ Tool V0 — **9 tool + 3 entri `kind: agent`**:
 > menuntut `scopes` — *scope memory/data yang disentuh* — tetapi tabel V0 tidak
 > pernah menyebutnya, jadi gerbang risiko (4.5) tidak punya scope untuk ditanyakan
 > ke mesin izin. `checkin.get` dan `mood.recent` sengaja **tanpa catatan bebas**
-> (`note`): coach membaca angka dan label, bukan tulisan pengguna (C-32).
+> (`note`): coach membaca angka dan label, bukan tulisan pengguna (C-32). ⚠️ Memori
+> episodik mood (3.6) memuat catatannya, dan `memory.search` menyerahkannya di bawah
+> scope `mood` — apakah itu boleh adalah **C-32** yang sama, milik pemilik.
 
 > 🔧 **Pelaksana tool V0 (tugas 4.3, 24 Sep 2026).** Satu jalan untuk tiap
 > pemanggilan — `agents.PelaksanaAlat`, urutannya tetap: **(1)** terdaftar di registry

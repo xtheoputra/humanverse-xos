@@ -20,17 +20,17 @@ manusia + agent + data + knowledge + simulation + automation**.
 
 | Hal | Keadaan |
 |---|---|
-| Tahap | 🔨 **Sprint 0 + Sprint 1 + Sprint 2 + Sprint 3 dikodekan** (16–24 Sep 2026) — branch `v0/sprint-0-foundation`, di atasnya `v0/sprint-1-identity`, `v0/sprint-2-human-core`, lalu `v0/sprint-3-memory-event` — **menunggu HUMAN REVIEW pemilik** |
-| Berkas **kode produksi** | **0 di `master`** · **Sprint 0 + 1 + 2 + 3 (30 dari 51 tugas `spec/07`) di branch** — api Python + proses pekerja (`hvx.pekerja`) + aplikasi Flutter pertama (`apps/mobile`) — [#3](../../issues/3) dijawab pemilik untuk memulai (**H-25**): AI coding agent di branch + PR, pemilik yang menggabungkan |
+| Tahap | 🔨 **Sprint 0 + Sprint 1 + Sprint 2 + Sprint 3 + Sprint 4 dikodekan** (16–24 Sep 2026) — branch `v0/sprint-0-foundation`, di atasnya `v0/sprint-1-identity`, `v0/sprint-2-human-core`, `v0/sprint-3-memory-event`, lalu `v0/sprint-4-ai` — **menunggu HUMAN REVIEW pemilik** |
+| Berkas **kode produksi** | **0 di `master`** · **Sprint 0 + 1 + 2 + 3 + 4 (39 dari 51 tugas `spec/07`) di branch** — api Python + proses pekerja (`hvx.pekerja`) + aplikasi Flutter pertama (`apps/mobile`) — [#3](../../issues/3) dijawab pemilik untuk memulai (**H-25**): AI coding agent di branch + PR, pemilik yang menggabungkan |
 | Berkas **perkakas** | **4** — [`tools/`](tools/README.md): `periksa_dokumen.py` · `uji_mutasi.py` · 🆕 `uji_mutasi_kode.py` · 🆕 `ci_lokal.py`. Di branch Sprint 0: **19 dari 26** pemeriksaan [`arch/11`](arch/11-PENEGAKAN.md) jalan (di `master`: 12) |
 | Repo git | privat `xtheoputra/humanverse-xos`, branch `master` |
 | Dokumen | **272 berkas** di `docs/` + **8 berkas** di `spec/` + **12 berkas** di [`arch/`](arch/README.md) |
 | Gerbang yang **sudah dijalankan** | **14 ✅ · R-1 🛑 7 temuan** (keputusan cakupan pemilik) · **15 kontrak `import-linter`** · CI lokal **lint → typecheck → test → build → scan hijau** — `uv run python tools/ci_lokal.py`, **manual** |
-| Merahnya **terbukti bisa terjadi** | **19 dari 19** — 25 mutasi dokumen (tiap mutasi wajib melahirkan temuan **baru**) + 344 mutasi kode (tiap mutasi wajib gagal dengan **alasan yang dimaksud**, dibaca dari baris galatnya — bukan dari mana pun di keluaran) · **tiap kontrak `import-linter` punya mutasinya sendiri** |
+| Merahnya **terbukti bisa terjadi** | **19 dari 19** — 25 mutasi dokumen (tiap mutasi wajib melahirkan temuan **baru**) + 476 mutasi kode (tiap mutasi wajib gagal dengan **alasan yang dimaksud**, dibaca dari baris galatnya — bukan dari mana pun di keluaran) · **tiap kontrak `import-linter` punya mutasinya sendiri** |
 | Gerbang di PR | ✅ **gratis** — `tools/ci_lokal.py --lapor-github` menempelkan status **`ci-lokal`** ke commit PR; GitHub Actions **dimatikan** atas keputusan pemilik (**H-26** — tanpa tagihan, [#160](../../issues/160)) |
 | Naskah pemilik | **24** — terakhir: **Phase 20 Civilization Platform** (39 bagian) — **fase TERAKHIR** |
 | Keputusan tertutup | **27 butir H** — 🆕 **H-27 data tiap pengguna milik pribadinya** · 🆕 **H-26 CI tanpa tagihan** · **H-25 siapa mengerjakan V0** · nama · MVP · struktur repo · ambang konfirmasi · model memory · memory meluruh · gerbang policy · context package · dua tangga R/L · manifest dipulihkan · **model transisi belajar dari galat sendiri** · **monetisasi punya fase (Phase 14)**. ✅ **H-20 (peta fase) DIPULIHKAN sebagai [`arch/01`](arch/01-PETA-20-FASE.md) — peta versi 3, 20 baris TERTUTUP, dan peta kini BERNOMOR VERSI** sehingga *“roadmap yang sudah kita tetapkan”* selalu punya rujukan yang bisa dibuka ([#101](../../issues/101) · [#108](../../issues/108) · [#132](../../issues/132) · [#133](../../issues/133) · [#142](../../issues/142)). ✅ **H-13 ([#72](../../issues/72)) DISELESAIKAN:** `Phase` dan `V0–V6` bukan dua rencana yang bersaing melainkan **dua sumbu** — `Phase` menghitung dokumen, `V` menghitung rilis. ⚠️ **H-11** ([#78](../../issues/78)) masih perlu ditinjau ulang |
-| Keputusan terbuka | **26 pertanyaan A** · **39 risiko B** · **167 ketidakcocokan E** · **20 lubang G** — dan **27 butir K** sudah saya putuskan sendiri |
+| Keputusan terbuka | **26 pertanyaan A** · **39 risiko B** · **167 ketidakcocokan E** · **20 lubang G** — dan **32 butir K** sudah saya putuskan sendiri |
 | Tanggal dokumen | 24 September 2026 |
 
 > ⚠️ **Nol baris kode di `master` itu disengaja sampai 16 Sep 2026 — dan kini
@@ -285,6 +285,35 @@ Tiap penjaga baru terbukti sanggup gagal — **344 mutasi kode** (127 baru),
 
 ---
 
+## 🔨 Sprint 4 — AI (24 Sep 2026)
+
+Sprint 4 [`spec/07`](spec/07-BACKLOG-V0.md) dikerjakan penuh di branch
+`v0/sprint-4-ai`, di atas Sprint 3 — satu commit per tugas (**K-18**).
+
+| | Yang dibangun | Bukti mesin |
+|---|---|---|
+| 4.1 | AI Gateway + Model Router; *“catat mood 3”* tanpa model (**K-28**) | penyedia model tidak disentuh — juga ujung-ke-ujung lewat percakapan |
+| 4.2 | registry agent & tool — 9 aturan spec/05 + A-1 + K-14; katalog dikelola migrasi (**K-29**) | satu kasus per aturan, semua pelanggaran sekaligus — `test_registri_agent.py` |
+| 4.3 | pelaksana tool + 9 tool V0 + 3 entri `kind: agent` | di luar registry tidak bisa dipanggil; pemanggilan agent lewat gerbang — `test_pelaksana_alat.py` · `test_alat_v0.py` |
+| 4.4 | runtime agent + `agent_runs` sebagai jejak audit | tools · scope · decision · confidence · cost — juga run yang gagal, ditahan, dan dibatalkan — `test_runtime_agent.py` |
+| 4.5 | gerbang risiko + alur konfirmasi (**E-192**) | R2 ditanya sekali, R3 setiap kali, R4 ditolak — `test_gerbang_risiko.py` |
+| 4.6 | `orchestrator-agent` | `parent_run_id` membentuk pohon, ditelusuri rekursif — `test_orkestrator.py` |
+| 4.7 | coach · habit · memory agent (**K-30**, **E-193**) | tiap balasan membawa `confidence` + `rationale` — `test_agent_v0.py` |
+| 4.8 | percakapan + SSE (**K-31**, **E-194**, **E-195**) | token mengalir; `done` memuat `cost_usd` — `test_percakapan.py` |
+| 4.9 | anggaran biaya per pengguna per hari (**K-32**) | habis → model kecil, bukan gagal — `test_anggaran.py` |
+
+🔴 **Menulisnya menemukan enam celah dokumen** — letak manifest (**E-190**), kolom
+scope tool (**E-191**), satu permintaan yang ditanya dua kali (**E-192**), pencarian
+memori yang menahan tiap jawaban coach pada izin `journal_raw` (**E-193**), riwayat
+tanpa alasan (**E-194**), dan izin yang diminta tanpa rute untuk menjawabnya
+(**E-195**) — dan satu balasan agent yang **bohong** sebelum sampai ke siapa pun
+(*“ditandai dilewati”* untuk catatan yang tidak berubah).
+
+Tiap penjaga baru terbukti sanggup gagal — **476 mutasi kode** (132 baru),
+**958 uji Python + 40 uji Flutter**.
+
+---
+
 ## 📌 Pekerjaan terbuka = GitHub Issues
 
 **157 issue** dalam 3 milestone — **59 ditutup, 98 terbuka**. Baca issue-nya,
@@ -419,7 +448,7 @@ di antaranya*), §16.5 (*tujuan manusia langsung ke kendali sendi*), §16.7
 (*punya `Collision Check`, tetapi itu menjawab "aman secara fisik", bukan
 "boleh dilakukan"*).
 
-## 🔧 Dua puluh tujuh keputusan yang diambil sendiri — [`docs/KEPUTUSAN-DIDELEGASIKAN.md`](docs/KEPUTUSAN-DIDELEGASIKAN.md)
+## 🔧 Tiga puluh dua keputusan yang diambil sendiri — [`docs/KEPUTUSAN-DIDELEGASIKAN.md`](docs/KEPUTUSAN-DIDELEGASIKAN.md)
 
 Atas permintaan pemilik (*"beri keputusan sendiri sesuai aturan"*, 9 Sep 2026),
 **dua puluh** pertanyaan **engineering** diputuskan dan ditegakkan di `spec/`
@@ -454,7 +483,12 @@ membalikkannya**:
 | **K-24** | **Ukuran dibatasi saat menulis; `Idempotency-Key` mengingat rujukan** — 1.000 goal · 100 milestone · 500 habit · badan 1 MiB · 1.000 kunci/hari | `test_batas_dan_balapan.py` · `test_idempotensi.py` |
 | **K-25** 🆕 | **Relay kotak keluar & grup konsumen** — stream membawa rujukan, bukan isi; jendela belakang 60 dtk, penanda dipangkas menurut kursor; klaim sesudah 30 dtk, stream mati sesudah 5 kali; peran `hvx_pekerja` | `hvx/pekerja.py` · `test_relay.py` |
 | **K-26** 🆕 | **Penyemat memori V0: lokal, deterministik, berkunci per pengguna** — tanpa API berbayar (A-6/#18, H-26) | `platform/sematan.py` · `test_sematan.py` |
-| **K-27** 🆕 | **Memori V0: episodik** — yang dilaporkan atau ditulis pengguna, keyakinan 1.000, bukti 1; ekstraksinya service, bukan agent | `memory/ekstraksi.py` · `test_memori.py` |
+| **K-27** | **Memori V0: episodik** — yang dilaporkan atau ditulis pengguna, keyakinan 1.000, bukti 1; ekstraksinya service, bukan agent | `memory/ekstraksi.py` · `test_memori.py` |
+| **K-28** 🆕 | **AI Gateway V0** — rute `deterministic` tanpa model untuk perintah; penyedia `lokal` tanpa jaringan dan tanpa biaya yang tidak menambah satu fakta pun | `platform/model.py` · `agents/niat.py` |
+| **K-29** 🆕 | **Katalog agent** — manifest YAML di paket api, dibekukan migrasi, api menolak mulai bila berbeda | `agents/registri.py` · migrasi `0007` |
+| **K-30** 🆕 | **Program agent V0** — jawaban dari fakta tool; keyakinan = banyaknya bukti, dilaporkan tidak dipakai memutuskan | `agents/program_v0.py` · `test_agent_v0.py` |
+| **K-31** 🆕 | **Aliran percakapan di dalam proses**, satu giliran per percakapan; isi tidak ke Redis | `agents/aliran.py` · `test_percakapan.py` |
+| **K-32** 🆕 | **Anggaran biaya model per pengguna per hari lokalnya** — habis → turun ke model kecil | `agents/runtime.py` · `test_anggaran.py` |
 
 🛑 **Yang sengaja TIDAK saya putuskan:** [#139](../../issues/139) (waktu pemilik) ·
 [#3](../../issues/3) (orang) · [#20](../../issues/20) (merek) · **seluruh butir C**
