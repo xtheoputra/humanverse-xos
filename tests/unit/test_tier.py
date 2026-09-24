@@ -63,3 +63,10 @@ def test_satu_tier_selalu_tier_itu_dan_tanpa_tier_tanpa_saran() -> None:
 def test_energi_di_luar_skala_check_in_ditolak(energi: int) -> None:
     with pytest.raises(ValueError, match="1–5"):
         tier_untuk_energi(TIGA_TIER, energi)
+
+
+def test_dua_dan_empat_tier_pada_energi_rendah() -> None:
+    """Tinjauan penegak buta Sprint 2: 2 dan 4 tier dulu hanya dijaga SIFAT (urut, dalam
+    rentang) — `jumlah_tier // 3` lolos, dan habit 2 tier tetap menyarankan versi penuh."""
+    assert [tier_untuk_energi(2, e) for e in (5, 3, 2, 1)] == [0, 0, 1, 1]
+    assert [tier_untuk_energi(4, e) for e in (5, 3, 2, 1)] == [0, 0, 1, 3]

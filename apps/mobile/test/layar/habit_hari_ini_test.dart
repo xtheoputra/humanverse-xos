@@ -268,6 +268,114 @@ void main() {
     );
   });
 
+  // ── tinjauan penegak buta Sprint 2 ─────────────────────────────────────────
+
+  testWidgets('energi disimpan BERSAMA check-in lama — PUT mengganti', (
+    t,
+  ) async {
+    final layanan = LayananPalsu(
+      checkin: const Checkin(
+        forDate: '2026-09-21',
+        energi: 4,
+        fokus: 3,
+        jamTidur: 6.5,
+      ),
+    );
+    await _pasang(t, layanan);
+
+    await t.tap(find.byKey(const Key('energi-1')));
+    await t.pumpAndSettle();
+
+    expect(
+      layanan.lamaEnergi?.fokus,
+      3,
+      reason: 'fokus hilang saat energi disimpan',
+    );
+    expect(layanan.lamaEnergi?.jamTidur, 6.5);
+  });
+
+  testWidgets('tanda "Disarankan hari ini" di tier yang disarankan server', (
+    t,
+  ) async {
+    final layanan = LayananPalsu(
+      habit: [
+        const Habit(
+          id: 'h1',
+          judul: 'Workout',
+          periode: 'day',
+          target: 1,
+          tier: [
+            Tier(label: 'A'),
+            Tier(label: 'B'),
+            Tier(label: 'C'),
+          ],
+          hari: HariHabit(forDate: '2026-09-21', energi: 2, tierDisarankan: 1),
+        ),
+      ],
+    );
+    await _pasang(t, layanan);
+
+    await t.tap(find.text('Workout'));
+    await t.pumpAndSettle();
+
+    expect(
+      find.descendant(
+        of: find.byKey(const Key('tier-1')),
+        matching: find.text('Disarankan hari ini'),
+      ),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('habit mingguan memakai jumlah per minggu yang dipilih', (
+    t,
+  ) async {
+    final layanan = LayananPalsu();
+    await _pasang(t, layanan);
+    await t.tap(find.byKey(const Key('tambah')));
+    await t.pumpAndSettle();
+    await t.enterText(find.byKey(const Key('judul-habit')), 'Lari');
+    await t.tap(find.byKey(const Key('periode')));
+    await t.pumpAndSettle();
+    await t.tap(find.text('Per minggu').last);
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const Key('target')));
+    await t.pumpAndSettle();
+    await t.tap(find.text('3×').last);
+    await t.pumpAndSettle();
+
+    await t.tap(find.byKey(const Key('simpan-habit')));
+    await t.pumpAndSettle();
+
+    expect(layanan.panggilan, contains('buat Lari week 3 '));
+  });
+
+  testWidgets('layar yang terbuka melewati tengah malam memakai tanggal BARU', (
+    t,
+  ) async {
+    var kini = DateTime(2026, 9, 21, 23, 59);
+    final layanan = LayananPalsu(habit: [_habit('h1', 'Air')]);
+    await t.pumpWidget(
+      MaterialApp(
+        home: LayarHabitHariIni(
+          layanan: layanan,
+          sesudahKeluar: () {},
+          jam: () => kini,
+        ),
+      ),
+    );
+    await t.pumpAndSettle();
+
+    kini = DateTime(2026, 9, 22, 0, 1);
+    await t.tap(find.byTooltip('Muat ulang'));
+    await t.pumpAndSettle();
+    await t.tap(find.text('Air'));
+    await t.pumpAndSettle();
+
+    expect(find.text('2026-09-22'), findsOneWidget);
+    expect(layanan.panggilan, contains('selesai h1 2026-09-22 -'));
+  });
+
   testWidgets('galat server tampil sebagai pesan, bukan layar rusak', (
     t,
   ) async {

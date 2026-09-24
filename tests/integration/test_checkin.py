@@ -167,3 +167,32 @@ async def test_check_in_pengguna_lain_tidak_terlihat_dan_tidak_tertimpa(
     assert _baris(api_bersama, b) == [(date(2026, 9, 14), 1, None, None, None)]
     daftar_b = (await api_bersama.klien.get("/v1/checkins", headers=auth(token_b))).json()
     assert [c["energy"] for c in daftar_b["items"]] == [1]
+
+
+# ── tinjauan penegak buta Sprint 2 ───────────────────────────────────────────
+
+
+async def test_put_mengganti_tiap_medan_bukan_hanya_energi(api_bersama: ApiUji) -> None:
+    uid, token = await api_bersama.pengguna_baru()
+    penuh = {"energy": 3, "focus": 4, "sleep_hours": 7.5, "note": "pagi"}
+
+    await _put(api_bersama, token, "2026-09-13", **penuh)
+    r = await _put(api_bersama, token, "2026-09-13", energy=2)
+
+    assert r.status_code == 200
+    assert _baris(api_bersama, uid) == [(date(2026, 9, 13), 2, None, None, None)], (
+        "PUT menambal focus/sleep_hours/note"
+    )
+
+
+async def test_check_in_hari_ini_di_zona_paling_maju_diterima(api_bersama: ApiUji) -> None:
+    """Batas `for_date` INKLUSIF: hari ini di UTC+14 sudah terjadi di Bumi."""
+    _uid, token = await api_bersama.pengguna_baru()
+    with psycopg.connect(psycopg_dsn(api_bersama.db.dsn_pemilik)) as k:
+        baris = k.execute("SELECT (now() AT TIME ZONE 'Pacific/Kiritimati')::date").fetchone()
+    assert baris is not None
+    (hari,) = baris
+
+    r = await _put(api_bersama, token, hari.isoformat(), energy=3)
+
+    assert r.status_code == 201, f"hari ini di UTC+14 ditolak: {r.status_code}"

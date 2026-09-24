@@ -167,3 +167,38 @@ async def test_mood_pengguna_lain_tidak_terlihat(api_bersama: ApiUji) -> None:
     r = await api_bersama.klien.get("/v1/moods", headers=auth(token_b))
 
     assert r.json()["items"] == []
+
+
+# ── tinjauan penegak buta Sprint 2 ───────────────────────────────────────────
+
+
+async def test_halaman_mood_dengan_occurred_at_kembar_tidak_melompat(api_bersama: ApiUji) -> None:
+    """Kursor keyset butuh pemecah seri `id` — tiga mood di detik yang sama."""
+    _uid, token = await api_bersama.pengguna_baru()
+    for v in (1, 2, 3):
+        await _mood(api_bersama, token, valence=v, occurred_at="2026-09-02T08:00:00Z")
+
+    terbaca: list[str] = []
+    kursor = None
+    for _ in range(5):
+        p: dict[str, Any] = {"limit": 1}
+        if kursor:
+            p["cursor"] = kursor
+        j = (await api_bersama.klien.get("/v1/moods", params=p, headers=auth(token))).json()
+        terbaca += [m["id"] for m in j["items"]]
+        kursor = j["next_cursor"]
+        if kursor is None:
+            break
+
+    assert len(terbaca) == len(set(terbaca)) == 3, f"mood kembar dilompati: {terbaca}"
+
+
+async def test_mood_enam_menit_di_depan_jam_basis_data_ditolak(api_bersama: ApiUji) -> None:
+    """spec/04: kelonggaran jam perangkat 5 menit — bukan satu jam."""
+    _uid, token = await api_bersama.pengguna_baru()
+    with psycopg.connect(psycopg_dsn(api_bersama.db.dsn_pemilik)) as k:
+        (sekarang,) = k.execute("SELECT now()").fetchone() or (None,)
+
+    r = await _mood(api_bersama, token, occurred_at=(sekarang + timedelta(minutes=6)).isoformat())
+
+    assert r.status_code == 422, f"mood 6 menit di depan diterima: {r.status_code}"

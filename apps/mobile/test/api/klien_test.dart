@@ -332,8 +332,123 @@ void main() {
     expect(c.keJsonDenganEnergi(2), {'energy': 2, 'sleep_hours': 7.5});
   });
 
-  test('tanggal lokal perangkat, bukan tanggal UTC', () {
-    final senin = DateTime(2026, 9, 21, 6, 30); // waktu LOKAL
-    expect(tanggalLokal(senin), '2026-09-21');
+  // ── tinjauan penegak buta Sprint 2: mutasi yang dulu lolos 23 uji ──────────
+
+  test('ulangan sesudah 401 membawa token BARU — bukan tanpa token', () async {
+    final klien = KlienApi(
+      dasar: dasar,
+      klien: MockClient((r) async {
+        switch (r.url.path) {
+          case '/v1/auth/login':
+            return _json(_akun('1'));
+          case '/v1/auth/refresh':
+            return _json({'tokens': _token('2')});
+        }
+        // MockClient yang menganggap "tanpa Authorization" sah tidak menangkap
+        // token baru yang lupa disimpan.
+        if (r.headers['Authorization'] == 'Bearer hvxa_akses2') {
+          return _json({'items': <Object>[]});
+        }
+        return _json({
+          'error': {'code': 'unauthenticated', 'message': 'x'},
+        }, 401);
+      }),
+    );
+    await klien.masuk(email: 'a@uji.id', sandi: 'x');
+
+    expect(await klien.habitPada('2026-09-24'), isEmpty);
   });
+
+  test('simpan energi ikut mengirim catatan check-in lama', () async {
+    late Map<String, dynamic> badan;
+    final klien = KlienApi(
+      dasar: dasar,
+      klien: MockClient((r) async {
+        if (r.url.path == '/v1/auth/login') return _json(_akun('1'));
+        badan = jsonDecode(r.body) as Map<String, dynamic>;
+        return _json({'for_date': '2026-09-24', ...badan});
+      }),
+    );
+    await klien.masuk(email: 'a@uji.id', sandi: 'x');
+
+    await klien.simpanEnergi(
+      '2026-09-24',
+      2,
+      lama: const Checkin(forDate: '2026-09-24', energi: 4, catatan: 'pagi'),
+    );
+
+    expect(badan, {'energy': 2, 'note': 'pagi'});
+  });
+
+  test(
+    'keluar mencabut sesi di SERVER dengan token yang sedang dipakai',
+    () async {
+      final panggilan = <String>[];
+      final klien = KlienApi(
+        dasar: dasar,
+        klien: MockClient((r) async {
+          panggilan.add(
+            '${r.method} ${r.url.path} ${r.headers['Authorization']}',
+          );
+          if (r.url.path == '/v1/auth/login') return _json(_akun('1'));
+          return http.Response('', 204);
+        }),
+      );
+      await klien.masuk(email: 'a@uji.id', sandi: 'x');
+
+      await klien.keluar();
+
+      expect(panggilan, contains('POST /v1/auth/logout Bearer hvxa_akses1'));
+      expect(klien.sudahMasuk, isFalse);
+    },
+  );
+
+  test('daftar dengan izin pelatihan: granted true + cakupan data', () async {
+    late Map<String, dynamic> badan;
+    final klien = KlienApi(
+      dasar: dasar,
+      klien: MockClient((r) async {
+        badan = jsonDecode(r.body) as Map<String, dynamic>;
+        return _json(_akun('1'), 201);
+      }),
+    );
+
+    await klien.daftar(
+      email: 'a@uji.id',
+      sandi: 'kuda-laut-berjalan-pelan',
+      namaTampilan: 'Ana',
+      zonaWaktu: 'Asia/Jakarta',
+      versiKebijakan: 'draf-v0',
+      izinkanPelatihanModel: true,
+    );
+
+    final setuju = badan['consents'] as Map<String, dynamic>;
+    expect(setuju['model_training'], {
+      'granted': true,
+      'data_scopes': ['habits', 'checkins'],
+    });
+  });
+
+  // `tanggalLokal` hanya bisa dibedakan dari tanggal UTC di mesin yang TIDAK
+  // berzona UTC — di mesin UTC keduanya identik, dan mutasi `toUtc()` lolos.
+  // Waktunya dipilih menurut arah selisih zona mesin, supaya tanggal UTC-nya
+  // selalu lain; `tools/ci_lokal.py` mematok `TZ=WIB-7` untuk `flutter test`.
+  final selisih = DateTime(2026, 9, 21).timeZoneOffset;
+  test(
+    'tanggal lokal perangkat, bukan tanggal UTC',
+    () {
+      final waktu = selisih > Duration.zero
+          ? DateTime(2026, 9, 21, 0, 5) // UTC: masih 20 September
+          : DateTime(2026, 9, 21, 23, 55); // UTC: sudah 22 September
+      expect(tanggalLokal(waktu), '2026-09-21');
+      expect(
+        waktu.toUtc().day,
+        isNot(21),
+        reason: 'uji ini tidak membedakan apa pun',
+      );
+    },
+    skip: selisih.inMinutes.abs() < 10
+        ? 'mesin berzona UTC — jalankan dengan TZ=WIB-7 (ci_lokal.py)'
+        : null,
+  );
 }

@@ -187,3 +187,63 @@ async def test_penyelesaian_milik_pemilik_habit(api_bersama: ApiUji) -> None:
             "SELECT user_id, source FROM habit_completions WHERE habit_id = %s", (h["id"],)
         ).fetchone()
     assert pemilik == (UUID(str(uid)), "manual")
+
+
+async def test_penyelesaian_habit_terhapus_tidak_bisa_dihapus_lewat_api(
+    api_bersama: ApiUji,
+) -> None:
+    """Tinjauan penegak buta: habit yang dihapus-lunak tidak ada bagi API — catatannya
+    juga; barisnya ikut hilang saat habit dihapus-keras (spec/01, 6.5)."""
+    _uid, token = await api_bersama.pengguna_baru()
+    h = await buat_habit(api_bersama, token)
+    await _catat(api_bersama, token, h["id"], for_date="2026-09-01")
+    await api_bersama.klien.delete(f"/v1/habits/{h['id']}", headers=auth(token))
+
+    r = await api_bersama.klien.delete(
+        f"/v1/habits/{h['id']}/completions/2026-09-01", headers=auth(token)
+    )
+
+    assert r.status_code == 404, f"catatan habit terhapus dihapus lewat API: {r.status_code}"
+    assert len(_baris(api_bersama, h["id"])) == 1
+
+
+async def test_dua_transaksi_menyisip_tanggal_sama_yang_kedua_tanpa_galat(
+    api_bersama: ApiUji,
+) -> None:
+    """`ON CONFLICT DO NOTHING` — DETERMINISTIK, bukan untung-untungan jadwal event loop.
+
+    Sejak kirim ulang mencari baris lamanya dulu (E-173), `ON CONFLICT` hanya
+    menjaga celah di antara pencarian dan INSERT — uji serentak lewat HTTP
+    kadang tidak jatuh ke celah itu (tinjauan penegak buta Sprint 2: mutasinya
+    berbunyi satu putaran, diam putaran berikutnya). Di sini transaksi B
+    menyisip tanggal yang sama saat INSERT transaksi A belum commit: B wajib
+    menunggu A, lalu tidak menulis apa pun — bukan `UniqueViolationError`.
+    """
+    from hvx.modules.habits import repository
+    from hvx.modules.platform import transaksi_pengguna
+
+    uid, token = await api_bersama.pengguna_baru()
+    h = await buat_habit(api_bersama, token)
+    engine = api_bersama.app.state.engine
+    isi: dict[str, Any] = {
+        "habit_id": UUID(h["id"]),
+        "for_date": date(2026, 9, 5),
+        "status": "done",
+        "tier_used": None,
+        "note": None,
+    }
+
+    async def sisip_b() -> Any:
+        async with transaksi_pengguna(engine, uid) as b:
+            return await repository.sisip_selesai(b, **isi)
+
+    async with transaksi_pengguna(engine, uid) as a:
+        pertama = await repository.sisip_selesai(a, **isi)
+        tugas_b = asyncio.create_task(sisip_b())
+        await asyncio.sleep(0.3)  # B sampai di INSERT dan menunggu indeks unik
+        assert not tugas_b.done(), "B tidak menunggu baris A yang belum commit"
+    kedua = await tugas_b
+
+    assert pertama is not None
+    assert kedua is None, "transaksi kedua menulis baris untuk tanggal yang sama"
+    assert len(_baris(api_bersama, h["id"])) == 1

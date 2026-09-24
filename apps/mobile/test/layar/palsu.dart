@@ -11,6 +11,8 @@ class LayananPalsu implements LayananHabit {
   Map<String, Object?>? daftarDengan;
   final List<String> panggilan = [];
   final List<String> idHabitDikirim = [];
+  // Check-in lama yang layar kirim bersama energi baru — PUT = ganti (spec/04).
+  Checkin? lamaEnergi;
   Exception? galatBerikutnya;
 
   @override
@@ -155,6 +157,7 @@ class LayananPalsu implements LayananHabit {
     Checkin? lama,
   }) async {
     panggilan.add('energi $tanggal $energi');
+    lamaEnergi = lama;
     checkin = Checkin(forDate: tanggal, energi: energi);
     return checkin!;
   }

@@ -15,8 +15,8 @@
 | Keputusan sendiri | **K-23** bacaan & pendengar lintas modul domain lewat titik rakit; energi check-in → tier adaptif · **K-24** ukuran dibatasi saat menulis; `Idempotency-Key` mengingat rujukan, bukan isi |
 | Temuan ditutup | 🆕 **E-168** · **E-169** (rute yang `spec/07` tuntut, `spec/04` tidak punya) · 🆕 **E-170 … E-176** (tinjauan sebelum PR) · **E-165** kini diterapkan |
 | `spec/` diubah | `01` (`goals_parent_not_self` · arti `for_date`) · `04` (pohon goal · habit pada tanggal · bentuk habit · penyelesaian · arti rentetan · check-in · mood · masukan ketat · ukuran badan · `Idempotency-Key` berujuk · kursor per daftar · galat validasi) · `05` (`habit.streak`) · `06` (aturan 3 & titik rakit · aturan 6 ditunda sampai 3.2) · `07` (status Sprint 2) |
-| Kode | 🔨 **Sprint 2 — 2.1–2.7 seluruhnya**, branch `v0/sprint-2-human-core`: api (`goals` · `habits` · `checkins`, migrasi 0004) + **aplikasi Flutter pertama** (`apps/mobile`) — **549 uji Python + 31 uji Flutter**, **67 mutasi baru, semuanya berbunyi** (kode: 108 → 175) |
-| Tinjauan sebelum PR | 🔍 **tiga lensa serentak** — keamanan (9 terbukti · 4 dugaan) · kontrak (19 terbukti · 5 dugaan) · penegak buta. Yang paling mahal: masukan yang dikoersi diam-diam (`"on"` menjadi persetujuan pelatihan model), goal anak yatim **40 dari 40** saat induknya dihapus serentak, dan cache `Idempotency-Key` yang menyimpan isi jawaban 24 jam di Redis bersama sesi |
+| Kode | 🔨 **Sprint 2 — 2.1–2.7 seluruhnya**, branch `v0/sprint-2-human-core`: api (`goals` · `habits` · `checkins`, migrasi 0004) + **aplikasi Flutter pertama** (`apps/mobile`) — **579 uji Python + 40 uji Flutter**, **109 mutasi baru, semuanya berbunyi** (kode: 108 → 217) |
+| Tinjauan sebelum PR | 🔍 **tiga lensa serentak** — keamanan (9 terbukti · 4 dugaan) · kontrak (19 terbukti · 5 dugaan) · penegak buta (**39 kerusakan lolos seluruh suite**, kini tiap kerusakan punya uji dan mutasi). Yang paling mahal: masukan yang dikoersi diam-diam (`"on"` menjadi persetujuan pelatihan model), goal anak yatim **40 dari 40** saat induknya dihapus serentak, dan cache `Idempotency-Key` yang menyimpan isi jawaban 24 jam di Redis bersama sesi |
 
 ---
 

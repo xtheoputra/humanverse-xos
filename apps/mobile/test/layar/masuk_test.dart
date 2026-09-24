@@ -106,6 +106,32 @@ void main() {
     },
   );
 
+  testWidgets('centang pelatihan model sampai ke layanan', (t) async {
+    // Tinjauan penegak buta Sprint 2: hanya arah "tidak disetujui" yang diuji —
+    // layar yang mengabaikan centangnya lolos (arah gagal-aman, tetapi salah).
+    final layanan = LayananPalsu();
+    await _pasang(t, layanan, () {});
+
+    await t.tap(find.text('Daftar').first);
+    await t.pumpAndSettle();
+    await t.enterText(find.byKey(const Key('email')), 'ana@uji.id');
+    await t.enterText(
+      find.byKey(const Key('sandi')),
+      'kuda-laut-berjalan-pelan',
+    );
+    await t.enterText(find.byKey(const Key('nama')), 'Ana');
+    for (final k in ['setuju', 'pelatihan']) {
+      await t.ensureVisible(find.byKey(Key(k)));
+      await t.tap(find.byKey(Key(k)));
+      await t.pumpAndSettle();
+    }
+    await t.ensureVisible(find.byKey(const Key('kirim')));
+    await t.tap(find.byKey(const Key('kirim')));
+    await t.pumpAndSettle();
+
+    expect(layanan.daftarDengan?['pelatihan'], isTrue);
+  });
+
   testWidgets('galat server (sandi ditolak) tampil apa adanya', (t) async {
     final layanan = LayananPalsu()
       ..galatBerikutnya = const GalatApi(

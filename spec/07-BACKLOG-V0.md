@@ -153,15 +153,16 @@ Tidak ada tugas yang boleh masuk `main` tanpa baris **HUMAN REVIEW**.
 > | 2.4 | rentetan dari `for_date`, *“hari ini”* menurut zona profil saat ini dari jam basis data; **pengguna yang pindah** Pago Pago (UTC−11) → Kiritimati (UTC+14) diuji lewat HTTP; `skipped` netral per kejadian, juga mingguan; hari sebelum habit ada tidak menjadi gagal (E-173) | penyeberangan garis tanggal ke timur melompati satu tanggal (tercatat di `spec/04`); masa `paused` dihitung seperti hari biasa — riwayat jeda tidak disimpan |
 > | 2.5 | `PUT` dua kali → satu baris, juga serentak; `PUT` identik tidak menulis ulang (`updated_at` tetap, E-176); `sleep_hours` angka JSON | event `checkin.logged` — tugas 3.2 |
 > | 2.6 | — (tanpa kalimat *Selesai bila*); kontrak `spec/04` diuji: id buatan klien, halaman berkursor keyset, waktu wajib berzona, `from` inklusif / `to` eksklusif | event `mood.logged` — tugas 3.2 |
-> | 2.7 | **layar yang dirakit `main.dart` diketuk terhadap api hidup** — daftar, tambah habit, tandai selesai, keluar — dan hasilnya diperiksa dari sesi lain di server (`apps/mobile/test/ujung/`, tahap smoke `tools/ci_lokal.py`); 30 uji widget dan klien; alur klien ujung-ke-ujung terhadap citra CI | belum pernah dipakai orang selain pengujinya — *enak dipakai* belum diukur; layar hanya mencatat `done` (belum `skipped`/`partial`); penyimpanan token dan antrean luring datang bersama 6.6 |
+> | 2.7 | **layar yang dirakit `main.dart` diketuk terhadap api hidup** — daftar, tambah habit, tandai selesai, keluar — dan hasilnya diperiksa dari sesi lain di server (`apps/mobile/test/ujung/`, tahap smoke `tools/ci_lokal.py`); 39 uji widget dan klien (`TZ=WIB-7` di gerbang — uji tanggal lokal tidak bermakna di mesin UTC); alur klien ujung-ke-ujung terhadap citra CI, termasuk token lama yang **ditolak server** sesudah keluar | belum pernah dipakai orang selain pengujinya — *enak dipakai* belum diukur; layar hanya mencatat `done` (belum `skipped`/`partial`); penyimpanan token dan antrean luring datang bersama 6.6 |
 >
 > Dua rute yang tugas-tugas ini tuntut tidak ada di [`04`](04-API-CONTRACTS.md)
 > sampai kodenya harus memanggilnya — **E-168** `GET /goals/{id}/tree` ·
 > **E-169** `GET /habits?for_date=` — kini ditambahkan.
 >
-> 🔍 **Tinjauan adversarial sebelum PR** (keamanan · kontrak; rinciannya
-> [`../docs/99-CATATAN-AUDIT.md`](../docs/99-CATATAN-AUDIT.md)): 28 temuan
-> terbukti, tiap temuan kode dibuktikan **merah dulu** lalu dijaga mutasi —
+> 🔍 **Tinjauan adversarial sebelum PR** (keamanan · kontrak · penegak buta;
+> rinciannya [`../docs/99-CATATAN-AUDIT.md`](../docs/99-CATATAN-AUDIT.md)): 28
+> temuan terbukti dan **39 kerusakan yang lolos seluruh suite**, tiap temuan
+> kode dibuktikan **merah dulu** lalu dijaga mutasi —
 > **E-170** masukan yang dikoersi diam-diam (`true` menjadi valensi mood;
 > detik Unix menjadi `for_date` UTC; persetujuan dari `"on"`) · **E-171**
 > `Idempotency-Key` yang menyimpan isi jawaban 24 jam (kini rujukan + kuota,
@@ -169,7 +170,10 @@ Tidak ada tugas yang boleh masuk `main` tanpa baris **HUMAN REVIEW**.
 > rentetan · **E-174** galat yang memantulkan masukan · **E-175** klien
 > Flutter · **E-176** dokumen yang tertinggal. Aturan 6
 > [`06`](06-MODULE-BOUNDARIES.md) **dilanggar dengan sengaja** sampai 3.2: enam
-> tabel ber-event ditulis sebelum tabel `events` ada.
+> tabel ber-event ditulis sebelum tabel `events` ada. Dan satu cacat Sprint 1
+> yang ketahuan lewat uji yang berkedip: batas laju menolak permintaan di
+> ujung ledakan saat jam Redis melangkah mundur ±1 dtk — kini jam per kunci
+> tidak mundur (langkah ≤ 2 dtk diserap).
 
 ---
 

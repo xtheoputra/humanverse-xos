@@ -11,6 +11,7 @@ import asyncio
 import uuid
 from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import AsyncExitStack
+from typing import Any
 
 import httpx
 import psycopg
@@ -89,7 +90,9 @@ def _periksa_429(r: httpx.Response, paling_lama_s: int) -> None:
     }
     nilai = r.headers.get("retry-after", "")
     assert nilai.isdigit(), "429 tanpa Retry-After"
-    assert 1 <= int(nilai) <= paling_lama_s, nilai
+    # +1: jam Redis di VM Docker Desktop bisa mundur ±1 dtk di antara dua perintah
+    # (diukur tinjauan Sprint 2) — GCRA lalu melihat jatahnya satu detik lebih jauh.
+    assert 1 <= int(nilai) <= paling_lama_s + 1, nilai
 
 
 async def test_mekanisme_meledak_sampai_batas_lalu_terisi_satu_per_interval(
@@ -122,6 +125,37 @@ async def test_mekanisme_meledak_sampai_batas_lalu_terisi_satu_per_interval(
 
         await pembatas.lupakan(batas, "s")
         assert (await pembatas.ambil(batas, "s")).sisa == 4
+    finally:
+        await redis.aclose()
+
+
+async def _jam_redis_ms(redis: Any) -> int:
+    detik, mikro = await redis.time()
+    return int(detik) * 1000 + int(mikro) // 1000
+
+
+@pytest.mark.parametrize(("mundur_ms", "lolos"), [(1_500, True), (10_000, False)])
+async def test_langkah_mundur_jam_redis_kecil_diserap_besar_tidak(
+    url_redis_uji: str, mundur_ms: int, lolos: bool
+) -> None:
+    """Jam VM Docker Desktop melangkah mundur ±1 dtk di bawah beban (tinjauan Sprint 2):
+    permintaan di ujung ledakan sesudahnya dulu ditolak 429 palsu — uji batas laju
+    berkedip. Disimulasikan: permintaan sebelumnya "terjadi" `mundur_ms` di depan."""
+    redis = buat_redis(url_redis_uji, socket_timeout_s=5, connect_timeout_s=2)
+    awalan = f"uji-{uuid.uuid4().hex[:12]}"
+    pembatas = PembatasLaju(redis, awalan)
+    batas = BatasLaju("uji", 2, 86_400)  # ledakan 2
+    kunci = f"{awalan}:laju:uji:s"
+    try:
+        assert (await pembatas.ambil(batas, "s")).lolos
+        depan = await _jam_redis_ms(redis) + mundur_ms
+        await redis.hset(kunci, mapping={"t": depan, "tat": depan + batas.interval_ms})
+
+        kedua = await pembatas.ambil(batas, "s")
+
+        assert kedua.lolos is lolos, (
+            f"langkah mundur {mundur_ms} ms: permintaan kedua lolos={kedua.lolos}"
+        )
     finally:
         await redis.aclose()
 

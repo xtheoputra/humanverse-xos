@@ -56,6 +56,23 @@ def _k(isi: object) -> str:
         _k(["goals", "9999-12-31T23:59:59-14:00", _ID]),
         _k(["goals", "0001-01-01T00:00:00+00:00", _ID]),
     ],
+    ids=[
+        "bukan-base64",
+        "objek",
+        "kosong",
+        "tanpa-zona-id-rusak",
+        "tanpa-zona",
+        "id-angka",
+        "waktu-angka",
+        "id-objek",
+        "jenis-daftar",
+        "bentuk-lama",
+        "string",
+        "null",
+        "meluap-plus14",
+        "meluap-minus14",
+        "tahun-0001",
+    ],
 )
 def test_kursor_rusak_menjadi_galat_400(teks: str) -> None:
     with pytest.raises(GalatApi) as g:

@@ -138,6 +138,13 @@ def _ujung_ke_ujung(dasar: str) -> int:
     return _flutter("test", "test/ujung", f"--dart-define=HVX_API_UJI={dasar}")()
 
 
+# Zona mesin untuk perintah Flutter (tinjauan penegak buta Sprint 2): `tanggalLokal`
+# hanya bisa dibedakan dari tanggal UTC di mesin yang TIDAK berzona UTC — di runner
+# UTC, mutasi `toUtc()` lolos seluruh uji. POSIX `WIB-7` = UTC+7, dibaca Dart di
+# Linux dan Windows. `tools/uji_mutasi_kode.py` memakai angka yang sama.
+TZ_FLUTTER = "WIB-7"
+
+
 def _flutter(*argumen: str, biner: str | None = None) -> Callable[[], int]:
     """Satu perintah di `apps/mobile` — dependensi dari `pubspec.lock` apa adanya."""
     program = biner or _FLUTTER
@@ -147,7 +154,7 @@ def _flutter(*argumen: str, biner: str | None = None) -> Callable[[], int]:
             if not (Path(alat).exists() or shutil.which(alat)):
                 print(f"🛑 {alat} tidak ditemukan — isi PATH atau {variabel}")
                 return 127
-        env = {**os.environ, "PYTHONIOENCODING": "utf-8"}
+        env = {**os.environ, "PYTHONIOENCODING": "utf-8", "TZ": TZ_FLUTTER}
         # --enforce-lockfile: kunci yang tidak cocok lagi GAGAL, sama dengan `uv --locked`.
         siap = subprocess.run([_FLUTTER, "pub", "get", "--enforce-lockfile"], cwd=APLIKASI, env=env)
         if siap.returncode != 0:

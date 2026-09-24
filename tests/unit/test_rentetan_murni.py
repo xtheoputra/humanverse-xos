@@ -245,3 +245,68 @@ def test_tingkat_minggu_pembuatan_yang_tidak_utuh_tidak_menjadi_gagal() -> None:
 def test_tingkat_sesudah_habit_ada_tetap_menghitung_yang_terlewat() -> None:
     catatan = {_hari(8): "done"}
     assert _harian(catatan, hari_ini=_hari(10), mulai=_hari(5))[2] == round(1 / 5, 3)
+
+
+# ── tinjauan penegak buta Sprint 2 ───────────────────────────────────────────
+
+
+def test_riwayat_lama_ditelusuri_terbatas(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Hasilnya sama dengan atau tanpa batas — yang dijaga BIAYANYA: satu `for_date`
+    tahun 1900 tidak boleh membuat tiap permintaan menelusuri 46 ribu hari."""
+    from hvx.modules.habits import rentetan as r
+
+    langkah = 0
+    asli = r._berikut
+
+    def dihitung(period: str, awal: date) -> date:
+        nonlocal langkah
+        langkah += 1
+        return asli(period, awal)
+
+    monkeypatch.setattr(r, "_berikut", dihitung)
+    r.hitung_rentetan(
+        period="day",
+        target_count=1,
+        weekdays=None,
+        mulai=SENIN,
+        hari_ini=SENIN,
+        penyelesaian={date(1900, 1, 1): "done", SENIN: "done"},
+    )
+
+    assert langkah <= r.RIWAYAT_MAKS_HARI + 40, f"{langkah} langkah untuk satu permintaan"
+
+
+def test_tingkat_mingguan_jendela_dimulai_dari_awal_minggu() -> None:
+    catatan = {SENIN - timedelta(weeks=w): "done" for w in range(8)}
+
+    r = hitung_rentetan(
+        period="week",
+        target_count=1,
+        weekdays=None,
+        mulai=SENIN - timedelta(weeks=8),
+        hari_ini=SENIN + timedelta(days=3),
+        penyelesaian=catatan,
+    )
+
+    assert r.completion_rate_30d == 1.0, f"minggu yang selalu terpenuhi: {r}"
+
+
+def test_terpanjang_dari_riwayat_berbulan_bulan_tetap_terhitung() -> None:
+    catatan = {SENIN - timedelta(days=250 - i): "done" for i in range(100)}
+
+    r = hitung_rentetan(
+        period="day",
+        target_count=1,
+        weekdays=None,
+        mulai=min(catatan),
+        hari_ini=SENIN,
+        penyelesaian=catatan,
+    )
+
+    assert r.longest == 100, f"rentetan terpanjang 250 hari lalu terpotong: {r}"
+
+
+def test_awal_habit_lebih_awal_dari_catatan_pertama_tetap_dihitung() -> None:
+    """Habit berumur 5 hari yang baru dijalankan hari ini: 1/6, bukan 1/1."""
+    tingkat = _harian({_hari(5): "done"}, hari_ini=_hari(5), mulai=_hari(0))[2]
+    assert tingkat == round(1 / 6, 3), f"awal habit diganti catatan pertama: {tingkat}"

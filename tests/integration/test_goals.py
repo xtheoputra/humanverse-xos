@@ -26,6 +26,28 @@ async def _goal(api: ApiUji, token: str, **isi: Any) -> dict[str, Any]:
     return hasil
 
 
+def _urutkan_waktu_dibuat(api: ApiUji, *goal_id: str) -> None:
+    """`created_at` berurutan persis urutan argumen, satu menit berselang.
+
+    Uji URUTAN tidak boleh bergantung pada jam: jam VM Docker Desktop bisa
+    melangkah mundur ±1 dtk di antara dua tulisan (tinjauan Sprint 2), dan goal
+    yang dibuat kemudian mendapat `created_at` lebih awal.
+    """
+    with psycopg.connect(psycopg_dsn(api.db.dsn_pemilik), autocommit=True) as k:
+        for i, gid in enumerate(goal_id):
+            k.execute(
+                "UPDATE goals SET created_at = now() - make_interval(mins => %s) WHERE id = %s",
+                (len(goal_id) - i, gid),
+            )
+
+
+async def _semua_goal(api: ApiUji, token: str) -> list[dict[str, Any]]:
+    r = await api.klien.get("/v1/goals", params={"limit": 100}, headers=auth(token))
+    assert r.status_code == 200, r.text
+    items: list[dict[str, Any]] = r.json()["items"]
+    return items
+
+
 # ───────────────────────────────────────────────────────── pohon (2.1) ──
 
 
@@ -33,8 +55,9 @@ async def test_pohon_goal_tiga_tingkat_terbaca_dalam_satu_kueri(api_bersama: Api
     _uid, token = await api_bersama.pengguna_baru()
     akar = await _goal(api_bersama, token, title="Hidup sehat", domain="health")
     karier = await _goal(api_bersama, token, title="Lari 10K", parent_id=akar["id"])
-    await _goal(api_bersama, token, title="Tidur cukup", parent_id=akar["id"])
+    tidur = await _goal(api_bersama, token, title="Tidur cukup", parent_id=akar["id"])
     cucu = await _goal(api_bersama, token, title="Interval mingguan", parent_id=karier["id"])
+    _urutkan_waktu_dibuat(api_bersama, akar["id"], karier["id"], tidur["id"], cucu["id"])
 
     with PenghitungKueri(api_bersama.app) as hitung:
         r = await api_bersama.klien.get(f"/v1/goals/{akar['id']}/tree", headers=auth(token))
@@ -265,7 +288,14 @@ async def test_daftar_berhalaman_tanpa_ganda_dan_tanpa_lompat(api_bersama: ApiUj
         if kursor is None:
             break
 
-    assert terbaca == list(reversed(dibuat))
+    # Tanpa ganda, tanpa lompat — dan urut `(created_at, id)` turun MENURUT SERVER.
+    # Bukan `reversed(dibuat)`: jam VM Docker bisa mundur ±1 dtk di antara dua
+    # tulisan (tinjauan penegak buta Sprint 2), dan `created_at` ikut mundur.
+    assert sorted(terbaca) == sorted(dibuat)
+    assert len(terbaca) == len(set(terbaca))
+    urutan = [(g["created_at"], g["id"]) for g in await _semua_goal(api_bersama, token)]
+    assert [i for _w, i in urutan] == terbaca
+    assert urutan == sorted(urutan, reverse=True)
 
 
 async def test_daftar_menyaring_status(api_bersama: ApiUji) -> None:
@@ -345,3 +375,94 @@ async def test_milestone_goal_terhapus_atau_milik_orang_lain_404(api_bersama: Ap
     assert orang_lain.status_code == 404
     assert ubah_lain.status_code == 404
     assert sesudah_hapus.status_code == 404
+
+
+# ── tinjauan penegak buta Sprint 2: mutasi yang dulu lolos seluruh suite ─────
+
+
+async def test_pohon_tidak_memuat_keturunan_yang_dihapus(api_bersama: ApiUji) -> None:
+    _uid, token = await api_bersama.pengguna_baru()
+    akar = await _goal(api_bersama, token, title="Akar")
+    await _goal(api_bersama, token, title="A", parent_id=akar["id"])
+    b = await _goal(api_bersama, token, title="B", parent_id=akar["id"])
+    await api_bersama.klien.delete(f"/v1/goals/{b['id']}", headers=auth(token))
+
+    r = await api_bersama.klien.get(f"/v1/goals/{akar['id']}/tree", headers=auth(token))
+
+    assert [c["title"] for c in r.json()["children"]] == ["A"], "goal terhapus ikut di pohon"
+
+
+async def test_pohon_sepuluh_tingkat_terbaca_utuh(api_bersama: ApiUji) -> None:
+    """E-168: kedalaman dibatasi SAAT MENULIS — membaca tidak pernah memotongnya."""
+    _uid, token = await api_bersama.pengguna_baru()
+    akar = induk = None
+    for i in range(10):
+        isi: dict[str, Any] = {"title": f"T{i}"}
+        if induk:
+            isi["parent_id"] = induk
+        induk = (await _goal(api_bersama, token, **isi))["id"]
+        akar = akar or induk
+
+    simpul = (await api_bersama.klien.get(f"/v1/goals/{akar}/tree", headers=auth(token))).json()
+    dalam = 0
+    while simpul["children"]:
+        (simpul,) = simpul["children"]
+        dalam += 1
+
+    assert dalam == 9, f"pohon dipotong diam-diam saat dibaca: {dalam + 1} tingkat"
+
+
+async def test_anak_pohon_menurut_waktu_dibuat_bukan_judul(api_bersama: ApiUji) -> None:
+    _uid, token = await api_bersama.pengguna_baru()
+    akar = await _goal(api_bersama, token, title="Akar")
+    zebra = await _goal(api_bersama, token, title="Zebra", parent_id=akar["id"])
+    apel = await _goal(api_bersama, token, title="Apel", parent_id=akar["id"])
+    _urutkan_waktu_dibuat(api_bersama, akar["id"], zebra["id"], apel["id"])
+
+    r = await api_bersama.klien.get(f"/v1/goals/{akar['id']}/tree", headers=auth(token))
+
+    assert [c["title"] for c in r.json()["children"]] == ["Zebra", "Apel"], (
+        "urutan anak pohon bukan urutan dibuat"
+    )
+
+
+async def test_goal_terhapus_tidak_bisa_diubah_dan_milestonenya_404(api_bersama: ApiUji) -> None:
+    _uid, token = await api_bersama.pengguna_baru()
+    k = api_bersama.klien
+    g = await _goal(api_bersama, token)
+    m = (
+        await k.post(f"/v1/goals/{g['id']}/milestones", json={"title": "M"}, headers=auth(token))
+    ).json()
+    await k.delete(f"/v1/goals/{g['id']}", headers=auth(token))
+
+    ubah = await k.patch(f"/v1/goals/{g['id']}", json={"title": "X"}, headers=auth(token))
+    kosong = await k.patch(f"/v1/milestones/{m['id']}", json={}, headers=auth(token))
+    baru = await k.post(f"/v1/goals/{g['id']}/milestones", json={"title": "N"}, headers=auth(token))
+
+    assert ubah.status_code == 404, f"PATCH goal terhapus: {ubah.status_code}"
+    assert kosong.status_code == 404, f"PATCH {{}} milestone goal terhapus: {kosong.status_code}"
+    assert baru.status_code == 404, f"milestone baru di goal terhapus: {baru.status_code}"
+
+
+async def test_halaman_goal_dengan_created_at_kembar_tidak_melompat(api_bersama: ApiUji) -> None:
+    """Kursor keyset butuh pemecah seri `id`: tiga goal dari SATU transaksi berbagi `now()`."""
+    uid, token = await api_bersama.pengguna_baru()
+    with psycopg.connect(psycopg_dsn(api_bersama.db.dsn_pemilik), autocommit=True) as k:
+        k.execute(
+            "INSERT INTO goals (user_id, title) VALUES (%s, 'A'), (%s, 'B'), (%s, 'C')",
+            (uid, uid, uid),
+        )
+
+    terbaca: list[str] = []
+    kursor = None
+    for _ in range(5):
+        param: dict[str, Any] = {"limit": 1}
+        if kursor:
+            param["cursor"] = kursor
+        j = (await api_bersama.klien.get("/v1/goals", params=param, headers=auth(token))).json()
+        terbaca += [g["id"] for g in j["items"]]
+        kursor = j["next_cursor"]
+        if kursor is None:
+            break
+
+    assert len(terbaca) == len(set(terbaca)) == 3, f"goal kembar dilompati: {terbaca}"

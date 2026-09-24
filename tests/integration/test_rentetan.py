@@ -188,3 +188,50 @@ async def test_rentetan_habit_pengguna_lain_404(api_bersama: ApiUji) -> None:
     r = await api_bersama.klien.get(f"/v1/habits/{h['id']}/streak", headers=auth(token_b))
 
     assert r.status_code == 404
+
+
+# ── tinjauan penegak buta Sprint 2: layanan (bukan hanya fungsi murni) ───────
+
+
+async def test_rentetan_lewat_http_mengikuti_hari_terjadwal(api_bersama: ApiUji) -> None:
+    _uid, token = await api_bersama.pengguna_baru(timezone="Asia/Jakarta")
+    hari_ini = _hari_ini_di(api_bersama, "Asia/Jakarta")
+    h = await buat_habit(api_bersama, token, schedule={"weekdays": [hari_ini.isoweekday()]})
+    await _catat(api_bersama, token, h["id"], hari_ini - timedelta(days=7))
+    await _catat(api_bersama, token, h["id"], hari_ini)
+
+    r = await _rentetan(api_bersama, token, h["id"])
+
+    assert (r["current"], r["completion_rate_30d"]) == (2, 1.0), (
+        f"layanan tidak meneruskan schedule.weekdays: {r}"
+    )
+
+
+async def test_tingkat_menghitung_hari_sejak_habit_dibuat(api_bersama: ApiUji) -> None:
+    _uid, token = await api_bersama.pengguna_baru(timezone="Asia/Jakarta")
+    h = await buat_habit(api_bersama, token)
+    _mundurkan_pembuatan(api_bersama, h["id"], 5)
+    await _catat(api_bersama, token, h["id"], _hari_ini_di(api_bersama, "Asia/Jakarta"))
+
+    r = await _rentetan(api_bersama, token, h["id"])
+
+    assert r["completion_rate_30d"] == round(1 / 6, 3), f"awal habit diabaikan: {r}"
+
+
+async def test_awal_habit_menurut_zona_profil_bukan_utc(api_bersama: ApiUji) -> None:
+    """Dibuat 00:30 waktu Kiritimati = 10:30 UTC sehari sebelumnya."""
+    _uid, token = await api_bersama.pengguna_baru(timezone=KIRITIMATI)
+    hari_k = _hari_ini_di(api_bersama, KIRITIMATI)
+    h = await buat_habit(api_bersama, token)
+    with psycopg.connect(psycopg_dsn(api_bersama.db.dsn_pemilik), autocommit=True) as k:
+        k.execute(
+            "UPDATE habits SET created_at = (%s::date + time '00:30') AT TIME ZONE %s "
+            "WHERE id = %s",
+            (hari_k - timedelta(days=3), KIRITIMATI, h["id"]),
+        )
+    for mundur in range(3, -1, -1):
+        await _catat(api_bersama, token, h["id"], hari_k - timedelta(days=mundur))
+
+    r = await _rentetan(api_bersama, token, h["id"])
+
+    assert (r["current"], r["completion_rate_30d"]) == (4, 1.0), f"awal habit di UTC: {r}"

@@ -99,6 +99,10 @@ class KlienApi implements LayananHabit {
   @override
   bool get sudahMasuk => _akses != null;
 
+  /// Token akses yang sedang dipakai — untuk `tool/ujung_ke_ujung.dart`, yang
+  /// membuktikan SERVER mencabutnya saat keluar (klien sendiri melupakannya).
+  String? get tokenAksesSaatIni => _akses;
+
   Uri _uri(String jalur, [Map<String, String>? kueri]) => dasar.replace(
     path: '${dasar.path.replaceAll(RegExp(r'/$'), '')}$jalur',
     queryParameters: kueri,

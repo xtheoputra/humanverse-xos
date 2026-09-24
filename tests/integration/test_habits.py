@@ -184,3 +184,35 @@ async def test_hapus_lunak_menyembunyikan_habit(api_bersama: ApiUji) -> None:
 
     assert (pertama.status_code, kedua.status_code) == (204, 404)
     assert (await api_bersama.klien.get("/v1/habits", headers=auth(token))).json()["items"] == []
+
+
+# ── tinjauan penegak buta Sprint 2 ───────────────────────────────────────────
+
+
+@pytest.mark.parametrize(
+    ("awal", "ubah"),
+    [
+        ({"schedule": {"weekdays": [1, 3, 5]}}, {"period": "week"}),
+        ({"period": "week", "target_count": 3}, {"schedule": {"weekdays": [1]}}),
+    ],
+)
+async def test_patch_jadwal_dan_periode_diperiksa_terhadap_baris_tersimpan(
+    api_bersama: ApiUji, awal: dict[str, Any], ubah: dict[str, Any]
+) -> None:
+    _uid, token = await api_bersama.pengguna_baru()
+    h = await buat_habit(api_bersama, token, **awal)
+
+    r = await api_bersama.klien.patch(f"/v1/habits/{h['id']}", json=ubah, headers=auth(token))
+
+    assert r.status_code == 422, f"paduan jadwal × periode tak sah diterima: {r.status_code}"
+    assert r.json()["error"]["code"] == "invalid_habit"
+
+
+async def test_rentetan_habit_terhapus_404(api_bersama: ApiUji) -> None:
+    _uid, token = await api_bersama.pengguna_baru()
+    h = await buat_habit(api_bersama, token)
+    await api_bersama.klien.delete(f"/v1/habits/{h['id']}", headers=auth(token))
+
+    r = await api_bersama.klien.get(f"/v1/habits/{h['id']}/streak", headers=auth(token))
+
+    assert r.status_code == 404, f"rentetan habit terhapus: {r.status_code}"

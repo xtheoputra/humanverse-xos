@@ -10,6 +10,7 @@
 import 'dart:io';
 import 'dart:math';
 
+import 'package:http/http.dart' as http;
 import 'package:hvx_app/api/klien.dart';
 import 'package:hvx_app/api/model.dart';
 
@@ -86,16 +87,22 @@ Future<void> main(List<String> argumen) async {
     'batalkan → belum selesai lagi',
   );
 
+  // Token yang dipakai SEBELUM keluar, dikirim lagi apa adanya sesudahnya: klien
+  // melupakan token di `finally`, jadi "permintaan berikutnya ditolak" terbukti
+  // apa pun keadaan sesi di server — klien yang tidak memanggil logout pun lulus
+  // (tinjauan penegak buta Sprint 2). Yang dibuktikan di sini SERVER-nya.
+  final tokenLama = klien.tokenAksesSaatIni;
+  _pastikan(tokenLama != null, 'token akses ada sebelum keluar');
   await klien.keluar();
-  _pastikan(!klien.sudahMasuk, 'keluar → sesi dicabut');
-  try {
-    await klien.habitPada(hariIni);
-    _pastikan(false, 'sesudah keluar, api menolak');
-  } on SesiBerakhir {
-    _pastikan(true, 'sesudah keluar, api menolak');
-  } on GalatApi catch (g) {
-    _pastikan(g.status == 401, 'sesudah keluar, api menolak (${g.status})');
-  }
+  _pastikan(!klien.sudahMasuk, 'keluar → klien melupakan token');
+  final sesudah = await http.get(
+    dasar.replace(path: '${dasar.path.replaceAll(RegExp(r'/$'), '')}/v1/me'),
+    headers: {'Authorization': 'Bearer $tokenLama'},
+  );
+  _pastikan(
+    sesudah.statusCode == 401,
+    'token lama ditolak SERVER sesudah keluar (${sesudah.statusCode})',
+  );
   stdout.writeln('✅ layar V0 pertama bekerja lawan api nyata');
   exit(0);
 }

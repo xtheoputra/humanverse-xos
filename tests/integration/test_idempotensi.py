@@ -274,3 +274,54 @@ async def test_badan_bersarang_dalam_bukan_json_tidak_500(api_bersama: ApiUji) -
     )
 
     assert r.status_code == 400, f"badan bersarang dalam dijawab {r.status_code}"
+
+
+# ── tinjauan penegak buta Sprint 2 ───────────────────────────────────────────
+
+
+async def test_kunci_dan_badan_sama_di_rute_lain_bukan_ulangan(api_bersama: ApiUji) -> None:
+    """Sidik memuat JALUR: `PATCH /goals/A` dan `/goals/B` berbadan sama adalah dua permintaan."""
+    _uid, token = await api_bersama.pengguna_baru()
+    k = api_bersama.klien
+    a = (await k.post("/v1/goals", json={"title": "A"}, headers=auth(token))).json()
+    b = (await k.post("/v1/goals", json={"title": "B"}, headers=auth(token))).json()
+    h = _kunci(api_bersama, token, "capai")
+
+    ra = await k.patch(f"/v1/goals/{a['id']}", json={"status": "achieved"}, headers=h)
+    rb = await k.patch(f"/v1/goals/{b['id']}", json={"status": "achieved"}, headers=h)
+    b_kini = (await k.get(f"/v1/goals/{b['id']}", headers=auth(token))).json()
+
+    assert ra.status_code == 200
+    assert rb.status_code == 422, f"rute lain diputar ulang: {rb.status_code}"
+    assert b_kini["status"] == "active"
+
+
+async def test_kunci_sama_di_post_habits_satu_baris(api_bersama: ApiUji) -> None:
+    uid, token = await api_bersama.pengguna_baru()
+    h = _kunci(api_bersama, token, "habit-1")
+    badan = {"title": "Air", "period": "day", "target_count": 1}
+
+    x = await api_bersama.klien.post("/v1/habits", json=badan, headers=h)
+    y = await api_bersama.klien.post("/v1/habits", json=badan, headers=h)
+    with psycopg.connect(psycopg_dsn(api_bersama.db.dsn_pemilik)) as k:
+        (n,) = k.execute("SELECT count(*) FROM habits WHERE user_id = %s", (uid,)).fetchone() or (
+            0,
+        )
+
+    assert n == 1, "Idempotency-Key diabaikan: habit ganda"
+    assert y.headers.get("Idempotent-Replayed") == "true"
+    assert x.json() == y.json()
+
+
+async def test_rujukan_diingat_dua_puluh_empat_jam(api_bersama: ApiUji) -> None:
+    import hashlib
+
+    uid, token = await api_bersama.pengguna_baru()
+    await api_bersama.klien.post(
+        "/v1/goals", json={"title": "X"}, headers=_kunci(api_bersama, token, "ttl-uji")
+    )
+    kunci = f"{api_bersama.awalan_redis}:idem:{uid}:{hashlib.sha256(b'ttl-uji').hexdigest()}"
+
+    ttl = await api_bersama.app.state.redis.ttl(kunci)
+
+    assert ttl > 23 * 3600, f"rujukan idempoten hanya diingat {ttl} detik"

@@ -67,12 +67,14 @@ tier mana yang disarankan”* tanpa N+1 permintaan. ✅ **Dibetulkan:** `GET
 suggested_tier }`; `energy` ikut sebagai **alasan** (naskah 4 §29). Pemetaan
 energi → tier: **K-23**.
 
-### 🔍 Tinjauan adversarial sebelum PR — dua lensa, 28 temuan terbukti
+### 🔍 Tinjauan adversarial sebelum PR — tiga lensa serentak
 
 Keamanan (9 terbukti, 4 dugaan) dan kontrak (19 terbukti, 5 dugaan), tiap
-temuan dibuktikan lewat HTTP ke api hidup atau kueri basis data. Tiap temuan
-kode di bawah dibuktikan **merah dulu**, lalu dijaga mutasi di
-`tools/uji_mutasi_kode.py` (kelompok `E-170` … `E-176`).
+temuan dibuktikan lewat HTTP ke api hidup atau kueri basis data; dan **penegak
+buta** — 39 kerusakan masuk akal yang lolos **seluruh** suite (bagian terakhir
+di bawah). Tiap temuan kode dibuktikan **merah dulu**, lalu dijaga mutasi di
+`tools/uji_mutasi_kode.py` (kelompok `E-170` … `E-176`, dan kode tugasnya
+untuk penegak buta).
 
 #### 🔴 E-170 — masukan dikoersi diam-diam: `true` menjadi valensi mood terburuk
 
@@ -171,6 +173,38 @@ seolah `for_date` dihitung dari zona profil; `PUT` check-in identik menggeser
 `updated_at` padahal `spec/04` menjanjikan *baris yang sama*; `ARCHITECTURE.md`
 tanpa migrasi `0004` dan aplikasi Flutter. ✅ Semuanya dibetulkan. Entri
 **E-165** di bawah semula masih *“⏳ belum ada tugas”* — kini diterapkan.
+
+#### 🔴 Penegak buta — 39 kerusakan yang lolos seluruh suite
+
+Peninjau ketiga merusak kode 7fb2383 di salinan, satu kerusakan per percobaan,
+dan menjalankan **seluruh** suite: 39 tetap hijau. Yang paling mahal:
+
+| Kerusakan yang lolos | Kenapa tidak ada uji yang merah |
+|---|---|
+| pohon goal memuat keturunan yang **dihapus**; atau dibaca 3 tingkat saja | tidak ada uji yang membaca pohon sesudah hapus, atau yang MEMBACA 10 tingkat |
+| sidik `Idempotency-Key` tanpa **jalur**: `PATCH /goals/B` menerima jawaban `/goals/A` | semua uji memakai `POST /v1/goals` |
+| rentetan tanpa `schedule.weekdays` · tanpa awal habit · awal habit di **UTC** | uji rentetan lewat HTTP hanya habit yang dibuat *sekarang*, tanpa jadwal |
+| `ZONA_PALING_MAJU = "UTC"` | pukul 00:00–09:59 UTC, Kiritimati dan UTC bertanggal sama — uji HTTP hanya bisa menangkapnya 14 jam sehari |
+| PUT check-in menambal `sleep_hours`/`focus`; kursor mood & goal tanpa pemecah seri `id` | uji hanya mengosongkan `energy`/`note`; data uji tidak pernah kembar |
+| klien Flutter tidak memanggil `logout` | **juga lolos alat ujung-ke-ujung lawan api hidup** — klien melupakan tokennya sendiri, jadi "ditolak sesudah keluar" benar apa pun keadaan sesi di server |
+| `tanggalLokal` memakai `toUtc()` | uji hanya bermakna di mesin berzona > UTC+6:30 — di runner UTC lolos |
+
+✅ **Dibetulkan:** satu uji per kerusakan — merah pada kerusakannya, dibuktikan
+42 mutasi baru (termasuk layar Flutter, dan dua lapis sekaligus bila kodenya
+berlapis); alat ujung-ke-ujung kini mengirim **token lama** ke server sesudah
+keluar; `flutter test` di gerbang dan mutasi berjalan dengan `TZ=WIB-7`, dan uji
+tanggal lokal **dilewati dengan alasan** di mesin UTC alih-alih lulus kosong;
+mutasi yang lemah dipatok ke kasusnya (`[badan0]`, `[tanpa-zona]`), bukan ke
+pesan yang cocok dengan parameter mana pun. Uji CORS negatif kini menuntut
+jawabannya datang **dari** CORS, bukan 500 dari lapisan di dalamnya.
+
+🔴 **Dan satu cacat sungguhan yang ditemukan peninjau lewat uji yang berkedip:**
+jam VM Docker Desktop melangkah **mundur** 0,76–1,18 dtk di bawah beban, dan
+skrip GCRA batas laju (1.7) menolak permintaan di ujung ledakan yang jatuh
+sesudahnya — `429` palsu, 1 dari 3–6 putaran `test_batas_laju.py`. ✅ Jam per
+kunci kini tidak mundur: langkah mundur sampai 2 dtk diserap, yang lebih besar
+dipakai apa adanya (menahan jam sebuah kunci satu jam karena jam server disetel
+mundur lebih buruk). Uji urutan `created_at` kini mematok waktunya sendiri.
 
 #### Yang TIDAK dibetulkan di Sprint 2
 

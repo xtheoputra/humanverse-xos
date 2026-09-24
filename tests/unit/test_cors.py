@@ -49,13 +49,33 @@ async def test_asal_yang_disebut_lolos_preflight_dengan_header_tulis() -> None:
 async def test_asal_lain_tidak_diloloskan() -> None:
     r = await _preflight(ASAL, "http://jahat.contoh")
 
+    # 400 dari CORSMiddleware sendiri — bukan 500 dari lapisan di dalamnya (tanpa
+    # Redis di uji ini). Tinjauan penegak buta Sprint 2: CORS yang dipasang di
+    # DALAM batas laju menjawab 500, dan tanpa baris ini uji tetap lulus.
+    assert r.status_code == 400, f"preflight asal asing dijawab {r.status_code}, bukan oleh CORS"
+    assert r.text == "Disallowed CORS origin"
     assert "access-control-allow-origin" not in r.headers, "asal yang tidak disebut diloloskan"
 
 
 async def test_tanpa_konfigurasi_tidak_ada_cors_sama_sekali() -> None:
+    from fastapi.middleware.cors import CORSMiddleware
+
+    app = create_app(_settings(""))
     r = await _preflight("", ASAL)
 
+    assert all(m.cls is not CORSMiddleware for m in app.user_middleware), "CORS terpasang"
     assert "access-control-allow-origin" not in r.headers
+
+
+def test_cors_paling_luar_supaya_galat_pun_membawa_header() -> None:
+    """429/401 yang dijawab lapisan dalam tetap bisa dibaca aplikasi web."""
+    from fastapi.middleware.cors import CORSMiddleware
+
+    app = create_app(_settings(ASAL))
+
+    assert app.user_middleware[0].cls is CORSMiddleware, [
+        m.cls.__name__ for m in app.user_middleware
+    ]
 
 
 @pytest.mark.parametrize(

@@ -50,10 +50,11 @@ async def test_belum_check_in_tier_penuh_bukan_diturunkan(api_bersama: ApiUji) -
 
     habit = await _hari(api_bersama, token, "2026-09-16")
 
-    assert [(h["day"]["energy"], h["day"]["suggested_tier"]) for h in habit] == [
-        (None, 0),
-        (None, None),
-    ]
+    # Menurut judul, bukan urutan: jam VM Docker yang mundur membalik `created_at`.
+    assert {h["title"]: (h["day"]["energy"], h["day"]["suggested_tier"]) for h in habit} == {
+        "Workout": (None, 0),
+        "Tanpa tier": (None, None),
+    }
 
 
 async def test_energi_dibaca_dari_tanggal_yang_diminta_saja(api_bersama: ApiUji) -> None:
@@ -104,3 +105,22 @@ async def test_daftar_tanpa_tanggal_tidak_membawa_hari(api_bersama: ApiUji) -> N
     r = await api_bersama.klien.get("/v1/habits", headers=auth(token))
 
     assert r.json()["items"][0]["day"] is None
+
+
+async def test_habit_ber_for_date_jumlah_kueri_tidak_tumbuh_bersama_habit(
+    api_bersama: ApiUji,
+) -> None:
+    """E-169: satu permintaan, jumlah pernyataan SQL tetap — bukan satu per habit."""
+    from _bantuan_db import PenghitungKueri
+
+    _uid, token = await api_bersama.pengguna_baru()
+    for i in range(4):
+        await buat_habit(api_bersama, token, title=f"H{i}")
+
+    with PenghitungKueri(api_bersama.app) as hitung:
+        r = await api_bersama.klien.get(
+            "/v1/habits", params={"for_date": "2026-09-20"}, headers=auth(token)
+        )
+
+    assert r.status_code == 200
+    assert len(hitung.pernyataan) <= 3, "N+1:\n" + "\n".join(hitung.pernyataan)

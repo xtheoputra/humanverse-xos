@@ -94,6 +94,17 @@ def _flutter_uji(berkas: str, nama: str) -> list[str]:
     return [_FLUTTER, "test", berkas, "--plain-name", nama]
 
 
+def _tz_flutter() -> str:
+    """Zona mesin yang `ci_lokal.py` pakai untuk Flutter — mutasi `toUtc()` hanya
+    terlihat di mesin yang tidak berzona UTC."""
+    sys.path.insert(0, str(AKAR / "tools"))
+    try:
+        from ci_lokal import TZ_FLUTTER
+    finally:
+        sys.path.pop(0)
+    return TZ_FLUTTER
+
+
 def _pindai_rahasia() -> list[str]:
     """Perintah pemindai rahasia DIAMBIL dari tools/ci_lokal.py — bukan disalin."""
     sys.path.insert(0, str(AKAR / "tools"))
@@ -168,6 +179,45 @@ _UJI_SERENTAK = (
 )
 _UJI_DIALOG_ID = "Simpan lagi sesudah jaringan putus mengirim id YANG SAMA; isian diubah → id baru"
 _UJI_DILEWATI = "habit yang DILEWATI tampil lain dan ketukan membatalkannya"
+_UJI_AKSES_BARU = "ulangan sesudah 401 membawa token BARU — bukan tanpa token"
+_UJI_CATATAN_LAMA = "simpan energi ikut mengirim catatan check-in lama"
+_UJI_LAYAR_LAMA = "energi disimpan BERSAMA check-in lama — PUT mengganti"
+_UJI_TANGGAL_LOKAL = "tanggal lokal perangkat, bukan tanggal UTC"
+_UJI_TANDA_SARAN = 'tanda "Disarankan hari ini" di tier yang disarankan server'
+_UJI_KELUAR = "keluar mencabut sesi di SERVER dengan token yang sedang dipakai"
+_UJI_TARGET_MINGGUAN = "habit mingguan memakai jumlah per minggu yang dipilih"
+_UJI_PELATIHAN_KLIEN = "daftar dengan izin pelatihan: granted true + cakupan data"
+_UJI_PELATIHAN_LAYAR = "centang pelatihan model sampai ke layanan"
+_UJI_TENGAH_MALAM = "layar yang terbuka melewati tengah malam memakai tanggal BARU"
+# Blok CORS `hvx.main` apa adanya — mutasi memindahkannya ke dalam batas laju.
+_CORS_BLOK = (
+    "    if settings.asal_cors:"
+    + NL
+    + "        # Paling luar: jawaban 401/429 pun membawa header CORS, supaya aplikasi"
+    + NL
+    + '        # web membaca galatnya alih-alih "network error". Tanpa kredensial'
+    + NL
+    + "        # peramban (cookie) — autentikasi V0 token bearer (K-21)."
+    + NL
+    + "        app.add_middleware("
+    + NL
+    + "            CORSMiddleware,"
+    + NL
+    + "            allow_origins=list(settings.asal_cors),"
+    + NL
+    + '            allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],'
+    + NL
+    + '            allow_headers=["Authorization", "Content-Type", "Idempotency-Key", "X-Request-ID"],'
+    + NL
+    + '            expose_headers=["Retry-After", "X-Request-ID", "Idempotent-Replayed"],'
+    + NL
+    + "            allow_credentials=False,"
+    + NL
+    + "            max_age=600,"
+    + NL
+    + "        )"
+    + NL
+)
 _UJI_ID_SAMA = (
     "membuat habit: id buatan pemanggil = id badan = Idempotency-Key, SAMA di tiap percobaan"
 )
@@ -560,7 +610,7 @@ MUTASI: list[Mutasi] = [
         [
             Sunting(
                 f"{MODUL}/platform/batas_laju.py",
-                "redis.call('SET', KEYS[1], tat_baru, 'PX', tat_baru - sekarang)" + NL,
+                "redis.call('HSET', KEYS[1], 'tat', tat_baru, 't', sekarang)" + NL,
                 "",
             )
         ],
@@ -1683,7 +1733,7 @@ MUTASI: list[Mutasi] = [
                 "        if saat.utcoffset() is not None and not WAKTU_MIN",
             )
         ],
-        _pytest("tests/unit/test_halaman.py::test_kursor_rusak_menjadi_galat_400"),
+        _pytest("tests/unit/test_halaman.py::test_kursor_rusak_menjadi_galat_400[tanpa-zona]"),
         harus_memuat="DID NOT RAISE",
     ),
     Mutasi(
@@ -1804,7 +1854,8 @@ MUTASI: list[Mutasi] = [
         "2.2",
         "habit harian boleh target 7 — satu tanggal hanya satu penyelesaian",
         [Sunting(f"{MODUL}/habits/schemas.py", '{"day": 1, ', '{"day": 7, ')],
-        _pytest(f"{UJI_HABITS}::test_habit_berbentuk_salah_ditolak_400"),
+        # Dipatok ke kasusnya: `assert 201 == 400` cocok dengan parameter mana pun.
+        _pytest(f"{UJI_HABITS}::test_habit_berbentuk_salah_ditolak_400[badan0]"),
         harus_memuat="assert 201 == 400",
         kelompok="db",
     ),
@@ -1821,8 +1872,11 @@ MUTASI: list[Mutasi] = [
                 "",
             )
         ],
-        _pytest(f"{UJI_SELESAI}::test_catatan_serentak_tanggal_sama_satu_baris_tanpa_galat"),
-        harus_memuat="catatan serentak tanggal sama:",
+        # Deterministik: B menyisip saat INSERT A belum commit — bukan untung-untungan
+        # jadwal event loop (uji serentak lewat HTTP berbunyi satu putaran, diam
+        # putaran berikutnya — tinjauan penegak buta Sprint 2).
+        _pytest(f"{UJI_SELESAI}::test_dua_transaksi_menyisip_tanggal_sama_yang_kedua_tanpa_galat"),
+        harus_memuat="UniqueViolationError",
         kelompok="db",
     ),
     Mutasi(
@@ -2036,7 +2090,9 @@ MUTASI: list[Mutasi] = [
             Sunting(
                 f"{MODUL}/checkins/service.py",
                 "            if badan.occurred_at is not None and badan.occurred_at > (",
-                "            if badan.occurred_at is None and badan.occurred_at > (",
+                # `False and …`, bukan `is None and …`: yang kedua menambah jalur
+                # TypeError (`None > datetime`) — mutasinya tidak bersih.
+                "            if False and badan.occurred_at is not None and badan.occurred_at > (",
             )
         ],
         _pytest(
@@ -2542,7 +2598,7 @@ MUTASI: list[Mutasi] = [
                 "    if not isinstance(isi, list) or len(isi) != 3:",
             )
         ],
-        _pytest("tests/unit/test_halaman.py::test_kursor_rusak_menjadi_galat_400"),
+        _pytest("tests/unit/test_halaman.py::test_kursor_rusak_menjadi_galat_400[id-angka]"),
         harus_memuat="AttributeError",
     ),
     Mutasi(
@@ -2632,6 +2688,641 @@ MUTASI: list[Mutasi] = [
         _pytest(f"{UJI_CHECKIN}::test_put_identik_tidak_menulis_ulang_baris"),
         harus_memuat="PUT identik menggeser updated_at",
         kelompok="db",
+    ),
+    # ── Tinjauan PENEGAK BUTA Sprint 2 — mutasi yang dulu lolos seluruh suite ──
+    Mutasi(
+        "2.1",
+        "pohon memuat keturunan yang dihapus-lunak",
+        [
+            Sunting(
+                f"{MODUL}/goals/repository.py",
+                "      WHERE c.deleted_at IS NULL AND p.kedalaman < :batas",
+                "      WHERE p.kedalaman < :batas",
+            )
+        ],
+        _pytest(f"{UJI_GOALS}::test_pohon_tidak_memuat_keturunan_yang_dihapus"),
+        harus_memuat="goal terhapus ikut di pohon",
+        kelompok="db",
+    ),
+    Mutasi(
+        "2.1",
+        "pohon dibaca 3 tingkat — tingkat ke-4…10 dipotong diam-diam",
+        [
+            Sunting(
+                f"{MODUL}/goals/service.py",
+                "        baris = await repository.pohon(conn, goal_id, MAKS_KEDALAMAN)",
+                "        baris = await repository.pohon(conn, goal_id, 2)",
+            )
+        ],
+        _pytest(f"{UJI_GOALS}::test_pohon_sepuluh_tingkat_terbaca_utuh"),
+        harus_memuat="pohon dipotong diam-diam saat dibaca",
+        kelompok="db",
+    ),
+    Mutasi(
+        "2.1",
+        "anak pohon diurutkan menurut judul, bukan waktu dibuat",
+        [
+            Sunting(
+                f"{MODUL}/goals/repository.py",
+                "    ORDER BY kedalaman, created_at, id",
+                "    ORDER BY kedalaman, title, id",
+            )
+        ],
+        _pytest(f"{UJI_GOALS}::test_anak_pohon_menurut_waktu_dibuat_bukan_judul"),
+        harus_memuat="urutan anak pohon bukan urutan dibuat",
+        kelompok="db",
+    ),
+    Mutasi(
+        "2.1",
+        "PATCH goal yang sudah dihapus-lunak berhasil",
+        [
+            Sunting(
+                f"{MODUL}/goals/repository.py",
+                "      SELECT id, status FROM goals WHERE id = :id AND deleted_at IS NULL FOR UPDATE",
+                "      SELECT id, status FROM goals WHERE id = :id FOR UPDATE",
+            )
+        ],
+        _pytest(f"{UJI_GOALS}::test_goal_terhapus_tidak_bisa_diubah_dan_milestonenya_404"),
+        harus_memuat="PATCH goal terhapus",
+        kelompok="db",
+    ),
+    Mutasi(
+        "2.1",
+        "PATCH {} milestone dari goal terhapus menjawab 200",
+        [
+            Sunting(
+                f"{MODUL}/goals/repository.py",
+                "    WHERE m.id = :id AND g.deleted_at IS NULL",
+                "    WHERE m.id = :id",
+            )
+        ],
+        _pytest(f"{UJI_GOALS}::test_goal_terhapus_tidak_bisa_diubah_dan_milestonenya_404"),
+        harus_memuat="PATCH {} milestone goal terhapus",
+        kelompok="db",
+    ),
+    Mutasi(
+        "2.1",
+        "milestone baru di goal terhapus — syarat goal hidup dicabut di kedua lapis",
+        [
+            Sunting(
+                f"{MODUL}/goals/service.py",
+                "            if not await repository.kunci_hidup(conn, goal_id):",
+                "            if False:",
+            ),
+            Sunting(
+                f"{MODUL}/goals/repository.py",
+                "    WHERE g.id = :goal_id AND g.deleted_at IS NULL",
+                "    WHERE g.id = :goal_id",
+            ),
+        ],
+        _pytest(f"{UJI_GOALS}::test_goal_terhapus_tidak_bisa_diubah_dan_milestonenya_404"),
+        harus_memuat="milestone baru di goal terhapus",
+        kelompok="db",
+    ),
+    Mutasi(
+        "2.1",
+        "kursor daftar goal tanpa pemecah seri id — goal ber-created_at sama dilompati",
+        [
+            Sunting(
+                f"{MODUL}/goals/repository.py",
+                "           OR (created_at, id) < (CAST(:k_waktu AS timestamptz), CAST(:k_id AS uuid)))",
+                "           OR created_at < CAST(:k_waktu AS timestamptz))",
+            )
+        ],
+        _pytest(f"{UJI_GOALS}::test_halaman_goal_dengan_created_at_kembar_tidak_melompat"),
+        harus_memuat="goal kembar dilompati",
+        kelompok="db",
+    ),
+    Mutasi(
+        "E-165",
+        "sidik permintaan tanpa JALUR — kunci & badan sama di rute lain diputar ulang",
+        [
+            Sunting(
+                f"{MODUL}/platform/idempotensi.py",
+                '    return "\\x00".join((metode, jalur, kueri, isi))',
+                '    return "\\x00".join((metode, kueri, isi))',
+            )
+        ],
+        _pytest(f"{UJI_IDEM}::test_kunci_dan_badan_sama_di_rute_lain_bukan_ulangan"),
+        harus_memuat="rute lain diputar ulang",
+        kelompok="db",
+    ),
+    Mutasi(
+        "E-165",
+        "POST /habits menjalankan kerja langsung — Idempotency-Key diterima lalu diabaikan",
+        [
+            Sunting(
+                f"{MODUL}/habits/routes.py",
+                "    return await idem.jalankan("
+                + NL
+                + "        pengguna.user_id, kerja, partial(service.baca_habit, engine, pengguna.user_id)"
+                + NL
+                + "    )"
+                + NL
+                + NL
+                + NL
+                + '@router.patch("/habits/{habit_id}"',
+                "    hasil = await kerja()"
+                + NL
+                + "    return JSONResponse(status_code=hasil.status, content=hasil.isi.model_dump(mode='json'))"
+                + NL
+                + NL
+                + NL
+                + '@router.patch("/habits/{habit_id}"',
+            )
+        ],
+        _pytest(f"{UJI_IDEM}::test_kunci_sama_di_post_habits_satu_baris"),
+        harus_memuat="Idempotency-Key diabaikan: habit ganda",
+        kelompok="db",
+    ),
+    Mutasi(
+        "E-165",
+        "rujukan idempoten diingat 60 detik, bukan 24 jam",
+        [
+            Sunting(
+                f"{MODUL}/platform/idempotensi.py",
+                "                await self._r.set(k, json.dumps(rujukan), ex=UMUR_JAWABAN_S)",
+                "                await self._r.set(k, json.dumps(rujukan), ex=_UMUR_PROSES_S)",
+            )
+        ],
+        _pytest(f"{UJI_IDEM}::test_rujukan_diingat_dua_puluh_empat_jam"),
+        harus_memuat="rujukan idempoten hanya diingat",
+        kelompok="db",
+    ),
+    Mutasi(
+        "2.2",
+        "PATCH habit tidak memeriksa jadwal TERSIMPAN terhadap period baru",
+        [
+            Sunting(
+                f"{MODUL}/habits/service.py",
+                '                periksa_jadwal(period, perubahan.get("schedule", kini.schedule))',
+                '                periksa_jadwal(period, perubahan.get("schedule", {}))',
+            )
+        ],
+        _pytest(
+            f"{UJI_HABITS}::test_patch_jadwal_dan_periode_diperiksa_terhadap_baris_tersimpan"
+            "[awal0-ubah0]"
+        ),
+        harus_memuat="paduan jadwal × periode tak sah diterima",
+        kelompok="db",
+    ),
+    Mutasi(
+        "2.2",
+        "PATCH habit tanpa periksa_jadwal sama sekali",
+        [
+            Sunting(
+                f"{MODUL}/habits/service.py",
+                '                periksa_jadwal(period, perubahan.get("schedule", kini.schedule))'
+                + NL,
+                "",
+            )
+        ],
+        _pytest(
+            f"{UJI_HABITS}::test_patch_jadwal_dan_periode_diperiksa_terhadap_baris_tersimpan"
+            "[awal1-ubah1]"
+        ),
+        harus_memuat="paduan jadwal × periode tak sah diterima",
+        kelompok="db",
+    ),
+    Mutasi(
+        "2.2",
+        "energi rendah pada habit 2 tier tetap menyarankan versi penuh",
+        [
+            Sunting(
+                f"{MODUL}/habits/tier.py",
+                "        return min(1, jumlah_tier - 1)",
+                "        return jumlah_tier // 3",
+            )
+        ],
+        _pytest("tests/unit/test_tier.py::test_dua_dan_empat_tier_pada_energi_rendah"),
+        harus_memuat="[0, 0, 0, 1] == [0, 0, 1, 1]",
+    ),
+    Mutasi(
+        "2.2",
+        "habit ber-for_date membaca penyelesaian satu kueri per habit (N+1)",
+        [
+            Sunting(
+                f"{MODUL}/habits/service.py",
+                "        selesai = await repository.selesai_tanggal(conn, user_id, for_date)",
+                "        selesai = {"
+                + NL
+                + "            h.id: p"
+                + NL
+                + "            for h in habit"
+                + NL
+                + "            if (p := await repository.selesai_pada(conn, h.id, for_date))"
+                + NL
+                + "        }",
+            )
+        ],
+        _pytest(f"{UJI_HARI}::test_habit_ber_for_date_jumlah_kueri_tidak_tumbuh_bersama_habit"),
+        harus_memuat="N+1:",
+        kelompok="db",
+    ),
+    Mutasi(
+        "2.3",
+        "tanggal paling maju ditanyakan ke UTC, bukan UTC+14 — lolos HTTP pukul 00–09 UTC",
+        [
+            Sunting(
+                f"{MODUL}/platform/zona_waktu.py",
+                'ZONA_PALING_MAJU = "Pacific/Kiritimati"',
+                'ZONA_PALING_MAJU = "UTC"',
+            )
+        ],
+        _pytest(
+            "tests/unit/test_zona_waktu.py"
+            "::test_tanggal_paling_maju_bertanya_ke_zona_berselisih_terbesar"
+        ),
+        harus_memuat="tanggal paling maju ditanyakan ke UTC",
+    ),
+    Mutasi(
+        "2.5",
+        "batas for_date check-in `>=` — hari ini di UTC+14 ditolak",
+        [
+            Sunting(
+                f"{MODUL}/checkins/service.py",
+                "        if for_date > await platform.tanggal_paling_maju(conn):",
+                "        if for_date >= await platform.tanggal_paling_maju(conn):",
+            )
+        ],
+        _pytest(f"{UJI_CHECKIN}::test_check_in_hari_ini_di_zona_paling_maju_diterima"),
+        harus_memuat="hari ini di UTC+14 ditolak",
+        kelompok="db",
+    ),
+    Mutasi(
+        "2.4",
+        "layanan rentetan tidak meneruskan schedule.weekdays",
+        [
+            Sunting(
+                f"{MODUL}/habits/service.py",
+                '        weekdays=habit.schedule.get("weekdays"),',
+                "        weekdays=None,",
+            )
+        ],
+        _pytest(f"{UJI_RENTETAN}::test_rentetan_lewat_http_mengikuti_hari_terjadwal"),
+        harus_memuat="layanan tidak meneruskan schedule.weekdays",
+        kelompok="db",
+    ),
+    Mutasi(
+        "2.4",
+        "layanan rentetan memakai hari ini sebagai awal habit",
+        [
+            Sunting(
+                f"{MODUL}/habits/service.py",
+                "        mulai = await repository.mulai_lokal(conn, habit_id, zona) or hari_ini",
+                "        mulai = hari_ini",
+            )
+        ],
+        _pytest(f"{UJI_RENTETAN}::test_tingkat_menghitung_hari_sejak_habit_dibuat"),
+        harus_memuat="awal habit diabaikan",
+        kelompok="db",
+    ),
+    Mutasi(
+        "2.4",
+        "tanggal awal habit dihitung di UTC, bukan zona profil",
+        [
+            Sunting(
+                f"{MODUL}/habits/repository.py",
+                "    SELECT (created_at AT TIME ZONE :zona)::date",
+                "    SELECT (created_at AT TIME ZONE COALESCE(NULLIF(:zona, :zona), 'UTC'))::date",
+            )
+        ],
+        _pytest(f"{UJI_RENTETAN}::test_awal_habit_menurut_zona_profil_bukan_utc"),
+        harus_memuat="awal habit di UTC",
+        kelompok="db",
+    ),
+    Mutasi(
+        "2.4",
+        "awal rentetan = catatan pertama — awal habit diabaikan",
+        [
+            Sunting(
+                f"{MODUL}/habits/rentetan.py",
+                "    awal = max(min([mulai, *penyelesaian]), hari_ini - timedelta(days=RIWAYAT_MAKS_HARI))",
+                "    awal = max(min(penyelesaian, default=mulai), hari_ini - timedelta(days=RIWAYAT_MAKS_HARI))",
+            )
+        ],
+        _pytest(
+            "tests/unit/test_rentetan_murni.py"
+            "::test_awal_habit_lebih_awal_dari_catatan_pertama_tetap_dihitung"
+        ),
+        harus_memuat="awal habit diganti catatan pertama",
+    ),
+    Mutasi(
+        "2.4",
+        "riwayat rentetan dipotong 90 hari — rentetan terpanjang lama terpotong",
+        [
+            Sunting(
+                f"{MODUL}/habits/rentetan.py", "RIWAYAT_MAKS_HARI = 3660", "RIWAYAT_MAKS_HARI = 90"
+            )
+        ],
+        _pytest(
+            "tests/unit/test_rentetan_murni.py"
+            "::test_terpanjang_dari_riwayat_berbulan_bulan_tetap_terhitung"
+        ),
+        harus_memuat="rentetan terpanjang 250 hari lalu terpotong",
+    ),
+    Mutasi(
+        "2.4",
+        "batas riwayat dicabut — satu for_date tahun 1900 menelusuri 46 ribu hari",
+        [
+            Sunting(
+                f"{MODUL}/habits/rentetan.py",
+                "    awal = max(min([mulai, *penyelesaian]), hari_ini - timedelta(days=RIWAYAT_MAKS_HARI))",
+                "    awal = min([mulai, *penyelesaian])",
+            )
+        ],
+        _pytest("tests/unit/test_rentetan_murni.py::test_riwayat_lama_ditelusuri_terbatas"),
+        harus_memuat="langkah untuk satu permintaan",
+    ),
+    Mutasi(
+        "2.4",
+        "tingkat penyelesaian mingguan: jendela tidak diratakan ke awal minggu",
+        [
+            Sunting(
+                f"{MODUL}/habits/rentetan.py", "    p = awal_periode(period, dari)", "    p = dari"
+            )
+        ],
+        _pytest(
+            "tests/unit/test_rentetan_murni.py::test_tingkat_mingguan_jendela_dimulai_dari_awal_minggu"
+        ),
+        harus_memuat="minggu yang selalu terpenuhi",
+    ),
+    Mutasi(
+        "2.4",
+        "rentetan habit yang dihapus-lunak tetap 200",
+        [
+            Sunting(
+                f"{MODUL}/habits/repository.py",
+                # Jangkar: `_AMBIL` satu-satunya yang diikuti `_AMBIL_UNTUK_UBAH`.
+                "    WHERE id = :id AND deleted_at IS NULL"
+                + NL
+                + '    """'
+                + NL
+                + ")"
+                + NL
+                + NL
+                + "_AMBIL_UNTUK_UBAH = text(",
+                "    WHERE id = :id"
+                + NL
+                + '    """'
+                + NL
+                + ")"
+                + NL
+                + NL
+                + "_AMBIL_UNTUK_UBAH = text(",
+            )
+        ],
+        _pytest(f"{UJI_HABITS}::test_rentetan_habit_terhapus_404"),
+        harus_memuat="rentetan habit terhapus",
+        kelompok="db",
+    ),
+    Mutasi(
+        "2.3",
+        "catatan habit terhapus bisa dihapus lewat API",
+        [
+            Sunting(
+                f"{MODUL}/habits/repository.py",
+                "    WHERE id = :id AND deleted_at IS NULL" + NL + "    FOR SHARE",
+                "    WHERE id = :id" + NL + "    FOR SHARE",
+            )
+        ],
+        _pytest(f"{UJI_SELESAI}::test_penyelesaian_habit_terhapus_tidak_bisa_dihapus_lewat_api"),
+        harus_memuat="catatan habit terhapus dihapus lewat API",
+        kelompok="db",
+    ),
+    Mutasi(
+        "2.5",
+        "PUT check-in menambal sleep_hours (COALESCE)",
+        [
+            Sunting(
+                f"{MODUL}/checkins/repository.py",
+                "      sleep_hours = EXCLUDED.sleep_hours,",
+                "      sleep_hours = COALESCE(EXCLUDED.sleep_hours, daily_checkins.sleep_hours),",
+            )
+        ],
+        _pytest(f"{UJI_CHECKIN}::test_put_mengganti_tiap_medan_bukan_hanya_energi"),
+        harus_memuat="PUT menambal focus/sleep_hours/note",
+        kelompok="db",
+    ),
+    Mutasi(
+        "2.5",
+        "PUT check-in menambal focus (COALESCE)",
+        [
+            Sunting(
+                f"{MODUL}/checkins/repository.py",
+                "      focus = EXCLUDED.focus,",
+                "      focus = COALESCE(EXCLUDED.focus, daily_checkins.focus),",
+            )
+        ],
+        _pytest(f"{UJI_CHECKIN}::test_put_mengganti_tiap_medan_bukan_hanya_energi"),
+        harus_memuat="PUT menambal focus/sleep_hours/note",
+        kelompok="db",
+    ),
+    Mutasi(
+        "2.6",
+        "kursor mood tanpa pemecah seri id — mood ber-occurred_at sama dilompati",
+        [
+            Sunting(
+                f"{MODUL}/checkins/repository.py",
+                "           OR (occurred_at, id) < (CAST(:k_waktu AS timestamptz), CAST(:k_id AS uuid)))",
+                "           OR occurred_at < CAST(:k_waktu AS timestamptz))",
+            )
+        ],
+        _pytest(f"{UJI_MOOD}::test_halaman_mood_dengan_occurred_at_kembar_tidak_melompat"),
+        harus_memuat="mood kembar dilompati",
+        kelompok="db",
+    ),
+    Mutasi(
+        "2.6",
+        "kelonggaran jam mood satu jam, bukan 5 menit (spec/04)",
+        [Sunting(f"{MODUL}/checkins/service.py", "LONGGAR_JAM_S = 300", "LONGGAR_JAM_S = 3600")],
+        _pytest(f"{UJI_MOOD}::test_mood_enam_menit_di_depan_jam_basis_data_ditolak"),
+        harus_memuat="mood 6 menit di depan diterima",
+        kelompok="db",
+    ),
+    Mutasi(
+        "1.7",
+        "langkah mundur jam Redis tidak diserap — 429 palsu di ujung ledakan",
+        [
+            Sunting(
+                f"{MODUL}/platform/batas_laju.py",
+                "if terakhir ~= nil and sekarang < terakhir and terakhir - sekarang <= tonumber(ARGV[3]) then",
+                "if false then",
+            )
+        ],
+        _pytest(f"{UJI_LAJU}::test_langkah_mundur_jam_redis_kecil_diserap_besar_tidak[1500-True]"),
+        harus_memuat="langkah mundur 1500 ms",
+        kelompok="db",
+    ),
+    Mutasi(
+        "2.7",
+        "CORS dipasang di DALAM batas laju — preflight asing dijawab 500, bukan oleh CORS",
+        [
+            Sunting("apps/api/src/hvx/main.py", _CORS_BLOK, ""),
+            Sunting(
+                "apps/api/src/hvx/main.py",
+                "    app.add_middleware(platform.BatasBadanMiddleware)" + NL,
+                _CORS_BLOK + "    app.add_middleware(platform.BatasBadanMiddleware)" + NL,
+            ),
+        ],
+        _pytest("tests/unit/test_cors.py::test_asal_lain_tidak_diloloskan"),
+        harus_memuat="bukan oleh CORS",
+    ),
+    # ── Tinjauan PENEGAK BUTA Sprint 2 — Flutter (apps/mobile) ──────────────
+    Mutasi(
+        "2.7",
+        "token baru hasil penyegaran tidak disimpan — ulangan memakai token lama",
+        [
+            Sunting(
+                f"{APLIKASI}/lib/api/klien.dart",
+                "    _simpanToken("
+                + NL
+                + "      (_json(jawaban) as Map<String, dynamic>)['tokens']"
+                + NL
+                + "          as Map<String, dynamic>,"
+                + NL
+                + "    );"
+                + NL,
+                "    _json(jawaban);" + NL,
+            )
+        ],
+        _flutter_uji("test/api/klien_test.dart", _UJI_AKSES_BARU),
+        harus_memuat=_UJI_AKSES_BARU + " [E]",
+        cwd=APLIKASI,
+    ),
+    Mutasi(
+        "2.7",
+        "catatan check-in lama hilang saat energi disimpan",
+        [
+            Sunting(
+                f"{APLIKASI}/lib/api/model.dart",
+                "    if (catatan != null) 'note': catatan," + NL,
+                "",
+            )
+        ],
+        _flutter_uji("test/api/klien_test.dart", _UJI_CATATAN_LAMA),
+        harus_memuat=_UJI_CATATAN_LAMA + " [E]",
+        cwd=APLIKASI,
+    ),
+    Mutasi(
+        "2.7",
+        "layar tidak mengirim check-in lama bersama energi",
+        [
+            Sunting(
+                f"{APLIKASI}/lib/layar/habit_hari_ini.dart",
+                "        lama: _checkin,",
+                "        lama: null,",
+            )
+        ],
+        _flutter_uji("test/layar/habit_hari_ini_test.dart", _UJI_LAYAR_LAMA),
+        harus_memuat=_UJI_LAYAR_LAMA + " [E]",
+        cwd=APLIKASI,
+    ),
+    Mutasi(
+        "2.7",
+        "tanggal lokal diambil dari UTC — lolos di mesin berzona UTC tanpa TZ terpatok",
+        [
+            Sunting(
+                f"{APLIKASI}/lib/api/model.dart",
+                "  final t = waktu.toLocal();",
+                "  final t = waktu.toUtc();",
+            )
+        ],
+        _flutter_uji("test/api/klien_test.dart", _UJI_TANGGAL_LOKAL),
+        harus_memuat=_UJI_TANGGAL_LOKAL + " [E]",
+        cwd=APLIKASI,
+    ),
+    Mutasi(
+        "2.7",
+        'tanda "Disarankan hari ini" selalu di tier pertama',
+        [
+            Sunting(
+                f"{APLIKASI}/lib/layar/habit_hari_ini.dart",
+                "    final disarankan = h.hari?.tierDisarankan ?? 0;",
+                "    final disarankan = h.hari == null ? 0 : 0;",
+            )
+        ],
+        _flutter_uji("test/layar/habit_hari_ini_test.dart", _UJI_TANDA_SARAN),
+        harus_memuat=_UJI_TANDA_SARAN + " [E]",
+        cwd=APLIKASI,
+    ),
+    Mutasi(
+        "2.7",
+        "keluar tidak mencabut sesi di server",
+        [
+            Sunting(
+                f"{APLIKASI}/lib/api/klien.dart",
+                "      if (_akses != null) await _kirim('POST', '/v1/auth/logout');" + NL,
+                "",
+            )
+        ],
+        _flutter_uji("test/api/klien_test.dart", _UJI_KELUAR),
+        harus_memuat=_UJI_KELUAR + " [E]",
+        cwd=APLIKASI,
+    ),
+    Mutasi(
+        "2.7",
+        "pembuatan habit tanpa Idempotency-Key",
+        [Sunting(f"{APLIKASI}/lib/api/klien.dart", "      kunciIdempotensi: id," + NL, "")],
+        _flutter_uji("test/api/klien_test.dart", _UJI_ID_SAMA),
+        harus_memuat=_UJI_ID_SAMA + " [E]",
+        cwd=APLIKASI,
+    ),
+    Mutasi(
+        "2.7",
+        "habit mingguan selalu dibuat 1× seminggu",
+        [
+            Sunting(
+                f"{APLIKASI}/lib/layar/habit_hari_ini.dart",
+                "      final target = _periode == 'day' ? 1 : _target;",
+                "      final target = _periode == 'day' ? 1 : 1;",
+            )
+        ],
+        _flutter_uji("test/layar/habit_hari_ini_test.dart", _UJI_TARGET_MINGGUAN),
+        harus_memuat=_UJI_TARGET_MINGGUAN + " [E]",
+        cwd=APLIKASI,
+    ),
+    Mutasi(
+        "2.7",
+        "klien selalu mengirim persetujuan pelatihan model = tidak",
+        [
+            Sunting(
+                f"{APLIKASI}/lib/api/klien.dart",
+                "          'model_training': izinkanPelatihanModel",
+                "          'model_training': false && izinkanPelatihanModel",
+            )
+        ],
+        _flutter_uji("test/api/klien_test.dart", _UJI_PELATIHAN_KLIEN),
+        harus_memuat=_UJI_PELATIHAN_KLIEN + " [E]",
+        cwd=APLIKASI,
+    ),
+    Mutasi(
+        "2.7",
+        "layar mengabaikan centang pelatihan model",
+        [
+            Sunting(
+                f"{APLIKASI}/lib/layar/masuk.dart",
+                "          izinkanPelatihanModel: _izinkanPelatihan,",
+                "          izinkanPelatihanModel: false && _izinkanPelatihan,",
+            )
+        ],
+        _flutter_uji("test/layar/masuk_test.dart", _UJI_PELATIHAN_LAYAR),
+        harus_memuat=_UJI_PELATIHAN_LAYAR + " [E]",
+        cwd=APLIKASI,
+    ),
+    Mutasi(
+        "2.7",
+        "muat ulang tidak menghitung ulang tanggal — lewat tengah malam menandai kemarin",
+        [
+            Sunting(
+                f"{APLIKASI}/lib/layar/habit_hari_ini.dart",
+                "      _tanggal = tanggalLokal(widget.jam());" + NL,
+                "",
+            )
+        ],
+        _flutter_uji("test/layar/habit_hari_ini_test.dart", _UJI_TENGAH_MALAM),
+        harus_memuat=_UJI_TENGAH_MALAM + " [E]",
+        cwd=APLIKASI,
     ),
 ]
 
@@ -2734,7 +3425,7 @@ def main() -> int:
             r = subprocess.run(
                 m.perintah,
                 cwd=AKAR / m.cwd if m.cwd else AKAR,
-                env=lingkungan,
+                env={**lingkungan, "TZ": _tz_flutter()} if m.cwd == APLIKASI else lingkungan,
                 capture_output=True,
                 text=True,
                 encoding="utf-8",

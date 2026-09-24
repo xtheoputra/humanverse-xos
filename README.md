@@ -26,7 +26,7 @@ manusia + agent + data + knowledge + simulation + automation**.
 | Repo git | privat `xtheoputra/humanverse-xos`, branch `master` |
 | Dokumen | **272 berkas** di `docs/` + **8 berkas** di `spec/` + **12 berkas** di [`arch/`](arch/README.md) |
 | Gerbang yang **sudah dijalankan** | **14 ✅ · R-1 🛑 7 temuan** (keputusan cakupan pemilik) · **15 kontrak `import-linter`** · CI lokal **lint → typecheck → test → build → scan hijau** — `uv run python tools/ci_lokal.py`, **manual** |
-| Merahnya **terbukti bisa terjadi** | **19 dari 19** — 25 mutasi dokumen (tiap mutasi wajib melahirkan temuan **baru**) + 175 mutasi kode (tiap mutasi wajib gagal dengan **alasan yang dimaksud**, dibaca dari baris galatnya — bukan dari mana pun di keluaran) · **tiap kontrak `import-linter` punya mutasinya sendiri** |
+| Merahnya **terbukti bisa terjadi** | **19 dari 19** — 25 mutasi dokumen (tiap mutasi wajib melahirkan temuan **baru**) + 217 mutasi kode (tiap mutasi wajib gagal dengan **alasan yang dimaksud**, dibaca dari baris galatnya — bukan dari mana pun di keluaran) · **tiap kontrak `import-linter` punya mutasinya sendiri** |
 | Gerbang di PR | ✅ **gratis** — `tools/ci_lokal.py --lapor-github` menempelkan status **`ci-lokal`** ke commit PR; GitHub Actions **dimatikan** atas keputusan pemilik (**H-26** — tanpa tagihan, [#160](../../issues/160)) |
 | Naskah pemilik | **24** — terakhir: **Phase 20 Civilization Platform** (39 bagian) — **fase TERAKHIR** |
 | Keputusan tertutup | **27 butir H** — 🆕 **H-27 data tiap pengguna milik pribadinya** · 🆕 **H-26 CI tanpa tagihan** · **H-25 siapa mengerjakan V0** · nama · MVP · struktur repo · ambang konfirmasi · model memory · memory meluruh · gerbang policy · context package · dua tangga R/L · manifest dipulihkan · **model transisi belajar dari galat sendiri** · **monetisasi punya fase (Phase 14)**. ✅ **H-20 (peta fase) DIPULIHKAN sebagai [`arch/01`](arch/01-PETA-20-FASE.md) — peta versi 3, 20 baris TERTUTUP, dan peta kini BERNOMOR VERSI** sehingga *“roadmap yang sudah kita tetapkan”* selalu punya rujukan yang bisa dibuka ([#101](../../issues/101) · [#108](../../issues/108) · [#132](../../issues/132) · [#133](../../issues/133) · [#142](../../issues/142)). ✅ **H-13 ([#72](../../issues/72)) DISELESAIKAN:** `Phase` dan `V0–V6` bukan dua rencana yang bersaing melainkan **dua sumbu** — `Phase` menghitung dokumen, `V` menghitung rilis. ⚠️ **H-11** ([#78](../../issues/78)) masih perlu ditinjau ulang |
@@ -230,11 +230,14 @@ longgar** — `true` diterima sebagai valensi mood terburuk, detik Unix sebagai
 menjadi yatim, 40 dari 40** (**E-172**); dan **cache `Idempotency-Key`
 menyimpan isi jawaban 24 jam** di Redis yang sama dengan sesi — memori yang
 murah dihabiskan, dan catatan pengguna yang tinggal sesudah dihapus
-(**E-171**, kini rujukan + kuota, **K-24**). Rinciannya:
+(**E-171**, kini rujukan + kuota, **K-24**). Lensa ketiga merusak kode satu
+kerusakan per percobaan: **39 kerusakan lolos seluruh suite** — termasuk klien
+yang tidak pernah memanggil `logout` dan tetap lulus uji ujung-ke-ujung lawan
+api hidup. Tiap kerusakan kini punya uji yang merah padanya. Rinciannya:
 [`docs/99-CATATAN-AUDIT.md`](docs/99-CATATAN-AUDIT.md).
 
-Tiap penjaga baru terbukti sanggup gagal — **175 mutasi kode** (34 baru),
-**549 uji Python + 31 uji Flutter**.
+Tiap penjaga baru terbukti sanggup gagal — **217 mutasi kode** (109 baru),
+**579 uji Python + 40 uji Flutter**.
 
 ---
 
