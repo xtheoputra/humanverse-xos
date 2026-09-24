@@ -21,6 +21,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from hvx import __version__
 from hvx.modules import (
+    activities,
     checkins,
     goals,
     habits,
@@ -119,4 +120,5 @@ def create_app(settings: platform.Settings | None = None) -> FastAPI:
     app.include_router(habits.router)
     app.include_router(checkins.router)
     app.include_router(journal.router)
+    app.include_router(activities.router)
     return app

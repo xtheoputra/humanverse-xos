@@ -4236,6 +4236,57 @@ MUTASI: list[Mutasi] = [
         ),
         harus_memuat="disentuh sebelum masukan divalidasi",
     ),
+    # ── Sprint 3 · 3.8 activities — `inferred` terpisah dari `manual` ──
+    Mutasi(
+        "3.8",
+        "jalur sistem mencatat tebakannya sebagai manual",
+        [
+            Sunting(
+                f"{MODUL}/activities/service.py",
+                '        source="inferred",',
+                '        source="manual",',
+            )
+        ],
+        _pytest(f"{UJI_AKTIVITAS}::test_jalur_sistem_selalu_inferred_dan_bisa_dipisahkan"),
+        harus_memuat="assert 'manual' == 'inferred'",
+        kelompok="db",
+    ),
+    Mutasi(
+        "3.8",
+        "saringan ?source= diabaikan — tebakan bercampur dengan catatan manusia",
+        [
+            Sunting(
+                f"{MODUL}/activities/repository.py",
+                "      AND (CAST(:source AS text) IS NULL OR source = CAST(:source AS text))" + NL,
+                "",
+            )
+        ],
+        _pytest(f"{UJI_AKTIVITAS}::test_jalur_sistem_selalu_inferred_dan_bisa_dipisahkan"),
+        harus_memuat="tebakan sistem bercampur dengan catatan manusia",
+        kelompok="db",
+    ),
+    Mutasi(
+        "3.8",
+        "klien bisa menyatakan sumber aktivitasnya",
+        [
+            Sunting(
+                f"{MODUL}/activities/schemas.py",
+                "    payload: Payload = Field(default_factory=dict)"
+                + NL
+                + NL
+                + '    @model_validator(mode="after")',
+                "    payload: Payload = Field(default_factory=dict)"
+                + NL
+                + '    source: Sumber = "manual"'
+                + NL
+                + NL
+                + '    @model_validator(mode="after")',
+            )
+        ],
+        _pytest(f"{UJI_AKTIVITAS}::test_klien_hanya_bisa_mencatat_manual"),
+        harus_memuat="klien bisa menyatakan aktivitasnya disimpulkan",
+        kelompok="db",
+    ),
 ]
 
 
