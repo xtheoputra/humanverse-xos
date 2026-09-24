@@ -5,25 +5,31 @@
   tidak bisa keduanya menyisipkan. PUT = ganti (lihat `IsiCheckin`).
 * `for_date` tanggal lokal perangkat — batasnya tanggal paling maju di Bumi
   (`platform.tanggal_paling_maju`), sama dengan penyelesaian habit (2.3).
+* **2.6** mood DILAPORKAN pengguna (spec/01: bukan ditaksir sistem — E-34).
+  `occurred_at` wajib berzona waktu, boleh lampau (dicatat belakangan), dan
+  tidak boleh lebih dari `LONGGAR_JAM_S` di depan jam basis data.
 """
 
 from __future__ import annotations
 
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from uuid import UUID
 
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from hvx.modules import platform
 
 from . import repository
 from .repository import HasilSimpan
-from .schemas import DaftarCheckin, IsiCheckin
+from .schemas import CatatMood, DaftarCheckin, HalamanMood, IsiCheckin, Mood
 
 # `GET /checkins` tanpa rentang: satu bulan terakhir yang tercatat.
 TERAKHIR_BAWAAN = 31
 # Rentang paling lebar yang dijawab sekaligus — satu tahun kabisat.
 RENTANG_MAKS_HARI = 366
+# Jam perangkat yang sedikit maju tidak membuat mood "sekarang" ditolak.
+LONGGAR_JAM_S = 300
 
 
 async def simpan(
@@ -63,3 +69,56 @@ async def daftar(
                 )
             checkin = await repository.rentang(conn, user_id=user_id, dari=dari, sampai=sampai)
     return DaftarCheckin(items=checkin)
+
+
+# ── spec/07 2.6 — mood_entries ────────────────────────────────────────────────
+
+
+async def catat_mood(engine: AsyncEngine, user_id: UUID, badan: CatatMood) -> Mood:
+    try:
+        async with platform.transaksi_pengguna(engine, user_id) as conn:
+            if badan.occurred_at is not None and badan.occurred_at > (
+                await repository.batas_waktu_mood(conn, LONGGAR_JAM_S)
+            ):
+                raise platform.GalatApi(
+                    422, "occurred_at_in_future", "Waktu mood itu belum terjadi."
+                )
+            return await repository.sisip_mood(
+                conn,
+                user_id=user_id,
+                id_=badan.id,
+                occurred_at=badan.occurred_at,
+                valence=badan.valence,
+                label=badan.label,
+                note=badan.note,
+            )
+    except IntegrityError as galat:
+        p = platform.rincian_pelanggaran(galat)
+        if p.sqlstate == platform.UNIQUE_VIOLATION and p.constraint == "mood_entries_pkey":
+            raise platform.GalatApi(
+                409, "already_exists", "Mood dengan id ini sudah ada."
+            ) from None
+        raise
+
+
+async def daftar_mood(
+    engine: AsyncEngine,
+    user_id: UUID,
+    *,
+    dari: datetime | None,
+    sampai: datetime | None,
+    batas: int,
+    kursor: str | None,
+) -> HalamanMood:
+    if dari is not None and sampai is not None and dari >= sampai:
+        raise platform.GalatApi(400, "invalid_request", "`from` wajib sebelum `to`.")
+    sesudah = platform.baca_kursor_waktu(kursor)
+    async with platform.transaksi_pengguna(engine, user_id) as conn:
+        mood = await repository.daftar_mood(
+            conn, user_id=user_id, dari=dari, sampai=sampai, sesudah=sesudah, batas=batas + 1
+        )
+    lanjut = None
+    if len(mood) > batas:
+        mood = mood[:batas]
+        lanjut = platform.kursor_waktu(mood[-1].occurred_at, mood[-1].id)
+    return HalamanMood(items=mood, next_cursor=lanjut)

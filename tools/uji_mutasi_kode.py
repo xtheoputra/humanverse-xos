@@ -147,6 +147,7 @@ UJI_SELESAI = "tests/integration/test_penyelesaian.py"
 UJI_RENTETAN = "tests/integration/test_rentetan.py"
 UJI_CHECKIN = "tests/integration/test_checkin.py"
 UJI_HARI = "tests/integration/test_habit_hari_ini.py"
+UJI_MOOD = "tests/integration/test_mood.py"
 FK_MILESTONE = (
     "  FOREIGN KEY (goal_id, user_id) REFERENCES goals (id, user_id) ON DELETE CASCADE" + NL + ");"
 )
@@ -1990,6 +1991,52 @@ MUTASI: list[Mutasi] = [
         ],
         _pytest("tests/unit/test_main.py::test_titik_rakit_memasang_pembaca_lintas_modul"),
         harus_memuat="hvx.main tidak memasang pembaca_energi dari checkins",
+    ),
+    # ── Sprint 2 · 2.6 mood_entries ──────────────────────────────────────
+    Mutasi(
+        "2.6",
+        "occurred_at mood di masa depan tidak diperiksa",
+        [
+            Sunting(
+                f"{MODUL}/checkins/service.py",
+                "            if badan.occurred_at is not None and badan.occurred_at > (",
+                "            if badan.occurred_at is None and badan.occurred_at > (",
+            )
+        ],
+        _pytest(
+            f"{UJI_MOOD}"
+            "::test_mood_di_masa_depan_ditolak_tetapi_jam_perangkat_sedikit_maju_diterima"
+        ),
+        harus_memuat="mood masa depan tersimpan",
+        kelompok="db",
+    ),
+    Mutasi(
+        "2.6",
+        "kursor mood inklusif — baris batas halaman terulang",
+        [
+            Sunting(
+                f"{MODUL}/checkins/repository.py",
+                "           OR (occurred_at, id) < (CAST(:k_waktu AS timestamptz), CAST(:k_id AS uuid)))",
+                "           OR (occurred_at, id) <= (CAST(:k_waktu AS timestamptz), CAST(:k_id AS uuid)))",
+            )
+        ],
+        _pytest(f"{UJI_MOOD}::test_halaman_berkursor_tanpa_ganda_dan_rentang_waktu"),
+        harus_memuat="halaman mood mengulang atau melompati baris",
+        kelompok="db",
+    ),
+    Mutasi(
+        "2.6",
+        "`to` rentang mood inklusif",
+        [
+            Sunting(
+                f"{MODUL}/checkins/repository.py",
+                "OR occurred_at < CAST(:sampai AS timestamptz))",
+                "OR occurred_at <= CAST(:sampai AS timestamptz))",
+            )
+        ],
+        _pytest(f"{UJI_MOOD}::test_halaman_berkursor_tanpa_ganda_dan_rentang_waktu"),
+        harus_memuat="`to` tidak eksklusif",
+        kelompok="db",
     ),
 ]
 

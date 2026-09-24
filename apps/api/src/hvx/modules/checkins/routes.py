@@ -12,17 +12,21 @@ from typing import Annotated
 from fastapi import APIRouter, Query, Request
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
+from pydantic import AwareDatetime
 
 from hvx.modules import identity, platform
 
 from . import service
-from .schemas import Checkin, DaftarCheckin, IsiCheckin
+from .schemas import CatatMood, Checkin, DaftarCheckin, HalamanMood, IsiCheckin, Mood
 
 router = APIRouter(prefix="/v1", tags=["checkins"])
 
 # `from` kata kunci Python — namanya di URL tetap `from` (spec/04).
 Dari = Annotated[date | None, Query(alias="from")]
 Sampai = Annotated[date | None, Query(alias="to")]
+# Mood bercap waktu — `from`/`to` ISO-8601 berzona (spec/04: waktu UTC dengan `Z`).
+DariWaktu = Annotated[AwareDatetime | None, Query(alias="from")]
+SampaiWaktu = Annotated[AwareDatetime | None, Query(alias="to")]
 
 
 @router.get("/checkins", response_model=DaftarCheckin)
@@ -49,3 +53,36 @@ async def simpan_checkin(
     return JSONResponse(
         status_code=201 if hasil.baru else 200, content=jsonable_encoder(hasil.checkin)
     )
+
+
+@router.get("/moods", response_model=HalamanMood)
+async def daftar_mood(
+    request: Request,
+    pengguna: identity.PenggunaDiperlukan,
+    dari: DariWaktu = None,
+    sampai: SampaiWaktu = None,
+    limit: platform.Batas = platform.BATAS_BAWAAN,
+    cursor: platform.Kursor = None,
+) -> HalamanMood:
+    return await service.daftar_mood(
+        platform.engine_dari(request),
+        pengguna.user_id,
+        dari=dari,
+        sampai=sampai,
+        batas=limit,
+        kursor=cursor,
+    )
+
+
+@router.post("/moods", status_code=201, response_model=Mood)
+async def catat_mood(
+    request: Request,
+    badan: CatatMood,
+    pengguna: identity.PenggunaDiperlukan,
+    idem: platform.Idempoten,
+) -> JSONResponse:
+    async def kerja() -> platform.Jawaban:
+        mood = await service.catat_mood(platform.engine_dari(request), pengguna.user_id, badan)
+        return platform.Jawaban(201, mood)
+
+    return await idem.jalankan(pengguna.user_id, kerja)

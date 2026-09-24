@@ -12,6 +12,6 @@ Berkas ini satu-satunya pintu keluar modul (spec/06 aturan 1).
 
 from .repository import energi_pada
 from .routes import router
-from .schemas import Checkin
+from .schemas import Checkin, Mood
 
-__all__ = ["Checkin", "energi_pada", "router"]
+__all__ = ["Checkin", "Mood", "energi_pada", "router"]

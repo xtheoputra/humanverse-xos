@@ -162,8 +162,8 @@ GET    /habits/{id}/streak       → { current, longest, completion_rate_30d }
 ```
 GET    /checkins             ?from=&to=
 PUT    /checkins/{for_date}  { energy?, focus?, sleep_hours?, note? }   → upsert: 201 baru · 200 diganti
-GET    /moods                ?from=&to=&cursor=
-POST   /moods                { id?, valence, label?, note?, occurred_at? }
+GET    /moods                ?from=&to=&limit=&cursor=     → { items, next_cursor }
+POST   /moods                { id?, valence, label?, note?, occurred_at? }   → 201
 GET    /journal              ?from=&to=&cursor=      → tanpa body, hanya ringkasan
 GET    /journal/{id}                                 → dengan body
 POST   /journal              { id?, title?, body, occurred_at? }
@@ -197,6 +197,13 @@ POST   /activities           { id?, kind, occurred_at, duration_seconds?, payloa
 > `day: { for_date, completion, energy, suggested_tier }` — `energy` ikut
 > sebagai **alasan** tier yang disarankan (Explainable AI naskah 4 §29).
 > Pemetaan energi → tier: **K-23** (naskah 4 §34).
+>
+> 🔧 **Mood (spec/07 2.6, 24 Sep 2026).** `occurred_at` **wajib berzona waktu**
+> (`2026-09-24T06:30` tanpa zona adalah jam yang berbeda di tiap negara → `400`),
+> boleh lampau, dan tidak boleh lebih dari 5 menit di depan jam basis data
+> (`422 occurred_at_in_future`). `GET /moods`: `from` inklusif, `to`
+> **eksklusif**, keduanya berzona; kursor keyset `(occurred_at, id)` — mood yang
+> dicatat mundur masuk di tempatnya tanpa menggeser halaman berikutnya.
 
 ---
 
