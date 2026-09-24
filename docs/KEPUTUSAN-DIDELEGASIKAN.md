@@ -585,6 +585,20 @@ sesudahnya.
 
 ---
 
+## K-29 · Katalog agent: manifest YAML di paket api, dibekukan migrasi, dibandingkan saat mulai
+
+> Diputuskan 24 September 2026, saat Sprint 4 tugas 4.2 ditulis.
+
+| | |
+|---|---|
+| **Keputusan** | **(1)** Manifest agent dan tool registry spec/05 adalah YAML di paket api (`agents/manifest/`, `agents/alat/`, E-190), divalidasi **9 aturan spec/05 + A-1 + K-14** saat api dibuat — **semua** pelanggaran sekaligus; satu pelanggaran = api tidak bisa dibuat. **(2)** Katalog basis data (`agents` · `agent_tools`) diisi **migrasi** (`0007`) dengan salinan beku tiap manifest (`manifest jsonb` kanonik, `id = uuid5('nama@versi')`); api membandingkannya saat mulai dan **menolak mulai** bila berbeda — pagu, tool, versi, maupun isi manifest. **(3)** Manifest yang berubah = **versi baru + migrasi baru**; baris versi lama turun ke `deprecated` (satu aktif per nama, aturan 5 + `agents_one_active_idx`). |
+| **Bukti** | spec/01 §10: `GRANT SELECT ON agents, agent_tools TO hvx_app` — *katalog sistem: dikelola migrasi*. `agent_runs.agent_id` menunjuk `agents(id)`, jadi katalog harus berbaris sebelum run pertama (4.4). Docstring pemeriksa A-1: *“validator manifest (Sprint 4 tugas 4.2) kelak memeriksa MANIFEST SUNGGUHAN dengan aturan yang sama”*. |
+| **Bacaan yang DITOLAK** | **(a)** *“Api mendaftarkan manifestnya sendiri saat mulai (UPSERT)”* — ditolak: hak menulis katalog sistem berarti api yang disusupi bisa menaikkan `max_risk` agentnya sendiri; spec/01 §10 sengaja tidak memberikannya. **(b)** *“Katalog hanya di memori”* — ditolak: `agent_runs` butuh baris untuk dirujuk, dan audit butuh tahu **versi** mana yang bertindak. **(c)** *“Migrasi membaca YAML saat dijalankan”* — ditolak: migrasi yang isinya mengikuti berkas lain tidak menghasilkan hal yang sama bila diulang besok. **(d)** *“Berhenti di pelanggaran pertama”* — ditolak: aturan 9 (pihak ketiga meminta lokasi) tersembunyi di balik aturan 2 (scope di luar daftar resmi) selama `location` belum resmi. |
+| **Harga yang diakui** | Manifest tertulis dua kali (YAML + migrasi) — dijaga uji kesamaan (`test_katalog_agent.py`) dan penolakan saat mulai, bukan ingatan. Menyunting manifest butuh migrasi, juga untuk perubahan kecil — sengaja: tiap versi manifest yang pernah bertindak tetap terbaca di `agents`. |
+| **Cara membalikkan** | `agents.pastikan_katalog` (`hvx.main`) dan migrasi `0007`; `tests/integration/test_katalog_agent.py` diubah bersamanya. |
+
+---
+
 ## Yang sengaja **tidak** saya putuskan
 
 | Butir | Kenapa |

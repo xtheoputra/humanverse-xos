@@ -24,6 +24,7 @@ dev = [
   # lint & tipe — spec/07 0.7
   "ruff>=0.6",
   "mypy>=1.11",
+  "types-PyYAML>=6.0",  # manifest agent YAML (spec/07 4.2)
   # batas modul & batas keras — spec/07 0.8
   "import-linter>=2.1",
   # pindai — spec/07 0.7

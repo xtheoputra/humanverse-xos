@@ -1,0 +1,13 @@
+name: habit.list
+version: 1.0.0
+kind: read
+description: Habit milik pengguna; dengan for_date, beserta keadaan hari itu (GET /habits)
+scopes: [habits]
+risk_level: 0
+input:
+  for_date: { type: date, required: false }
+output:
+  items: array
+side_effects: none
+reaches_third_party: false
+rate_limit: 60/min/user

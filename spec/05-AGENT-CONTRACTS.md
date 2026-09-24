@@ -52,7 +52,21 @@ evaluation:
     cost_usd_per_run: 0.02
 ```
 
-Aturan validasi yang ditegakkan saat registrasi:
+> 🔧 **Letak V0 (E-190, 24 Sep 2026, tugas 4.2).** `agents/<name>/manifest.yaml` dan
+> `tools/<name>.yaml` di atas ditulis sebelum repo punya `tools/` — kini folder
+> perkakas pengembang (pemeriksa dokumen, gerbang CI). Registry V0 tinggal di
+> paket api: `apps/api/src/hvx/modules/agents/manifest/<name>.yaml` dan
+> `…/agents/alat/<name>.yaml`, dibaca saat api dibuat. Katalog basis data
+> (`agents`, `agent_tools`) diisi **migrasi** dengan salinan bekunya — api tidak
+> bisa mendaftarkan agent (spec/01 §10), dan **menolak mulai** bila katalog
+> berbeda dari manifest yang divalidasinya (**K-29**).
+
+Aturan validasi yang ditegakkan saat registrasi — **semua** pelanggaran dilaporkan
+sekaligus, bukan hanya yang pertama (aturan 9 tidak tersembunyi di balik aturan 2).
+Ditegakkan `agents.validasi_registri` (`tests/unit/test_registri_agent.py`: satu
+kasus per aturan), ditambah **A-1** (`risk_level` sebagai properti agent ditolak;
+`autonomy.max_level` wajib `L0`–`L5`) dan **K-14** (entri `agent.<x>` menunjuk agent
+aktif, dengan `risk_level` = `max_risk`-nya):
 
 | # | Aturan |
 |---|---|
@@ -219,20 +233,26 @@ rate_limit:   60/min/user
 
 Tool V0 — **9 tool + 3 entri `kind: agent`**:
 
-| Tool | Kind | Risk | Dipakai |
-|---|---|---|---|
-| `habit.list` | read | 0 | Coach, Habit |
-| `habit.streak` | read | 0 | Coach, Habit |
-| `habit.complete` | write | 2 | Habit |
-| `goal.list` | read | 0 | Coach |
-| `checkin.get` | read | 0 | Coach |
-| `mood.recent` | read | 0 | Coach |
-| `memory.search` | read | 0 | Coach, Memory |
-| `memory.write` | write | 2 | Memory |
-| `recommendation.create` | write | 1 | Coach |
-| `agent.coach` | **agent** | 1 | Orchestrator |
-| `agent.habit` | **agent** | 2 | Orchestrator |
-| `agent.memory` | **agent** | 2 | Orchestrator |
+| Tool | Kind | Risk | Dipakai | Scope 🔧 |
+|---|---|---|---|---|
+| `habit.list` | read | 0 | Coach, Habit | habits |
+| `habit.streak` | read | 0 | Coach, Habit | habits |
+| `habit.complete` | write | 2 | Habit | habits |
+| `goal.list` | read | 0 | Coach | goals |
+| `checkin.get` | read | 0 | Coach | checkins |
+| `mood.recent` | read | 0 | Coach | mood |
+| `memory.search` | read | 0 | Coach, Memory | yang diminta manifest pemanggil — semua scope resmi |
+| `memory.write` | write | 2 | Memory | satu scope yang diizinkan — semua kecuali `journal_raw` |
+| `recommendation.create` | write | 1 | Coach | coaching_notes |
+| `agent.coach` | **agent** | 1 | Orchestrator | scope baca & tulis `coach-agent` |
+| `agent.habit` | **agent** | 2 | Orchestrator | habits |
+| `agent.memory` | **agent** | 2 | Orchestrator | scope `memory-agent` |
+
+> 🔧 **Kolom *Scope* ditambahkan 24 Sep 2026 (E-191, tugas 4.2).** Skema tool
+> menuntut `scopes` — *scope memory/data yang disentuh* — tetapi tabel V0 tidak
+> pernah menyebutnya, jadi gerbang risiko (4.5) tidak punya scope untuk ditanyakan
+> ke mesin izin. `checkin.get` dan `mood.recent` sengaja **tanpa catatan bebas**
+> (`note`): coach membaca angka dan label, bukan tulisan pengguna (C-32).
 
 > 🔧 **Tiga baris terakhir ditambahkan 11 September 2026 — menerapkan
 > [K-14](../docs/KEPUTUSAN-DIDELEGASIKAN.md), yang sudah diputuskan

@@ -1,0 +1,14 @@
+name: memory.search
+version: 1.0.0
+kind: read
+description: Pencarian memori semantik, hanya di scope manifest pemanggil yang diizinkan (3.7)
+scopes: [habits, goals, checkins, mood, coaching_notes, journal_raw]
+risk_level: 0
+input:
+  kueri: { type: string, required: true }
+  batas: { type: integer, required: false }
+output:
+  items: array
+side_effects: none
+reaches_third_party: false
+rate_limit: 60/min/user

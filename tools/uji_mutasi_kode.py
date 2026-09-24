@@ -294,6 +294,8 @@ UJI_TERBIT = "tests/integration/test_penerbitan_event.py"
 UJI_NIAT = "tests/unit/test_niat.py"
 UJI_GERBANG_MODEL = "tests/unit/test_gerbang_model.py"
 UJI_RUTE = "tests/integration/test_rute_model.py"
+UJI_REGISTRI = "tests/unit/test_registri_agent.py::test_manifest_yang_melanggar_ditolak"
+UJI_KATALOG = "tests/integration/test_katalog_agent.py"
 FK_MILESTONE = (
     "  FOREIGN KEY (goal_id, user_id) REFERENCES goals (id, user_id) ON DELETE CASCADE" + NL + ");"
 )
@@ -5500,6 +5502,185 @@ MUTASI: list[Mutasi] = [
         ],
         _pytest(f"{UJI_RUTE}::test_pesan_yang_dikirim_ulang_tidak_mencatat_mood_dua_kali"),
         harus_memuat="kiriman ulang mencatat mood dua kali",
+        kelompok="db",
+    ),
+    # ── Sprint 4 · 4.2 registry agent: 9 aturan spec/05 + A-1 + K-14, katalog dikelola migrasi ──
+    Mutasi(
+        "4.2",
+        "aturan 1 — tool di luar registry diterima",
+        [
+            Sunting(
+                f"{MODUL}/agents/registri.py",
+                '            salah.append(Pelanggaran(m.name, "1", f"tool {t} tidak ada di tool registry"))',
+                "            pass",
+            )
+        ],
+        _pytest(UJI_REGISTRI),
+        harus_memuat="aturan 1 tidak ditegakkan",
+    ),
+    Mutasi(
+        "4.2",
+        "aturan 2 — scope manifest di luar daftar resmi diterima",
+        [
+            Sunting(
+                f"{MODUL}/agents/registri.py",
+                "    asing = sorted(scope - identity.SCOPE_RESMI.keys())  # aturan 2",
+                "    asing: list[str] = []  # aturan 2",
+            )
+        ],
+        _pytest(UJI_REGISTRI),
+        harus_memuat="aturan 2 tidak ditegakkan",
+    ),
+    Mutasi(
+        "4.2",
+        "aturan 3 — tool lebih berisiko dari pagu max_risk diterima",
+        [
+            Sunting(
+                f"{MODUL}/agents/registri.py",
+                "        if alat[t].risk_level > m.pagu_risiko:",
+                "        if False:",
+            )
+        ],
+        _pytest(UJI_REGISTRI),
+        harus_memuat="aturan 3 tidak ditegakkan",
+    ),
+    Mutasi(
+        "4.2",
+        "aturan 4 — gerbang keselamatan tidak diperiksa",
+        [
+            Sunting(
+                f"{MODUL}/agents/registri.py",
+                "    if keselamatan is None or keselamatan < AMBANG_KESELAMATAN:",
+                "    if False:",
+            )
+        ],
+        _pytest(UJI_REGISTRI),
+        harus_memuat="aturan 4 tidak ditegakkan",
+    ),
+    Mutasi(
+        "4.2",
+        "aturan 5 — dua versi aktif untuk satu nama",
+        [
+            Sunting(
+                f"{MODUL}/agents/registri.py", "        if m.name in aktif:", "        if False:"
+            )
+        ],
+        _pytest(UJI_REGISTRI),
+        harus_memuat="aturan 5 tidak ditegakkan",
+    ),
+    Mutasi(
+        "4.2",
+        "aturan 6 — pihak ketiga boleh meminta journal_raw",
+        [
+            Sunting(
+                f"{MODUL}/agents/registri.py",
+                '            ("6", SCOPE_TERLARANG_PIHAK_KETIGA_6),\n',
+                "",
+            )
+        ],
+        _pytest(UJI_REGISTRI),
+        harus_memuat="aturan 6 tidak ditegakkan",
+    ),
+    Mutasi(
+        "4.2",
+        "aturan 7 — tool yang menyentuh orang lain di bawah R3",
+        [
+            Sunting(
+                f"{MODUL}/agents/registri.py",
+                "    if alat.reaches_third_party and alat.risk_level < 3:",
+                "    if False:",
+            )
+        ],
+        _pytest(UJI_REGISTRI),
+        harus_memuat="aturan 7 tidak ditegakkan",
+    ),
+    Mutasi(
+        "4.2",
+        "aturan 8 — tool tanpa risk_level tidak ditolak sebagai aturan 8",
+        [
+            Sunting(
+                f"{MODUL}/agents/registri.py", '    if "risk_level" not in mentah:', "    if False:"
+            )
+        ],
+        _pytest(UJI_REGISTRI),
+        harus_memuat="aturan 8 tidak ditegakkan",
+    ),
+    Mutasi(
+        "4.2",
+        "aturan 9 — pihak ketiga boleh meminta lokasi",
+        [
+            Sunting(
+                f"{MODUL}/agents/registri.py",
+                '            ("9", SCOPE_TERLARANG_PIHAK_KETIGA_9),\n',
+                "",
+            )
+        ],
+        _pytest(UJI_REGISTRI),
+        harus_memuat="aturan 9 tidak ditegakkan",
+    ),
+    Mutasi(
+        "4.2",
+        "A-1 — risk_level sebagai properti agent diterima",
+        [
+            Sunting(
+                f"{MODUL}/agents/registri.py", "        if terlarang in mentah", "        if False"
+            )
+        ],
+        _pytest(UJI_REGISTRI),
+        harus_memuat="aturan A-1 tidak ditegakkan",
+    ),
+    Mutasi(
+        "4.2",
+        "K-14 — entri agent lebih murah dari agent yang dipanggil",
+        [
+            Sunting(
+                f"{MODUL}/agents/registri.py",
+                "        elif a.risk_level != dipanggil.pagu_risiko:",
+                "        elif False:",
+            )
+        ],
+        _pytest(UJI_REGISTRI),
+        harus_memuat="aturan K-14 tidak ditegakkan",
+    ),
+    Mutasi(
+        "4.2",
+        "K-14 — entri agent tanpa agent aktif",
+        [
+            Sunting(
+                f"{MODUL}/agents/registri.py",
+                '            salah.append(Pelanggaran(a.name, "K-14", "tidak menunjuk agent aktif mana pun"))',
+                "            continue",
+            )
+        ],
+        _pytest(UJI_REGISTRI),
+        harus_memuat="aturan K-14 tidak ditegakkan",
+    ),
+    Mutasi(
+        "4.2",
+        "katalog: isi manifest jsonb tidak dibandingkan — manifest yang disunting berjalan diam-diam",
+        [
+            Sunting(
+                f"{MODUL}/agents/registri.py",
+                "        if harapan != ada or json.loads(manifest_json(registri.mentah[nama])) != b.manifest:",
+                "        if harapan != ada:",
+            )
+        ],
+        _pytest(f"{UJI_KATALOG}::test_api_menolak_mulai_bila_katalog_berbeda_dari_manifest"),
+        harus_memuat="DID NOT RAISE",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.2",
+        "api mulai tanpa membandingkan katalog dengan manifest",
+        [
+            Sunting(
+                "apps/api/src/hvx/main.py",
+                "            await agents.pastikan_katalog(engine, registri)" + NL,
+                "",
+            )
+        ],
+        _pytest(f"{UJI_KATALOG}::test_api_menolak_mulai_bila_katalog_berbeda_dari_manifest"),
+        harus_memuat="DID NOT RAISE",
         kelompok="db",
     ),
     # ── alat ini sendiri: mutasi yang menggantung dihentikan beserta turunannya ──

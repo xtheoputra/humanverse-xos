@@ -1,0 +1,15 @@
+name: memory.write
+version: 1.0.0
+kind: write
+description: Tulis memori yang pengguna minta diingat, di satu scope yang diizinkan
+scopes: [habits, goals, checkins, mood, coaching_notes]
+risk_level: 2
+input:
+  scope: { type: string, required: true }
+  isi: { type: string, required: true }
+output:
+  id: uuid | null
+  baru: boolean
+side_effects: writes_user_data
+reaches_third_party: false
+rate_limit: 20/min/user

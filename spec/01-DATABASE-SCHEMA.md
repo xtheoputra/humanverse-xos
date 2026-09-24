@@ -813,6 +813,11 @@ CREATE TABLE agent_tools (
 > membuat *automatic rollback* (§23) punya arti: aktifkan versi lama, versi
 > baru turun status.
 >
+> 🔧 **Isi katalog V0 (tugas 4.2, K-29):** migrasi `0007` menyisipkan empat agent
+> spec/05 dan tool-nya — `manifest` = salinan beku manifest YAML (bentuk kanonik),
+> `id = uuid5(RUANG_ID_AGENT, 'nama@versi')`. Api hanya `SELECT` (§10), dan menolak
+> mulai bila katalog ini berbeda dari manifest yang divalidasinya.
+>
 > ⚠️ `agents` dan `agent_tools` **tidak ada di 19 tabel V0** §31, padahal
 > `agent_runs` di daftar itu jelas menunjuk sebuah agent. Naskah 6 memintanya.
 > Butir **E-42**.

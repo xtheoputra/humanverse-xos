@@ -11,12 +11,36 @@ Berkas ini satu-satunya pintu keluar modul (spec/06 aturan 1).
 
 from .deterministik import CARA_MENGISI_MOOD, HasilDeterministik, jalankan_deterministik
 from .niat import MoodDiminta, Niat, kenali
+from .registri import (
+    RUANG_ID_AGENT,
+    Alat,
+    KatalogBerbeda,
+    Manifest,
+    Pelanggaran,
+    RegistriAgent,
+    RegistriTidakSah,
+    manifest_json,
+    muat_registri,
+    pastikan_katalog,
+    validasi_registri,
+)
 
 __all__ = [
     "CARA_MENGISI_MOOD",
+    "RUANG_ID_AGENT",
+    "Alat",
     "HasilDeterministik",
+    "KatalogBerbeda",
+    "Manifest",
     "MoodDiminta",
     "Niat",
+    "Pelanggaran",
+    "RegistriAgent",
+    "RegistriTidakSah",
     "jalankan_deterministik",
     "kenali",
+    "manifest_json",
+    "muat_registri",
+    "pastikan_katalog",
+    "validasi_registri",
 ]

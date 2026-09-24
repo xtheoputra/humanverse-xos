@@ -22,6 +22,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from hvx import __version__
 from hvx.modules import (
     activities,
+    agents,
     checkins,
     goals,
     habits,
@@ -38,6 +39,9 @@ DOKUMENTASI_TERBUKA: frozenset[str] = frozenset({"local", "test", "ci"})
 def create_app(settings: platform.Settings | None = None) -> FastAPI:
     settings = settings or platform.Settings()  # dari lingkungan (HVX_*)
     platform.konfigurasi_log(level=settings.log_level, json=settings.log_json)
+    # spec/07 4.2: manifest & tool registry divalidasi SEBELUM api bisa dibuat —
+    # satu pelanggaran aturan spec/05 dan tidak ada yang melayani (K-29).
+    registri = agents.muat_registri()
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
@@ -45,6 +49,8 @@ def create_app(settings: platform.Settings | None = None) -> FastAPI:
         try:
             # B-40: api tidak pernah melayani sebagai peran yang melewati RLS.
             await platform.pastikan_peran_aplikasi(engine)
+            # K-29: katalog `agents` (dikelola migrasi) == manifest yang divalidasi.
+            await agents.pastikan_katalog(engine, registri)
         except BaseException:
             await engine.dispose()
             raise
@@ -78,6 +84,7 @@ def create_app(settings: platform.Settings | None = None) -> FastAPI:
     )
     app.state.settings = settings
     app.state.versi = __version__
+    app.state.registri_agent = registri
     # Titik rakit menyambung modul yang tidak boleh saling impor (K-17): identity
     # mengumumkan pendaftaran, profile membuat profil — di transaksi yang sama.
     app.state.pendengar_pendaftaran = (profile.buat_profil_awal,)
