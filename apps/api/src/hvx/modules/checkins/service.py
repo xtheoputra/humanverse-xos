@@ -21,7 +21,7 @@ from datetime import date, datetime, timedelta
 from uuid import UUID
 
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.ext.asyncio import AsyncEngine
+from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine
 
 from hvx.modules import events, platform
 
@@ -163,3 +163,13 @@ async def daftar_mood(
         mood = mood[:batas]
         lanjut = platform.kursor_waktu("moods", mood[-1].occurred_at, mood[-1].id)
     return HalamanMood(items=mood, next_cursor=lanjut)
+
+
+async def mood_untuk_ekstraksi(conn: AsyncConnection, mood_id: UUID) -> Mood | None:
+    """Satu mood — HANYA untuk memori (spec/07 3.6), di transaksi pemiliknya.
+
+    `note` tidak masuk event (spec/03 `mood.logged` = `{valence, label?}`), jadi
+    ekstraktor memori membacanya di sini — `memory` boleh mengimpor `checkins`
+    (K-17).
+    """
+    return await repository.mood_id(conn, mood_id)

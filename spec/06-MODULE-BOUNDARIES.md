@@ -135,9 +135,11 @@ dengan SQL — harus lewat `__init__.py` pemiliknya.
 > (RLS dan transaksinya sama). Yang terpasang: `pendengar_pendaftaran`
 > (identity → profile) · `pembaca_zona_waktu` (habits ← profile) ·
 > `pembaca_energi` (habits ← checkins) · `pembaca_goal_hidup` (habits ← goals) ·
-> `pendengar_goal_dihapus` (goals → habits). Rute yang butuh sambungan MENOLAK
-> berjalan tanpanya (`RuntimeError`), bukan jatuh ke bawaan diam-diam, dan
-> `tests/unit/test_main.py` memeriksa kelimanya terpasang.
+> `pendengar_goal_dihapus` (goals → habits) · `pendengar_jurnal_berubah`
+> (journal → memory, 3.6 — `memory` di ATAS `journal` dan boleh mengimpornya,
+> tetapi `journal` tidak boleh mengimpor `memory`). Rute yang butuh sambungan
+> MENOLAK berjalan tanpanya (`RuntimeError`), bukan jatuh ke bawaan diam-diam,
+> dan `tests/unit/test_main.py` memeriksa keenamnya terpasang.
 >
 > ✅ **Aturan 6 dan Sprint 2 (E-176) — ditutup 3.2.** Sprint 2 menulis
 > `goals` · `goal_milestones` · `habits` · `habit_completions` ·

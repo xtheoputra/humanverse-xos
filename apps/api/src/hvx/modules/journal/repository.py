@@ -33,6 +33,18 @@ _AMBIL = text(
     """
 )
 
+# Ekstraksi memori (3.6) membaca isi di bawah kunci BAGI: `PATCH`/`DELETE` yang
+# serentak menunggu sampai memorinya commit, lalu pendengarnya melihat memori itu
+# dan menyelaraskannya — bukan melompatinya karena memori belum ada.
+_AMBIL_UNTUK_EKSTRAKSI = text(
+    """
+    SELECT id, title, body, occurred_at, word_count, created_at, updated_at
+    FROM journal_entries
+    WHERE id = :id AND deleted_at IS NULL
+    FOR SHARE
+    """
+)
+
 _DAFTAR = text(
     """
     SELECT id, title, occurred_at, word_count, created_at, updated_at
@@ -105,6 +117,11 @@ async def sisip(
 
 async def ambil(conn: AsyncConnection, jurnal_id: UUID) -> Jurnal | None:
     baris = (await conn.execute(_AMBIL, {"id": jurnal_id})).mappings().first()
+    return _jurnal(baris) if baris else None
+
+
+async def ambil_untuk_ekstraksi(conn: AsyncConnection, jurnal_id: UUID) -> Jurnal | None:
+    baris = (await conn.execute(_AMBIL_UNTUK_EKSTRAKSI, {"id": jurnal_id})).mappings().first()
     return _jurnal(baris) if baris else None
 
 

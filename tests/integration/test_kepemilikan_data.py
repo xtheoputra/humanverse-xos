@@ -206,6 +206,7 @@ DEFINER_DIIZINKAN = frozenset(
     {
         "auth_lookup_for_login",  # login: mencari akun per email sebelum pengguna dikenali
         "events_untuk_relay",  # relay 3.3: RUJUKAN event semua pengguna, tanpa payload
+        "memori_perlu_diselaraskan",  # penyelaras vektor 3.5–3.7: HANYA user_id yang berpekerjaan
     }
 )
 NL = chr(10)

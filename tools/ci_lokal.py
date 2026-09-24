@@ -32,6 +32,7 @@ sisanya.
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import re
 import shutil
@@ -39,9 +40,12 @@ import subprocess
 import sys
 import tempfile
 import time
+import urllib.error
 import urllib.request
+import uuid
 from collections.abc import Callable
 from pathlib import Path
+from typing import Any
 
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8")
@@ -85,7 +89,9 @@ def _smoke_compose() -> int:
 
     Sesudah sehat, klien aplikasi Flutter yang SAMA dengan layar (spec/07 2.7)
     menjalankan alur manusia — daftar, check-in, habit, tandai selesai, batal,
-    keluar — terhadap api dari citra itu (`apps/mobile/tool/ujung_ke_ujung.dart`).
+    keluar — terhadap api dari citra itu (`apps/mobile/tool/ujung_ke_ujung.dart`);
+    lalu sebuah mood harus sampai ke Qdrant sebagai memori lewat wadah `pekerja`
+    (`_memori_ujung_ke_ujung`).
     🔴 Dibuat karena layar pertama yang dicoba lawan tumpukan compose menemui
     `500` yang tidak satu pun uji tangkap: uji api memakai basis data yang baru
     dimigrasi, uji widget memakai layanan palsu — tidak ada yang mempertemukan
@@ -116,7 +122,10 @@ def _smoke_compose() -> int:
                     badan = jawab.read().decode()
                     print(f"  {url} → {jawab.status} {badan}")
                     if jawab.status == 200 and '"status":"ok"' in badan.replace(" ", ""):
-                        return _ujung_ke_ujung(f"http://127.0.0.1:{env['HVX_API_PORT']}")
+                        dasar = f"http://127.0.0.1:{env['HVX_API_PORT']}"
+                        return _ujung_ke_ujung(dasar) or _memori_ujung_ke_ujung(
+                            dasar, f"http://127.0.0.1:{env['HVX_QDRANT_PORT']}"
+                        )
             except OSError as galat:
                 print(f"  {url} → {galat}")
             time.sleep(2)
@@ -138,6 +147,55 @@ def _ujung_ke_ujung(dasar: str) -> int:
         return klien
     print(f"  layar diketuk lawan api hidup (apps/mobile/test/ujung) → {dasar}", flush=True)
     return _flutter("test", "test/ujung", f"--dart-define=HVX_API_UJI={dasar}")()
+
+
+def _json_post(url: str, isi: dict[str, Any], token: str | None = None) -> dict[str, Any]:
+    kepala = {"Content-Type": "application/json"}
+    if token:
+        kepala["Authorization"] = f"Bearer {token}"
+    minta = urllib.request.Request(  # noqa: S310 - URL tumpukan lokal buatan sendiri
+        url, data=json.dumps(isi).encode(), headers=kepala, method="POST"
+    )
+    with urllib.request.urlopen(minta, timeout=10) as jawab:  # noqa: S310
+        hasil: dict[str, Any] = json.loads(jawab.read().decode())
+        return hasil
+
+
+def _memori_ujung_ke_ujung(dasar: str, qdrant: str) -> int:
+    """Mood lewat api hidup → relay → konsumen → memori → Qdrant, di WADAH `pekerja`.
+
+    🔴 `tests/integration/test_pekerja.py` menjalankan `pekerja.jalankan()` di
+    proses uji — wadah compose yang tidak pernah bekerja (perintah salah, Qdrant
+    tak terjangkau, `HVX_SEMATAN_KEY` hilang) tidak terlihat di sana. Tumpukan
+    compose penuh dari citra CI adalah satu-satunya tempat ketiganya bertemu.
+    """
+    print(f"  mood → pekerja → memori di Qdrant → {qdrant}", flush=True)
+    akun = _json_post(
+        f"{dasar}/v1/auth/register",
+        {
+            "email": f"ci-{uuid.uuid4().hex}@uji.id",
+            "password": uuid.uuid4().hex,
+            "display_name": "CI",
+            "timezone": "Asia/Jakarta",
+            "consents": {"policy_version": "ci", "terms": True, "privacy": True},
+        },
+    )
+    token = str(akun["tokens"]["access_token"])
+    uid = str(akun["user"]["id"])
+    _json_post(f"{dasar}/v1/moods", {"valence": 3, "note": "ujung ke ujung"}, token)
+    saring = {"filter": {"must": [{"key": "user_id", "match": {"value": uid}}]}, "exact": True}
+    for _ in range(60):
+        try:
+            jawab = _json_post(f"{qdrant}/collections/memories/points/count", saring)
+            jumlah = int(jawab["result"]["count"])
+        except urllib.error.HTTPError:
+            jumlah = 0  # koleksi belum dibuat penyelaras
+        if jumlah >= 1:
+            print(f"  memori tersemat: {jumlah} titik milik pengguna CI")
+            return 0
+        time.sleep(1)
+    print("🛑 mood tidak sampai ke Qdrant sebagai memori dalam 60 detik — wadah pekerja?")
+    return 1
 
 
 # Zona mesin untuk perintah Flutter (tinjauan penegak buta Sprint 2): `tanggalLokal`

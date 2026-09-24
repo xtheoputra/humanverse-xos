@@ -8,10 +8,16 @@
   kunci. Menyunting jurnal bukan fakta perilaku baru (peta aturan 6 spec/06).
 * `safety_flag` tetap NULL: jalur eskalasi keselamatan (issue #21) milik
   pemilik — kolomnya hanya memastikan tempatnya sudah ada (spec/01).
+* **Menyunting atau menghapus jurnal menyelaraskan TURUNANNYA di transaksi yang
+  sama** — pendengar yang dipasang titik rakit `hvx.main` (K-23): memori
+  episodik jurnal (3.6) mengikuti isi barunya, atau dikosongkan saat jurnalnya
+  dihapus. Tanpa itu kalimat yang dihapus pemiliknya dari jurnal tetap hidup di
+  memori — dan di vektornya.
 """
 
 from __future__ import annotations
 
+from collections.abc import Awaitable, Callable, Sequence
 from datetime import datetime
 from typing import Any
 from uuid import UUID
@@ -24,6 +30,11 @@ from hvx.modules import events, platform
 
 from . import repository
 from .schemas import BuatJurnal, HalamanJurnal, Jurnal, UbahJurnal, hitung_kata
+
+# (koneksi transaksi penyunting, id jurnal) — dipanggil SESUDAH jurnal diubah atau
+# dihapus, sebelum commit. Pendengar membaca keadaan barunya lewat
+# `isi_untuk_ekstraksi` (`None` = sudah dihapus).
+PendengarJurnalBerubah = Callable[[AsyncConnection, UUID], Awaitable[None]]
 
 # Jam perangkat yang sedikit maju tidak membuat tulisan "sekarang" ditolak.
 LONGGAR_JAM_S = 300
@@ -116,7 +127,13 @@ async def daftar(
     return HalamanJurnal(items=jurnal, next_cursor=lanjut)
 
 
-async def ubah(engine: AsyncEngine, user_id: UUID, jurnal_id: UUID, badan: UbahJurnal) -> Jurnal:
+async def ubah(
+    engine: AsyncEngine,
+    user_id: UUID,
+    jurnal_id: UUID,
+    badan: UbahJurnal,
+    pendengar: Sequence[PendengarJurnalBerubah],
+) -> Jurnal:
     perubahan: dict[str, Any] = badan.model_dump(include=badan.model_fields_set)
     async with platform.transaksi_pengguna(engine, user_id) as conn:
         if not perubahan:  # `PATCH {}` tidak menyentuh baris — updated_at tetap
@@ -127,12 +144,33 @@ async def ubah(engine: AsyncEngine, user_id: UUID, jurnal_id: UUID, badan: UbahJ
             jurnal = await repository.ubah(
                 conn, jurnal_id, perubahan, hitung_kata(isi) if isi is not None else None
             )
+            if jurnal is not None:
+                for p in pendengar:
+                    await p(conn, jurnal_id)
     if jurnal is None:
         raise _tidak_ditemukan()
     return jurnal
 
 
-async def hapus(engine: AsyncEngine, user_id: UUID, jurnal_id: UUID) -> None:
+async def hapus(
+    engine: AsyncEngine,
+    user_id: UUID,
+    jurnal_id: UUID,
+    pendengar: Sequence[PendengarJurnalBerubah],
+) -> None:
     async with platform.transaksi_pengguna(engine, user_id) as conn:
         if not await repository.hapus(conn, jurnal_id):
             raise _tidak_ditemukan()
+        for p in pendengar:
+            await p(conn, jurnal_id)
+
+
+async def isi_untuk_ekstraksi(conn: AsyncConnection, jurnal_id: UUID) -> Jurnal | None:
+    """Satu jurnal hidup — HANYA untuk memori (spec/07 3.6), di transaksi pemiliknya.
+
+    Isi jurnal sengaja tidak pernah masuk event (spec/03), jadi ekstraktor dan
+    pendengar memori membacanya di sini — `memory` boleh mengimpor `journal`
+    (K-17). `None` = sudah dihapus. Dibaca di bawah kunci BAGI (lihat
+    `repository._AMBIL_UNTUK_EKSTRAKSI`).
+    """
+    return await repository.ambil_untuk_ekstraksi(conn, jurnal_id)

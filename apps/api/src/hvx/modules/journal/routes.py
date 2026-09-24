@@ -22,6 +22,19 @@ from .schemas import BuatJurnal, HalamanJurnal, Jurnal, UbahJurnal
 router = APIRouter(prefix="/v1", tags=["journal"])
 
 
+def _pendengar(request: Request) -> tuple[service.PendengarJurnalBerubah, ...]:
+    """Dipasang titik rakit `hvx.main` (K-23) — `journal` tidak tahu siapa turunannya.
+
+    Tidak ada bawaan "tanpa pendengar" kalau titik rakit lupa: memori yang tetap
+    memuat kalimat yang sudah dihapus pemiliknya adalah tepat cacat yang
+    pendengar ini tutup.
+    """
+    pendengar = getattr(request.app.state, "pendengar_jurnal_berubah", None)
+    if pendengar is None:
+        raise RuntimeError("hvx.main tidak memasang app.state.pendengar_jurnal_berubah (K-23)")
+    return tuple(pendengar)
+
+
 DariWaktu = Annotated[platform.WaktuBerzona | None, Query(alias="from")]
 SampaiWaktu = Annotated[platform.WaktuBerzona | None, Query(alias="to")]
 
@@ -79,9 +92,10 @@ async def ubah_jurnal(
     idem: platform.Idempoten,
 ) -> JSONResponse:
     engine = platform.engine_dari(request)
+    pendengar = _pendengar(request)
 
     async def kerja() -> platform.Jawaban:
-        jurnal = await service.ubah(engine, pengguna.user_id, jurnal_id, badan)
+        jurnal = await service.ubah(engine, pengguna.user_id, jurnal_id, badan, pendengar)
         return platform.Jawaban(200, jurnal, jurnal.id)
 
     return await idem.jalankan(
@@ -93,5 +107,7 @@ async def ubah_jurnal(
 async def hapus_jurnal(
     request: Request, jurnal_id: UUID, pengguna: identity.PenggunaDiperlukan
 ) -> Response:
-    await service.hapus(platform.engine_dari(request), pengguna.user_id, jurnal_id)
+    await service.hapus(
+        platform.engine_dari(request), pengguna.user_id, jurnal_id, _pendengar(request)
+    )
     return Response(status_code=204)

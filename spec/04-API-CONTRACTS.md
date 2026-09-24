@@ -185,6 +185,14 @@ POST   /activities           { id?, kind, occurred_at, duration_seconds?, payloa
 > `GET /journal` **tidak** mengembalikan `body`. Daftar jurnal sering dimuat
 > di layar ringkasan; mengirim seluruh isi tulisan pribadi ke sana adalah
 > kebocoran yang tidak perlu.
+>
+> 🔧 **`PATCH` dan `DELETE /journal/{id}` menjangkau memorinya (spec/07 3.6).**
+> Tiap jurnal melahirkan satu memori episodik (scope `journal_raw`). Menyunting
+> jurnal mengganti isi memori itu, dan menghapusnya **mengosongkan** memori itu
+> — keduanya di transaksi yang sama dengan jurnalnya; titik vektornya
+> diselaraskan pekerja sesudah commit. `DELETE` sendiri tetap hapus-lunak
+> (`deleted_at`): isi jurnal tersimpan sampai akun dihapus — **C-31**, milik
+> pemilik.
 
 > 🔧 **`PUT /checkins/{for_date}` = GANTI, bukan tambal (spec/07 2.5, 24 Sep
 > 2026).** Badan adalah check-in tanggal itu: medan yang tidak dikirim menjadi

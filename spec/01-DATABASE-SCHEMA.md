@@ -1119,6 +1119,26 @@ CREATE FUNCTION events_untuk_relay(p_sesudah timestamptz, p_sesudah_id uuid, p_b
   $$;
 REVOKE ALL ON FUNCTION events_untuk_relay(timestamptz, uuid, integer) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION events_untuk_relay(timestamptz, uuid, integer) TO hvx_app;
+
+-- Penyelaras vektor memori (spec/07 3.5–3.7): memories → Qdrant, untuk SEMUA
+-- pengguna — RLS `memories` (§11) tidak meloloskannya. Sempit: hanya-baca, hanya
+-- `user_id` yang punya pekerjaan (memori terhapus yang titiknya belum dibuang,
+-- atau yang vektornya belum/tidak lagi cocok dengan penyemat `p_model`); isinya
+-- dibaca di transaksi PEMILIKNYA. Paling banyak 1000 pengguna per panggilan.
+CREATE FUNCTION memori_perlu_diselaraskan(p_model text, p_batas integer)
+  RETURNS TABLE (user_id uuid)
+  LANGUAGE sql STABLE SECURITY DEFINER
+  SET search_path = pg_catalog, public, pg_temp
+  AS $$
+    SELECT m.user_id
+    FROM public.memories m
+    WHERE m.deleted_at IS NOT NULL OR m.model_version IS DISTINCT FROM p_model
+    GROUP BY m.user_id
+    ORDER BY min(m.updated_at), m.user_id
+    LIMIT least(greatest(p_batas, 1), 1000)
+  $$;
+REVOKE ALL ON FUNCTION memori_perlu_diselaraskan(text, integer) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION memori_perlu_diselaraskan(text, integer) TO hvx_app;
 ```
 
 > 🔑 **Kenapa fungsi, bukan kebijakan RLS yang lebih longgar** (17 Sep 2026,
@@ -1140,6 +1160,22 @@ GRANT EXECUTE ON FUNCTION events_untuk_relay(timestamptz, uuid, integer) TO hvx_
 > `payload`: konsumen membaca isi event di transaksi PEMILIKNYA
 > (`transaksi_pengguna`), jadi RLS tetap menjaga isi, dan Redis tidak pernah
 > menyimpan data pengguna (prinsip yang sama dengan `Idempotency-Key`, E-171).
+>
+> 🔧 **Fungsi ke-3: `memori_perlu_diselaraskan` (24 Sep 2026, spec/07 3.5–3.7).**
+> Qdrant tidak ikut transaksi PostgreSQL, jadi memori dan titik vektornya
+> diselaraskan **sesudah** commit oleh proses pekerja: memori baru disemat,
+> memori yang isinya berubah disemat ulang, dan titik memori yang dihapus
+> dibuang — naskah: *“tidak boleh hanya menghapus row di PostgreSQL”*
+> ([`../docs/139`](../docs/139-PRIVACY-DELETION-RETENTION.md)). Fungsi ini hanya
+> menjawab **pengguna mana** yang punya pekerjaan; baris dan isinya dibaca di
+> transaksi pemiliknya, di bawah RLS. Tiga kolom yang dibacanya berarti:
+> `model_version` = penyemat vektor yang **cocok dengan isi saat ini** (`NULL` =
+> belum disemat, atau isinya berubah sesudah disemat) · `embedding_id` = id
+> titik Qdrant sesudah pertama disemat (`NULL` = belum pernah) · `deleted_at`
+> terisi = isi sudah dikosongkan, titik dan barisnya menunggu dibuang.
+> ⚠️ Kondisi `model_version IS DISTINCT FROM p_model` memindai tabel penuh tiap
+> putaran — cukup untuk V0 (satu pengguna nyata, spec/06); V1 butuh kolom
+> penanda berindeks ([K-25](../docs/KEPUTUSAN-DIDELEGASIKAN.md)).
 
 ---
 
@@ -1152,7 +1188,7 @@ Menutup janji *Delete* di Privacy Center (naskah 5 §26) tanpa merusak audit:
 | 1 | `users.status = 'pending_deletion'`, sesi dicabut, agent berhenti melayani |
 | 2 | Tenggang **30 hari** — pengguna masih bisa membatalkan |
 | 3 | `DELETE FROM users` → cascade menghapus profil, goal, habit, jurnal, mood, memori, percakapan, rekomendasi, event, human_states |
-| 4 | Titik embedding di Qdrant dihapus berdasarkan `memories.embedding_id` yang dikumpulkan **sebelum** tahap 3 |
+| 4 | Titik embedding di Qdrant dihapus berdasarkan `memories.embedding_id` yang dikumpulkan **sebelum** tahap 3 — atau per saringan `user_id` payload (`platform.KlienVektor.hapus_milik`, 3.5), yang juga membuang titik yatim |
 | 5 | `audit_logs` **tetap**, dengan `user_id` diacak jadi id semu satu arah; isinya sudah metadata saja |
 | 6 | Satu baris audit terakhir: `action='account.deleted'` |
 

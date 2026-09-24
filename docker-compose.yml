@@ -145,9 +145,10 @@ services:
       retries: 12
       start_period: 5s
 
-  # Relay kotak keluar event → Redis Streams, dan grup konsumen (spec/07 3.3).
-  # Citra yang sama dengan api, proses terpisah (`hvx/pekerja.py`): tanpa port —
-  # ia hanya berbicara ke PostgreSQL dan Redis, sebagai anggota hvx_app.
+  # Relay kotak keluar event → Redis Streams, grup konsumen (ekstraksi memori), dan
+  # penyelaras memories → Qdrant (spec/07 3.3 · 3.5 · 3.6). Citra yang sama dengan
+  # api, proses terpisah (`hvx/pekerja.py`): tanpa port — ia hanya berbicara ke
+  # PostgreSQL, Redis, dan Qdrant, sebagai anggota hvx_app.
   pekerja:
     <<: *api-image
     command: ["python", "-m", "hvx.pekerja"]
@@ -157,10 +158,15 @@ services:
       HVX_REDIS_URL: redis://redis:6379/0
       HVX_LOG_LEVEL: ${HVX_LOG_LEVEL:-INFO}
       HVX_IP_HASH_KEY: ${HVX_IP_HASH_KEY:-hvx-dev-only-ip-hash-key-0123456789abcdef}
+      HVX_QDRANT_URL: http://qdrant:6333
+      # Kunci penyemat lokal (K-26) — tanpa kunci, vektor di Qdrant bisa dibalik jadi kata.
+      HVX_SEMATAN_KEY: ${HVX_SEMATAN_KEY:-hvx-dev-only-sematan-key-0123456789abcdef}
     depends_on:
       postgres:
         condition: service_healthy
       redis:
+        condition: service_healthy
+      qdrant:
         condition: service_healthy
       migrate:
         condition: service_completed_successfully

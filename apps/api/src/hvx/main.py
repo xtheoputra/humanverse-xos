@@ -26,6 +26,7 @@ from hvx.modules import (
     habits,
     identity,
     journal,
+    memory,
     platform,
     profile,
 )
@@ -88,6 +89,9 @@ def create_app(settings: platform.Settings | None = None) -> FastAPI:
     # goal yang dihapus melepas habit yang menautnya, di transaksi hapus yang sama.
     app.state.pembaca_goal_hidup = goals.kunci_goal_hidup
     app.state.pendengar_goal_dihapus = (habits.lepas_goal,)
+    # Jurnal diubah/dihapus → memori episodiknya mengikuti, di transaksi yang sama
+    # (spec/07 3.6): kalimat yang dihapus pemiliknya tidak hidup terus di memori.
+    app.state.pendengar_jurnal_berubah = (memory.selaraskan_jurnal,)
     platform.pasang_penangan_galat(app)
     # Yang ditambahkan TERAKHIR paling luar: 429 batas laju tetap membawa
     # X-Request-ID dan tercatat di baris `request.completed`. Batas ukuran badan

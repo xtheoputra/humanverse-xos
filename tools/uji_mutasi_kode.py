@@ -3633,8 +3633,8 @@ MUTASI: list[Mutasi] = [
                 "        tugas: list[asyncio.Task[None]] = []",
             )
         ],
-        _pytest(f"{UJI_PEKERJA}::test_pekerja_menyalurkan_event_lalu_berhenti_bersih"),
-        harus_memuat="pekerja tidak menyalurkan event dalam 10 detik",
+        _pytest(f"{UJI_PEKERJA}::{_UJI_PEKERJA_PENUH}"),
+        harus_memuat="pekerja tidak menyalurkan event dalam 15 detik",
         kelompok="db",
     ),
     Mutasi(
@@ -3833,6 +3833,265 @@ MUTASI: list[Mutasi] = [
         ],
         _pytest(f"{UJI_JURNAL}::test_kueri_daftar_tidak_membaca_body_dari_basis_data"),
         harus_memuat="kueri daftar memilih body",
+        kelompok="db",
+    ),
+    # ── Sprint 3 · 3.6 ekstraksi memori dari jurnal & mood ──
+    Mutasi(
+        "3.6",
+        "memori ekstraksi tanpa event sumber",
+        [
+            Sunting(
+                f"{MODUL}/memory/ekstraksi.py",
+                "        source_event_id=ev.id,",
+                "        source_event_id=None,  # type: ignore[arg-type]",
+            )
+        ],
+        _pytest(
+            f"{UJI_MEMORI}::test_tiap_memori_punya_kind_scope_confidence_bukti_dan_event_sumber"
+        ),
+        harus_memuat="memori tanpa event sumber",
+        kelompok="db",
+    ),
+    Mutasi(
+        "3.6",
+        "keyakinan memori dibiarkan bawaan kolom (0.500)",
+        [
+            Sunting(
+                f"{MODUL}/memory/repository.py",
+                "scope, content, confidence, evidence_count,"
+                + NL
+                + "                          source_event_id, valid_from)"
+                + NL
+                + "    VALUES (:id, :user_id, :kind, :scope, :content, :confidence, :evidence_count,",
+                "scope, content, evidence_count,"
+                + NL
+                + "                          source_event_id, valid_from)"
+                + NL
+                + "    VALUES (:id, :user_id, :kind, :scope, :content, :evidence_count,",
+            )
+        ],
+        _pytest(
+            f"{UJI_MEMORI}::test_tiap_memori_punya_kind_scope_confidence_bukti_dan_event_sumber"
+        ),
+        harus_memuat="Decimal('0.500')",
+        kelompok="db",
+    ),
+    Mutasi(
+        "3.6",
+        "id memori tidak deterministik — event yang diserahkan lagi menggandakan memori",
+        [
+            Sunting(
+                f"{MODUL}/memory/ekstraksi.py",
+                'return uuid5(_RUANG_ID_MEMORI, f"{event_type}:{subjek_id}:{kind}")',
+                'return uuid5(_RUANG_ID_MEMORI, f"{event_type}:{subjek_id}:{kind}:'
+                "{__import__('os').urandom(8).hex()}\")",
+            )
+        ],
+        _pytest(f"{UJI_MEMORI}::test_event_yang_diserahkan_lagi_tidak_menggandakan_memori"),
+        harus_memuat="memori ganda untuk satu event",
+        kelompok="db",
+    ),
+    Mutasi(
+        "3.6",
+        "ekstraksi membaca jurnal yang sudah dihapus",
+        [
+            Sunting(
+                f"{MODUL}/journal/repository.py",
+                "    WHERE id = :id AND deleted_at IS NULL" + NL + "    FOR SHARE",
+                "    WHERE id = :id" + NL + "    FOR SHARE",
+            )
+        ],
+        _pytest(f"{UJI_MEMORI}::test_jurnal_yang_dihapus_sebelum_diekstrak_tidak_diingat"),
+        harus_memuat="jurnal terhapus tetap diingat",
+        kelompok="db",
+    ),
+    Mutasi(
+        "3.6",
+        "ekstraksi tanpa kunci BAGI — PATCH serentak kalah, memori memuat isi lama",
+        [
+            Sunting(
+                f"{MODUL}/journal/repository.py",
+                "    WHERE id = :id AND deleted_at IS NULL" + NL + "    FOR SHARE" + NL,
+                "    WHERE id = :id AND deleted_at IS NULL" + NL,
+            )
+        ],
+        _pytest(f"{UJI_MEMORI}::test_sunting_jurnal_menunggu_ekstraksi_yang_sedang_membacanya"),
+        harus_memuat="PATCH tidak menunggu ekstraksi yang sedang membaca jurnal",
+        kelompok="db",
+    ),
+    Mutasi(
+        "3.6",
+        "hapus jurnal tidak memanggil pendengarnya — isi hidup terus di memori",
+        [
+            Sunting(
+                f"{MODUL}/journal/service.py",
+                "            raise _tidak_ditemukan()"
+                + NL
+                + "        for p in pendengar:"
+                + NL
+                + "            await p(conn, jurnal_id)"
+                + NL,
+                "            raise _tidak_ditemukan()" + NL,
+            )
+        ],
+        _pytest(f"{UJI_MEMORI}::test_jurnal_dihapus_isi_memori_hilang_seketika_lalu_titiknya"),
+        harus_memuat="isi jurnal terhapus tetap di memori sampai penyelaras lewat",
+        kelompok="db",
+    ),
+    Mutasi(
+        "3.6",
+        "sunting jurnal tidak memanggil pendengarnya — memori memuat isi lama",
+        [
+            Sunting(
+                f"{MODUL}/journal/service.py",
+                "            if jurnal is not None:"
+                + NL
+                + "                for p in pendengar:"
+                + NL
+                + "                    await p(conn, jurnal_id)"
+                + NL,
+                "",
+            )
+        ],
+        _pytest(f"{UJI_MEMORI}::test_jurnal_disunting_memori_dan_vektornya_mengikuti"),
+        harus_memuat="assert 'bertengkar dengan atasan' == 'berdamai dengan atasan'",
+        kelompok="db",
+    ),
+    Mutasi(
+        "3.6",
+        "titik rakit tidak memasang pendengar jurnal",
+        [
+            Sunting(
+                "apps/api/src/hvx/main.py",
+                "    app.state.pendengar_jurnal_berubah = (memory.selaraskan_jurnal,)",
+                "    app.state.pendengar_jurnal_berubah = ()",
+            )
+        ],
+        _pytest("tests/unit/test_main.py::test_titik_rakit_memasang_pembaca_lintas_modul"),
+        harus_memuat="sunting & hapus jurnal tidak menyelaraskan memorinya",
+    ),
+    Mutasi(
+        "3.6",
+        "pekerja tidak merakit konsumen memori",
+        [
+            Sunting(
+                "apps/api/src/hvx/pekerja.py",
+                "            tangani=memory.ekstrak," + NL + "        )," + NL + "    ]",
+                "            tangani=memory.ekstrak," + NL + "        )," + NL + "    ][:0]",
+            )
+        ],
+        _pytest(f"{UJI_PEKERJA}::{_UJI_PEKERJA_PENUH}"),
+        harus_memuat="pekerja tidak mengekstrak memori dari mood",
+        kelompok="db",
+    ),
+    # ── Sprint 3 · 3.5 penyelaras memories → Qdrant ──
+    Mutasi(
+        "3.5",
+        "pekerja tidak menyalakan penyelaras vektor",
+        [Sunting("apps/api/src/hvx/pekerja.py", "        if penyelaras:", "        if False:")],
+        _pytest(f"{UJI_PEKERJA}::{_UJI_PEKERJA_PENUH}"),
+        harus_memuat="pekerja tidak menyemat memori ke Qdrant",
+        kelompok="db",
+    ),
+    Mutasi(
+        "3.5",
+        "sunting isi tidak menandai vektornya basi",
+        [
+            Sunting(
+                f"{MODUL}/memory/repository.py",
+                "      model_version = CASE WHEN content IS DISTINCT FROM :content THEN NULL"
+                + NL
+                + "                           ELSE model_version END",
+                "      model_version = model_version",
+            )
+        ],
+        _pytest(f"{UJI_MEMORI}::test_jurnal_disunting_memori_dan_vektornya_mengikuti"),
+        harus_memuat="isi berubah, vektor lama dianggap masih cocok",
+        kelompok="db",
+    ),
+    Mutasi(
+        "3.5",
+        "penyelaras membuang baris tanpa membuang titiknya",
+        [
+            Sunting(
+                f"{MODUL}/memory/penyelaras.py",
+                "            await self._vektor.hapus(self._koleksi, buang)" + NL,
+                "",
+            )
+        ],
+        _pytest(f"{UJI_MEMORI}::test_jurnal_dihapus_isi_memori_hilang_seketika_lalu_titiknya"),
+        harus_memuat="titik vektornya tertinggal",
+        kelompok="db",
+    ),
+    Mutasi(
+        "3.5",
+        "hapus jurnal tidak mengosongkan isi memorinya",
+        [
+            Sunting(
+                f"{MODUL}/memory/repository.py",
+                "    UPDATE memories SET content = '', summary = NULL, deleted_at = now()",
+                "    UPDATE memories SET summary = NULL, deleted_at = now()",
+            )
+        ],
+        _pytest(f"{UJI_MEMORI}::test_jurnal_dihapus_isi_memori_hilang_seketika_lalu_titiknya"),
+        harus_memuat="isi jurnal terhapus tetap di memori sampai penyelaras lewat",
+        kelompok="db",
+    ),
+    Mutasi(
+        "3.5",
+        "payload titik Qdrant memuat isi memori",
+        [
+            Sunting(
+                f"{MODUL}/memory/penyelaras.py",
+                '                            "model": self._penyemat.nama,',
+                '                            "model": self._penyemat.nama,'
+                + NL
+                + '                            "content": b.content,',
+            )
+        ],
+        _pytest(f"{UJI_MEMORI}::test_penyelaras_menyemat_tanpa_isi_di_payload"),
+        harus_memuat="payload Qdrant memuat lebih dari rujukan",
+        kelompok="db",
+    ),
+    Mutasi(
+        "3.5",
+        "memori penyemat lain tidak disemat ulang (spec/01 DAN migrasi)",
+        [
+            Sunting(
+                "spec/01-DATABASE-SCHEMA.md",
+                "    WHERE m.deleted_at IS NOT NULL OR m.model_version IS DISTINCT FROM p_model",
+                "    WHERE m.deleted_at IS NOT NULL OR m.model_version IS NULL",
+            ),
+            Sunting(
+                f"{MIGRASI}/0006_penyelaras_memori.up.sql",
+                "    WHERE m.deleted_at IS NOT NULL OR m.model_version IS DISTINCT FROM p_model",
+                "    WHERE m.deleted_at IS NOT NULL OR m.model_version IS NULL",
+            ),
+        ],
+        _pytest(f"{UJI_MEMORI}::test_penyemat_lain_disemat_ulang_bukan_dicampur"),
+        harus_memuat="memori penyemat lama tidak disemat ulang",
+        kelompok="db",
+    ),
+    Mutasi(
+        "3.5",
+        "EXECUTE penyelaras memori tidak dicabut dari PUBLIC (spec/01 DAN migrasi)",
+        [
+            Sunting(
+                "spec/01-DATABASE-SCHEMA.md",
+                "REVOKE ALL ON FUNCTION memori_perlu_diselaraskan(text, integer) FROM PUBLIC;" + NL,
+                "",
+            ),
+            Sunting(
+                f"{MIGRASI}/0006_penyelaras_memori.up.sql",
+                "REVOKE ALL ON FUNCTION memori_perlu_diselaraskan(text, integer) FROM PUBLIC;" + NL,
+                "",
+            ),
+        ],
+        _pytest(
+            "tests/integration/test_kepemilikan_data.py"
+            "::test_fungsi_security_definer_hanya_daftar_izin_terpatok_dan_bukan_untuk_public"
+        ),
+        harus_memuat="memori_perlu_diselaraskan",
         kelompok="db",
     ),
 ]

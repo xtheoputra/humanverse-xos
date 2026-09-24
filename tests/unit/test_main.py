@@ -44,7 +44,7 @@ def test_titik_rakit_memasang_pembaca_lintas_modul() -> None:
     Rute rentetan MENOLAK berjalan tanpa pembaca ini (bukan jatuh ke UTC diam-diam),
     jadi titik rakit yang lupa memasangnya akan terlihat di sini dulu.
     """
-    from hvx.modules import checkins, goals, habits, profile
+    from hvx.modules import checkins, goals, habits, memory, profile
 
     app = _app("test")
     assert getattr(app.state, "pembaca_zona_waktu", None) is profile.zona_waktu, (
@@ -59,4 +59,8 @@ def test_titik_rakit_memasang_pembaca_lintas_modul() -> None:
     )
     assert habits.lepas_goal in getattr(app.state, "pendengar_goal_dihapus", ()), (
         "hapus goal tidak melepas habit yang menautnya"
+    )
+    # spec/07 3.6: jurnal diubah/dihapus → memori episodiknya mengikuti.
+    assert memory.selaraskan_jurnal in getattr(app.state, "pendengar_jurnal_berubah", ()), (
+        "sunting & hapus jurnal tidak menyelaraskan memorinya"
     )

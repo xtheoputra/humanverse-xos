@@ -51,7 +51,7 @@ from .idempotensi import (
     PembacaUlang,
     idempotensi,
 )
-from .keadaan import engine_dari, redis_dari, settings_dari, sidik_ip
+from .keadaan import engine_dari, nama_hos, redis_dari, settings_dari, sidik_ip
 from .log import RequestContextMiddleware, ikat_pengguna, konfigurasi_log
 from .masukan import (
     PENJAGA_KETAT,
@@ -136,6 +136,7 @@ __all__ = [
     "konfigurasi_log",
     "kursor_waktu",
     "laporan_kesehatan",
+    "nama_hos",
     "nama_zona_sah",
     "pasang_penangan_galat",
     "pastikan_peran_aplikasi",
