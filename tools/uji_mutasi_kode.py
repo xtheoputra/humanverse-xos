@@ -291,6 +291,9 @@ UJI_AKTIVITAS = "tests/integration/test_aktivitas.py"
 UJI_PEKERJA = "tests/integration/test_pekerja.py"
 _UJI_PEKERJA_PENUH = "test_pekerja_menyalurkan_mengekstrak_dan_menyemat_lalu_berhenti_bersih"
 UJI_TERBIT = "tests/integration/test_penerbitan_event.py"
+UJI_NIAT = "tests/unit/test_niat.py"
+UJI_GERBANG_MODEL = "tests/unit/test_gerbang_model.py"
+UJI_RUTE = "tests/integration/test_rute_model.py"
 FK_MILESTONE = (
     "  FOREIGN KEY (goal_id, user_id) REFERENCES goals (id, user_id) ON DELETE CASCADE" + NL + ");"
 )
@@ -5372,6 +5375,132 @@ MUTASI: list[Mutasi] = [
             "test_pemulihan_membuang_bytecode_berkas_yang_dimutasi"
         ),
         harus_memuat="bytecode berkas yang dimutasi tertinggal",
+    ),
+    # ── Sprint 4 · 4.1 AI Gateway + Model Router — "catat mood" tanpa model ──
+    Mutasi(
+        "4.1",
+        "catat mood dirutekan ke model — INSERT lewat inferensi",
+        [
+            Sunting(
+                f"{MODUL}/agents/niat.py",
+                '            return Niat("deterministic", "catat_mood", mood)',
+                '            return Niat("simple", "catat_mood", mood)',
+            )
+        ],
+        _pytest(f"{UJI_NIAT}::test_perintah_mood_dirutekan_deterministik_tanpa_model"),
+        harus_memuat="dirutekan ke model simple",
+    ),
+    Mutasi(
+        "4.1",
+        "perintah di tengah kalimat dijalankan — teks yang tidak dimaksudkan bertindak",
+        [
+            Sunting(
+                f"{MODUL}/agents/niat.py",
+                '    r"^\\s*(?:(?:catat|log|simpan|isi)\\s+)?mood',
+                '    r"\\s*(?:(?:catat|log|simpan|isi)\\s+)?mood',
+            ),
+            Sunting(
+                f"{MODUL}/agents/niat.py",
+                "    awalan = _AWALAN_MOOD.match(teks)",
+                "    awalan = _AWALAN_MOOD.search(teks)",
+            ),
+        ],
+        _pytest(f"{UJI_NIAT}::test_yang_bukan_perintah_tidak_dijalankan"),
+        harus_memuat="dijalankan sebagai perintah",
+    ),
+    Mutasi(
+        "4.1",
+        "valensi yang tidak utuh ditebak — “catat mood 34” menjadi 3",
+        [
+            Sunting(
+                f"{MODUL}/agents/niat.py",
+                'rf"^(?P<v>[1-5])(?:\\s*/\\s*5)?(?=\\s|{_PEMISAH}|$)"',
+                'rf"^(?P<v>[1-5])(?:\\s*/\\s*5)?"',
+            )
+        ],
+        _pytest(f"{UJI_NIAT}::test_perintah_mood_tanpa_valensi_utuh_dijawab_bukan_ditebak"),
+        harus_memuat="ditebak",
+    ),
+    Mutasi(
+        "4.1",
+        "Model Router tetap memakai model besar sesudah anggaran habis",
+        [
+            Sunting(
+                f"{MODUL}/platform/model.py",
+                '        return "simple" if anggaran_habis else kelas',
+                "        return kelas",
+            )
+        ],
+        _pytest(f"{UJI_GERBANG_MODEL}::test_model_router_turun_ke_model_kecil_saat_anggaran_habis"),
+        harus_memuat="anggaran habis, tetap model besar",
+    ),
+    Mutasi(
+        "4.1",
+        "penyedia lokal mengarang jawaban tanpa bahan (Pasal 8)",
+        [
+            Sunting(
+                f"{MODUL}/platform/model.py",
+                "            teks = TANPA_DATA",
+                '            teks = "Kamu baik-baik saja minggu ini."',
+            )
+        ],
+        _pytest(f"{UJI_GERBANG_MODEL}::test_tanpa_bahan_tidak_mengarang"),
+        harus_memuat="jawaban tanpa bahan",
+    ),
+    Mutasi(
+        "4.1",
+        "model berbayar tanpa harga diterima — biayanya tidak bisa dibatasi",
+        [
+            Sunting(
+                f"{MODUL}/platform/model.py",
+                "            if model not in self._harga and nama_penyedia != PenyediaLokal.nama:",
+                "            if False:",
+            )
+        ],
+        _pytest(f"{UJI_GERBANG_MODEL}::test_model_berbayar_tanpa_harga_ditolak_saat_dirakit"),
+        harus_memuat="DID NOT RAISE",
+    ),
+    Mutasi(
+        "4.1",
+        "biaya tanpa token keluar — anggaran meremehkan jawaban panjang",
+        [
+            Sunting(
+                f"{MODUL}/platform/model.py",
+                "        mentah = (Decimal(token_masuk) * self.masuk + Decimal(token_keluar) * self.keluar) / (",
+                "        mentah = (Decimal(token_masuk) * self.masuk) / (",
+            )
+        ],
+        _pytest(f"{UJI_GERBANG_MODEL}::test_kelas_menentukan_model_dan_jejaknya_lengkap"),
+        harus_memuat="tarif × token masuk & keluar",
+    ),
+    Mutasi(
+        "4.1",
+        "harga model negatif diterima",
+        [
+            Sunting(
+                f"{MODUL}/platform/config.py",
+                "            if masuk < 0 or keluar < 0 or not (masuk.is_finite() and keluar.is_finite()):",
+                "            if not (masuk.is_finite() and keluar.is_finite()):",
+            )
+        ],
+        _pytest(
+            "tests/unit/test_config.py::test_harga_model_dibaca_dari_json_dan_yang_salah_ditolak"
+        ),
+        harus_memuat="DID NOT RAISE",
+    ),
+    Mutasi(
+        "4.1",
+        "pesan yang dikirim ulang mencatat mood kedua",
+        [
+            Sunting(
+                f"{MODUL}/agents/deterministik.py",
+                "            id=mood_id, valence=niat.mood.valensi,",
+                "            id=None, valence=niat.mood.valensi,",
+            )
+        ],
+        _pytest(f"{UJI_RUTE}::test_pesan_yang_dikirim_ulang_tidak_mencatat_mood_dua_kali"),
+        harus_memuat="kiriman ulang mencatat mood dua kali",
+        kelompok="db",
     ),
     # ── alat ini sendiri: mutasi yang menggantung dihentikan beserta turunannya ──
     Mutasi(

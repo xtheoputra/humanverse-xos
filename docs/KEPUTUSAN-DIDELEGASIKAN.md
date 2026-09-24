@@ -571,6 +571,20 @@ sesudahnya.
 
 ---
 
+## K-28 · AI Gateway V0: rute tanpa model untuk perintah, penyedia lokal untuk sisanya
+
+> Diputuskan 24 September 2026, saat Sprint 4 tugas 4.1 ditulis.
+
+| | |
+|---|---|
+| **Keputusan** | **(1)** Tiga rute, diputuskan pengenal niat **berbentuk aturan** sebelum model mana pun disentuh (`agents/niat.py`): **`deterministic`** — perintah berbentuk tetap dijalankan layanan biasa tanpa model (V0: *“catat mood 3 cemas”* → `checkins.catat_mood`, dengan `mood.logged`-nya); **`reasoning`** — permintaan analisis (pola · kenapa · evaluasi · rencana) atau pesan ≥ 40 kata; **`simple`** — selainnya. **(2)** Satu gerbang model di `platform` (`GerbangModel`, B-2): kelas → model `penyedia/nama` (`HVX_MODEL_SIMPLE` · `HVX_MODEL_REASONING`) → penyedia; tiap panggilan membawa pulang model · token masuk & keluar · latensi · **biaya** dari tabel harga `HVX_MODEL_HARGA` (USD per sejuta token). Model di luar penyedia `lokal` **tanpa harga ditolak** saat gerbang dirakit. **(3)** Penyedia V0 = **`lokal`**: tanpa jaringan, tanpa bobot model, deterministik — ia merangkai `bahan` (kalimat fakta yang disiapkan agent sesudah gerbang izin) dan **tidak menambah satu fakta pun**; tanpa bahan ia menjawab *belum ada data* (arch/08 Pasal 8). Token = kata, biaya 0 kecuali diberi harga. |
+| **Bukti** | Naskah 5 §22 (`docs/92`): *“Catat mood saya” → cheap model / **deterministic*** — *mencatat mood adalah `INSERT`, bukan inferensi*; naskah 4 §48–§49: *jangan memakai model paling mahal untuk semua hal*. Penyedia LLM **milik pemilik** — tarif & bagi hasil, dan ke mana data pengguna boleh dikirim ([`../arch/05`](../arch/05-TECHNOLOGY-STACK.md) §6, A-6/[#18](../../issues/18), butir C). CI tanpa tagihan (**H-26**): uji tidak boleh memanggil layanan berbayar. |
+| **Bacaan yang DITOLAK** | **(a)** *“Pasang API model berbayar sekarang, kuncinya menyusul”* — ditolak: memilih penyedia = memilih tarif **dan** mengirim isi percakapan pengguna ke pihak ketiga; keduanya bukan milik agent. **(b)** *“Model bobot-terbuka lokal (llama.cpp dsb.)”* — ditolak untuk V0: ratusan MB–GB bobot di citra, GPU/CPU di CI, dan tetap memutuskan model mana yang menjawab pengguna — alasan yang sama dengan K-26 (a). **(c)** *“Pengenal niat memakai model kecil”* — ditolak: memanggil model untuk memutuskan apakah perlu model menggagalkan tujuan rute itu (biaya, latensi), dan pengenal aturan bisa diuji kalimat demi kalimat. **(d)** *“Penyedia lokal mengarang jawaban bertemplat yang terdengar cerdas”* — ditolak: jawaban tanpa sumber adalah pelanggaran Pasal 8 yang sama persis dengan model yang berhalusinasi. |
+| **Harga yang diakui** | ⚠️ **V0 tidak menalar.** Jawaban *reasoning* adalah daftar fakta yang dikumpulkan agent, bukan analisis bahasa; yang nyata adalah jalurnya — rute, pilihan model, token, biaya, aliran token — supaya penyedia sungguhan kelak masuk tanpa mengubah satu agent pun. Pengenal aturan salah menilai sebagian kalimat; salahnya diarahkan ke sisi yang murah (`simple`), dan `deterministic` hanya untuk perintah yang diawali kata perintahnya dengan valensi yang utuh. |
+| **Cara membalikkan** | Penyedia baru: kelas di `platform/model.py` dengan `nama` = awalan id model, dipasang `gerbang_model_dari`; `HVX_MODEL_*` + `HVX_MODEL_HARGA`. Rute: `agents/niat.py`; `tests/unit/test_niat.py` diubah bersamanya. |
+
+---
+
 ## Yang sengaja **tidak** saya putuskan
 
 | Butir | Kenapa |

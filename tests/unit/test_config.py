@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from decimal import Decimal
+
 import pytest
 from pydantic import ValidationError
 
@@ -148,3 +150,23 @@ def test_qdrant_tanpa_kunci_penyemat_ditolak_saat_mulai(monkeypatch: pytest.Monk
 
     monkeypatch.setenv("HVX_SEMATAN_KEY", "s" * 32)
     assert Settings().qdrant_url == "http://qdrant:6333"
+
+
+def test_harga_model_dibaca_dari_json_dan_yang_salah_ditolak(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """spec/07 4.1 · K-28 — harga per sejuta token (masuk, keluar); gerbang model
+    menghitung biaya tiap panggilan dari sini (4.9)."""
+    _isi(monkeypatch)
+    monkeypatch.setenv("HVX_MODEL_HARGA", '{"lokal/hvx-nalar-v1": [3, 15.5]}')
+
+    assert Settings().model_harga == {"lokal/hvx-nalar-v1": (Decimal(3), Decimal("15.5"))}
+
+    for salah in ('{"lokal/hvx-nalar-v1": [-1, 0]}', '{"tanpa-penyedia": [1, 1]}'):
+        monkeypatch.setenv("HVX_MODEL_HARGA", salah)
+        with pytest.raises(ValidationError, match="HVX_MODEL_HARGA"):
+            Settings()
+    monkeypatch.delenv("HVX_MODEL_HARGA")
+    monkeypatch.setenv("HVX_MODEL_REASONING", "Bukan Id Model")
+    with pytest.raises(ValidationError, match="model_reasoning"):
+        Settings()

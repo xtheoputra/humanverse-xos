@@ -39,6 +39,9 @@ uv run --locked python -m hvx.pekerja
 | `HVX_QDRANT_API_KEY` | | kosong — kunci API Qdrant (wajib di luar D0 lokal) |
 | `HVX_QDRANT_KOLEKSI` | | `memories` — nama koleksi (uji memakai koleksi sekali pakai) |
 | `HVX_SEMATAN_KEY` | bila Qdrant | ≥ 32 karakter — kunci penyemat lokal (**K-26**), diturunkan per pengguna. Tanpa kunci, vektor di Qdrant bisa **dibalik menjadi kata** isi jurnal; menggantinya = seluruh memori disemat ulang |
+| `HVX_MODEL_SIMPLE` | | `lokal/hvx-ringkas-v1` — model kelas *simple* (**K-28**), `penyedia/nama`. V0 hanya penyedia `lokal`: tanpa jaringan, tanpa biaya, merangkai fakta yang disiapkan agent |
+| `HVX_MODEL_REASONING` | | `lokal/hvx-nalar-v1` — model kelas *reasoning* (**K-28**). Perintah berbentuk tetap (*“catat mood 3”*) tidak memanggil model mana pun |
+| `HVX_MODEL_HARGA` | | `{}` — JSON `{"penyedia/nama": [masuk, keluar]}`, USD per sejuta token. Model di luar penyedia `lokal` **tanpa harga ditolak saat mulai**: biaya yang tak terhitung tak bisa dibatasi (4.9) |
 
 Rute yang ada — kontraknya [`spec/04`](../../spec/04-API-CONTRACTS.md):
 
