@@ -100,6 +100,21 @@ async def test_bawaan_pemanggil_hanya_untuk_yang_tanpa_keputusan_tersimpan(izin:
     assert await izin.mesin.cek(uid, COACH, "mood", "read", bawaan="allow") == "allow"
 
 
+async def test_scope_sensitif_tidak_pernah_allow_karena_bawaan(izin: Izin) -> None:
+    """E-180 · naskah 5 §15 — jurnal mentah *“tidak boleh otomatis”*: hanya `allow` yang
+    DISIMPAN pengguna sendiri membukanya, bukan bawaan risk 0 gerbang risiko."""
+    uid = izin.pengguna_baru()
+
+    for _ in range(2):  # yang kedua dari cache "tanpa keputusan"
+        assert await izin.mesin.cek(uid, COACH, "journal_raw", "read", bawaan="allow") == "ask", (
+            "journal_raw terbuka karena bawaan"
+        )
+    assert await izin.mesin.cek(uid, COACH, "mood", "read", bawaan="allow") == "allow"
+
+    await izin.mesin.tetapkan(uid, COACH, "journal_raw", "read", "allow")
+    assert await izin.mesin.cek(uid, COACH, "journal_raw", "read", bawaan="allow") == "allow"
+
+
 async def test_perubahan_izin_tidak_tersimpan_tanpa_jejak_audit(
     izin: Izin, monkeypatch: pytest.MonkeyPatch
 ) -> None:

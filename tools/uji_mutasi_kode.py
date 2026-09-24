@@ -4094,6 +4094,148 @@ MUTASI: list[Mutasi] = [
         harus_memuat="memori_perlu_diselaraskan",
         kelompok="db",
     ),
+    # ── Sprint 3 · 3.7 pencarian memori — agent tanpa izin scope tidak menerima barisnya ──
+    Mutasi(
+        "3.7",
+        "pencarian mengabaikan keputusan pengguna",
+        [
+            Sunting(
+                f"{MODUL}/memory/pencarian.py",
+                '            keputusan = await self._izin.cek(user_id, subjek, scope, "read", bawaan=_BAWAAN_RISK_0)',
+                '            keputusan = "allow"',
+            )
+        ],
+        _pytest(f"{UJI_MEMORI}::test_agent_tanpa_izin_scope_tidak_menerima_barisnya"),
+        harus_memuat="journal_raw terbuka tanpa izin",
+        kelompok="db",
+    ),
+    Mutasi(
+        "3.7",
+        "manifest tidak membatasi — semua scope resmi dicari",
+        [
+            Sunting(
+                f"{MODUL}/memory/pencarian.py",
+                "        for scope in sorted(diminta):",
+                "        for scope in sorted(identity.SCOPE_RESMI):",
+            )
+        ],
+        _pytest(f"{UJI_MEMORI}::test_agent_tanpa_izin_scope_tidak_menerima_barisnya"),
+        harus_memuat="izin pengguna melebarkan manifest",
+        kelompok="db",
+    ),
+    Mutasi(
+        "3.7",
+        "scope tidak diperiksa ulang di baris PostgreSQL — payload Qdrant basi menang",
+        [
+            Sunting(
+                f"{MODUL}/memory/repository.py",
+                "      AND scope = ANY(CAST(:scope AS text[]))" + NL,
+                "",
+            )
+        ],
+        _pytest(f"{UJI_MEMORI}::test_payload_qdrant_basi_tidak_meloloskan_scope"),
+        harus_memuat="scope di payload Qdrant menang atas scope di baris",
+        kelompok="db",
+    ),
+    Mutasi(
+        "3.7",
+        "memori terhapus diserahkan selama titiknya masih di Qdrant",
+        [
+            Sunting(
+                f"{MODUL}/memory/repository.py",
+                "    WHERE id = ANY(CAST(:ids AS uuid[])) AND deleted_at IS NULL"
+                + NL
+                + "      AND scope",
+                "    WHERE id = ANY(CAST(:ids AS uuid[]))" + NL + "      AND scope",
+            )
+        ],
+        _pytest(f"{UJI_MEMORI}::test_jurnal_dihapus_isi_memori_hilang_seketika_lalu_titiknya"),
+        harus_memuat="memori terhapus diserahkan karena titiknya masih ada",
+        kelompok="db",
+    ),
+    Mutasi(
+        "3.7",
+        "kueri tanpa kata tetap menanyai Qdrant",
+        [
+            Sunting(
+                f"{MODUL}/memory/pencarian.py", "        if not any(vektor):", "        if False:"
+            )
+        ],
+        _pytest(f"{UJI_MEMORI}::test_kueri_tanpa_kata_tidak_menanyai_qdrant"),
+        harus_memuat="Qdrant ditanya padahal jawabannya sudah pasti kosong",
+        kelompok="db",
+    ),
+    Mutasi(
+        "3.7",
+        "kandidat berskor 0 diserahkan sebagai kecocokan",
+        [
+            Sunting(
+                f"{MODUL}/memory/pencarian.py",
+                "            if k.skor > 0  # kosinus ≤ 0 bukan kemiripan",
+                "            if True",
+            )
+        ],
+        _pytest(f"{UJI_MEMORI}::test_kandidat_berskor_nol_bukan_kecocokan"),
+        harus_memuat="kandidat berskor 0 diserahkan sebagai kecocokan",
+        kelompok="db",
+    ),
+    Mutasi(
+        "3.7",
+        "pencarian tidak menolak scope di luar daftar resmi sendiri",
+        [Sunting(f"{MODUL}/memory/pencarian.py", "        if asing:", "        if False:")],
+        _pytest(
+            f"{UJI_MEMORI}::test_permintaan_yang_salah_bentuk_ditolak[manifest0-rapat-5-daftar resmi]"
+        ),
+        harus_memuat="Regex pattern did not match",
+        kelompok="db",
+    ),
+    Mutasi(
+        "3.7",
+        "batas hasil tidak dijaga",
+        [
+            Sunting(
+                f"{MODUL}/memory/pencarian.py",
+                "not 1 <= batas <= MAKS_HASIL:",
+                "not 0 <= batas <= MAKS_HASIL + 1_000:",
+            )
+        ],
+        _pytest(
+            f"{UJI_MEMORI}::test_permintaan_yang_salah_bentuk_ditolak[manifest2-rapat-0-batas]"
+        ),
+        harus_memuat="Qdrant ditanya padahal jawabannya sudah pasti kosong",
+        kelompok="db",
+    ),
+    Mutasi(
+        "3.7",
+        "scope sensitif terbuka karena bawaan risk 0",
+        [
+            Sunting(
+                f"{MODUL}/identity/izin.py",
+                '        if bawaan == "allow" and SCOPE_RESMI[scope].sensitif:',
+                "        if False:",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_izin.py::test_scope_sensitif_tidak_pernah_allow_karena_bawaan"
+        ),
+        harus_memuat="journal_raw terbuka karena bawaan",
+        kelompok="db",
+    ),
+    Mutasi(
+        "3.7",
+        "mesin izin menerima scope di luar daftar resmi",
+        [
+            Sunting(
+                f"{MODUL}/identity/izin.py",
+                "    if scope not in SCOPE_RESMI:",
+                "    if False:",
+            )
+        ],
+        _pytest(
+            "tests/unit/test_izin_masukan.py::test_scope_dan_aksi_tak_dikenal_ditolak[habit-read]"
+        ),
+        harus_memuat="disentuh sebelum masukan divalidasi",
+    ),
 ]
 
 

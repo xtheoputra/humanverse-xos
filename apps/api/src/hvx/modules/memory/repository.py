@@ -15,6 +15,7 @@ Tiga kolom yang menyelaraskan memori dengan Qdrant (spec/01 §12, fungsi ke-3):
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
@@ -36,6 +37,19 @@ _SISIP = text(
     ON CONFLICT (id) DO NOTHING
     RETURNING id, kind, scope, content, summary, confidence, evidence_count, model_version,
            source_event_id, valid_from, valid_until, created_at
+    """
+)
+
+# Baris yang boleh diserahkan pencarian: hidup, masih berlaku, dan scope-nya masih
+# diizinkan MENURUT POSTGRESQL — payload Qdrant bisa basi, baris ini tidak.
+_HIDUP_MENURUT_ID = text(
+    """
+    SELECT id, kind, scope, content, summary, confidence, evidence_count, model_version,
+           source_event_id, valid_from, valid_until, created_at
+    FROM memories
+    WHERE id = ANY(CAST(:ids AS uuid[])) AND deleted_at IS NULL
+      AND scope = ANY(CAST(:scope AS text[]))
+      AND (valid_until IS NULL OR valid_until > now())
     """
 )
 
@@ -139,6 +153,13 @@ async def sisip(
         .first()
     )
     return _memori(baris) if baris else None
+
+
+async def hidup_menurut_id(
+    conn: AsyncConnection, ids: Iterable[UUID], scope: Iterable[str]
+) -> dict[UUID, Memori]:
+    hasil = await conn.execute(_HIDUP_MENURUT_ID, {"ids": list(ids), "scope": list(scope)})
+    return {b["id"]: _memori(b) for b in hasil.mappings()}
 
 
 async def ganti_isi(conn: AsyncConnection, id_: UUID, content: str, valid_from: datetime) -> None:

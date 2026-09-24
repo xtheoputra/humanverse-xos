@@ -8,7 +8,7 @@ from typing import Any
 
 import pytest
 
-from hvx.modules.identity import IzinTidakSah, MesinIzin, Subjek
+from hvx.modules.identity import SCOPE_RESMI, IzinTidakSah, MesinIzin, Subjek
 
 
 class _TidakBolehDisentuh:
@@ -44,13 +44,28 @@ def test_subjek_berbentuk_salah_ditolak(tipe: Any, id_: Any) -> None:
 
 @pytest.mark.parametrize(
     ("scope", "aksi"),
-    [("Habits", "read"), ("habits:x", "read"), ("", "read"), ("habits", "destroy")],
+    [
+        ("Habits", "read"),
+        ("habits:x", "read"),
+        ("", "read"),
+        ("habits", "destroy"),
+        ("habit", "read"),  # salah ketik: berbentuk sah, tetapi bukan scope resmi (E-180)
+    ],
 )
 async def test_scope_dan_aksi_tak_dikenal_ditolak(scope: Any, aksi: Any) -> None:
     with pytest.raises(IzinTidakSah):
         await MESIN.cek(UID, COACH, scope, aksi)
     with pytest.raises(IzinTidakSah):
         await MESIN.tetapkan(UID, COACH, scope, aksi, "allow")
+
+
+def test_tiap_scope_resmi_lolos_pola_kunci_cache() -> None:
+    """Kunci cache izin disusun dari scope — daftar resmi tidak boleh memuat `:`."""
+    from hvx.modules.identity.izin import _POLA_SCOPE
+
+    assert SCOPE_RESMI, "daftar scope resmi kosong"
+    assert [s for s in SCOPE_RESMI if not _POLA_SCOPE.fullmatch(s)] == []
+    assert SCOPE_RESMI["journal_raw"].sensitif, "jurnal mentah bukan scope sensitif"
 
 
 async def test_user_id_bukan_uuid_ditolak() -> None:
