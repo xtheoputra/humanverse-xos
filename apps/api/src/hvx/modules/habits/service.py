@@ -7,10 +7,18 @@
   tidak boleh membaca tabel `goals` (spec/06 aturan 5), jadi goal yang tidak
   ada — atau milik pengguna lain — dikenali dari penolakan basis data.
 * Hapus = hapus-lunak (spec/01 `deleted_at`); penyelesaiannya tetap tersimpan.
+* **2.3** penyelesaian idempoten per tanggal: kirim ulang `for_date` yang sama
+  → `200` dengan baris yang sudah ada, bukan baris kedua dan bukan `409`
+  (spec/04). `for_date` adalah tanggal LOKAL perangkat (spec/01) — ditolak
+  hanya bila belum terjadi di tempat mana pun di Bumi
+  (`platform.tanggal_paling_maju`), sebab perangkat yang sedang bepergian bisa
+  berada di zona lain dari `profiles.timezone`.
 """
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+from datetime import date
 from typing import Any
 from uuid import UUID
 
@@ -20,7 +28,16 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 from hvx.modules import platform
 
 from . import repository
-from .schemas import BuatHabit, DaftarHabit, Habit, UbahHabit, periksa_jadwal, periksa_target
+from .schemas import (
+    BuatHabit,
+    CatatPenyelesaian,
+    DaftarHabit,
+    Habit,
+    Penyelesaian,
+    UbahHabit,
+    periksa_jadwal,
+    periksa_target,
+)
 
 
 def _tidak_ditemukan() -> platform.GalatApi:
@@ -107,3 +124,52 @@ async def hapus(engine: AsyncEngine, user_id: UUID, habit_id: UUID) -> None:
     async with platform.transaksi_pengguna(engine, user_id) as conn:
         if not await repository.hapus(conn, habit_id):
             raise _tidak_ditemukan()
+
+
+# ── spec/07 2.3 — penyelesaian ───────────────────────────────────────────────
+
+
+@dataclass(frozen=True)
+class HasilCatat:
+    penyelesaian: Penyelesaian
+    baru: bool  # False = tanggal itu sudah tercatat; baris lama yang dikembalikan
+
+
+async def catat(
+    engine: AsyncEngine, user_id: UUID, habit_id: UUID, badan: CatatPenyelesaian
+) -> HasilCatat:
+    async with platform.transaksi_pengguna(engine, user_id) as conn:
+        habit = await repository.ambil_untuk_catat(conn, habit_id)
+        if habit is None:
+            raise _tidak_ditemukan()
+        if badan.tier_used is not None and badan.tier_used >= len(habit.adaptive_tiers):
+            raise platform.GalatApi(
+                422, "invalid_tier", "tier_used di luar adaptive_tiers habit ini."
+            )
+        if badan.for_date > await platform.tanggal_paling_maju(conn):
+            raise platform.GalatApi(
+                422, "for_date_in_future", "Tanggal itu belum terjadi di mana pun."
+            )
+        baru = await repository.sisip_selesai(
+            conn,
+            habit_id=habit_id,
+            for_date=badan.for_date,
+            status=badan.status,
+            tier_used=badan.tier_used,
+            note=badan.note,
+        )
+        if baru is not None:
+            return HasilCatat(baru, baru=True)
+        ada = await repository.selesai_pada(conn, habit_id, badan.for_date)
+    if ada is None:  # pragma: no cover - habit terkunci, dan DO NOTHING berarti barisnya ada
+        raise _tidak_ditemukan()
+    return HasilCatat(ada, baru=False)
+
+
+async def hapus_catatan(engine: AsyncEngine, user_id: UUID, habit_id: UUID, for_date: date) -> None:
+    """Idempoten: tanggal yang tidak tercatat tetap `204` — "batalkan" dari perangkat
+    luring yang terkirim dua kali tidak berubah menjadi galat."""
+    async with platform.transaksi_pengguna(engine, user_id) as conn:
+        if await repository.ambil_untuk_catat(conn, habit_id) is None:
+            raise _tidak_ditemukan()
+        await repository.hapus_selesai(conn, habit_id, for_date)

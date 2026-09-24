@@ -143,6 +143,7 @@ UJI_GOALS = "tests/integration/test_goals.py"
 UJI_IDEM = "tests/integration/test_idempotensi.py"
 UJI_IDEM_RUTE = "tests/unit/test_idempotensi_terpasang.py"
 UJI_HABITS = "tests/integration/test_habits.py"
+UJI_SELESAI = "tests/integration/test_penyelesaian.py"
 FK_MILESTONE = (
     "  FOREIGN KEY (goal_id, user_id) REFERENCES goals (id, user_id) ON DELETE CASCADE" + NL + ");"
 )
@@ -1775,6 +1776,63 @@ MUTASI: list[Mutasi] = [
         [Sunting(f"{MODUL}/habits/schemas.py", '{"day": 1, ', '{"day": 7, ')],
         _pytest(f"{UJI_HABITS}::test_habit_berbentuk_salah_ditolak_400"),
         harus_memuat="assert 201 == 400",
+        kelompok="db",
+    ),
+    # ── Sprint 2 · 2.3 habit_completions + idempotensi tanggal ───────────
+    Mutasi(
+        "2.3",
+        "INSERT penyelesaian tanpa ON CONFLICT — kirim ulang tanggal sama menjadi galat",
+        [
+            Sunting(
+                f"{MODUL}/habits/repository.py",
+                "    ON CONFLICT (habit_id, for_date) DO NOTHING" + NL,
+                "",
+            )
+        ],
+        _pytest(f"{UJI_SELESAI}::test_kirim_ulang_tanggal_sama_200_bukan_baris_kedua"),
+        harus_memuat="kirim ulang for_date yang sama bukan 200",
+        kelompok="db",
+    ),
+    Mutasi(
+        "2.3",
+        "tier_used tidak dicocokkan dengan adaptive_tiers habit",
+        [
+            Sunting(
+                f"{MODUL}/habits/service.py",
+                "        if badan.tier_used is not None and badan.tier_used >= len(habit.adaptive_tiers):",
+                "        if badan.tier_used is not None and badan.tier_used > 99:",
+            )
+        ],
+        _pytest(f"{UJI_SELESAI}::test_tier_di_luar_adaptive_tiers_ditolak_422"),
+        harus_memuat="tier di luar adaptive_tiers tersimpan",
+        kelompok="db",
+    ),
+    Mutasi(
+        "2.3",
+        "for_date masa depan tidak diperiksa",
+        [
+            Sunting(
+                f"{MODUL}/habits/service.py",
+                "        if badan.for_date > await platform.tanggal_paling_maju(conn):",
+                "        if badan.for_date > date.max:",
+            )
+        ],
+        _pytest(f"{UJI_SELESAI}::test_tanggal_yang_belum_terjadi_di_mana_pun_ditolak"),
+        harus_memuat="tanggal masa depan tersimpan",
+        kelompok="db",
+    ),
+    Mutasi(
+        "2.3",
+        "batas for_date memakai zona paling BELAKANG — hari ini di UTC+14 ditolak",
+        [
+            Sunting(
+                f"{MODUL}/habits/service.py",
+                "        if badan.for_date > await platform.tanggal_paling_maju(conn):",
+                '        if badan.for_date > await platform.hari_ini_di(conn, "Pacific/Pago_Pago"):',
+            )
+        ],
+        _pytest(f"{UJI_SELESAI}::test_tanggal_yang_belum_terjadi_di_mana_pun_ditolak"),
+        harus_memuat="tanggal hari ini di UTC+14 ditolak untuk pengguna UTC−11",
         kelompok="db",
     ),
 ]

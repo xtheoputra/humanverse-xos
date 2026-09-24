@@ -6,6 +6,7 @@ E-165) — dijaga `tests/unit/test_idempotensi_terpasang.py`.
 
 from __future__ import annotations
 
+from datetime import date
 from uuid import UUID
 
 from fastapi import APIRouter, Request, Response
@@ -14,7 +15,15 @@ from fastapi.responses import JSONResponse
 from hvx.modules import identity, platform
 
 from . import service
-from .schemas import BuatHabit, DaftarHabit, Habit, StatusHabit, UbahHabit
+from .schemas import (
+    BuatHabit,
+    CatatPenyelesaian,
+    DaftarHabit,
+    Habit,
+    Penyelesaian,
+    StatusHabit,
+    UbahHabit,
+)
 
 router = APIRouter(prefix="/v1", tags=["habits"])
 
@@ -62,4 +71,36 @@ async def hapus_habit(
     request: Request, habit_id: UUID, pengguna: identity.PenggunaDiperlukan
 ) -> Response:
     await service.hapus(platform.engine_dari(request), pengguna.user_id, habit_id)
+    return Response(status_code=204)
+
+
+@router.post(
+    "/habits/{habit_id}/completions",
+    status_code=201,
+    response_model=Penyelesaian,
+    responses={200: {"model": Penyelesaian, "description": "tanggal itu sudah tercatat"}},
+)
+async def catat_penyelesaian(
+    request: Request,
+    habit_id: UUID,
+    badan: CatatPenyelesaian,
+    pengguna: identity.PenggunaDiperlukan,
+    idem: platform.Idempoten,
+) -> JSONResponse:
+    async def kerja() -> platform.Jawaban:
+        hasil = await service.catat(
+            platform.engine_dari(request), pengguna.user_id, habit_id, badan
+        )
+        return platform.Jawaban(201 if hasil.baru else 200, hasil.penyelesaian)
+
+    return await idem.jalankan(pengguna.user_id, kerja)
+
+
+@router.delete(
+    "/habits/{habit_id}/completions/{for_date}", status_code=204, response_class=Response
+)
+async def hapus_penyelesaian(
+    request: Request, habit_id: UUID, for_date: date, pengguna: identity.PenggunaDiperlukan
+) -> Response:
+    await service.hapus_catatan(platform.engine_dari(request), pengguna.user_id, habit_id, for_date)
     return Response(status_code=204)

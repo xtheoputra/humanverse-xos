@@ -128,6 +128,15 @@ GET    /habits/{id}/streak       → { current, longest, completion_rate_30d }
 > `POST .../completions` memakai `UNIQUE (habit_id, for_date)`. Kirim ulang
 > tanggal yang sama mengembalikan **200 dengan baris yang sudah ada**, bukan
 > `409` — pencatatan habit dari perangkat luring harus selalu aman diulang.
+>
+> 🔧 **Ditegakkan 24 Sep 2026 (spec/07 2.3):** baris lama dikembalikan **apa
+> adanya** — ulangan tidak menimpa; mengganti status berarti `DELETE` lalu
+> `POST`. `DELETE …/completions/{for_date}` juga idempoten (`204` walau tanggal
+> itu tidak tercatat). `for_date` adalah tanggal lokal **perangkat**, jadi
+> batasnya bukan zona profil: tanggal ditolak (`422 for_date_in_future`) hanya
+> bila **belum terjadi di mana pun di Bumi** (UTC+14). `tier_used` wajib di
+> dalam `adaptive_tiers` habit itu (`422 invalid_tier`) dan tidak boleh
+> menyertai `skipped` (`400`).
 
 ---
 

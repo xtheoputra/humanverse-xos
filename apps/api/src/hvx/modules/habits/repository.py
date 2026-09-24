@@ -9,13 +9,14 @@ from __future__ import annotations
 
 import json
 from collections.abc import Mapping
+from datetime import date
 from typing import Any
 from uuid import UUID
 
 from sqlalchemy import RowMapping, text
 from sqlalchemy.ext.asyncio import AsyncConnection
 
-from .schemas import Habit
+from .schemas import Habit, Penyelesaian
 
 # Batas atas daftar habit — habit bukan aliran data; seribu habit aktif bukan
 # pemakaian yang V0 layani, dan jawaban tanpa batas bukan jawaban.
@@ -84,6 +85,47 @@ _UBAH = text(
 
 _HAPUS = text(
     "UPDATE habits SET deleted_at = now() WHERE id = :id AND deleted_at IS NULL RETURNING id"
+)
+
+# ── spec/07 2.3 — penyelesaian ───────────────────────────────────────────────
+
+# Habit dikunci BERBAGI selama penyelesaian dicatat: tier yang diperiksa tidak
+# bisa berubah (PATCH menunggu) sebelum penyelesaiannya tersimpan.
+_AMBIL_UNTUK_CATAT = text(
+    """
+    SELECT id, goal_id, title, period, target_count, schedule, adaptive_tiers, status,
+           created_at, updated_at
+    FROM habits
+    WHERE id = :id AND deleted_at IS NULL
+    FOR SHARE
+    """
+)
+
+# `UNIQUE (habit_id, for_date)` + `DO NOTHING`: kirim ulang tanggal yang sama
+# tidak menulis baris kedua dan tidak menjadi galat (spec/04 — pencatatan dari
+# perangkat luring harus selalu aman diulang). `user_id` dari baris habitnya.
+_SISIP_SELESAI = text(
+    """
+    INSERT INTO habit_completions (habit_id, user_id, for_date, status, tier_used, note)
+    SELECT h.id, h.user_id, :for_date, :status, CAST(:tier_used AS smallint),
+           CAST(:note AS text)
+    FROM habits h
+    WHERE h.id = :habit_id AND h.deleted_at IS NULL
+    ON CONFLICT (habit_id, for_date) DO NOTHING
+    RETURNING id, habit_id, for_date, status, tier_used, note, source, completed_at, created_at
+    """
+)
+
+_SELESAI_PADA = text(
+    """
+    SELECT id, habit_id, for_date, status, tier_used, note, source, completed_at, created_at
+    FROM habit_completions
+    WHERE habit_id = :habit_id AND for_date = :for_date
+    """
+)
+
+_HAPUS_SELESAI = text(
+    "DELETE FROM habit_completions WHERE habit_id = :habit_id AND for_date = :for_date"
 )
 
 _BISA_DIUBAH = (
@@ -170,3 +212,56 @@ async def ubah(conn: AsyncConnection, habit_id: UUID, perubahan: Mapping[str, An
 
 async def hapus(conn: AsyncConnection, habit_id: UUID) -> bool:
     return (await conn.execute(_HAPUS, {"id": habit_id})).first() is not None
+
+
+def _penyelesaian(baris: RowMapping) -> Penyelesaian:
+    return Penyelesaian.model_validate(dict(baris))
+
+
+async def ambil_untuk_catat(conn: AsyncConnection, habit_id: UUID) -> Habit | None:
+    baris = (await conn.execute(_AMBIL_UNTUK_CATAT, {"id": habit_id})).mappings().first()
+    return _habit(baris) if baris else None
+
+
+async def sisip_selesai(
+    conn: AsyncConnection,
+    *,
+    habit_id: UUID,
+    for_date: date,
+    status: str,
+    tier_used: int | None,
+    note: str | None,
+) -> Penyelesaian | None:
+    """Baris BARU — atau `None` bila tanggal itu sudah tercatat (atau habit-nya tidak ada)."""
+    baris = (
+        (
+            await conn.execute(
+                _SISIP_SELESAI,
+                {
+                    "habit_id": habit_id,
+                    "for_date": for_date,
+                    "status": status,
+                    "tier_used": tier_used,
+                    "note": note,
+                },
+            )
+        )
+        .mappings()
+        .first()
+    )
+    return _penyelesaian(baris) if baris else None
+
+
+async def selesai_pada(
+    conn: AsyncConnection, habit_id: UUID, for_date: date
+) -> Penyelesaian | None:
+    baris = (
+        (await conn.execute(_SELESAI_PADA, {"habit_id": habit_id, "for_date": for_date}))
+        .mappings()
+        .first()
+    )
+    return _penyelesaian(baris) if baris else None
+
+
+async def hapus_selesai(conn: AsyncConnection, habit_id: UUID, for_date: date) -> None:
+    await conn.execute(_HAPUS_SELESAI, {"habit_id": habit_id, "for_date": for_date})
