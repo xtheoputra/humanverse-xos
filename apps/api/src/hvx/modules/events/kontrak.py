@@ -17,8 +17,8 @@ diam-diam dari dokumennya.
 from __future__ import annotations
 
 from datetime import date
-from decimal import Decimal
 from typing import Annotated, Any, Literal
+from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -42,10 +42,23 @@ class HabitSelesai(_Payload):
     status: Literal["done", "partial"]
     tier_used: int | None = None
     note: str | None = None
+    # spec/03 🔧 3.2 — tanpa keduanya proyeksi `habit_completions` (spec/02
+    # aturan D) tidak bisa dibangun ulang: tanggal LOKAL, dan baris yang dicatat.
+    for_date: date
+    completion_id: UUID
 
 
 class HabitDilewati(_Payload):
     reason: str | None = None
+    for_date: date
+    completion_id: UUID
+
+
+class PenyelesaianDicabut(_Payload):
+    """`habit.completion_retracted` 🔧 (E-178) — penyelesaian yang DIBATALKAN pengguna."""
+
+    for_date: date
+    completion_id: UUID
 
 
 class MoodDicatat(_Payload):
@@ -70,7 +83,8 @@ class GoalTercapai(_Payload):
 class CheckinDicatat(_Payload):
     energy: int | None = None
     focus: int | None = None
-    sleep_hours: Decimal | None = None
+    sleep_hours: float | None = None  # angka JSON, seperti spec/04 (E-170) — bukan "7.5"
+    for_date: date  # spec/03 🔧 3.2 — tanggal lokal check-in itu
 
 
 # event_type → (schema_version, model payload). Hanya jenis ✅ V0 spec/03.
@@ -78,6 +92,7 @@ REGISTRY: dict[str, tuple[int, type[_Payload]]] = {
     "habit.created": (1, HabitDibuat),
     "habit.completed": (1, HabitSelesai),
     "habit.skipped": (1, HabitDilewati),
+    "habit.completion_retracted": (1, PenyelesaianDicabut),
     "mood.logged": (1, MoodDicatat),
     "journal.created": (1, JurnalDibuat),
     "goal.created": (1, GoalDibuat),

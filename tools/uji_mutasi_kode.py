@@ -225,6 +225,14 @@ UJI_KETAT_RUTE = "tests/unit/test_masukan_ketat_semua_rute.py"
 UJI_BALAPAN = "tests/integration/test_batas_dan_balapan.py"
 UJI_BADAN = "tests/unit/test_batas_badan.py"
 UJI_EVENT = "tests/integration/test_event.py"
+UJI_RELAY = "tests/integration/test_relay.py"
+UJI_VEKTOR = "tests/integration/test_vektor.py"
+UJI_MEMORI = "tests/integration/test_memori.py"
+UJI_JURNAL = "tests/integration/test_jurnal.py"
+UJI_AKTIVITAS = "tests/integration/test_aktivitas.py"
+UJI_PEKERJA = "tests/integration/test_pekerja.py"
+_UJI_PEKERJA_PENUH = "test_pekerja_menyalurkan_mengekstrak_dan_menyemat_lalu_berhenti_bersih"
+UJI_TERBIT = "tests/integration/test_penerbitan_event.py"
 FK_MILESTONE = (
     "  FOREIGN KEY (goal_id, user_id) REFERENCES goals (id, user_id) ON DELETE CASCADE" + NL + ");"
 )
@@ -3392,6 +3400,128 @@ MUTASI: list[Mutasi] = [
         ],
         _pytest("tests/unit/test_kontrak_event.py::test_isi_jurnal_tidak_pernah_masuk_event"),
         harus_memuat="DID NOT RAISE",
+    ),
+    # ── Sprint 3 · 3.2 penerbitan event dari goals · habits · checkins (aturan 6) ─
+    Mutasi(
+        "3.2",
+        "POST /goals tanpa goal.created",
+        [
+            Sunting(
+                f"{MODUL}/goals/service.py",
+                "            await events.terbitkan("
+                + NL
+                + "                conn,"
+                + NL
+                + "                user_id=user_id,"
+                + NL
+                + '                event_type="goal.created",',
+                "            await events.terbitkan("
+                + NL
+                + "                conn,"
+                + NL
+                + "                user_id=user_id,"
+                + NL
+                + '                event_type="goal.created",'.replace(
+                    "events.terbitkan", "_tidak_menerbitkan"
+                ),
+            ),
+            _sisip(
+                f"{MODUL}/goals/service.py",
+                "async def _tidak_menerbitkan(*_a: object, **_k: object) -> None:"
+                + NL
+                + "    return None",
+            ),
+        ],
+        _pytest(f"{UJI_TERBIT}::test_goal_dibuat_menerbitkan_goal_created_sekali"),
+        harus_memuat="POST /goals tidak menerbitkan tepat satu goal.created",
+        kelompok="db",
+    ),
+    Mutasi(
+        "3.2",
+        "galat penerbitan ditelan — goal tersimpan tanpa event-nya",
+        [
+            Sunting(
+                f"{MODUL}/goals/service.py",
+                "            await events.terbitkan("
+                + NL
+                + "                conn,"
+                + NL
+                + "                user_id=user_id,"
+                + NL
+                + '                event_type="goal.created",',
+                "            await events.terbitkan("
+                + NL
+                + "                conn,"
+                + NL
+                + "                user_id=user_id,"
+                + NL
+                + '                event_type="goal.created",'.replace(
+                    "events.terbitkan", "_terbit_diam"
+                ),
+            ),
+            _sisip(
+                f"{MODUL}/goals/service.py",
+                "async def _terbit_diam(conn: AsyncConnection, **isi: Any) -> None:"
+                + NL
+                + "    try:"
+                + NL
+                + "        await events.terbitkan(conn, **isi)"
+                + NL
+                + "    except events.EventTidakSah:"
+                + NL
+                + "        pass"
+                + NL
+                + "from sqlalchemy.ext.asyncio import AsyncConnection  # noqa: E402",
+            ),
+        ],
+        _pytest(f"{UJI_TERBIT}::test_event_yang_gagal_terbit_membatalkan_tulisannya"),
+        harus_memuat="goal tersimpan tanpa event-nya",
+        kelompok="db",
+    ),
+    Mutasi(
+        "3.2",
+        "DELETE penyelesaian tanpa habit.completion_retracted",
+        [
+            Sunting(
+                f"{MODUL}/habits/service.py",
+                "        if dicabut is not None:" + NL + "            await events.terbitkan(",
+                "        if dicabut is None:" + NL + "            await events.terbitkan(",
+            )
+        ],
+        _pytest(f"{UJI_TERBIT}::test_penyelesaian_kirim_ulang_batal_dan_koreksi"),
+        harus_memuat="peta aturan 6 tidak ditepati",
+        kelompok="db",
+    ),
+    Mutasi(
+        "3.2",
+        "check-in diterbitkan juga saat isinya tidak berubah",
+        [
+            Sunting(
+                f"{MODUL}/checkins/service.py",
+                "        if lama != (c.energy, c.focus, c.sleep_hours):",
+                "        if True:",
+            )
+        ],
+        _pytest(
+            f"{UJI_TERBIT}"
+            "::test_check_in_diterbitkan_hanya_saat_isinya_berubah_dan_koreksi_tidak_ditelan"
+        ),
+        harus_memuat="event check-in tidak mengikuti perubahan isinya",
+        kelompok="db",
+    ),
+    Mutasi(
+        "3.2",
+        "kunci mood per menit (spec/03 lama) — mood kedua dalam satu menit ditolak",
+        [
+            Sunting(
+                f"{MODUL}/checkins/service.py",
+                '                idempotency_key=f"mood:{mood.id}",',
+                '                idempotency_key=f"mood:{user_id}:{mood.occurred_at:%Y%m%d%H%M}",',
+            )
+        ],
+        _pytest(f"{UJI_TERBIT}::test_dua_mood_dalam_satu_menit_dua_event"),
+        harus_memuat="mood kedua dalam menit yang sama gagal",
+        kelompok="db",
     ),
 ]
 

@@ -64,7 +64,8 @@ def test_isi_jurnal_tidak_pernah_masuk_event() -> None:
         ("mood.logged", {"valence": 9}),
         ("habit.completed", {"status": "skipped"}),  # skipped = habit.skipped
         ("goal.completed", {"days_taken": -1}),
-        ("checkin.logged", {"energy": 3, "mood": 2}),  # medan tak dikenal
+        ("checkin.logged", {"energy": 3, "for_date": "2026-09-24", "mood": 2}),  # tak dikenal
+        ("habit.completed", {"status": "done"}),  # for_date & completion_id wajib (3.2)
     ],
 )
 def test_payload_di_luar_kontrak_ditolak(jenis: str, payload: dict[str, object]) -> None:
@@ -73,7 +74,10 @@ def test_payload_di_luar_kontrak_ditolak(jenis: str, payload: dict[str, object])
 
 
 def test_payload_sah_dinormalkan_ke_json_tanpa_medan_kosong() -> None:
-    versi, isi = payload_sah("checkin.logged", {"energy": 2, "sleep_hours": "7.5"})
+    versi, isi = payload_sah(
+        "checkin.logged", {"energy": 2, "sleep_hours": 7.5, "for_date": "2026-09-24"}
+    )
 
     assert versi == 1
-    assert isi == {"energy": 2, "sleep_hours": "7.5"}
+    # `sleep_hours` angka JSON, seperti di spec/04 (E-170) — bukan string "7.5".
+    assert isi == {"energy": 2, "sleep_hours": 7.5, "for_date": "2026-09-24"}

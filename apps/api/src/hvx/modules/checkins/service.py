@@ -5,6 +5,11 @@
   tidak bisa keduanya menyisipkan. PUT = ganti (lihat `IsiCheckin`).
 * `for_date` tanggal lokal perangkat — batasnya tanggal paling maju di Bumi
   (`platform.tanggal_paling_maju`), sama dengan penyelesaian habit (2.3).
+* **Event (spec/07 3.2)** — `checkin.logged` hanya bila PUT MENGUBAH isi
+  check-in (atau membuatnya): kuncinya `updated_at` baris itu, jadi koreksi
+  A → B → A menjadi tiga event dan proyeksinya berakhir di A — sama dengan
+  tabelnya. PUT yang sama persis tidak menerbitkan apa pun. `mood.logged` untuk
+  tiap mood baru, kuncinya id mood (spec/03 aturan 1, E-177).
 * **2.6** mood DILAPORKAN pengguna (spec/01: bukan ditaksir sistem — E-34).
   `occurred_at` wajib berzona waktu, boleh lampau (dicatat belakangan), dan
   tidak boleh lebih dari `LONGGAR_JAM_S` di depan jam basis data.
@@ -18,7 +23,7 @@ from uuid import UUID
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncEngine
 
-from hvx.modules import platform
+from hvx.modules import events, platform
 
 from . import repository
 from .repository import HasilSimpan
@@ -40,7 +45,8 @@ async def simpan(
             raise platform.GalatApi(
                 422, "for_date_in_future", "Tanggal itu belum terjadi di mana pun."
             )
-        return await repository.simpan(
+        lama = await repository.sebelum(conn, user_id, for_date)
+        hasil = await repository.simpan(
             conn,
             user_id=user_id,
             for_date=for_date,
@@ -49,6 +55,24 @@ async def simpan(
             sleep_hours=isi.sleep_hours,
             note=isi.note,
         )
+        c = hasil.checkin
+        if lama != (c.energy, c.focus, c.sleep_hours):
+            await events.terbitkan(
+                conn,
+                user_id=user_id,
+                event_type="checkin.logged",
+                occurred_at=c.updated_at,
+                idempotency_key=f"checkin:{for_date.isoformat()}:{c.updated_at.isoformat()}",
+                subject_type="checkin",
+                subject_id=c.id,
+                payload={
+                    "energy": c.energy,
+                    "focus": c.focus,
+                    "sleep_hours": c.sleep_hours,
+                    "for_date": for_date,
+                },
+            )
+        return hasil
 
 
 async def daftar(
@@ -83,7 +107,7 @@ async def catat_mood(engine: AsyncEngine, user_id: UUID, badan: CatatMood) -> Mo
                 raise platform.GalatApi(
                     422, "occurred_at_in_future", "Waktu mood itu belum terjadi."
                 )
-            return await repository.sisip_mood(
+            mood = await repository.sisip_mood(
                 conn,
                 user_id=user_id,
                 id_=badan.id,
@@ -92,6 +116,17 @@ async def catat_mood(engine: AsyncEngine, user_id: UUID, badan: CatatMood) -> Mo
                 label=badan.label,
                 note=badan.note,
             )
+            await events.terbitkan(
+                conn,
+                user_id=user_id,
+                event_type="mood.logged",
+                occurred_at=mood.occurred_at,
+                idempotency_key=f"mood:{mood.id}",
+                subject_type="mood",
+                subject_id=mood.id,
+                payload={"valence": mood.valence, "label": mood.label},
+            )
+            return mood
     except IntegrityError as galat:
         p = platform.rincian_pelanggaran(galat)
         if p.sqlstate == platform.UNIQUE_VIOLATION and p.constraint == "mood_entries_pkey":
