@@ -29,6 +29,7 @@ uv run --locked uvicorn hvx.main:create_app --factory --reload
 | `HVX_RATE_LIMIT_AUTH_IP` | | `30/600` — `register` + `login` per IP |
 | `HVX_RATE_LIMIT_LOGIN_FAILURES` | | `100/86400` — login gagal per akun: 100 sekaligus (NIST SP 800-63B-4: ≤ 100), lalu satu tiap `detik/jumlah`; berhasil masuk menghapus hitungannya. ⚠️ Batas **laju**, bukan penguncian sesudah 100 kegagalan beruntun — **B-42** · K-22 |
 | `FORWARDED_ALLOW_IPS` | | `127.0.0.1` — dibaca **uvicorn**, bukan `Settings`: hanya dari alamat ini `X-Forwarded-For` dipercaya. Di belakang penyeimbang beban (D1+) wajib diisi alamatnya — kalau tidak, semua klien berbagi satu jatah batas laju |
+| `HVX_CORS_ORIGINS` | | kosong — asal peramban yang boleh memanggil api, dipisah koma (`http://localhost:5000` untuk `apps/mobile` versi web). Kosong = **tanpa CORS**; `*` dan asal berjalur **ditolak saat mulai** |
 
 Rute yang ada — kontraknya [`spec/04`](../../spec/04-API-CONTRACTS.md):
 
@@ -37,6 +38,25 @@ Rute yang ada — kontraknya [`spec/04`](../../spec/04-API-CONTRACTS.md):
 | `GET /health` | `200 {status, version, db, redis}`, atau `503` dengan bentuk sama kalau satu ketergantungan mati — **di luar** batas laju |
 | `POST /v1/auth/register` · `login` · `refresh` · `logout` | tugas 1.1 — `logout` butuh sesi |
 | `GET /v1/me` · `PATCH /v1/me/profile` | tugas 1.3 — butuh sesi |
+| `GET·POST /v1/goals` · `GET·PATCH·DELETE /v1/goals/{id}` · `GET /v1/goals/{id}/tree` · `POST /v1/goals/{id}/milestones` · `PATCH /v1/milestones/{id}` | tugas 2.1 — pohon goal satu kueri |
+| `GET·POST /v1/habits` (`?for_date=` → `day{}`) · `PATCH·DELETE /v1/habits/{id}` | tugas 2.2 — tier yang disarankan dari energi check-in |
+| `POST /v1/habits/{id}/completions` · `DELETE …/completions/{for_date}` | tugas 2.3 — kirim ulang tanggal sama → `200` |
+| `GET /v1/habits/{id}/streak` | tugas 2.4 — menurut zona profil saat ini |
+| `GET /v1/checkins` · `PUT /v1/checkins/{for_date}` | tugas 2.5 — PUT = ganti, satu baris per tanggal |
+| `GET·POST /v1/moods` | tugas 2.6 |
+
+Tulisan `POST`/`PATCH` domain menerima `Idempotency-Key` (spec/04, E-165) —
+rute baru menyatakan `idem: platform.Idempoten` **dan** mengakhiri badannya
+dengan `return await idem.jalankan(user_id, kerja, baca_ulang)`:
+`tests/unit/test_idempotensi_terpasang.py` menolak rute tulis yang tidak
+menerimanya atau tidak memanggilnya. Redis hanya mengingat **rujukan**
+(sidik · status · id) — `baca_ulang` membaca sumber dayanya lagi saat diputar
+ulang (E-171, K-24).
+
+Masukan **ketat** (spec/04, E-170): medan angka/boolean/tanggal/waktu memakai
+`platform.Bulat` · `Benar` · `Tanggal` · `WaktuBerzona` · `AngkaJson` —
+`tests/unit/test_masukan_ketat_semua_rute.py` menelusuri skema inti tiap rute.
+Badan lebih dari 1 MiB → `413` sebelum autentikasi (`platform.BatasBadanMiddleware`).
 
 Galat selalu beramplop `{"error": {"code", "message", "details"?}}`; yang tak
 tertangani dijawab `500` dengan `X-Request-ID`, tanpa rincian galat.

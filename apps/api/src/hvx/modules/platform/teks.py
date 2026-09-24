@@ -40,4 +40,14 @@ def tanpa_nul_bersarang(nilai: Any) -> Any:
     return nilai
 
 
+def _berisi(nilai: str) -> str:
+    if not nilai.strip():
+        raise ValueError("tidak boleh kosong atau hanya spasi")
+    return nilai
+
+
 TeksTanpaNul = Annotated[str, AfterValidator(_tanpa_nul)]
+# Judul, label, nama: teks yang harus BERISI — `"   "` lolos `min_length=1` tetapi
+# tampil sebagai baris kosong di layar. Teksnya tidak dipangkas: yang ditulis
+# pengguna disimpan apa adanya.
+TeksBerisi = Annotated[str, AfterValidator(_tanpa_nul), AfterValidator(_berisi)]

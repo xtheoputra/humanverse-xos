@@ -4,6 +4,48 @@
 
 ---
 
+## Sesi 31 — 24 September 2026
+
+**Pemilik: *“kerjakan semua tugas yang belum terselesaikan dengan sempurna”*.**
+
+| Hal | Hasil |
+|---|---|
+| Naskah baru | **tidak ada** |
+| Keputusan pemilik | tidak ada yang baru — yang diikuti: H-25 (branch + PR, pemilik menggabungkan) · H-26 · H-27 · *“betulkan saja menurut anda benarnya dimana”* |
+| Keputusan sendiri | **K-23** bacaan & pendengar lintas modul domain lewat titik rakit; energi check-in → tier adaptif · **K-24** ukuran dibatasi saat menulis; `Idempotency-Key` mengingat rujukan, bukan isi |
+| Temuan ditutup | 🆕 **E-168** · **E-169** (rute yang `spec/07` tuntut, `spec/04` tidak punya) · 🆕 **E-170 … E-176** (tinjauan sebelum PR) · **E-165** kini diterapkan |
+| `spec/` diubah | `01` (`goals_parent_not_self` · arti `for_date`) · `04` (pohon goal · habit pada tanggal · bentuk habit · penyelesaian · arti rentetan · check-in · mood · masukan ketat · ukuran badan · `Idempotency-Key` berujuk · kursor per daftar · galat validasi) · `05` (`habit.streak`) · `06` (aturan 3 & titik rakit · aturan 6 ditunda sampai 3.2) · `07` (status Sprint 2) |
+| Kode | 🔨 **Sprint 2 — 2.1–2.7 seluruhnya**, branch `v0/sprint-2-human-core`: api (`goals` · `habits` · `checkins`, migrasi 0004) + **aplikasi Flutter pertama** (`apps/mobile`) — **579 uji Python + 40 uji Flutter**, **109 mutasi baru, semuanya berbunyi** (kode: 108 → 217) |
+| Tinjauan sebelum PR | 🔍 **tiga lensa serentak** — keamanan (9 terbukti · 4 dugaan) · kontrak (19 terbukti · 5 dugaan) · penegak buta (**39 kerusakan lolos seluruh suite**, kini tiap kerusakan punya uji dan mutasi). Yang paling mahal: masukan yang dikoersi diam-diam (`"on"` menjadi persetujuan pelatihan model), goal anak yatim **40 dari 40** saat induknya dihapus serentak, dan cache `Idempotency-Key` yang menyimpan isi jawaban 24 jam di Redis bersama sesi |
+
+---
+
+### 🔑 Layar pertama, dan bukti bahwa manusia bisa memakainya
+
+2.7 menuntut *“bisa dipakai manusia, bukan hanya curl”*. Uji widget memakai
+layanan palsu; uji ujung-ke-ujung memakai klien asli tanpa layar — dan tinjauan
+kontrak mencatat celah di antara keduanya. Kini `apps/mobile/test/ujung/`
+merakit **layar yang sama** dengan `main.dart`, mengetuknya — daftar, tambah
+habit, tandai selesai, keluar — terhadap api hidup di tahap smoke, lalu
+memeriksa hasilnya **dari sesi lain di server**, bukan dari keadaan layar.
+
+⚠️ **Yang diakui:** *enak dipakai* belum diukur — layar itu belum pernah
+dipakai orang selain pengujinya.
+
+---
+
+### 🔴 Tiga hal yang “cukup” di kepala tetapi tidak di mesin
+
+| Yang diandaikan | Yang terjadi |
+|---|---|
+| pydantic menolak tipe yang salah | mode **python** — yang dipakai FastAPI untuk badan — menerima `true` sebagai 1 dan detik Unix sebagai tanggal **UTC**; persetujuan tercatat dari string `"on"` |
+| hapus-lunak menaikkan anak goal menjadi akar | ya — kecuali anak yang ditulis **serentak**: 40 dari 40 yatim tanpa kunci `FOR SHARE` |
+| `Idempotency-Key` hanya cache | cache itu menyimpan catatan pengguna 24 jam sesudah dihapus, ~5 KiB per permintaan 19 byte, di Redis `noeviction` yang sama dengan sesi |
+
+Ketiganya ditutup — dengan uji yang **merah pada kode lama** dan mutasi.
+
+---
+
 ## Sesi 30 — 17 September 2026
 
 **Pemilik membaca ringkasan PR #163 dan menjawab tiga hal sekaligus: *“gunakan alternatif versi gratis jangan ada tagihan”* · *“menulis kode dan menemukan kesalahan, betulkan saja menurut anda benarnya dimana. kerjakan b-40, b-41”* · *“data milik satu pengguna harus milik pengguna tersebut, data masing-masing pengguna milik pribadi user”* — lalu *“lanjutkan tugas yang belum selesai lainnya”*.**

@@ -43,7 +43,7 @@ di fase berikutnya.
 |---|---|
 | Nama tabel | `snake_case`, **jamak** |
 | Kunci utama | `id uuid PRIMARY KEY DEFAULT gen_random_uuid()` |
-| Waktu | `timestamptz`, disimpan UTC. Kolom tanggal lokal pengguna pakai `date` + `profiles.timezone` |
+| Waktu | `timestamptz`, disimpan UTC. Kolom tanggal lokal pengguna (`for_date`) pakai `date`: tanggal lokal **perangkat** saat hal itu terjadi — tidak pernah diturunkan dari cap waktu UTC, dan **tidak** dari `profiles.timezone` (perangkat yang bepergian bisa berada di zona lain). `profiles.timezone` menjawab *“hari ini”* pengguna — rentetan 2.4 (🔧 E-176: semula *“`date` + `profiles.timezone`”*, terbaca seolah tanggalnya dihitung dari zona profil) |
 | Jejak baris | setiap tabel punya `created_at`, dan `updated_at` bila barisnya bisa berubah |
 | Hapus | `deleted_at timestamptz` pada tabel berisi tulisan pengguna; sisanya hapus keras |
 | Uang | `numeric(12,6)` — jangan `float` |
@@ -244,7 +244,10 @@ CREATE TABLE goals (
   -- B-41: baris anak hanya boleh menunjuk induk milik pengguna yang SAMA.
   UNIQUE (id, user_id),
   FOREIGN KEY (parent_id, user_id) REFERENCES goals (id, user_id)
-    ON DELETE SET NULL (parent_id)
+    ON DELETE SET NULL (parent_id),
+  -- spec/07 2.1 — FK diperiksa SESUDAH barisnya ada: tanpa ini goal bisa menjadi
+  -- induk dirinya sendiri, dan pohonnya lingkaran (migrasi 0004).
+  CONSTRAINT goals_parent_not_self CHECK (parent_id <> id)
 );
 CREATE INDEX goals_user_status_idx ON goals (user_id, status) WHERE deleted_at IS NULL;
 CREATE INDEX goals_parent_idx      ON goals (parent_id) WHERE parent_id IS NOT NULL;
@@ -284,6 +287,13 @@ CREATE INDEX goal_milestones_goal_idx ON goal_milestones (goal_id, position);
 > `UNIQUE (id, user_id)` dan tiap anak menunjuknya dengan **pasangan**
 > kolom, sehingga basis data sendiri yang menolak. `ON DELETE SET NULL
 > (kolom)` (PostgreSQL 15+) mengosongkan hanya kolom induk, bukan `user_id`.
+>
+> 🔧 **`goals_parent_not_self` — 24 Sep 2026, migrasi 0004 (spec/07 2.1).** FK
+> komposit di atas diperiksa **sesudah** barisnya ada, jadi goal yang menunjuk
+> **dirinya sendiri** lolos — dan pohon goal menjadi lingkaran yang tidak pernah
+> berakhir. Lingkaran yang lebih panjang tidak bisa terbentuk: `parent_id` tidak
+> bisa diubah lewat API ([`04`](04-API-CONTRACTS.md)), dan goal baru hanya bisa
+> menunjuk goal yang sudah ada.
 
 ```sql
 -- @retention   : until-account-deleted

@@ -99,7 +99,7 @@ $ python tools/uji_mutasi.py
 25 mutasi · 25 terbukti BERBUNYI — tiap mutasi wajib melahirkan temuan BARU
 
 $ uv run python tools/uji_mutasi_kode.py
-108 mutasi · 108 terbukti BERBUNYI — dengan ALASAN yang dimaksud (pytest: dibaca dari baris galat)
+217 mutasi · 217 terbukti BERBUNYI — dengan ALASAN yang dimaksud (pytest: dibaca dari baris galat)
    19 import-linter (satu per id kontrak + modul baru, siklus, stdlib, berkas baru)
     1 ruff banned-api · 3 peta penegak §6 · 4 rantai pasok & tanpa-tagihan · 1 pemindai rahasia
    14 basis data — 8 migrasi · 6 kepemilikan data (FK komposit · RLS · isi kebijakan · GRANT · peran api · kebocoran pool)
@@ -113,6 +113,15 @@ $ uv run python tools/uji_mutasi_kode.py
                   tak dikenal · NFKC · event loop ×2 · kerangka · IP mentah · kunci HMAC · NUL)
                 · 3 batas laju · 2 audit satu transaksi · 2 bawaan izin · 1 persetujuan · 1 NUL jsonb
                 · 1 kelompok galat · 2 pemindai spec/06 · 1 alat mutasi itu sendiri
+   33 Sprint 2 — 5 goals (pohon satu kueri · CHECK · kedalaman · anak naik · kursor)
+                · 5 Idempotency-Key · 4 habit & tier · 4 penyelesaian · 6 rentetan · 3 check-in
+                · 3 mood · 3 layar Flutter (flutter test)
+   34 tinjauan Sprint 2 — 7 masukan ketat (E-170) · 8 Idempotency-Key & ukuran badan (E-171)
+                · 7 balapan & batas (E-172) · 3 arti rentetan (E-173) · 5 galat, kursor & zona (E-174)
+                · 3 klien Flutter (E-175) · 1 PUT identik (E-176)
+   42 penegak buta Sprint 2 — 7 pohon & goal · 3 Idempotency-Key · 4 habit & tier · 2 batas for_date
+                · 7 rentetan lewat layanan · 2 habit terhapus · 2 PUT menambal · 2 mood · 1 jam Redis mundur
+                · 1 CORS di dalam batas laju · 11 aplikasi Flutter (dengan TZ=WIB-7)
 ```
 
 > 🔴 **Dua hal yang uji mutasi ajarkan di Sprint 0 — keduanya tentang alat

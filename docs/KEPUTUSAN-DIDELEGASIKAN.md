@@ -501,6 +501,34 @@ sesudahnya.
 
 ---
 
+## K-23 · Bacaan lintas modul domain lewat titik rakit; energi check-in ke tier adaptif
+
+> Diputuskan 24 September 2026, saat Sprint 2 tugas 2.2 dan 2.4 ditulis.
+
+| | |
+|---|---|
+| **Keputusan** | **(1)** Modul domain yang butuh MEMBACA data modul domain lain di transaksi yang sama menerima **fungsi pembaca** dari titik rakit `hvx.main` lewat `app.state` — bukan impor, bukan SQL ke tabel milik modul lain. Pertama: `habits` menerima `profile.zona_waktu` (*“hari ini”* rentetan, 2.4) dan `checkins.energi_pada` (tier yang disarankan, 2.2/2.5). Pembaca berjalan di koneksi pemanggil — satu transaksi, satu RLS. Rute yang butuh pembaca **menolak berjalan** bila titik rakit lupa memasangnya (tidak jatuh ke UTC atau "tanpa energi" diam-diam). **(2)** Energi check-in 1–5 dipetakan ke tiga kondisi naskah 4 §34: **3–5 atau belum check-in** = normal (tier 0) · **2** = rendah (tier 1) · **1** = sangat rendah (tier paling ringan). |
+| **Bukti** | `spec/06` aturan 3 (domain tidak saling impor) dan aturan 5 (SQL hanya tabel sendiri) — keduanya ditegakkan mesin. Tetapi event (jalur yang aturan 3 sebut) melayani **tulisan**, bukan **bacaan**: tidak ada event `profile.*` di 22 event V0 (E-166), dan zona waktu dibutuhkan pada saat membaca. Preseden: **K-17** — pendengar pendaftaran yang dipasang titik rakit. Pemetaan energi: naskah 4 §34 menyebut *rendah* dan *sangat rendah* tanpa skala; skala `daily_checkins.energy` 1–5 dengan 3 sebagai titik tengah. |
+| **Bacaan yang DITOLAK** | **(a)** *“Klien mengirim `?today=` dan `?energy=`”* — ditolak: agent (Sprint 4, tool `habit.streak`) tidak punya perangkat, dan aturan bisnis pindah ke klien. **(b)** *“`habits` membaca `profiles.timezone` langsung”* — ditolak: melanggar aturan 5, dan pemisahan layanan V2 menjadi penulisan ulang. **(c)** *“Proyeksi zona waktu di tabel `habits`”* — ditolak: menambah kolom demi menyalin data milik modul lain, dan butuh event profil yang belum ada. **(d)** *“Belum check-in = energi rendah”* — ditolak: sistem tidak menurunkan target seseorang karena ia belum menjawab (*“Bukan menyalahkan user”*, naskah 4 §33). |
+| **Harga yang diakui** | Ketergantungan antarmodul yang **tidak terlihat** oleh `import-linter`: ia hidup di `hvx.main`, dan pemisahan layanan V2 mengganti tiap pembaca dengan panggilan jaringan. Karena itu tiap pembaca dijaga uji titik rakit (`test_main.py`) — dan jumlahnya kecil dengan sengaja. |
+| **Cara membalikkan** | Hapus baris `app.state.pembaca_*` di `hvx.main` dan parameternya di `habits/service.py`; `test_main.py` dan uji rentetan/tier merah dan wajib diubah bersamanya. Pemetaan energi: `habits/tier.py`. |
+
+---
+
+## K-24 · Ukuran yang dibatasi saat menulis, dan `Idempotency-Key` yang mengingat rujukan
+
+> Diputuskan 24 September 2026, saat temuan tinjauan Sprint 2 dibetulkan (E-171, E-172).
+
+| | |
+|---|---|
+| **Keputusan** | **(1)** Batas yang ditegakkan **saat menulis** — diperiksa serial dengan kunci penasihat per pemilik, jadi tulisan serentak tidak bisa bersama melewatinya: **1.000** goal hidup per pengguna · **100** milestone per goal · **500** habit hidup per pengguna (`422 goal_limit_reached` · `milestone_limit_reached` · `habit_limit_reached`). **(2)** Badan permintaan paling besar **1 MiB** → `413 payload_too_large`, sebelum autentikasi dan sebelum badan dibaca. **(3)** `Idempotency-Key` mengingat **rujukan** selama 24 jam — sidik HMAC permintaan, status, id sumber daya — **bukan isi jawaban**; ulangan membaca ulang sumber daya itu di bawah RLS pengguna yang sama. Paling banyak **1.000 kunci baru per pengguna per 24 jam** (`429 rate_limited`); ulangan kunci lama tidak memakai kuota. |
+| **Bukti** | Tinjauan keamanan Sprint 2, diukur: `GET /goals/{id}/tree` atas 20 ribu goal = jawaban 86 MB dan event loop tertahan; badan jawaban ~5,2 KiB tersimpan untuk permintaan 19 byte, di Redis `noeviction` yang sama dengan sesi — batas laju per pengguna `300/60` (K-22) berarti 432 ribu entri sehari per akun; catatan pengguna tinggal di Redis dan AOF-nya 24 jam sesudah hapus-keras; FastAPI membaca badan utuh sebelum dependensi autentikasi berjalan. Tinjauan kontrak: `GET /habits` memotong di 500 tanpa tanda (F9). |
+| **Bacaan yang DITOLAK** | **(a)** *“Beri halaman pada pohon dan daftar habit”* — ditolak: pohon adalah satu jawaban dengan sengaja (E-168), dan layar hari ini butuh semua habit hari itu. **(b)** *“Potong saat membaca”* — ditolak: itu tepat pemotongan diam-diam yang E-168 larang. **(c)** *“Simpan isi jawaban, dengan batas ukuran”* — ditolak: isi pengguna tetap tinggal di Redis sesudah dihapus, dan batas per entri tetap berlipat per permintaan. **(d)** *“Batas laju saja cukup”* — ditolak: batas laju menghitung permintaan, bukan memori yang ditinggalkannya. **(e)** *“Redis cache tersendiri berkebijakan eviction”* — ditunda: tambah satu layanan untuk masalah yang kuota + rujukan sudah batasi. |
+| **Harga yang diakui** | Ulangan menerima keadaan **sekarang**: `PATCH` lain di antaranya ikut terlihat, dan sumber daya yang sudah dihapus menjawab `404`. Draf IETF membolehkan server menyimpan jawaban; yang ini memilih tidak menyimpan isi pengguna di luar PostgreSQL. Pengguna yang sungguh butuh lebih dari 500 habit atau 1.000 goal ditolak; jurnal lebih dari 1 MiB teks (±500 halaman) ditolak; antrean luring lebih dari 1.000 tulisan berkunci sehari menerima `429` sampai jendelanya lewat. Kunci penasihat menyerialkan pembuatan goal/habit **satu** pengguna — bukan antarpengguna. |
+| **Cara membalikkan** | Angka: `MAKS_GOAL` · `MAKS_MILESTONE` (`goals/service.py`), `DAFTAR_MAKS` (`habits/repository.py`), `MAKS_BADAN_BYTE` (`platform/batas_badan.py`), `KUOTA_KUNCI` (`platform/idempotensi.py`) — `test_batas_dan_balapan.py`, `test_masukan_ketat.py`, `test_idempotensi.py` diubah bersamanya. Menyimpan isi jawaban lagi: `Idempotensi.jalankan` — `test_redis_hanya_menyimpan_rujukan_tanpa_isi_tulisan` merah dan wajib dihapus bersama alasannya. |
+
+---
+
 ## Yang sengaja **tidak** saya putuskan
 
 | Butir | Kenapa |

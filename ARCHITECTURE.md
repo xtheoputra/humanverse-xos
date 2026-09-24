@@ -5,8 +5,9 @@
 > **apa yang sudah dibangun, dan kenapa bentuknya begitu.** Setiap baris di
 > bawah menunjuk penegaknya, supaya tidak ada yang hanya dinyatakan.
 
-Keadaan: **Sprint 0 (Foundation) + Sprint 1 (Identity)** — 15 dari 51 tugas
-`spec/07`, di dua branch bertumpuk yang menunggu HUMAN REVIEW.
+Keadaan: **Sprint 0 (Foundation) + Sprint 1 (Identity) + Sprint 2 (Human
+Core)** — 22 dari 51 tugas `spec/07`, di tiga branch bertumpuk yang menunggu
+HUMAN REVIEW.
 
 ---
 
@@ -19,6 +20,8 @@ docker compose                                   arch/09 §1
 ├── migrate    alembic upgrade head  sekali jalan, SEBELUM api — sebagai PEMILIK skema
 ├── db-roles   psql peran-lokal.sql  sekali jalan: peran login api, anggota hvx_app (D0 saja)
 └── api        uvicorn hvx.main:create_app --factory — sebagai anggota hvx_app
+
+apps/mobile     Flutter — layar V0 pertama (spec/07 2.7): Android · iOS · web
 ```
 
 V0 punya satu pengguna nyata. Yang dijaga sejak awal bukan proses terpisah,
@@ -59,7 +62,7 @@ HTTP/SDK model hanya di `platform`.
 | | Di mana | Penegak |
 |---|---|---|
 | bentuk 23 tabel | [`spec/01`](spec/01-DATABASE-SCHEMA.md) | — sumber |
-| migrasi | `data/migrations/versions/` — `0001_v0_skema` · `0002_persetujuan_tujuan` (`consents.purpose`, B-22) · `0003_pencarian_masuk` (fungsi login, §12); tiap migrasi `.up.sql` + `.down.sql` | `test_migrasi.py`: katalog migrasi **==** katalog DDL `spec/01` — tabel (persistensi · RLS · opsi · hak akses · komentar) · kolom (tipe · null · bawaan · collation · identity · generated) · hak akses & komentar kolom · constraint · index · pemicu (`pg_get_triggerdef` + menyala/mati) · kebijakan RLS · rule · sequence · fungsi · tipe · ekstensi (+ versi). **Tidak** dibandingkan: statistik, `STORAGE`/`COMPRESSION` kolom, kepemilikan, hak bawaan |
+| migrasi | `data/migrations/versions/` — `0001_v0_skema` · `0002_persetujuan_tujuan` (`consents.purpose`, B-22) · `0003_pencarian_masuk` (fungsi login, §12) · `0004_goal_bukan_induk_dirinya` (`CHECK goals_parent_not_self`); tiap migrasi `.up.sql` + `.down.sql` | `test_migrasi.py`: katalog migrasi **==** katalog DDL `spec/01` — tabel (persistensi · RLS · opsi · hak akses · komentar) · kolom (tipe · null · bawaan · collation · identity · generated) · hak akses & komentar kolom · constraint · index · pemicu (`pg_get_triggerdef` + menyala/mati) · kebijakan RLS · rule · sequence · fungsi · tipe · ekstensi (+ versi). **Tidak** dibandingkan: statistik, `STORAGE`/`COMPRESSION` kolom, kepemilikan, hak bawaan |
 | naik & turun bersih | idem | `test_migrasi.py`: naik → turun (kosong, kecuali ekstensi — lihat bawah) → naik (identik) |
 | parser P-1..P-3 melihat semua tabel | — | `test_migrasi.py`: nama tabel yang parser baca **==** tabel di katalog basis data sungguhan |
 | anotasi retensi + `data_subject` (K-16) | komentar SQL di atas tiap `CREATE TABLE` | `periksa_dokumen.py` P-1 · P-2 · P-3 atas `spec/01` **dan** migrasi |
@@ -106,11 +109,18 @@ tersedia apa adanya di berkas `.up.sql`/`.down.sql`.
 | rute yang butuh pengguna | dependensi `identity.PenggunaDiperlukan`, **bukan** middleware | rute menyatakannya di tanda tangan; rute yang lupa tidak punya `user_id` untuk dipakai sama sekali |
 | login di bawah RLS | fungsi `SECURITY DEFINER` sempit `auth_lookup_for_login` — satu-satunya di daftar izin `test_kepemilikan_data.py` | RLS `users` tidak meloloskan pencarian per email sebelum pengguna dikenali; kebijakannya **tidak** dilonggarkan |
 | pendaftaran membuat profil | `identity` menjalankan **pendengar pendaftaran** di transaksi yang sama; `hvx.main` memasang `profile.buat_profil_awal` | `identity` di bawah `profile` (K-17) — ia tidak boleh mengimpornya, dan akun tanpa profil tidak boleh tercipta |
+| bacaan & pendengar lintas modul domain | `hvx.main` memasang fungsi pintu keluar di `app.state`, dipanggil dengan koneksi **pemanggil**: zona waktu profil · energi check-in · goal yang hidup (dikunci `FOR SHARE`) → `habits`; hapus goal → `habits.lepas_goal` (**K-23**) | domain tidak saling impor (`spec/06` aturan 3) dan SQL hanya tabel sendiri (aturan 5), tetapi bacaan ini harus satu transaksi — event melayani tulisan, bukan bacaan. Rute yang butuh sambungannya menolak berjalan tanpanya; `test_main.py` memeriksa kelimanya |
+| hapus-lunak vs tulisan serentak | goal HIDUP dikunci `FOR SHARE` sebelum anak, milestone, atau tautan habit ditulis; hapus-lunak (`FOR NO KEY UPDATE`) menunggu, lalu pernyataan berikutnya melihat tulisan barunya | tanpa kunci: 40 dari 40 goal anak yang dibuat serentak dengan hapus induknya menjadi yatim (tinjauan Sprint 2, E-172) |
+| batas ukuran data | ≤ 1.000 goal · ≤ 100 milestone per goal · ≤ 500 habit per pengguna, **saat menulis**, diperiksa di bawah kunci penasihat per pemilik (**K-24**) | pohon goal dan daftar habit dibaca utuh dalam satu jawaban — dibatasi di pintu masuk, tidak pernah dipotong saat dibaca |
 | izin agent | `identity.MesinIzin`: tanpa baris / kedaluwarsa → `ask`, atau `bawaan` pemanggil; cache Redis bergenerasi, generasi diganti sebelum **dan** sesudah commit; cache menyimpan *“tanpa keputusan”*, bukan bawaan | menghapus kunci cache saja membiarkan pembaca lambat menghidupkan kembali izin yang baru dicabut; gerbang risiko `spec/05` butuh bawaan per risk tanpa menimpa `ask` yang disetel pengguna (E-167) |
 | batas laju | mekanisme GCRA (skrip Lua, jam Redis) di `platform`; per IP sebagai middleware ASGI atas `/v1/*`, per pengguna di dependensi autentikasi, kredensial & kegagalan login di `identity` (**K-22**) | middleware menutup rute baru tanpa perlu diingat; `/health` di luarnya supaya tetap bisa melaporkan Redis mati |
-| jatah batas laju | selalu **dipakai** dalam satu perintah — tidak ada mode *“tanya dulu, pakai nanti”*; jatah login gagal per akun dipakai **sebelum** argon2, kuncinya dibentuk basis data (`lower()` = pembanding `citext`) | tanya-lalu-hitung meloloskan 12 dari 12 tebakan serentak dengan batas 3; `lower()` Python ≠ PostgreSQL untuk `İ` (tinjauan Sprint 1) |
+| jatah batas laju | selalu **dipakai** dalam satu perintah — tidak ada mode *“tanya dulu, pakai nanti”*; jatah login gagal per akun dipakai **sebelum** argon2, kuncinya dibentuk basis data (`lower()` = pembanding `citext`); jam per kunci tidak mundur (langkah ≤ 2 dtk diserap) | tanya-lalu-hitung meloloskan 12 dari 12 tebakan serentak dengan batas 3; `lower()` Python ≠ PostgreSQL untuk `İ` (tinjauan Sprint 1); jam VM Docker yang melangkah mundur ±1 dtk membuat `429` palsu di ujung ledakan (tinjauan Sprint 2) |
 | galat tak tertangani | middleware merender **500 `{error: {code, message}}`** + `X-Request-ID`, tanpa rincian galat | `ServerErrorMiddleware` Starlette berada DI LUAR middleware pengguna — 500-nya tidak pernah membawa `X-Request-ID`. ⚠️ Akibatnya `app.exception_handler(Exception)` **tidak akan pernah terpanggil** untuk galat yang sampai ke middleware |
 | `X-Request-ID` | dipakai ulang kalau berbentuk id (`[A-Za-z0-9._-]{1,128}`), diganti kalau tidak | nilai klien masuk log apa adanya |
+| bentuk masukan | angka, boolean, tanggal, waktu, desimal lewat `platform.Bulat` · `Benar` · `Tanggal` · `WaktuBerzona` · `AngkaJson` — di badan, kueri, dan jalur | FastAPI memvalidasi dalam mode python pydantic yang longgar: `true` → 1, detik Unix → tanggal UTC, `"on"` → persetujuan (E-170). `test_masukan_ketat_semua_rute.py` menelusuri skema inti tiap rute |
+| galat validasi | `loc` hanya nama yang dinyatakan api; `msg` bawaan hanya untuk jenis yang tidak mengutip masukan | `uuid_parsing` mengutip karakter masukan; kunci tak dikenal adalah masukan klien (E-174) |
+| ukuran badan | ≤ 1 MiB → `413`, middleware ASGI **sebelum** autentikasi, juga untuk badan *chunked* | FastAPI membaca badan utuh sebelum dependensi autentikasi berjalan |
+| `Idempotency-Key` | Redis mengingat **rujukan** (sidik HMAC · status · id) 24 jam; ulangan membaca ulang sumber daya di bawah RLS; ≤ 1.000 kunci baru per pengguna per 24 jam; satu skrip Lua *ambil-atau-kunci* (**K-24**) | menyimpan isi jawaban: ~5 KiB per permintaan 19 byte di Redis `noeviction` bersama sesi, dan isi pengguna tinggal sesudah dihapus (E-171) |
 | middleware | ASGI murni, bukan `BaseHTTPMiddleware` | yang kedua memutus `contextvars` dan menahan SSE (tugas 4.8) |
 | dokumentasi interaktif | terbuka **hanya** di `local` · `test` · `ci`; `HVX_ENV` **wajib** | daftar izin, bukan daftar tolak: lingkungan yang lupa diisi atau baru ditambahkan jatuh ke sisi tertutup |
 
@@ -132,4 +142,5 @@ apa: [`arch/11`](arch/11-PENEGAKAN.md) §6.
 | rute izin per agent (`/privacy/permissions`) | tugas 6.4 — mesinnya sudah ada (1.5) |
 | pohon `security/` — B-1 belum bisa dinyatakan | risk gate, tugas 4.5 |
 | Qdrant | Sprint 3 tugas 3.5 |
-| aplikasi Flutter | Sprint 2 tugas 2.7 |
+| event domain — keenam tabel Sprint 2 ditulis tanpa event (`spec/06` aturan 6, E-176) | Sprint 3 tugas 3.1–3.2 |
+| penyimpanan token & antrean luring di aplikasi | tugas 6.6 |

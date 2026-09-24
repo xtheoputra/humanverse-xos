@@ -28,9 +28,11 @@ from __future__ import annotations
 
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from dataclasses import dataclass
 from uuid import UUID
 
 from sqlalchemy import text
+from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine, create_async_engine
 
 _SKEMA_POLOS = ("postgresql://", "postgres://")
@@ -162,3 +164,32 @@ async def transaksi_sistem(engine: AsyncEngine) -> AsyncIterator[AsyncConnection
     async with engine.begin() as conn:
         await conn.execute(_SETEL_PENGGUNA, {"user_id": ""})
         yield conn
+
+
+@dataclass(frozen=True)
+class Pelanggaran:
+    """SQLSTATE dan nama constraint dari galat basis data — tanpa pesannya.
+
+    Pesan PostgreSQL membawa isi baris (`DETAIL: Key (email)=(…)`); keputusan
+    kode — "409 atau 422?" — dibuat dari pengenal ini, bukan dari teks galat
+    (SECURITY.md, tinjauan Sprint 1).
+    """
+
+    sqlstate: str | None
+    constraint: str | None
+
+
+UNIQUE_VIOLATION = "23505"
+FOREIGN_KEY_VIOLATION = "23503"
+CHECK_VIOLATION = "23514"
+
+
+def rincian_pelanggaran(galat: DBAPIError) -> Pelanggaran:
+    sqlstate: str | None = None
+    constraint: str | None = None
+    g: BaseException | None = galat.orig
+    while g is not None and (sqlstate is None or constraint is None):
+        sqlstate = sqlstate or getattr(g, "sqlstate", None) or getattr(g, "pgcode", None)
+        constraint = constraint or getattr(g, "constraint_name", None)
+        g = g.__cause__
+    return Pelanggaran(sqlstate, constraint)

@@ -250,7 +250,7 @@ kode**. Persen tidak bisa dipakai di repo ini.
 |---|---|
 | Spesifikasi V0 | ✅ **selesai** — 23 tabel · 22 event · 51 tugas |
 | **Kode V0 — di `master`** | 🛑 **0 dari 51 tugas** — sampai PR Sprint 0 digabung pemilik |
-| **Kode V0 — ditulis, menunggu HUMAN REVIEW** | ⏳ **8 dari 51** — Sprint 0 (0.1–0.8), branch `v0/sprint-0-foundation` |
+| **Kode V0 — ditulis, menunggu HUMAN REVIEW** | ⏳ **22 dari 51** — Sprint 0 (0.1–0.8) · Sprint 1 (1.1–1.7) · Sprint 2 (2.1–2.7), tiga branch bertumpuk `v0/sprint-0-foundation` → `v0/sprint-1-identity` → `v0/sprint-2-human-core` |
 | Master Architecture v2.0 | ✅ **selesai** — [`README.md`](README.md) 11 butir |
 | Tahap yang tidak diblokir keputusan | **T0–T5** |
 | Tahap yang menunggu pemilik | **T6–T12** |

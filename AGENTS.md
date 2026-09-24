@@ -60,6 +60,7 @@ apps/api/src/hvx/
     ├── profile/ goals/ habits/ checkins/ journal/ activities/
     ├── events/  memory/  intelligence/
     └── agents/        tidak ada yang boleh mengimpornya
+apps/mobile/           Flutter — layar V0 (spec/07 2.7); klien = `lib/api/klien.dart`
 data/migrations/       Alembic; SQL di *.up.sql / *.down.sql
 tests/unit/ · tests/integration/
 tools/                 pemeriksa dokumen, uji mutasi, CI lokal
@@ -89,6 +90,13 @@ tools/                 pemeriksa dokumen, uji mutasi, CI lokal
 | perubahan basis data dan jejak auditnya satu transaksi | `test_izin.py` · `test_persetujuan.py` · `test_auth.py` | panggil `audit(conn, …)` dengan `conn` perubahannya; jangan `commit()` di antaranya |
 | galat basis data dicatat **tanpa pesan** (pesan PostgreSQL membawa isi baris) | `test_galat_basis_data.py` | jangan konfigurasi ulang log tanpa `_galat_basis_data_tanpa_isi`; baca SQLSTATE dan nama constraint, bukan pesannya |
 | teks bebas dari klien tidak memuat NUL | `test_auth.py` · `test_profil.py` | medan `str` yang disimpan: `platform.TeksTanpaNul`; `jsonb`: `platform.tanpa_nul_bersarang` |
+| angka · boolean · tanggal · waktu dari klien **ketat** — pydantic mode python mengoersi `true`→1, detik Unix→tanggal UTC (E-170) | `test_masukan_ketat_semua_rute.py` (skema inti tiap rute) | medan badan: `platform.Bulat` · `Benar` · `Tanggal` · `WaktuBerzona` · `AngkaJson`; kueri/jalur bertanggal: `platform.Tanggal` · `WaktuBerzona` — jangan `int`/`bool`/`date`/`datetime` polos |
+| rute tulis domain **menyatakan dan memanggil** `Idempotency-Key` | `test_idempotensi_terpasang.py` | `idem: platform.Idempoten` + `return await idem.jalankan(user_id, kerja, baca_ulang)`; `kerja` mengembalikan `platform.Jawaban(status, isi, id)` — Redis hanya menyimpan rujukan (E-171) |
+| bacaan/pendengar lintas modul domain lewat titik rakit, bukan impor (K-23) | `test_main.py` | fungsi pintu keluar modul dipasang `hvx.main` di `app.state`; rute mengambilnya dan **menolak berjalan** tanpanya |
+| tulisan yang menaut baris lain (goal) mengunci barisnya hidup | `test_batas_dan_balapan.py` (serentak) | `goals.kunci_goal_hidup(conn, id)` — `FOR SHARE` — **sebelum** menulis anak, milestone, atau tautan |
+| daftar yang dibaca utuh dibatasi **saat menulis** (K-24) | `test_batas_dan_balapan.py` | hitung di bawah `pg_advisory_xact_lock` per pemilik → `422 *_limit_reached`; jangan memotong saat membaca |
+| kursor halaman terikat daftar asalnya | `test_halaman.py` | `platform.kursor_waktu("<daftar>", …)` · `baca_kursor_waktu("<daftar>", …)` |
+| aplikasi Flutter bersih dan teruji | `ci_lokal.py`: `dart format` · `flutter analyze --fatal-infos` · `flutter test` · layar diketuk lawan api hidup (smoke) | `flutter`/`dart` di PATH, atau `HVX_FLUTTER`/`HVX_DART` |
 
 🔑 **Setiap penegak baru wajib dibuktikan sanggup gagal** — tambahkan
 mutasinya di `tools/uji_mutasi.py` (dokumen) atau `tools/uji_mutasi_kode.py`
@@ -109,6 +117,7 @@ python -m pip install uv          # sekali, kalau belum ada
 uv sync                           # seluruh lingkungan dari uv.lock
 uv run pytest -m "not integration"                  # putaran cepat
 docker compose up -d --wait postgres redis          # layanan untuk uji integrasi
+(cd apps/mobile && flutter test)                    # aplikasi — tanpa server
 uv run --locked python tools/ci_lokal.py            # GERBANG PENUH sebelum PR
 git push && uv run --locked python tools/ci_lokal.py --lapor-github   # + status di PR
 ```

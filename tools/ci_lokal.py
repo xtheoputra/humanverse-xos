@@ -55,8 +55,18 @@ TRIVY = (
 )
 # `uv run` mengisi UV dengan jalur binernya sendiri; di luar itu cari di PATH.
 _UV = [os.environ.get("UV") or shutil.which("uv") or "uv"]
-# Direktori yang tidak dipindai rahasia: lingkungan terpasang & cache alat.
-_LEWATI_PINDAI = [".git", ".venv", "node_modules", ".mypy_cache", ".ruff_cache", ".pytest_cache"]
+# Aplikasi Flutter (ADR-001, spec/07 2.7). `HVX_FLUTTER` menunjuk biner `flutter`
+# kalau tidak ada di PATH. Tanpa Flutter tahapnya GAGAL — tidak dilewati.
+APLIKASI = AKAR / "apps" / "mobile"
+_FLUTTER = os.environ.get("HVX_FLUTTER") or shutil.which("flutter") or "flutter"
+# `dart` ikut Flutter (flutter/bin); `flutter format` sudah tidak ada.
+_DART = os.environ.get("HVX_DART") or shutil.which("dart") or "dart"
+# Direktori yang tidak dipindai rahasia: lingkungan terpasang, cache alat, dan
+# keluaran bangun Flutter.
+_LEWATI_PINDAI = [
+    ".git", ".venv", "node_modules", ".mypy_cache", ".ruff_cache", ".pytest_cache",
+    "apps/mobile/.dart_tool", "apps/mobile/build",
+]  # fmt: skip
 
 # Kecuali R-1: enam roadmap fase GAGAL R-1 hari ini, dan mengurutkannya ulang
 # adalah keputusan CAKUPAN milik pemilik (#99 #111 #116 #121 #131 #144).
@@ -70,7 +80,16 @@ Langkah = tuple[str, list[str] | Callable[[], int], bool]  # (nama, perintah, wa
 
 
 def _smoke_compose() -> int:
-    """Jalankan tumpukan compose penuh DARI CITRA CI, tuntut /health 200, lalu bongkar."""
+    """Jalankan tumpukan compose penuh DARI CITRA CI, tuntut /health 200, lalu bongkar.
+
+    Sesudah sehat, klien aplikasi Flutter yang SAMA dengan layar (spec/07 2.7)
+    menjalankan alur manusia — daftar, check-in, habit, tandai selesai, batal,
+    keluar — terhadap api dari citra itu (`apps/mobile/tool/ujung_ke_ujung.dart`).
+    🔴 Dibuat karena layar pertama yang dicoba lawan tumpukan compose menemui
+    `500` yang tidak satu pun uji tangkap: uji api memakai basis data yang baru
+    dimigrasi, uji widget memakai layanan palsu — tidak ada yang mempertemukan
+    klien dengan api sungguhan.
+    """
     proyek = ["docker", "compose", "-p", "hvx-ci-smoke"]
     env = {
         **os.environ,
@@ -95,13 +114,55 @@ def _smoke_compose() -> int:
                     badan = jawab.read().decode()
                     print(f"  {url} → {jawab.status} {badan}")
                     if jawab.status == 200 and '"status":"ok"' in badan.replace(" ", ""):
-                        return 0
+                        return _ujung_ke_ujung(f"http://127.0.0.1:{env['HVX_API_PORT']}")
             except OSError as galat:
                 print(f"  {url} → {galat}")
             time.sleep(2)
         return 1
     finally:
         subprocess.run([*proyek, "down", "-v", "--remove-orphans"], cwd=AKAR, env=env)
+
+
+def _ujung_ke_ujung(dasar: str) -> int:
+    """Alur manusia layar V0 pertama lawan api hidup — lihat `_smoke_compose`.
+
+    Dua bukti: klien asli TANPA layar (`tool/ujung_ke_ujung.dart`), lalu LAYAR
+    yang diketuk seperti manusia (`test/ujung/`, spec/07 2.7 — tinjauan kontrak
+    Sprint 2: tidak ada yang menjalankan layar terhadap api nyata).
+    """
+    print(f"  ujung ke ujung (apps/mobile) → {dasar}", flush=True)
+    klien = _flutter("run", "tool/ujung_ke_ujung.dart", dasar, biner=_DART)()
+    if klien != 0:
+        return klien
+    print(f"  layar diketuk lawan api hidup (apps/mobile/test/ujung) → {dasar}", flush=True)
+    return _flutter("test", "test/ujung", f"--dart-define=HVX_API_UJI={dasar}")()
+
+
+# Zona mesin untuk perintah Flutter (tinjauan penegak buta Sprint 2): `tanggalLokal`
+# hanya bisa dibedakan dari tanggal UTC di mesin yang TIDAK berzona UTC — di runner
+# UTC, mutasi `toUtc()` lolos seluruh uji. POSIX `WIB-7` = UTC+7, dibaca Dart di
+# Linux dan Windows. `tools/uji_mutasi_kode.py` memakai angka yang sama.
+TZ_FLUTTER = "WIB-7"
+
+
+def _flutter(*argumen: str, biner: str | None = None) -> Callable[[], int]:
+    """Satu perintah di `apps/mobile` — dependensi dari `pubspec.lock` apa adanya."""
+    program = biner or _FLUTTER
+
+    def jalankan() -> int:
+        for alat, variabel in ((_FLUTTER, "HVX_FLUTTER"), (program, "HVX_DART")):
+            if not (Path(alat).exists() or shutil.which(alat)):
+                print(f"🛑 {alat} tidak ditemukan — isi PATH atau {variabel}")
+                return 127
+        env = {**os.environ, "PYTHONIOENCODING": "utf-8", "TZ": TZ_FLUTTER}
+        # --enforce-lockfile: kunci yang tidak cocok lagi GAGAL, sama dengan `uv --locked`.
+        siap = subprocess.run([_FLUTTER, "pub", "get", "--enforce-lockfile"], cwd=APLIKASI, env=env)
+        if siap.returncode != 0:
+            return siap.returncode
+        return subprocess.run([program, *argumen], cwd=APLIKASI, env=env).returncode
+
+    jalankan.__name__ = f"{Path(program).stem} " + " ".join(argumen)
+    return jalankan
 
 
 def _pip_audit() -> int:
@@ -190,6 +251,14 @@ TAHAP: dict[str, list[Langkah]] = {
             True,
         ),
         (
+            "dart format (apps/mobile)",
+            _flutter(
+                "format", "--output=none", "--set-exit-if-changed", "lib", "test", biner=_DART
+            ),
+            True,
+        ),
+        ("flutter analyze (apps/mobile)", _flutter("analyze", "--fatal-infos"), True),
+        (
             "R-1 (dilaporkan, keputusan cakupan pemilik)",
             [PY, "tools/periksa_dokumen.py", "R-1"],
             False,
@@ -201,6 +270,7 @@ TAHAP: dict[str, list[Langkah]] = {
     "test": [
         ("pytest + cakupan ≥ 70 %", [PY, "-m", "pytest", "--cov", "--cov-report=term"], True),
         ("uji_mutasi kode — migrasi", [PY, "tools/uji_mutasi_kode.py", "--hanya-db"], True),
+        ("flutter test (apps/mobile)", _flutter("test"), True),
     ],
     "build": [
         (

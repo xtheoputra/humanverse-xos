@@ -9,7 +9,12 @@ Kebijakan yang tahu apa itu pengguna atau login tinggal di `identity`.
   perbatasan dua jendela. `jumlah/jendela` berarti: boleh meledak sampai
   `jumlah` sekaligus, lalu terisi kembali satu tiap `jendela/jumlah`.
 * **Jam Redis, bukan jam proses** (`TIME` di dalam skrip): semua instans api
-  menghitung dengan satu jam.
+  menghitung dengan satu jam — dan jam itu **tidak mundur per kunci**. Langkah
+  mundur sampai `_MUNDUR_DISERAP_MS` dibaca sebagai "waktu yang sama": jam VM
+  Docker Desktop di bawah beban melangkah mundur 0,76–1,18 dtk (diukur tinjauan
+  Sprint 2), dan permintaan di ujung ledakan yang kebetulan jatuh sesudahnya
+  ditolak `429` palsu. Langkah yang lebih besar dipakai apa adanya — menahan
+  jam sebuah kunci satu jam karena jam server disetel mundur satu jam lebih buruk.
 * **IP tidak pernah disimpan mentah** — kuncinya HMAC dengan `HVX_IP_HASH_KEY`.
   **IPv6 dihitung per /64**: satu pelanggan biasa menerima satu /64 utuh, jadi
   batas per alamat dilewati cukup dengan berganti alamat di jaringannya sendiri.
@@ -38,14 +43,22 @@ from .keadaan import redis_dari, settings_dari
 _POLA_NAMA = re.compile(r"^[a-z][a-z0-9-]{0,39}$")
 _PESAN = "Terlalu banyak permintaan. Coba lagi nanti."
 
-# KEYS[1] kunci · ARGV[1] interval emisi (ms) · ARGV[2] toleransi (ms)
-# → {lolos 0/1, coba lagi dalam ms, sisa}
+# Langkah mundur jam Redis yang diserap per kunci — lihat docstring modul.
+_MUNDUR_DISERAP_MS = 2_000
+
+# KEYS[1] kunci (hash: tat · t) · ARGV[1] interval emisi (ms) · ARGV[2] toleransi (ms)
+# · ARGV[3] langkah mundur yang diserap (ms) → {lolos 0/1, coba lagi dalam ms, sisa}
 _GCRA = """
 local interval = tonumber(ARGV[1])
 local toleransi = tonumber(ARGV[2])
 local waktu = redis.call('TIME')
 local sekarang = tonumber(waktu[1]) * 1000 + math.floor(tonumber(waktu[2]) / 1000)
-local tat = tonumber(redis.call('GET', KEYS[1]))
+local simpan = redis.call('HMGET', KEYS[1], 'tat', 't')
+local tat = tonumber(simpan[1])
+local terakhir = tonumber(simpan[2])
+if terakhir ~= nil and sekarang < terakhir and terakhir - sekarang <= tonumber(ARGV[3]) then
+  sekarang = terakhir
+end
 if tat == nil or tat < sekarang then
   tat = sekarang
 end
@@ -54,7 +67,8 @@ local boleh_pada = tat_baru - toleransi
 if sekarang < boleh_pada then
   return {0, boleh_pada - sekarang, 0}
 end
-redis.call('SET', KEYS[1], tat_baru, 'PX', tat_baru - sekarang)
+redis.call('HSET', KEYS[1], 'tat', tat_baru, 't', sekarang)
+redis.call('PEXPIRE', KEYS[1], tat_baru - sekarang)
 return {1, 0, math.floor((sekarang - boleh_pada) / interval)}
 """
 
@@ -119,7 +133,7 @@ class PembatasLaju:
         interval = batas.interval_ms
         lolos, coba_lagi, sisa = await self._skrip(
             keys=[self._kunci(batas, subjek)],
-            args=[interval, interval * batas.jumlah],
+            args=[interval, interval * batas.jumlah, _MUNDUR_DISERAP_MS],
         )
         return HasilLaju(lolos=bool(lolos), sisa=int(sisa), coba_lagi_ms=int(coba_lagi))
 
