@@ -124,6 +124,14 @@ _SELESAI_PADA = text(
     """
 )
 
+_SELESAI_TANGGAL = text(
+    """
+    SELECT id, habit_id, for_date, status, tier_used, note, source, completed_at, created_at
+    FROM habit_completions
+    WHERE user_id = :user_id AND for_date = :for_date
+    """
+)
+
 _HAPUS_SELESAI = text(
     "DELETE FROM habit_completions WHERE habit_id = :habit_id AND for_date = :for_date"
 )
@@ -298,3 +306,11 @@ async def mulai_lokal(conn: AsyncConnection, habit_id: UUID, zona: str) -> date 
 async def riwayat(conn: AsyncConnection, habit_id: UUID) -> dict[date, str]:
     hasil = await conn.execute(_RIWAYAT, {"habit_id": habit_id})
     return {b.for_date: str(b.status) for b in hasil}
+
+
+async def selesai_tanggal(
+    conn: AsyncConnection, user_id: UUID, for_date: date
+) -> dict[UUID, Penyelesaian]:
+    """{habit_id: penyelesaian} semua habit pengguna pada tanggal itu — SATU kueri."""
+    hasil = await conn.execute(_SELESAI_TANGGAL, {"user_id": user_id, "for_date": for_date})
+    return {p.habit_id: p for p in (_penyelesaian(b) for b in hasil.mappings())}

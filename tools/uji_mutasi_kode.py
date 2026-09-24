@@ -145,6 +145,8 @@ UJI_IDEM_RUTE = "tests/unit/test_idempotensi_terpasang.py"
 UJI_HABITS = "tests/integration/test_habits.py"
 UJI_SELESAI = "tests/integration/test_penyelesaian.py"
 UJI_RENTETAN = "tests/integration/test_rentetan.py"
+UJI_CHECKIN = "tests/integration/test_checkin.py"
+UJI_HARI = "tests/integration/test_habit_hari_ini.py"
 FK_MILESTONE = (
     "  FOREIGN KEY (goal_id, user_id) REFERENCES goals (id, user_id) ON DELETE CASCADE" + NL + ");"
 )
@@ -1923,6 +1925,71 @@ MUTASI: list[Mutasi] = [
         ],
         _pytest("tests/unit/test_main.py::test_titik_rakit_memasang_pembaca_lintas_modul"),
         harus_memuat="hvx.main tidak memasang pembaca_zona_waktu dari profile",
+    ),
+    # ── Sprint 2 · 2.5 daily_checkins (upsert per tanggal) + tier dari energi ─
+    Mutasi(
+        "2.5",
+        "check-in tanpa ON CONFLICT — PUT kedua menjadi galat",
+        [
+            Sunting(
+                f"{MODUL}/checkins/repository.py",
+                "    ON CONFLICT (user_id, for_date) DO UPDATE SET"
+                + NL
+                + "      energy = EXCLUDED.energy,"
+                + NL
+                + "      focus = EXCLUDED.focus,"
+                + NL
+                + "      sleep_hours = EXCLUDED.sleep_hours,"
+                + NL
+                + "      note = EXCLUDED.note"
+                + NL,
+                "",
+            )
+        ],
+        _pytest(f"{UJI_CHECKIN}::test_put_dua_kali_satu_baris"),
+        harus_memuat="PUT kedua bukan 200",
+        kelompok="db",
+    ),
+    Mutasi(
+        "2.5",
+        "PUT check-in menambal (COALESCE), bukan mengganti",
+        [
+            Sunting(
+                f"{MODUL}/checkins/repository.py",
+                "      energy = EXCLUDED.energy,",
+                "      energy = COALESCE(EXCLUDED.energy, daily_checkins.energy),",
+            )
+        ],
+        _pytest(f"{UJI_CHECKIN}::test_put_mengganti_medan_yang_tidak_dikirim_menjadi_kosong"),
+        harus_memuat="PUT menambal, bukan mengganti",
+        kelompok="db",
+    ),
+    Mutasi(
+        "2.2",
+        "tier yang disarankan tidak membaca energi check-in",
+        [
+            Sunting(
+                f"{MODUL}/habits/service.py",
+                "suggested_tier=tier_untuk_energi(len(h.adaptive_tiers), energi),",
+                "suggested_tier=tier_untuk_energi(len(h.adaptive_tiers), None),",
+            )
+        ],
+        _pytest(f"{UJI_HARI}::test_tier_turun_saat_energi_rendah"),
+        harus_memuat="tier tidak turun saat energi rendah",
+        kelompok="db",
+    ),
+    Mutasi(
+        "2.5",
+        "titik rakit tidak memasang pembaca energi check-in (K-23)",
+        [
+            Sunting(
+                "apps/api/src/hvx/main.py",
+                "    app.state.pembaca_energi = checkins.energi_pada" + NL,
+                "",
+            )
+        ],
+        _pytest("tests/unit/test_main.py::test_titik_rakit_memasang_pembaca_lintas_modul"),
+        harus_memuat="hvx.main tidak memasang pembaca_energi dari checkins",
     ),
 ]
 

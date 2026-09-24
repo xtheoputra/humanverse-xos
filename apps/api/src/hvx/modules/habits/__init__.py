@@ -12,11 +12,12 @@ Berkas ini satu-satunya pintu keluar modul (spec/06 aturan 1).
 from .rentetan import Rentetan, hitung_rentetan
 from .routes import router
 from .schemas import Habit
-from .service import PembacaZonaWaktu
+from .service import PembacaEnergi, PembacaZonaWaktu
 from .tier import tier_untuk_energi
 
 __all__ = [
     "Habit",
+    "PembacaEnergi",
     "PembacaZonaWaktu",
     "Rentetan",
     "hitung_rentetan",

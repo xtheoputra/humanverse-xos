@@ -44,9 +44,12 @@ def test_titik_rakit_memasang_pembaca_lintas_modul() -> None:
     Rute rentetan MENOLAK berjalan tanpa pembaca ini (bukan jatuh ke UTC diam-diam),
     jadi titik rakit yang lupa memasangnya akan terlihat di sini dulu.
     """
-    from hvx.modules import profile
+    from hvx.modules import checkins, profile
 
     app = _app("test")
     assert getattr(app.state, "pembaca_zona_waktu", None) is profile.zona_waktu, (
         "hvx.main tidak memasang pembaca_zona_waktu dari profile"
+    )
+    assert getattr(app.state, "pembaca_energi", None) is checkins.energi_pada, (
+        "hvx.main tidak memasang pembaca_energi dari checkins"
     )

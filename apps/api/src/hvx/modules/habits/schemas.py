@@ -84,10 +84,6 @@ class Habit(BaseModel):
     updated_at: datetime
 
 
-class DaftarHabit(BaseModel):
-    items: list[Habit]
-
-
 class BuatHabit(BaseModel):
     """`POST /habits` — spec/04: `period` dan `target_count` WAJIB (bukan bawaan spec/01)."""
 
@@ -164,6 +160,30 @@ class CatatPenyelesaian(BaseModel):
         if self.status == "skipped" and self.tier_used is not None:
             raise ValueError("tier_used tidak berarti untuk status 'skipped'")
         return self
+
+
+# ── spec/07 2.2 · 2.5 — habit pada satu tanggal ──────────────────────────────
+
+
+class HariHabit(BaseModel):
+    """`GET /habits?for_date=` — keadaan habit pada tanggal LOKAL itu.
+
+    `energy` ikut dikirim sebagai ALASAN `suggested_tier` (Explainable AI naskah 4
+    §29): tier yang turun tanpa menyebut kenapa terbaca seperti hukuman.
+    """
+
+    for_date: date
+    completion: Penyelesaian | None
+    energy: int | None
+    suggested_tier: int | None
+
+
+class HabitHari(Habit):
+    day: HariHabit | None = None
+
+
+class DaftarHabit(BaseModel):
+    items: list[HabitHari]
 
 
 # ── spec/07 2.4 — rentetan ────────────────────────────────────────────────────

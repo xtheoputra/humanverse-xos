@@ -41,13 +41,28 @@ def _pembaca_zona_waktu(request: Request) -> service.PembacaZonaWaktu:
     return pembaca  # type: ignore[no-any-return]
 
 
+def _pembaca_energi(request: Request) -> service.PembacaEnergi:
+    """Dipasang titik rakit `hvx.main` (K-23): energi check-in milik `checkins`."""
+    pembaca = getattr(request.app.state, "pembaca_energi", None)
+    if pembaca is None:
+        raise RuntimeError("hvx.main tidak memasang app.state.pembaca_energi (K-23)")
+    return pembaca  # type: ignore[no-any-return]
+
+
 @router.get("/habits", response_model=DaftarHabit)
 async def daftar_habit(
     request: Request,
     pengguna: identity.PenggunaDiperlukan,
     status: StatusHabit | None = None,
+    for_date: date | None = None,
 ) -> DaftarHabit:
-    return await service.daftar(platform.engine_dari(request), pengguna.user_id, status=status)
+    return await service.daftar(
+        platform.engine_dari(request),
+        pengguna.user_id,
+        status=status,
+        for_date=for_date,
+        pembaca_energi=_pembaca_energi(request) if for_date is not None else None,
+    )
 
 
 @router.post("/habits", status_code=201, response_model=Habit)

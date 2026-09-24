@@ -19,7 +19,7 @@ from functools import partial
 from fastapi import FastAPI
 
 from hvx import __version__
-from hvx.modules import goals, habits, identity, platform, profile
+from hvx.modules import checkins, goals, habits, identity, platform, profile
 
 DOKUMENTASI_TERBUKA: frozenset[str] = frozenset({"local", "test", "ci"})
 
@@ -73,6 +73,8 @@ def create_app(settings: platform.Settings | None = None) -> FastAPI:
     # K-23: bacaan lintas modul domain di transaksi pemanggil — habits butuh zona
     # waktu profil untuk "hari ini" rentetan (spec/07 2.4) tanpa mengimpor profile.
     app.state.pembaca_zona_waktu = profile.zona_waktu
+    # …dan energi check-in untuk tier habit yang disarankan (spec/07 2.2, naskah 4 §34).
+    app.state.pembaca_energi = checkins.energi_pada
     platform.pasang_penangan_galat(app)
     # Yang ditambahkan TERAKHIR paling luar: 429 batas laju tetap membawa
     # X-Request-ID dan tercatat di baris `request.completed`.
@@ -83,4 +85,5 @@ def create_app(settings: platform.Settings | None = None) -> FastAPI:
     app.include_router(profile.router)
     app.include_router(goals.router)
     app.include_router(habits.router)
+    app.include_router(checkins.router)
     return app

@@ -88,7 +88,7 @@ DELETE /goals/{id}                            → 204 (soft delete)
 POST   /goals/{id}/milestones { title, position?, due_date? }   → 201
 PATCH  /milestones/{id}       { status?, title?, due_date? }
 
-GET    /habits               ?status=active
+GET    /habits               ?status=active&for_date=     → { items }; dengan for_date, tiap habit membawa day{}   🔧 2.2
 POST   /habits               { id?, title, period, target_count, schedule?, goal_id?, adaptive_tiers? }
 PATCH  /habits/{id}
 DELETE /habits/{id}
@@ -161,7 +161,7 @@ GET    /habits/{id}/streak       → { current, longest, completion_rate_30d }
 
 ```
 GET    /checkins             ?from=&to=
-PUT    /checkins/{for_date}  { energy?, focus?, sleep_hours?, note? }   → upsert
+PUT    /checkins/{for_date}  { energy?, focus?, sleep_hours?, note? }   → upsert: 201 baru · 200 diganti
 GET    /moods                ?from=&to=&cursor=
 POST   /moods                { id?, valence, label?, note?, occurred_at? }
 GET    /journal              ?from=&to=&cursor=      → tanpa body, hanya ringkasan
@@ -176,6 +176,27 @@ POST   /activities           { id?, kind, occurred_at, duration_seconds?, payloa
 > `GET /journal` **tidak** mengembalikan `body`. Daftar jurnal sering dimuat
 > di layar ringkasan; mengirim seluruh isi tulisan pribadi ke sana adalah
 > kebocoran yang tidak perlu.
+
+> 🔧 **`PUT /checkins/{for_date}` = GANTI, bukan tambal (spec/07 2.5, 24 Sep
+> 2026).** Badan adalah check-in tanggal itu: medan yang tidak dikirim menjadi
+> kosong — dua `PUT` yang sama selalu menghasilkan baris yang sama, apa pun
+> isinya sebelumnya (idempoten dengan sendirinya; `Idempotency-Key` tidak
+> dijanjikan untuk `PUT`). Satu pernyataan `INSERT … ON CONFLICT (user_id,
+> for_date) DO UPDATE` — `PUT` serentak tidak bisa menyisipkan baris kedua.
+> `sleep_hours` satu angka desimal (`numeric(3,1)`): `7.25` **ditolak** `400`,
+> tidak dibulatkan diam-diam. `for_date` mengikuti aturan penyelesaian habit
+> (`422 for_date_in_future` hanya bila belum terjadi di mana pun).
+> `GET /checkins`: `from` dan `to` dikirim **bersama** (inklusif, paling lebar
+> 366 tanggal, terbaru dulu); tanpa keduanya — 31 check-in terakhir.
+>
+> 🔧 **`GET /habits?for_date=` ditambahkan 24 Sep 2026 (E-169), saat 2.2 dan
+> 2.7 ditulis.** 2.2 menuntut *“tier turun saat energi rendah”*, dan layar 2.7
+> menandai habit selesai **hari ini** — tidak satu rute pun yang menjawab
+> *“habit mana yang sudah selesai tanggal ini, dan tier mana yang disarankan”*
+> tanpa N+1 permintaan. Dengan `for_date`, tiap habit membawa
+> `day: { for_date, completion, energy, suggested_tier }` — `energy` ikut
+> sebagai **alasan** tier yang disarankan (Explainable AI naskah 4 §29).
+> Pemetaan energi → tier: **K-23** (naskah 4 §34).
 
 ---
 

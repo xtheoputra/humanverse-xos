@@ -39,15 +39,20 @@ from .schemas import (
     CatatPenyelesaian,
     DaftarHabit,
     Habit,
+    HabitHari,
+    HariHabit,
     JawabanRentetan,
     Penyelesaian,
     UbahHabit,
     periksa_jadwal,
     periksa_target,
 )
+from .tier import tier_untuk_energi
 
 # (koneksi pemanggil, user_id) → zona IANA dari profil, atau None — K-23.
 PembacaZonaWaktu = Callable[[AsyncConnection, UUID], Awaitable[str | None]]
+# (koneksi pemanggil, user_id, tanggal lokal) → energi check-in 1–5, atau None — K-23.
+PembacaEnergi = Callable[[AsyncConnection, UUID, date], Awaitable[int | None]]
 ZONA_BAWAAN = "UTC"  # spec/01 profiles.timezone DEFAULT 'UTC'
 
 
@@ -65,10 +70,39 @@ def _galat_integritas(galat: IntegrityError) -> platform.GalatApi | None:
     return None
 
 
-async def daftar(engine: AsyncEngine, user_id: UUID, *, status: str | None) -> DaftarHabit:
+async def daftar(
+    engine: AsyncEngine,
+    user_id: UUID,
+    *,
+    status: str | None,
+    for_date: date | None = None,
+    pembaca_energi: PembacaEnergi | None = None,
+) -> DaftarHabit:
+    """Daftar habit; dengan `for_date`, tiap habit membawa keadaannya pada tanggal itu —
+    penyelesaiannya dan tier yang disarankan dari energi check-in (spec/07 2.2, naskah 4 §34).
+    """
     async with platform.transaksi_pengguna(engine, user_id) as conn:
         habit = await repository.daftar(conn, user_id=user_id, status=status)
-    return DaftarHabit(items=habit)
+        if for_date is None:
+            return DaftarHabit(items=[HabitHari(**h.model_dump()) for h in habit])
+        if pembaca_energi is None:
+            raise RuntimeError("pembaca_energi wajib untuk daftar habit ber-for_date (K-23)")
+        energi = await pembaca_energi(conn, user_id, for_date)
+        selesai = await repository.selesai_tanggal(conn, user_id, for_date)
+    return DaftarHabit(
+        items=[
+            HabitHari(
+                **h.model_dump(),
+                day=HariHabit(
+                    for_date=for_date,
+                    completion=selesai.get(h.id),
+                    energy=energi,
+                    suggested_tier=tier_untuk_energi(len(h.adaptive_tiers), energi),
+                ),
+            )
+            for h in habit
+        ]
+    )
 
 
 async def buat(engine: AsyncEngine, user_id: UUID, badan: BuatHabit) -> Habit:
