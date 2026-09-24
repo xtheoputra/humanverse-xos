@@ -95,6 +95,7 @@ def create_app(settings: platform.Settings | None = None) -> FastAPI:
             ),
             platform.gerbang_model_dari(settings),
             pencari,
+            anggaran_harian_usd=settings.ai_anggaran_harian_usd,
         )
         app.state.percakapan = agents.LayananPercakapan(
             engine, runtime, agents.AliranPercakapan(), mesin_izin, tanda

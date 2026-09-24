@@ -902,7 +902,9 @@ ALTER TABLE recommendations
 > (`action` wajib — `reply` · `delegate` · id yang disentuh), dan run yang tidak
 > berhasil `{"action": "<status>"}`; `error` = `{code, type}` — **tanpa pesan**, sebab
 > pesan galat bisa mengutip tulisan pengguna. `cost_usd` = run itu sendiri; biaya
-> satu permintaan (SSE `done`) = seluruh pohonnya.
+> satu permintaan (SSE `done`) = seluruh pohonnya. Anggaran harian (4.9, K-32) dibaca
+> dari kolom yang sama; run yang diturunkan ke model kecil membawa
+> `decision.model_downgraded = true`.
 
 ```sql
 -- @retention   : forever

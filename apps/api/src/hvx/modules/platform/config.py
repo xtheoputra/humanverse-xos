@@ -120,6 +120,10 @@ class Settings(BaseSettings):
     # `{"lokal/hvx-nalar-v1": [3, 15]}`. Model di luar penyedia `lokal` tanpa harga
     # DITOLAK gerbang: biaya yang tak terhitung tak bisa dibatasi (4.9).
     model_harga: dict[str, tuple[Decimal, Decimal]] = Field(default_factory=dict)
+    # Anggaran biaya model per PENGGUNA per HARI LOKALNYA (spec/07 4.9, K-32). Melewatinya
+    # menurunkan kelas model ke `simple` — bukan menolak. Angka sebenarnya milik pemilik
+    # (uang, A-6/#18); bawaannya longgar, dan penyedia lokal V0 gratis.
+    ai_anggaran_harian_usd: Decimal = Field(default=Decimal("0.50"), ge=0, le=1_000)
 
     @field_validator("model_harga")
     @classmethod

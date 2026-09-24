@@ -431,3 +431,19 @@ class RingkasanPohon:
 async def ringkas_pohon(conn: AsyncConnection, user_id: UUID, run_id: UUID) -> RingkasanPohon:
     baris = (await conn.execute(_RINGKAS_POHON, {"run_id": run_id, "user_id": user_id})).one()
     return RingkasanPohon(Decimal(baris.biaya), int(baris.masuk), int(baris.keluar), baris.model)
+
+
+# Anggaran harian (4.9): biaya run yang SUDAH ditutup sejak awal hari lokal pengguna — run
+# yang masih berjalan belum punya `cost_usd` (NULL tidak ikut dijumlah), dan dihitung dari
+# ingatan proses oleh runtime.
+_BIAYA_SEJAK = text(
+    """
+    SELECT coalesce(sum(cost_usd), 0) FROM agent_runs
+    WHERE user_id = :user_id AND started_at >= :sejak
+    """
+)
+
+
+async def biaya_sejak(conn: AsyncConnection, user_id: UUID, sejak: datetime) -> Decimal:
+    hasil = await conn.execute(_BIAYA_SEJAK, {"user_id": user_id, "sejak": sejak})
+    return Decimal(hasil.scalar_one())

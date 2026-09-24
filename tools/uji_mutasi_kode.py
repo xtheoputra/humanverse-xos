@@ -304,6 +304,7 @@ UJI_GERBANG = "tests/integration/test_gerbang_risiko.py"
 UJI_ORKESTRATOR = "tests/integration/test_orkestrator.py"
 UJI_AGENT_V0 = "tests/integration/test_agent_v0.py"
 UJI_PERCAKAPAN = "tests/integration/test_percakapan.py"
+UJI_ANGGARAN = "tests/integration/test_anggaran.py"
 FK_MILESTONE = (
     "  FOREIGN KEY (goal_id, user_id) REFERENCES goals (id, user_id) ON DELETE CASCADE" + NL + ");"
 )
@@ -6738,6 +6739,104 @@ MUTASI: list[Mutasi] = [
         _pytest(f"{UJI_PERCAKAPAN}::test_aliran_tanpa_giliran_204"),
         harus_memuat="204 berarti jangan menyambung ulang",
         kelompok="db",
+    ),
+    # ── Sprint 4 · 4.9 anggaran harian: melewati batas → turun ke model kecil, bukan gagal ──
+    Mutasi(
+        "4.9",
+        "anggaran tidak diperiksa sebelum memanggil model",
+        [
+            Sunting(
+                f"{MODUL}/agents/runtime.py",
+                "        pilihan = self._runtime.gerbang_model.pilih_kelas(diminta, anggaran_habis=habis)",
+                "        pilihan = self._runtime.gerbang_model.pilih_kelas(diminta, anggaran_habis=False)",
+            )
+        ],
+        _pytest(f"{UJI_ANGGARAN}::test_anggaran_habis_turun_ke_model_kecil_bukan_gagal"),
+        harus_memuat="anggaran habis tidak menurunkan kelas model",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.9",
+        "turun kelas tidak tercatat di jejak run",
+        [
+            Sunting(
+                f"{MODUL}/agents/runtime.py",
+                '            keputusan_run["model_downgraded"] = True  # anggaran harian habis (4.9)',
+                "            pass",
+            )
+        ],
+        _pytest(f"{UJI_ANGGARAN}::test_anggaran_habis_turun_ke_model_kecil_bukan_gagal"),
+        harus_memuat="turun kelas tidak tercatat di jejaknya",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.9",
+        "biaya sebelum hari ini ikut dihitung",
+        [
+            Sunting(
+                f"{MODUL}/agents/runtime.py",
+                "            hour=0, minute=0, second=0, microsecond=0",
+                "            year=2000, hour=0, minute=0, second=0, microsecond=0",
+            )
+        ],
+        _pytest(f"{UJI_ANGGARAN}::test_biaya_kemarin_waktu_lokal_tidak_dihitung"),
+        harus_memuat="biaya hari kemarin (waktu lokal) ikut dihitung",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.9",
+        "hari anggaran = hari UTC, bukan hari lokal pengguna",
+        [
+            Sunting(
+                f"{MODUL}/agents/runtime.py",
+                '        return self._jam().astimezone(ZoneInfo(zona or "UTC"))',
+                '        return self._jam().astimezone(ZoneInfo("UTC"))',
+            )
+        ],
+        _pytest(f"{UJI_ANGGARAN}::test_hari_anggaran_adalah_hari_lokal_bukan_hari_utc"),
+        harus_memuat="anggaran dihitung per hari UTC, bukan hari pengguna",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.9",
+        "biaya run yang sedang berjalan tidak dihitung",
+        [
+            Sunting(
+                f"{MODUL}/agents/runtime.py",
+                "            berjalan += run.biaya_usd",
+                "            berjalan += 0",
+            )
+        ],
+        _pytest(f"{UJI_ANGGARAN}::test_panggilan_kedua_satu_run_melihat_biaya_yang_pertama"),
+        harus_memuat="biaya run yang sedang berjalan tidak dihitung",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.9",
+        "anggaran harian tidak dirakit — api tanpa batas biaya",
+        [
+            Sunting(
+                "apps/api/src/hvx/main.py",
+                "            anggaran_harian_usd=settings.ai_anggaran_harian_usd,\n",
+                "",
+            )
+        ],
+        _pytest(f"{UJI_PERCAKAPAN}::test_anggaran_harian_dirakit_dari_setelan"),
+        harus_memuat="anggaran harian tidak dirakit",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.9",
+        "anggaran harian negatif diterima",
+        [
+            Sunting(
+                f"{MODUL}/platform/config.py",
+                '    ai_anggaran_harian_usd: Decimal = Field(default=Decimal("0.50"), ge=0, le=1_000)',
+                '    ai_anggaran_harian_usd: Decimal = Field(default=Decimal("0.50"), le=1_000)',
+            )
+        ],
+        _pytest("tests/unit/test_config.py::test_anggaran_harian_negatif_ditolak"),
+        harus_memuat="anggaran harian negatif diterima",
     ),
     # ── alat ini sendiri: bytecode mutan tidak tertinggal sesudah dipulihkan ──
     Mutasi(

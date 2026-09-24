@@ -44,6 +44,8 @@ class Jalannya:
     # Biaya run anak yang sudah selesai (K-14) — bukan kolom run ini, tetapi bagian dari
     # yang dibayar satu permintaan (SSE `done`, spec/04).
     biaya_turunan_usd: Decimal = field(default_factory=lambda: Decimal("0"))
+    # Anggaran harian habis — model diturunkan ke kelas kecil (4.9); tercatat di `decision`.
+    turun_kelas: bool = False
 
     def catat_alat(self, nama: str, risiko: int) -> None:
         if nama not in self.alat_dipakai:

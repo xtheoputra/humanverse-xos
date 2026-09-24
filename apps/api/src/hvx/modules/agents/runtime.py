@@ -28,7 +28,7 @@ import re
 import time
 from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import UTC, date, datetime
 from decimal import Decimal
 from typing import Any, Literal, Protocol
 from uuid import UUID, uuid4
@@ -148,9 +148,7 @@ class KonteksAgent:
     async def tanggal_lokal(self) -> date:
         """*Hari ini* pengguna — zona waktu profilnya (spec/01 `profiles.timezone`), bukan
         jam server: *“tandai lari selesai”* pukul 01.00 WIB adalah hari itu di Jakarta."""
-        async with platform.transaksi_pengguna(self._runtime.engine, self.jalannya.user_id) as c:
-            zona = await profile.zona_waktu(c, self.jalannya.user_id)
-        return datetime.now(ZoneInfo(zona or "UTC")).date()
+        return (await self._runtime.kini_lokal(self.jalannya.user_id)).date()
 
     async def _kabari(self, jenis: str, data: Mapping[str, Any]) -> None:
         if self._pendengar is not None:
@@ -198,7 +196,11 @@ class KonteksAgent:
         tetap tercatat sebatas yang sudah keluar: token yang sudah dibayar tidak
         hilang dari jejak dan dari anggaran (4.9).
         """
-        pilihan = kelas or self._runtime.kelas_bawaan(self.jalannya)
+        diminta = kelas or self._runtime.kelas_bawaan(self.jalannya)
+        habis = await self._runtime.anggaran_habis(self.jalannya)
+        pilihan = self._runtime.gerbang_model.pilih_kelas(diminta, anggaran_habis=habis)
+        if pilihan != diminta:
+            self.jalannya.turun_kelas = True
         aliran = self._runtime.gerbang_model.alirkan(
             platform.PermintaanModel(pilihan, tugas, pertanyaan, tuple(bahan), maks_token)
         )
@@ -226,6 +228,8 @@ class RuntimeAgent:
         pelaksana: PelaksanaAlat,
         gerbang_model: platform.GerbangModel,
         pencari_memori: memory.PencariMemori | None = None,
+        anggaran_harian_usd: Decimal | None = None,
+        jam: Callable[[], datetime] | None = None,
     ) -> None:
         asing = sorted(set(program) - set(registri.agent))
         if asing:
@@ -236,6 +240,33 @@ class RuntimeAgent:
         self.pelaksana = pelaksana
         self.gerbang_model = gerbang_model
         self.pencari_memori = pencari_memori
+        self.anggaran_harian_usd = anggaran_harian_usd
+        # Jam yang bisa diganti uji: batas "hari lokal" diuji di SATU saat yang dipilih,
+        # bukan bergantung pada pukul berapa uji itu kebetulan dijalankan.
+        self._jam = jam or (lambda: datetime.now(UTC))
+
+    async def kini_lokal(self, user_id: UUID) -> datetime:
+        async with platform.transaksi_pengguna(self.engine, user_id) as conn:
+            zona = await profile.zona_waktu(conn, user_id)
+        return self._jam().astimezone(ZoneInfo(zona or "UTC"))
+
+    async def anggaran_habis(self, j: Jalannya) -> bool:
+        """Biaya hari lokal pengguna ini ≥ anggarannya (4.9, K-32)? Yang dihitung: run yang
+        sudah ditutup hari ini, DITAMBAH run yang masih berjalan di pohon ini — panggilan
+        kedua satu giliran melihat biaya panggilan pertamanya."""
+        if self.anggaran_harian_usd is None:
+            return False
+        awal_hari = (await self.kini_lokal(j.user_id)).replace(
+            hour=0, minute=0, second=0, microsecond=0
+        )
+        async with platform.transaksi_pengguna(self.engine, j.user_id) as conn:
+            terpakai = await repository.biaya_sejak(conn, j.user_id, awal_hari)
+        berjalan = Decimal(0)
+        run: Jalannya | None = j
+        while run is not None:
+            berjalan += run.biaya_usd
+            run = run.induk
+        return terpakai + berjalan >= self.anggaran_harian_usd
 
     def kelas_bawaan(self, jalannya: Jalannya) -> platform.KelasModel:
         kelas = jalannya.agent.model.kelas
@@ -348,6 +379,8 @@ class RuntimeAgent:
         keputusan_run: dict[str, NilaiAksi] = (
             dict(keputusan.aksi) if keputusan is not None else dict(aksi or {"action": status})
         )
+        if j.turun_kelas:
+            keputusan_run["model_downgraded"] = True  # anggaran harian habis (4.9)
         async with platform.transaksi_pengguna(self.engine, j.user_id) as conn:
             tertutup = await repository.selesai_run(
                 conn,

@@ -100,6 +100,12 @@ async def _aliran(api: ApiUji, token: str, cid: str) -> list[tuple[str, dict[str
     return _sse(r.text)
 
 
+def test_anggaran_harian_dirakit_dari_setelan(api: ApiUji) -> None:
+    assert api.app.state.percakapan.runtime.anggaran_harian_usd == Decimal("0.50"), (
+        "anggaran harian tidak dirakit"
+    )
+
+
 async def test_percakapan_dibuat_dan_didaftar(api: ApiUji) -> None:
     _uid, token = await api.pengguna_baru()
     kunci = {"Idempotency-Key": f"k-{uuid.uuid4().hex}"}

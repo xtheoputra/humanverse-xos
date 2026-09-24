@@ -10,7 +10,8 @@ dan bisa diperlambat per token untuk menguji aliran yang terputus.
 from __future__ import annotations
 
 import asyncio
-from collections.abc import AsyncIterator, Mapping
+from collections.abc import AsyncIterator, Callable, Mapping
+from datetime import datetime
 from decimal import Decimal
 from typing import Any
 from uuid import UUID
@@ -69,6 +70,8 @@ def runtime_uji(
     *,
     gerbang: agents.Gerbang | None = None,
     gerbang_model: platform.GerbangModel | None = None,
+    anggaran: Decimal | None = None,
+    jam: Callable[[], datetime] | None = None,
 ) -> agents.RuntimeAgent:
     return agents.RuntimeAgent(
         api.app.state.engine,
@@ -76,6 +79,8 @@ def runtime_uji(
         program,
         agents.PelaksanaAlat(REGISTRI, agents.IMPLEMENTASI, gerbang or GerbangBuka(), None),
         gerbang_model or gerbang_model_uji(),
+        anggaran_harian_usd=anggaran,
+        jam=jam,
     )
 
 

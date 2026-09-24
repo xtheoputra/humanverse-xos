@@ -627,6 +627,20 @@ sesudahnya.
 
 ---
 
+## K-32 · Anggaran biaya model: per pengguna per hari lokalnya, dibaca dari `agent_runs`
+
+> Diputuskan 24 September 2026, saat Sprint 4 tugas 4.9 ditulis.
+
+| | |
+|---|---|
+| **Keputusan** | **(1)** Sebelum TIAP panggilan model, runtime menjumlahkan biaya run pengguna yang sudah ditutup sejak **awal hari lokalnya** (zona waktu profil) **ditambah** biaya run pohon ini yang masih berjalan; bila ≥ `HVX_AI_ANGGARAN_HARIAN_USD`, kelas model **diturunkan** ke `simple` — jawaban tetap ada, tidak ada galat. **(2)** Turun kelas tercatat: `model_used` memuat model yang benar-benar menjawab, dan `decision.model_downgraded = true`. **(3)** Bawaan **0,50 USD** per pengguna per hari — longgar, dan penyedia lokal V0 gratis; **angka sebenarnya milik pemilik** (uang, A-6/#18). |
+| **Bukti** | spec/07 4.9: *melewati batas → turun ke model kecil, bukan gagal*; *4.9 sering dilupakan sampai tagihan pertama datang … yang penting jalurnya ada sejak awal*. arch/04 §3: anggaran diikat pada jejak — `agent_runs` adalah jejak yang sama dengan audit. |
+| **Bacaan yang DITOLAK** | **(a)** *“Penghitung biaya di Redis”* — ditolak: satu lagi angka yang bisa menyimpang dari jejak audit, dan hilang bila Redis dikosongkan. **(b)** *“Hari UTC”* — ditolak: pengguna di Jakarta akan mendapat anggaran baru pukul 07.00, bukan tengah malam. **(c)** *“Tolak permintaan saat anggaran habis”* — ditolak oleh spec/07 sendiri. **(d)** *“Hanya biaya run yang sudah ditutup”* — ditolak: satu giliran dengan beberapa panggilan akan melewati anggaran tanpa satu pun terlihat. |
+| **Harga yang diakui** | Model kecil pun berbayar bila diberi harga — anggaran yang habis memperlambat tagihan, tidak menghentikannya. Satu kueri tambahan per panggilan model (`agent_runs_user_time_idx`). |
+| **Cara membalikkan** | `RuntimeAgent.anggaran_habis` · `HVX_AI_ANGGARAN_HARIAN_USD`; `tests/integration/test_anggaran.py` diubah bersamanya. |
+
+---
+
 ## Yang sengaja **tidak** saya putuskan
 
 | Butir | Kenapa |

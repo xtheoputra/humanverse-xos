@@ -124,7 +124,7 @@ class LayananPercakapan:
         tanda: TokenKonfirmasi,
     ) -> None:
         self._engine = engine
-        self._runtime = runtime
+        self.runtime = runtime
         self.aliran = aliran
         self._izin = mesin_izin
         self._tanda = tanda
@@ -221,7 +221,7 @@ class LayananPercakapan:
             if niat.rute == "deterministic":
                 await self._simpan(user_id, percakapan_id, pesan_id, "user", badan.content)
                 return await self._deterministik(user_id, percakapan_id, pesan_id, badan.content)
-            j = await self._runtime.mulai(
+            j = await self.runtime.mulai(
                 user_id, AGENT_AKAR, pemicu="user", percakapan_id=percakapan_id
             )
             await self._simpan(
@@ -287,7 +287,7 @@ class LayananPercakapan:
             await self.aliran.kirim(percakapan_id, jenis, data)
 
         try:
-            hasil = await self._runtime.lanjutkan(j, isi, pendengar=pendengar)
+            hasil = await self.runtime.lanjutkan(j, isi, pendengar=pendengar)
             k = hasil.keputusan
             teks, keyakinan, alasan = k.teks, k.confidence, k.rationale
         except AlatDitolak as galat:
@@ -385,7 +385,7 @@ class LayananPercakapan:
                 )
                 await self.aliran.kirim(percakapan_id, "done", _done(balasan))
                 return TerimaKonfirmasi(agent_run_id=akar[0], status="completed")
-            j = await self._runtime.mulai(
+            j = await self.runtime.mulai(
                 user_id,
                 AGENT_AKAR,
                 pemicu="user",

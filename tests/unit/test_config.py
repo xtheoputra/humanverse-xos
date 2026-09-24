@@ -170,3 +170,20 @@ def test_harga_model_dibaca_dari_json_dan_yang_salah_ditolak(
     monkeypatch.setenv("HVX_MODEL_REASONING", "Bukan Id Model")
     with pytest.raises(ValidationError, match="model_reasoning"):
         Settings()
+
+
+def test_anggaran_harian_negatif_ditolak() -> None:
+    """4.9 — anggaran negatif = setiap panggilan model di atas anggaran, diam-diam."""
+    from decimal import Decimal
+
+    from pydantic import ValidationError
+
+    from hvx.modules.platform import Settings
+
+    dasar = {"database_url": "postgresql://x", "redis_url": "redis://x", "env": "test"}
+    assert Settings(**dasar).ai_anggaran_harian_usd == Decimal("0.50")
+    try:
+        Settings(**dasar, ai_anggaran_harian_usd=-1)
+    except ValidationError:
+        return
+    raise AssertionError("anggaran harian negatif diterima")
