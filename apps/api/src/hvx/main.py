@@ -20,7 +20,15 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from hvx import __version__
-from hvx.modules import checkins, goals, habits, identity, platform, profile
+from hvx.modules import (
+    checkins,
+    goals,
+    habits,
+    identity,
+    journal,
+    platform,
+    profile,
+)
 
 DOKUMENTASI_TERBUKA: frozenset[str] = frozenset({"local", "test", "ci"})
 
@@ -106,4 +114,5 @@ def create_app(settings: platform.Settings | None = None) -> FastAPI:
     app.include_router(goals.router)
     app.include_router(habits.router)
     app.include_router(checkins.router)
+    app.include_router(journal.router)
     return app

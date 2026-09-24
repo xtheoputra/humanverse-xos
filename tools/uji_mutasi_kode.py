@@ -3660,6 +3660,62 @@ MUTASI: list[Mutasi] = [
         harus_memuat="events_untuk_relay",
         kelompok="db",
     ),
+    # ── Sprint 3 · 3.4 journal — daftar TANPA body; isi jurnal tidak pernah masuk event ──
+    Mutasi(
+        "3.4",
+        "kontrak daftar jurnal memuat body (walau kosong)",
+        [
+            Sunting(
+                f"{MODUL}/journal/schemas.py",
+                "    word_count: int"
+                + NL
+                + "    created_at: datetime"
+                + NL
+                + "    updated_at: datetime"
+                + NL
+                + NL
+                + NL
+                + "class Jurnal(RingkasanJurnal):",
+                "    word_count: int"
+                + NL
+                + "    created_at: datetime"
+                + NL
+                + "    updated_at: datetime"
+                + NL
+                + "    body: str | None = None"
+                + NL
+                + NL
+                + NL
+                + "class Jurnal(RingkasanJurnal):",
+            )
+        ],
+        _pytest(f"{UJI_JURNAL}::test_kontrak_daftar_jurnal_tidak_punya_medan_body"),
+        harus_memuat="kontrak GET /journal memuat body",
+        kelompok="db",
+    ),
+    Mutasi(
+        "3.4",
+        "kueri daftar jurnal memilih body — isi tulisan ikut ke layar ringkasan",
+        [
+            Sunting(
+                f"{MODUL}/journal/repository.py",
+                "title, occurred_at, word_count, created_at, updated_at"
+                + NL
+                + "    FROM journal_entries",
+                "title, body, occurred_at, word_count, created_at, updated_at"
+                + NL
+                + "    FROM journal_entries",
+            ),
+            Sunting(
+                f"{MODUL}/journal/repository.py",
+                "    return [RingkasanJurnal.model_validate(dict(b)) for b in hasil.mappings()]",
+                "    return [Jurnal.model_validate(dict(b)) for b in hasil.mappings()]",
+            ),
+        ],
+        _pytest(f"{UJI_JURNAL}::test_kueri_daftar_tidak_membaca_body_dari_basis_data"),
+        harus_memuat="kueri daftar memilih body",
+        kelompok="db",
+    ),
 ]
 
 

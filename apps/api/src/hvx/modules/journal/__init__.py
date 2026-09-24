@@ -5,8 +5,10 @@ Dikerjakan: Sprint 3 (3.4) — spec/07.
 
 Modul domain. `GET /journal` tidak pernah mengembalikan `body` (spec/04).
 
-Berkas ini satu-satunya pintu keluar modul (spec/06 aturan 1). Masih kosong:
-belum ada yang diekspor.
+Berkas ini satu-satunya pintu keluar modul (spec/06 aturan 1).
 """
 
-__all__: list[str] = []
+from .routes import router
+from .schemas import Jurnal, RingkasanJurnal
+
+__all__ = ["Jurnal", "RingkasanJurnal", "router"]
