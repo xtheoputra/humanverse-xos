@@ -20,6 +20,7 @@ penuh hijau.
 | `spec/` diubah | `01` (`ai_messages.confidence` · `rationale`, isi `agent_runs`) · `04` (percakapan, SSE, rute konfirmasi) · `05` (letak manifest · kolom scope · pelaksana tool · runtime · gerbang · orchestrator · program V0 · `menyaring_izin`) · `07` (status Sprint 4) |
 | Kode | 🔨 **Sprint 4 — 4.1–4.9 seluruhnya**, branch `v0/sprint-4-ai`: AI Gateway · registry & katalog · pelaksana tool · runtime & `agent_runs` · gerbang risiko & konfirmasi · orchestrator · program agent V0 · percakapan & SSE · anggaran, migrasi 0007–0008 — **958 uji Python + 40 uji Flutter**, **132 mutasi baru, semuanya berbunyi** (kode: 344 → 476) |
 | Gerbang Sprint 3 | tiga gerbang penuh berturut-turut menemukan sesuatu, semuanya dibetulkan — penegak yang lemah, **bytecode mutan basi** di alat ukurnya sendiri, dan uji regresi E-189 yang jendelanya hanya 200 ms |
+| ⏸️ Berhenti di | sesi diakhiri pemilik sesudah Sprint 4 selesai dikodekan dan ter-push. **Langkah berikutnya, berurutan:** tinjauan tiga lensa Sprint 4 (keamanan · kontrak · penegak buta) → gerbang penuh `ci_lokal.py --lapor-github` → PR Sprint 4 (base `v0/sprint-3-memory-event`) → Sprint 5 → Sprint 6. PR #163–#166 menunggu HUMAN REVIEW |
 
 ---
 
