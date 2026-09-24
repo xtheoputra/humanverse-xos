@@ -22,6 +22,8 @@ dependencies = [
   "argon2-cffi>=23.1",       # argon2id untuk sandi
   "email-validator>=2.2",    # EmailStr pydantic; pemeriksaan DNS tidak dipakai
   "tzdata>=2024.1",          # zona waktu IANA yang sama di Windows dan di citra Linux
+  # Sprint 3 — memori (spec/07 3.5): klien REST Qdrant, HANYA di `platform` (B-2)
+  "httpx>=0.27",
 ]
 
 [build-system]

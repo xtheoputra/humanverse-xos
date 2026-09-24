@@ -131,3 +131,20 @@ def test_dsn_berparameter_kueri_ditolak_saat_mulai(dsn: str) -> None:
     kueri pertama."""
     with pytest.raises(ValidationError, match="PGSSLMODE"):
         Settings(database_url=dsn, redis_url="redis://x", env="test")
+
+
+def test_qdrant_tanpa_kunci_penyemat_ditolak_saat_mulai(monkeypatch: pytest.MonkeyPatch) -> None:
+    """K-26 — penyemat tanpa kunci bisa dibalik dengan kamus: vektor di Qdrant
+    membocorkan kata isi jurnal. Qdrant yang diisi tanpa kunci gagal keras."""
+    _isi(monkeypatch)
+    monkeypatch.setenv("HVX_QDRANT_URL", "http://qdrant:6333")
+
+    with pytest.raises(ValidationError, match="HVX_SEMATAN_KEY"):
+        Settings()
+
+    monkeypatch.setenv("HVX_SEMATAN_KEY", "s" * 31)
+    with pytest.raises(ValidationError, match="sematan_key"):
+        Settings()
+
+    monkeypatch.setenv("HVX_SEMATAN_KEY", "s" * 32)
+    assert Settings().qdrant_url == "http://qdrant:6333"

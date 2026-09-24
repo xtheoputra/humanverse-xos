@@ -65,7 +65,9 @@ from .masukan import (
 )
 from .redis_store import buat_redis, ping_redis
 from .routes import router
+from .sematan import Penyemat, PenyematHash, penyemat_dari
 from .teks import TeksBerisi, TeksTanpaNul, tanpa_nul_bersarang
+from .vektor import GalatVektor, HasilCari, KlienVektor, Titik, klien_vektor_dari
 from .zona_waktu import (
     ZONA_PALING_MAJU,
     ZonaWaktuIANA,
@@ -96,22 +98,28 @@ __all__ = [
     "Benar",
     "Bulat",
     "GalatApi",
+    "GalatVektor",
+    "HasilCari",
     "HasilLaju",
     "Idempoten",
     "Idempotensi",
     "Jawaban",
+    "KlienVektor",
     "Kursor",
     "Lingkungan",
     "Pelanggaran",
     "PembacaUlang",
     "PembatasLaju",
     "Pemeriksaan",
+    "Penyemat",
+    "PenyematHash",
     "PeranTidakAman",
     "RequestContextMiddleware",
     "Settings",
     "Tanggal",
     "TeksBerisi",
     "TeksTanpaNul",
+    "Titik",
     "WaktuBerzona",
     "ZonaWaktuIANA",
     "baca_kursor_waktu",
@@ -124,6 +132,7 @@ __all__ = [
     "ikat_pengguna",
     "jaringan_klien",
     "jawaban_galat",
+    "klien_vektor_dari",
     "konfigurasi_log",
     "kursor_waktu",
     "laporan_kesehatan",
@@ -131,6 +140,7 @@ __all__ = [
     "pasang_penangan_galat",
     "pastikan_peran_aplikasi",
     "pembatas_laju",
+    "penyemat_dari",
     "ping_db",
     "ping_redis",
     "redis_dari",

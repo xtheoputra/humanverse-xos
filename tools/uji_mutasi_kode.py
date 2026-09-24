@@ -19,7 +19,8 @@ byte demi byte — termasuk bila prosesnya gagal di tengah.
     uv run python tools/uji_mutasi_kode.py --hanya-db   # hanya mutasi migrasi (tahap test)
     uv run python tools/uji_mutasi_kode.py --hanya-docker   # hanya pemindai rahasia (tahap scan)
 
-Mutasi migrasi butuh `HVX_TEST_DATABASE_URL`. Tanpa itu — dan tanpa
+Mutasi migrasi butuh `HVX_TEST_DATABASE_URL` (dan `HVX_TEST_QDRANT_URL` sejak
+memori vektor 3.5). Tanpa itu — dan tanpa
 `--tanpa-db` yang MENYATAKAN bahwa bagian itu tidak dijalankan — berkas ini
 keluar 1: bagian yang tidak dijalankan tidak boleh terbaca sebagai lulus.
 """
@@ -65,7 +66,7 @@ class Mutasi:
     # juga keluar 1. Keluarannya WAJIB memuat alasan yang dimaksud mutasi.
     harus_memuat: str
     kode_tertangkap: set[int] = field(default_factory=lambda: {1})
-    # lint (bawaan) · db (butuh HVX_TEST_DATABASE_URL) · docker (butuh daemon Docker)
+    # lint (bawaan) · db (butuh HVX_TEST_DATABASE_URL · _QDRANT_URL) · docker (daemon Docker)
     kelompok: str = "lint"
     # Direktori kerja perintah, relatif terhadap akar repo — `flutter test` wajib
     # dijalankan dari akar aplikasinya.
@@ -3660,6 +3661,124 @@ MUTASI: list[Mutasi] = [
         harus_memuat="events_untuk_relay",
         kelompok="db",
     ),
+    # ── Sprint 3 · 3.5 Qdrant — Qdrant tidak punya RLS; saringannya yang menjaga H-27 ──
+    Mutasi(
+        "3.5",
+        "pencarian vektor tanpa saringan user_id — titik pengguna lain ikut",
+        [
+            Sunting(
+                f"{MODUL}/platform/vektor.py",
+                'wajib: list[dict[str, Any]] = [{"key": "user_id", "match": {"value": str(user_id)}}]',
+                "wajib: list[dict[str, Any]] = []",
+            )
+        ],
+        _pytest(f"{UJI_VEKTOR}::test_pencarian_hanya_titik_milik_pengguna_itu"),
+        harus_memuat="titik pengguna lain ikut",
+        kelompok="db",
+    ),
+    Mutasi(
+        "3.5",
+        "saringan scope kosong dibaca sebagai 'semua scope'",
+        [
+            Sunting(
+                f"{MODUL}/platform/vektor.py",
+                '                return []  # saringan kosong = tidak ada yang boleh cocok, bukan "semua"',
+                "                continue",
+            )
+        ],
+        _pytest(f"{UJI_VEKTOR}::test_saringan_scope_dan_scope_kosong_tidak_berarti_semua"),
+        harus_memuat="tanpa scope yang diizinkan, pencarian mengembalikan sesuatu",
+        kelompok="db",
+    ),
+    Mutasi(
+        "3.5",
+        "pencarian tanpa user_id tidak ditolak sebelum ke Qdrant",
+        [
+            Sunting(
+                f"{MODUL}/platform/vektor.py",
+                "        if not isinstance(user_id, UUID):"
+                + NL
+                + '            raise TypeError("pencarian vektor wajib dibatasi satu user_id (H-27)")'
+                + NL,
+                "",
+            )
+        ],
+        _pytest(f"{UJI_VEKTOR}::test_pencarian_tanpa_pengguna_ditolak_sebelum_ke_qdrant"),
+        harus_memuat="DID NOT RAISE",
+        kelompok="db",
+    ),
+    Mutasi(
+        "3.5",
+        "hapus_milik tanpa saringan pengguna — titik semua pengguna terhapus",
+        [
+            Sunting(
+                f"{MODUL}/platform/vektor.py",
+                '            {"filter": {"must": [{"key": "user_id", "match": {"value": str(user_id)}}]}},',
+                '            {"filter": {"must": []}},',
+            )
+        ],
+        _pytest(f"{UJI_VEKTOR}::test_hapus_milik_menghapus_titik_satu_pengguna_saja"),
+        harus_memuat="titik pengguna lain ikut terhapus",
+        kelompok="db",
+    ),
+    Mutasi(
+        "3.5",
+        "pesan GalatVektor memuat badan galat Qdrant (yang memantulkan masukan)",
+        [
+            Sunting(
+                f"{MODUL}/platform/vektor.py",
+                """raise GalatVektor(f"qdrant {metode} {jalur.split('?')[0]} → {r.status_code}")""",
+                """raise GalatVektor(f"qdrant {metode} {jalur.split('?')[0]} → {r.status_code} {r.text}")""",
+            )
+        ],
+        _pytest(f"{UJI_VEKTOR}::test_galat_qdrant_tidak_memantulkan_isi_permintaan"),
+        harus_memuat="badan galat Qdrant ikut",
+        kelompok="db",
+    ),
+    Mutasi(
+        "3.5",
+        "koleksi berdimensi lain dipakai begitu saja",
+        [
+            Sunting(
+                f"{MODUL}/platform/vektor.py",
+                '                raise GalatVektor(f"koleksi {nama} bukan kosinus berdimensi {dimensi}")',
+                "                pass",
+            )
+        ],
+        _pytest(f"{UJI_VEKTOR}::test_koleksi_berdimensi_lain_ditolak_bukan_dipakai"),
+        harus_memuat="DID NOT RAISE",
+        kelompok="db",
+    ),
+    Mutasi(
+        "3.5",
+        "penyemat memakai hash() Python — vektor berbeda tiap proses",
+        [
+            Sunting(
+                f"{MODUL}/platform/sematan.py",
+                "            cerna = hashlib.blake2b(fitur.encode(), digest_size=8, key=self._kunci).digest()",
+                '            cerna = hash(fitur).to_bytes(8, "little", signed=True)',
+            )
+        ],
+        _pytest(
+            "tests/unit/test_sematan.py::test_sama_di_tiap_proses_bukan_hash_python_yang_diacak"
+        ),
+        harus_memuat="assert [",
+    ),
+    Mutasi(
+        "3.5",
+        "penyemat mengabaikan kuncinya — kata isi jurnal terbaca dari vektor dengan kamus",
+        [
+            Sunting(
+                f"{MODUL}/platform/sematan.py",
+                "            cerna = hashlib.blake2b(fitur.encode(), digest_size=8, key=self._kunci).digest()",
+                "            cerna = hashlib.blake2b(fitur.encode(), digest_size=8).digest()",
+            )
+        ],
+        _pytest(
+            "tests/unit/test_sematan.py::test_tanpa_kunci_yang_sama_kata_tidak_bisa_ditebak_dari_vektor"
+        ),
+        harus_memuat="kata terbaca tanpa kunci",
+    ),
     # ── Sprint 3 · 3.4 journal — daftar TANPA body; isi jurnal tidak pernah masuk event ──
     Mutasi(
         "3.4",
@@ -3792,8 +3911,9 @@ def main() -> int:
     else:
         jalan = {"lint", "db", "docker"}
 
-    if "db" in jalan and not os.environ.get("HVX_TEST_DATABASE_URL"):
-        print("🛑 HVX_TEST_DATABASE_URL tidak diisi — mutasi migrasi tidak bisa dibuktikan.")
+    kosong = [v for v in ("HVX_TEST_DATABASE_URL", "HVX_TEST_QDRANT_URL") if not os.environ.get(v)]
+    if "db" in jalan and kosong:
+        print(f"🛑 {' · '.join(kosong)} tidak diisi — mutasi kelompok db tidak bisa dibuktikan.")
         print(
             "   Isi variabelnya, atau jalankan dengan --tanpa-db untuk MENYATAKAN bagian itu dilewati."
         )

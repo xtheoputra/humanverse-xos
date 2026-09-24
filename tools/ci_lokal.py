@@ -21,7 +21,8 @@ arch/11 §1 daftar enam kali. Karena itu `ci.yml` hanya memanggil berkas ini.
 `--locked` di perintah di atas bukan hiasan: `uv run` biasa MENULIS ULANG
 `uv.lock` yang basi sebelum berkas ini sempat memeriksanya.
 
-Tahap `test` butuh HVX_TEST_DATABASE_URL & HVX_TEST_REDIS_URL. Tahap `build`
+Tahap `test` butuh HVX_TEST_DATABASE_URL · HVX_TEST_REDIS_URL · HVX_TEST_QDRANT_URL
+(`docker compose up -d --wait postgres redis qdrant`). Tahap `build`
 dan `scan` butuh Docker; `scan` selalu didahului `build` di pemanggilan yang
 sama, supaya yang dipindai adalah citra yang baru dibangun dan diuji asap —
 bukan tag yang kebetulan sedang ada. Tahap pertama yang merah menghentikan
@@ -97,6 +98,7 @@ def _smoke_compose() -> int:
         "HVX_API_PORT": os.environ.get("HVX_CI_API_PORT", "18000"),
         "HVX_POSTGRES_PORT": os.environ.get("HVX_CI_POSTGRES_PORT", "15432"),
         "HVX_REDIS_PORT": os.environ.get("HVX_CI_REDIS_PORT", "16379"),
+        "HVX_QDRANT_PORT": os.environ.get("HVX_CI_QDRANT_PORT", "16333"),
     }
     try:
         r = subprocess.run(
