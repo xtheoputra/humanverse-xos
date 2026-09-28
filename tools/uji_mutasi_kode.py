@@ -6174,7 +6174,7 @@ MUTASI: list[Mutasi] = [
             )
         ],
         _pytest(f"{UJI_GERBANG}::test_risk_2_minta_izin_sekali"),
-        harus_memuat="jawaban pengguna tidak tercatat",
+        harus_memuat="jawaban pengguna atau tulisan agent tidak tercatat",
         kelompok="db",
     ),
     Mutasi(
@@ -6793,7 +6793,7 @@ MUTASI: list[Mutasi] = [
     ),
     Mutasi(
         "4.9",
-        "hari anggaran = hari UTC, bukan hari lokal pengguna",
+        "hari ini agent = hari UTC, bukan zona waktu profil",
         [
             Sunting(
                 f"{MODUL}/agents/runtime.py",
@@ -6801,8 +6801,8 @@ MUTASI: list[Mutasi] = [
                 '        return self._jam().astimezone(ZoneInfo("UTC"))',
             )
         ],
-        _pytest(f"{UJI_ANGGARAN}::test_hari_anggaran_adalah_hari_lokal_bukan_hari_utc"),
-        harus_memuat="anggaran dihitung per hari UTC, bukan hari pengguna",
+        _pytest(f"{UJI_RUNTIME}::test_hari_ini_agent_menurut_zona_waktu_profil_bukan_utc"),
+        harus_memuat="hari ini agent bukan tanggal zona waktu profil",
         kelompok="db",
     ),
     Mutasi(
@@ -7932,6 +7932,1412 @@ MUTASI: list[Mutasi] = [
         harus_memuat="langkah mundur 4000 ms",
         kelompok="db",
     ),
+    # ── Sprint 4 · penegak buta G1-gerbang ──
+    Mutasi(
+        "4.5",
+        "deny pengguna diabaikan untuk R3 — ditanyakan sebagai konfirmasi (B1)",
+        [
+            Sunting(
+                f"{MODUL}/agents/gerbang.py",
+                '        if "deny" in keputusan:',
+                '        if "deny" in keputusan and alat.risk_level < RISIKO_KONFIRMASI:',
+            )
+        ],
+        _pytest(f"{UJI_GERBANG}::test_deny_mendahului_konfirmasi_r3"),
+        harus_memuat="deny pengguna atas R3 ditanyakan sebagai konfirmasi",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.5",
+        "deny hanya dibaca di scope pertama pemanggilan (B2)",
+        [
+            Sunting(
+                f"{MODUL}/agents/gerbang.py",
+                '        if "deny" in keputusan:',
+                '        if keputusan[:1] == ["deny"]:',
+            )
+        ],
+        _pytest(f"{UJI_GERBANG}::test_deny_di_scope_mana_pun_menolak_delegasi"),
+        harus_memuat="deny pengguna di scope selain yang pertama diabaikan",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.5",
+        "permintaan izin membawa seluruh scope tool, bukan scope pemanggilan (B3)",
+        [
+            Sunting(
+                f"{MODUL}/agents/gerbang.py",
+                'raise self._tahan(jalannya, alat, "konfirmasi" if konfirmasi else "izin", scopes, sidik)',
+                'raise self._tahan(jalannya, alat, "konfirmasi" if konfirmasi else "izin", '
+                "tuple(alat.scopes), sidik)",
+            )
+        ],
+        _pytest(f"{UJI_GERBANG}::test_permintaan_izin_hanya_scope_pemanggilannya"),
+        harus_memuat="permintaan izin memuat scope yang tidak disentuh pemanggilannya",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.5",
+        "ask hanya dibaca di scope pertama pemanggilan (B6)",
+        [
+            Sunting(
+                f"{MODUL}/agents/gerbang.py",
+                'if (konfirmasi or "ask" in keputusan) and not disetujui:',
+                'if (konfirmasi or keputusan[:1] == ["ask"]) and not disetujui:',
+            )
+        ],
+        _pytest(f"{UJI_GERBANG}::test_tanya_aku_di_scope_mana_pun_menahan_delegasi"),
+        harus_memuat="ask pengguna di scope selain yang pertama dilewati",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.5",
+        "R1 yang belum diputuskan ditanyakan — bawaan allow hanya R0 (B13)",
+        [
+            Sunting(
+                f"{MODUL}/agents/gerbang.py",
+                '"allow" if delegasi or alat.risk_level <= RISIKO_BAWAAN_IZINKAN else "ask"',
+                '"allow" if delegasi or alat.risk_level < RISIKO_BAWAAN_IZINKAN else "ask"',
+            )
+        ],
+        _pytest(f"{UJI_GERBANG}::test_r1_yang_belum_diputuskan_jalan_tanpa_bertanya"),
+        harus_memuat="R1 yang belum diputuskan pengguna ditanyakan",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.5",
+        "persetujuan tidak terikat agent — milik agent lain meloloskan (B14)",
+        [
+            Sunting(
+                f"{MODUL}/agents/gerbang.py",
+                "p.agent == jalannya.agent.name and p.alat == alat.name and p.sidik == sidik",
+                "p.alat == alat.name and p.sidik == sidik",
+            )
+        ],
+        _pytest(f"{UJI_GERBANG}::test_persetujuan_terikat_agentnya"),
+        harus_memuat="persetujuan untuk agent lain meloloskan pemanggilan ini",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.5",
+        "delegasi R3 dikonfirmasi sendiri — satu permintaan ditanya dua kali (B15)",
+        [
+            Sunting(
+                f"{MODUL}/agents/gerbang.py",
+                "        konfirmasi = not delegasi and alat.risk_level >= RISIKO_KONFIRMASI",
+                "        konfirmasi = alat.risk_level >= RISIKO_KONFIRMASI",
+            )
+        ],
+        _pytest(f"{UJI_GERBANG}::test_delegasi_tidak_ditanya_dua_kali[3]"),
+        harus_memuat="delegasi ditanyakan sendiri: orchestrator-agent",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.5",
+        "AKSI_IZIN delegasi = read, bukan execute (B16)",
+        [Sunting(f"{MODUL}/agents/registri.py", '    "agent": "execute",', '    "agent": "read",')],
+        _pytest(f"{UJI_KATALOG}::test_izin_katalog_sesuai_jenis_tool"),
+        harus_memuat="aksi katalog ≠ jenis tool-nya",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.5",
+        "gerbang menanyai izin read untuk delegasi, bukan execute (B16)",
+        [
+            Sunting(
+                f"{MODUL}/agents/gerbang.py",
+                "        aksi = AKSI_IZIN[alat.kind]",
+                '        aksi = "read" if delegasi else AKSI_IZIN[alat.kind]',
+            )
+        ],
+        _pytest(f"{UJI_GERBANG}::test_delegasi_ditanyakan_sebagai_izin_execute"),
+        harus_memuat="deny read menghalangi delegasi",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.5",
+        "tolak tercatat agent.action_approved — jejak audit bohong (B17)",
+        [
+            Sunting(
+                f"{MODUL}/agents/konfirmasi.py",
+                'aksi="agent.action_approved" if setuju else "agent.action_rejected",',
+                'aksi="agent.action_approved",',
+            )
+        ],
+        _pytest(f"{UJI_GERBANG}::test_jawaban_sekali_pakai"),
+        harus_memuat="penolakan pengguna tercatat sebagai persetujuan",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.5",
+        "R4 bukan kode gerbang — run failed, bukan blocked (B18)",
+        [
+            Sunting(
+                f"{MODUL}/agents/runtime.py",
+                'KODE_GERBANG = frozenset({"perlu_izin", "perlu_konfirmasi", "ditolak_pengguna", '
+                '"risiko_terlarang"})',
+                'KODE_GERBANG = frozenset({"perlu_izin", "perlu_konfirmasi", "ditolak_pengguna"})',
+            )
+        ],
+        _pytest(f"{UJI_GERBANG}::test_risk_4_ditolak_tanpa_bertanya"),
+        harus_memuat="R4 tercatat sebagai kegagalan, bukan penolakan gerbang",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.5",
+        "permintaan menunjuk run induk, bukan run anak yang ditahan (B38)",
+        [
+            Sunting(
+                f"{MODUL}/agents/gerbang.py",
+                "            run_id=j.id,",
+                "            run_id=(j.induk or j).id,",
+            )
+        ],
+        _pytest(f"{UJI_GERBANG}::test_delegasi_tidak_ditanya_dua_kali[2]"),
+        harus_memuat="permintaan menunjuk run induk, bukan run anak yang DITAHAN",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.5",
+        "izinkan_selalu hanya menyimpan scope pertama permintaan (B39)",
+        [
+            Sunting(
+                f"{MODUL}/agents/konfirmasi.py",
+                "        for scope in p.scopes:",
+                "        for scope in p.scopes[:1]:",
+            )
+        ],
+        _pytest(f"{UJI_GERBANG}::test_izinkan_selalu_mengingat_seluruh_scope_permintaan"),
+        harus_memuat="izinkan_selalu hanya mengingat sebagian scope permintaan",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.5",
+        "token konfirmasi berumur 150 menit, bukan 15 (B51)",
+        [Sunting(f"{MODUL}/agents/konfirmasi.py", "UMUR_TOKEN_S = 900", "UMUR_TOKEN_S = 9000")],
+        _pytest(f"{UJI_GERBANG}::test_token_konfirmasi_berumur_15_menit"),
+        harus_memuat="bukan 15 menit",
+        kelompok="db",
+    ),
+    # ── akhir penegak buta G1-gerbang ──
+    # ── Sprint 4 · penegak buta G2-registri ──
+    Mutasi(
+        "4.2",
+        "aturan 7 menerima tool R2 yang menyentuh orang lain (B7)",
+        [
+            Sunting(
+                f"{MODUL}/agents/registri.py",
+                "if alat.reaches_third_party and alat.risk_level < 3:",
+                "if alat.reaches_third_party and alat.risk_level < 2:",
+            )
+        ],
+        _pytest(f"{UJI_REGISTRI_BERKAS}::test_registry_yang_melanggar_ditolak_buta"),
+        harus_memuat="aturan 7 tidak ditegakkan — tool R2 yang menyentuh orang lain",
+    ),
+    Mutasi(
+        "4.2",
+        "aturan 6 · 9 hanya membaca memory.read manifest — scope tool & tulis lolos (B8)",
+        [
+            Sunting(
+                f"{MODUL}/agents/registri.py",
+                "diminta = sorted(scope & terlarang)",
+                "diminta = sorted(set(m.memory.read) & terlarang)",
+            )
+        ],
+        _pytest(f"{UJI_REGISTRI_BERKAS}::test_registry_yang_melanggar_ditolak_tinjauan"),
+        harus_memuat="aturan 6 tidak ditegakkan — pihak ketiga meminta journal_raw lewat tool",
+    ),
+    Mutasi(
+        "4.2",
+        "aturan 2 tidak memeriksa scope memory.write manifest (B9)",
+        [
+            Sunting(
+                f"{MODUL}/agents/registri.py",
+                "scope = set(m.memory.read) | set(m.memory.write)",
+                "scope = set(m.memory.read)",
+            )
+        ],
+        _pytest(f"{UJI_REGISTRI_BERKAS}::test_registry_yang_melanggar_ditolak_buta"),
+        harus_memuat="aturan 2 tidak ditegakkan — scope tulis manifest di luar daftar resmi",
+    ),
+    Mutasi(
+        "4.2",
+        "aturan 2 tidak memeriksa scopes tool (B10)",
+        [
+            Sunting(
+                f"{MODUL}/agents/registri.py",
+                "asing = sorted(set(alat.scopes) - identity.SCOPE_RESMI.keys())",
+                "asing: list[str] = []",
+            )
+        ],
+        _pytest(f"{UJI_REGISTRI_BERKAS}::test_registry_yang_melanggar_ditolak_buta"),
+        harus_memuat="aturan 2 tidak ditegakkan — scope tool di luar daftar resmi",
+    ),
+    Mutasi(
+        "4.2",
+        "manifest draft/deprecated dimuat sebagai agent aktif (B11)",
+        [
+            Sunting(
+                f"{MODUL}/agents/registri.py",
+                '        if m.status != "active":',
+                '        if m.status == "disabled":',
+            )
+        ],
+        _pytest(f"{UJI_REGISTRI_BERKAS}::test_hanya_manifest_aktif_yang_dimuat"),
+        harus_memuat="manifest `status: draft` dimuat sebagai agent aktif",
+    ),
+    Mutasi(
+        "4.2",
+        "medan manifest/tool yang tidak dikenal diabaikan diam-diam (B12)",
+        [
+            Sunting(
+                f"{MODUL}/agents/registri.py",
+                '_KETAT = ConfigDict(extra="forbid", frozen=True, strict=True)',
+                '_KETAT = ConfigDict(extra="ignore", frozen=True, strict=True)',
+            )
+        ],
+        _pytest(f"{UJI_REGISTRI_BERKAS}::test_registry_yang_melanggar_ditolak_buta"),
+        harus_memuat="aturan bentuk tidak ditegakkan — medan manifest yang tidak dikenal",
+    ),
+    Mutasi(
+        "4.7",
+        "tool penyaring izin boleh ber-efek — tulisan lolos dari gerbang (B43)",
+        [
+            Sunting(
+                f"{MODUL}/agents/registri.py",
+                'if alat.menyaring_izin and (alat.kind != "read" or alat.side_effects != "none"):',
+                'if alat.menyaring_izin and alat.kind != "read":',
+            )
+        ],
+        _pytest(f"{UJI_REGISTRI_BERKAS}::test_registry_yang_melanggar_ditolak_buta"),
+        harus_memuat="aturan bentuk tidak ditegakkan — tool penyaring izin yang menulis",
+    ),
+    Mutasi(
+        "4.2",
+        "A-1 — `risk` sebagai properti agent diterima (B44)",
+        [
+            Sunting(
+                f"{MODUL}/agents/registri.py",
+                '        for terlarang in ("risk_level", "risk")',
+                '        for terlarang in ("risk_level",)',
+            )
+        ],
+        _pytest(f"{UJI_REGISTRI_BERKAS}::test_registry_yang_melanggar_ditolak_buta"),
+        harus_memuat="aturan A-1 tidak ditegakkan — risk sebagai properti agent",
+    ),
+    Mutasi(
+        "4.2",
+        "nama tool ≠ nama berkas diterima — dua berkas saling menimpa (B45)",
+        [
+            Sunting(
+                f"{MODUL}/agents/registri.py", "    if alat.name != nama_berkas:", "    if False:"
+            )
+        ],
+        _pytest(f"{UJI_REGISTRI_BERKAS}::test_registry_yang_melanggar_ditolak_buta"),
+        harus_memuat="aturan bentuk tidak ditegakkan — nama tool berbeda dengan nama berkasnya",
+    ),
+    Mutasi(
+        "4.2",
+        "nama manifest ≠ nama berkas meledak KeyError, bukan pelanggaran (B46)",
+        [Sunting(f"{MODUL}/agents/registri.py", "    if m.name != nama_berkas:", "    if False:")],
+        _pytest(
+            f"{UJI_REGISTRI_BERKAS}::"
+            "test_nama_manifest_berbeda_dengan_berkasnya_dilaporkan_bukan_meledak"
+        ),
+        harus_memuat="meledak sebagai KeyError",
+    ),
+    Mutasi(
+        "4.2",
+        "registry mengoersi teks menjadi angka (B47)",
+        [
+            Sunting(
+                f"{MODUL}/agents/registri.py",
+                '_KETAT = ConfigDict(extra="forbid", frozen=True, strict=True)',
+                '_KETAT = ConfigDict(extra="forbid", frozen=True, strict=False)',
+            )
+        ],
+        _pytest(f"{UJI_REGISTRI_BERKAS}::test_registry_yang_melanggar_ditolak_buta"),
+        harus_memuat="aturan bentuk tidak ditegakkan — risk_level berupa teks",
+    ),
+    Mutasi(
+        "4.3",
+        "habit.complete dilonggarkan ke 60/min/user (B88)",
+        [
+            Sunting(
+                f"{MODUL}/agents/alat/habit.complete.yaml",
+                "rate_limit: 20/min/user",
+                "rate_limit: 60/min/user",
+            )
+        ],
+        _pytest(f"{UJI_REGISTRI_BERKAS}::test_tool_tulis_dibatasi_lebih_ketat_daripada_bacaan"),
+        harus_memuat="batas laju tool tulis",
+    ),
+    Mutasi(
+        "4.1",
+        "biaya model dibulatkan ke bawah (B57)",
+        [
+            Sunting(
+                f"{MODUL}/platform/model.py",
+                "return mentah.quantize(_SEN_MIKRO, rounding=ROUND_HALF_UP)",
+                'return mentah.quantize(_SEN_MIKRO, rounding="ROUND_DOWN")',
+            )
+        ],
+        _pytest(f"{UJI_GERBANG_MODEL}::test_biaya_dibulatkan_setengah_ke_atas_ke_sen_mikro"),
+        harus_memuat="separuh sen-mikro dibulatkan ke bawah",
+    ),
+    Mutasi(
+        "4.1",
+        "harga model KELUAR negatif diterima (B58)",
+        [
+            Sunting(
+                f"{MODUL}/platform/config.py",
+                "if masuk < 0 or keluar < 0 or not (masuk.is_finite() and keluar.is_finite()):",
+                "if masuk < 0 or not (masuk.is_finite() and keluar.is_finite()):",
+            )
+        ],
+        _pytest(
+            f"{UJI_CONFIG}::test_harga_model_keluar_negatif_atau_tak_hingga_ditolak_saat_mulai"
+        ),
+        harus_memuat="HVX_MODEL_HARGA harga keluar negatif diterima",
+    ),
+    # B59: `is_finite()` saja tidak bisa dirusak — Decimal pydantic menolak inf/NaN
+    # (`finite_number`) sebelum validatornya berjalan. Kerusakan setaranya membuang
+    # KEDUA lapis: izinkan inf/NaN di setelan, lalu buang pemeriksaan hingga.
+    Mutasi(
+        "4.1",
+        "harga model tak hingga diterima — gerbang meledak di tiap panggilan (B59)",
+        [
+            Sunting(
+                f"{MODUL}/platform/config.py",
+                'model_config = SettingsConfigDict(env_prefix="HVX_", extra="ignore", frozen=True)',
+                'model_config = SettingsConfigDict(env_prefix="HVX_", extra="ignore", frozen=True, allow_inf_nan=True)',
+            ),
+            Sunting(
+                f"{MODUL}/platform/config.py",
+                "if masuk < 0 or keluar < 0 or not (masuk.is_finite() and keluar.is_finite()):",
+                "if masuk < 0 or keluar < 0:",
+            ),
+        ],
+        _pytest(
+            f"{UJI_CONFIG}::test_harga_model_keluar_negatif_atau_tak_hingga_ditolak_saat_mulai"
+        ),
+        harus_memuat="HVX_MODEL_HARGA harga masuk tak hingga diterima",
+    ),
+    Mutasi(
+        "4.1",
+        "bawaan model simple = model reasoning — turun kelas tidak menurunkan apa pun (B60)",
+        [
+            Sunting(
+                f"{MODUL}/platform/config.py",
+                'model_simple: str = Field(default="lokal/hvx-ringkas-v1", pattern=POLA_MODEL)',
+                'model_simple: str = Field(default="lokal/hvx-nalar-v1", pattern=POLA_MODEL)',
+            )
+        ],
+        _pytest(f"{UJI_CONFIG}::test_bawaan_model_simple_dan_reasoning_berbeda"),
+        harus_memuat="bawaan kelas simple dan reasoning memakai model yang sama",
+    ),
+    # ── akhir penegak buta G2-registri ──
+    # ── Sprint 4 · penegak buta G3-runtime ──
+    Mutasi(
+        "4.4",
+        "habit.complete tidak mencatat scope habits (B25)",
+        [
+            Sunting(
+                f"{MODUL}/agents/alat_v0.py",
+                '    k.jalannya.catat_scope("habits")\n    try:\n        badan = _badan_penyelesaian(m)',
+                "    try:\n        badan = _badan_penyelesaian(m)",
+            )
+        ],
+        _pytest(f"{UJI_RUNTIME}::test_habit_complete_sendiri_mencatat_scope_habits"),
+        harus_memuat="scope yang disentuh habit.complete tidak tercatat",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.3",
+        "batas laju satu ember untuk semua tool (B30)",
+        [
+            Sunting(
+                f"{MODUL}/agents/pelaksana_alat.py",
+                'nama_batas = "alat-" + alat.name.replace(".", "-").replace("_", "-")',
+                'nama_batas = "alat"',
+            )
+        ],
+        _pytest(f"{UJI_PELAKSANA}::test_batas_laju_milik_tiap_tool_bukan_satu_ember"),
+        harus_memuat="batas laju bukan per tool",
+    ),
+    Mutasi(
+        "4.4",
+        "biaya run = panggilan model terakhir saja (B31)",
+        [
+            Sunting(
+                f"{MODUL}/agents/jalannya.py",
+                "        self.biaya_usd += jawaban.biaya_usd",
+                "        self.biaya_usd = jawaban.biaya_usd",
+            )
+        ],
+        _pytest(f"{UJI_RUNTIME}::test_token_dan_biaya_run_jumlah_seluruh_panggilan_model"),
+        harus_memuat="biaya run hanya panggilan model terakhir",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.3",
+        "gerbang ditanya sebelum batas laju — penolakan tak memakai jatah (B32)",
+        [
+            Sunting(
+                f"{MODUL}/agents/pelaksana_alat.py",
+                "        await self._batasi(jalannya, alat)\n"
+                "        await self._gerbang.periksa(jalannya, alat, bersih)",
+                "        await self._gerbang.periksa(jalannya, alat, bersih)\n"
+                "        await self._batasi(jalannya, alat)",
+            )
+        ],
+        _pytest(f"{UJI_PELAKSANA}::test_batas_laju_dipakai_sebelum_gerbang"),
+        harus_memuat="penolakan gerbang tidak memakai jatah batas laju",
+    ),
+    Mutasi(
+        "4.6",
+        "run anak tanpa conversation_id percakapannya (B36)",
+        [
+            Sunting(
+                f"{MODUL}/agents/runtime.py",
+                "            percakapan_id=induk.percakapan_id,",
+                "            percakapan_id=None,",
+            )
+        ],
+        _pytest(f"{UJI_ORKESTRATOR}::test_run_anak_membawa_percakapan_induknya"),
+        harus_memuat="run anak lepas dari percakapan induknya",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.4",
+        "tokens_in = panggilan model terakhir saja (B41)",
+        [
+            Sunting(
+                f"{MODUL}/agents/jalannya.py",
+                "        self.token_masuk += jawaban.token_masuk",
+                "        self.token_masuk = jawaban.token_masuk",
+            )
+        ],
+        _pytest(f"{UJI_RUNTIME}::test_token_dan_biaya_run_jumlah_seluruh_panggilan_model"),
+        harus_memuat="token run hanya panggilan model terakhir",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.3",
+        "`true` diterima sebagai number (B48, E-170)",
+        [
+            Sunting(
+                f"{MODUL}/agents/pelaksana_alat.py",
+                "        if isinstance(nilai, bool) or not isinstance(nilai, int | float):",
+                "        if not isinstance(nilai, int | float):",
+            )
+        ],
+        _pytest(f"{UJI_PELAKSANA}::test_masukan_yang_salah_ditolak_sebelum_gerbang"),
+        harus_memuat="'confidence': True, 'rationale': ['a']} diterima",
+    ),
+    Mutasi(
+        "4.3",
+        "medan boolean menerima bilangan 1/0 (B49, E-170)",
+        [
+            Sunting(
+                f"{MODUL}/agents/pelaksana_alat.py",
+                'cocok = {"string": str, "boolean": bool, "array": list, "object": dict}[tipe]',
+                'cocok = {"string": str, "boolean": int, "array": list, "object": dict}[tipe]',
+            )
+        ],
+        _pytest(f"{UJI_PELAKSANA}::test_boolean_ketat_bilangan_bukan_boolean"),
+        harus_memuat="medan boolean menerima bilangan",
+    ),
+    Mutasi(
+        "4.3",
+        "batas laju dipakai sebelum skema masukan diperiksa (B50)",
+        [
+            Sunting(
+                f"{MODUL}/agents/pelaksana_alat.py",
+                "        bersih = periksa_masukan(alat, masukan)\n",
+                "        await self._batasi(jalannya, alat)\n"
+                "        bersih = periksa_masukan(alat, masukan)\n",
+            ),
+            Sunting(
+                f"{MODUL}/agents/pelaksana_alat.py",
+                '                raise _salah(nama, "ditolak pemilik datanya") from None\n'
+                "        await self._batasi(jalannya, alat)\n",
+                '                raise _salah(nama, "ditolak pemilik datanya") from None\n',
+            ),
+        ],
+        _pytest(f"{UJI_PELAKSANA}::test_masukan_salah_ditolak_tanpa_memakai_jatah"),
+        harus_memuat="masukan salah (skema tool) memakai jatah batas laju",
+    ),
+    Mutasi(
+        "4.3",
+        "batas laju dipakai sebelum pemeriksa pemilik data (B50, E-204)",
+        [
+            Sunting(
+                f"{MODUL}/agents/pelaksana_alat.py",
+                "        impl = self._impl[nama]\n",
+                "        await self._batasi(jalannya, alat)\n        impl = self._impl[nama]\n",
+            ),
+            Sunting(
+                f"{MODUL}/agents/pelaksana_alat.py",
+                '                raise _salah(nama, "ditolak pemilik datanya") from None\n'
+                "        await self._batasi(jalannya, alat)\n",
+                '                raise _salah(nama, "ditolak pemilik datanya") from None\n',
+            ),
+        ],
+        _pytest(f"{UJI_PELAKSANA}::test_masukan_salah_ditolak_tanpa_memakai_jatah"),
+        harus_memuat="masukan salah (pemilik data) memakai jatah batas laju",
+    ),
+    Mutasi(
+        "4.4",
+        "decision tanpa batas 10 kunci (B52)",
+        [
+            Sunting(
+                f"{MODUL}/agents/runtime.py",
+                '    if "action" not in k.aksi or len(k.aksi) > AKSI_KUNCI_MAKS:',
+                '    if "action" not in k.aksi:',
+            )
+        ],
+        _pytest(UJI_KEPUTUSAN),
+        harus_memuat="keputusan rusak diterima — aksi lebih dari 10 kunci",
+    ),
+    Mutasi(
+        "4.4",
+        "galat AI Gateway tercatat `internal`, bukan `model_gagal` (B53)",
+        [
+            Sunting(
+                f"{MODUL}/agents/runtime.py",
+                '        return "model_gagal"',
+                '        return "internal"',
+            )
+        ],
+        _pytest(f"{UJI_RUNTIME}::test_galat_model_tercatat_model_gagal"),
+        harus_memuat="galat AI Gateway tercatat dengan kode lain",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.6",
+        "biaya run anak ditimpa, bukan dijumlah (B54)",
+        [
+            Sunting(
+                f"{MODUL}/agents/runtime.py",
+                "        induk.biaya_turunan_usd += hasil.biaya_usd",
+                "        induk.biaya_turunan_usd = hasil.biaya_usd",
+            )
+        ],
+        _pytest(f"{UJI_ORKESTRATOR}::test_biaya_seluruh_run_anak_dijumlah"),
+        harus_memuat="biaya run anak ditimpa, bukan dijumlah",
+        kelompok="db",
+    ),
+    # B55 dirancang ulang: anggaran tidak lagi menelusuri `run.induk` di memori, tetapi
+    # membaca `agent_runs` (jatah run yang berjalan, E-201). Kerusakan setaranya: kembali ke
+    # "run tertutup dari basis data + biaya run INI dari memori" — leluhur yang masih
+    # berjalan hilang dari hitungan.
+    Mutasi(
+        "4.9",
+        "anggaran = run tertutup + run ini — biaya leluhur yang berjalan hilang (B55, K-32)",
+        [
+            Sunting(
+                f"{MODUL}/agents/repository.py",
+                "    WHERE user_id = :user_id AND started_at >= :sejak\n",
+                "    WHERE user_id = :user_id AND started_at >= :sejak AND status <> 'running'\n",
+            ),
+            Sunting(
+                f"{MODUL}/agents/runtime.py",
+                "terpakai = await repository.biaya_sejak(",
+                "terpakai = j.biaya_usd + await repository.biaya_sejak(",
+            ),
+        ],
+        _pytest(f"{UJI_ANGGARAN}::test_biaya_run_leluhur_yang_masih_berjalan_ikut_dihitung"),
+        harus_memuat="biaya run leluhur yang masih berjalan tidak dihitung anggaran",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.4",
+        "latency_ms selalu 0 (B56)",
+        [
+            Sunting(
+                f"{MODUL}/agents/runtime.py",
+                "                latency_ms=round((time.perf_counter() - mulai) * 1000),",
+                "                latency_ms=0,",
+            )
+        ],
+        _pytest(f"{UJI_RUNTIME}::test_latency_ms_mengukur_lamanya_run"),
+        harus_memuat="latency_ms tidak mengukur lamanya run",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.4",
+        "risk_level run = risiko tool terakhir, bukan tertinggi (B90)",
+        [
+            Sunting(
+                f"{MODUL}/agents/jalannya.py",
+                "        self.risiko_tertinggi = max(risiko, self.risiko_tertinggi or 0)",
+                "        self.risiko_tertinggi = risiko",
+            )
+        ],
+        _pytest(f"{UJI_PELAKSANA}::test_risiko_run_yang_tertinggi_bukan_yang_terakhir"),
+        harus_memuat="bukan yang tertinggi",
+    ),
+    # ── akhir penegak buta G3-runtime ──
+    # ── Sprint 4 · penegak buta G5-percakapan ──
+    Mutasi(
+        "4.3",
+        "api hidup merakit pelaksana tool tanpa batas laju (B5)",
+        [
+            Sunting(
+                "apps/api/src/hvx/main.py",
+                "                platform.PembatasLaju(redis, settings.redis_prefix),",
+                "                None,",
+            )
+        ],
+        _pytest(f"{UJI_PERCAKAPAN}::test_galat_sse_berkode_api_bukan_kode_internal"),
+        harus_memuat="pelaksana api hidup dirakit tanpa batas laju tool",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.8",
+        "pembuang giliran lama menghapus giliran yang sedang berjalan (B19)",
+        [
+            Sunting(
+                f"{MODUL}/agents/aliran.py",
+                "        if self._giliran.get(percakapan_id) is g:",
+                "        if percakapan_id in self._giliran:",
+            )
+        ],
+        _pytest(
+            "tests/unit/test_aliran.py::"
+            "test_pembuang_giliran_lama_tidak_menghapus_giliran_yang_sedang_berjalan"
+        ),
+        harus_memuat="pembuang giliran lama menghapus giliran yang sedang berjalan",
+    ),
+    Mutasi(
+        "4.1",
+        "“catat mood 3.5” dilempar ke orchestrator (B27)",
+        [
+            Sunting(
+                f"{MODUL}/agents/percakapan.py",
+                '            if niat.rute == "deterministic":',
+                '            if niat.jenis == "catat_mood":',
+            )
+        ],
+        _pytest(f"{UJI_PERCAKAPAN}::test_perintah_mood_yang_tidak_terbaca_dijawab_tanpa_agent"),
+        harus_memuat="perintah mood yang tidak terbaca dilempar ke orchestrator",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.8",
+        "balasan deterministik tanpa alasan (B28)",
+        [
+            Sunting(
+                f"{MODUL}/agents/percakapan.py",
+                "            confidence=KEYAKINAN_PASTI,\n"
+                "            rationale=(_ALASAN_DETERMINISTIK[niat.jenis],),",
+                "            confidence=KEYAKINAN_PASTI,\n            rationale=(),",
+            )
+        ],
+        _pytest(
+            f"{UJI_PERCAKAPAN}::"
+            "test_balasan_deterministik_mengalir_dan_tersimpan_seperti_balasan_agent"
+        ),
+        harus_memuat="balasan deterministik tanpa alasan",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.8",
+        "log giliran yang gagal mengutip pesan galatnya (B29)",
+        [
+            Sunting(
+                f"{MODUL}/agents/percakapan.py",
+                'log.error("percakapan.giliran_gagal", kode=_kode(galat), jenis=type(galat).__name__)',
+                'log.error("percakapan.giliran_gagal", kode=_kode(galat), '
+                "jenis=type(galat).__name__, pesan=str(galat))",
+            )
+        ],
+        _pytest(f"{UJI_PERCAKAPAN}::test_galat_giliran_dicatat_tanpa_pesannya"),
+        harus_memuat="log galat giliran mengutip isi galatnya",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.8",
+        "jalur deterministik tidak mengalirkan token sebelum done (B61)",
+        [
+            Sunting(
+                f"{MODUL}/agents/percakapan.py",
+                '        await self.aliran.kirim(percakapan_id, "token", {"text": hasil.teks})',
+                "        pass",
+            )
+        ],
+        _pytest(
+            f"{UJI_PERCAKAPAN}::"
+            "test_balasan_deterministik_mengalir_dan_tersimpan_seperti_balasan_agent"
+        ),
+        harus_memuat="jalur deterministik tidak mengalirkan token sebelum done",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.8",
+        "riwayat: biaya balasan deterministik kosong, bukan 0 (B62)",
+        [
+            Sunting(
+                f"{MODUL}/agents/percakapan.py",
+                "            cost_usd=Decimal(0),\n"
+                "            confidence=KEYAKINAN_PASTI,\n"
+                "            rationale=(_ALASAN",
+                "            cost_usd=None,\n"
+                "            confidence=KEYAKINAN_PASTI,\n"
+                "            rationale=(_ALASAN",
+            )
+        ],
+        _pytest(
+            f"{UJI_PERCAKAPAN}::"
+            "test_balasan_deterministik_mengalir_dan_tersimpan_seperti_balasan_agent"
+        ),
+        harus_memuat="riwayat: biaya balasan deterministik bukan 0",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.5",
+        "balasan penolakan tidak terikat run akar gilirannya (B63)",
+        [
+            Sunting(
+                f"{MODUL}/agents/percakapan.py",
+                "                    agent_run_id=akar[0],\n                    cost_usd=Decimal(0),",
+                "                    agent_run_id=None,\n                    cost_usd=Decimal(0),",
+            )
+        ],
+        _pytest(f"{UJI_PERCAKAPAN}::test_konfirmasi_ditolak_tidak_menjalankan_apa_pun"),
+        harus_memuat="balasan penolakan tidak terikat run akar gilirannya",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.5",
+        "R3 menawarkan “izinkan selalu” (B64)",
+        [
+            Sunting(
+                f"{MODUL}/agents/percakapan.py",
+                '        "remember_allowed": k.jenis == "izin",',
+                '        "remember_allowed": True,',
+            )
+        ],
+        _pytest(f"{UJI_PERCAKAPAN}::test_r3_lewat_percakapan_dikonfirmasi_tanpa_bisa_diingat"),
+        harus_memuat="R3 menawarkan “izinkan selalu”",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.5",
+        "R3 dialirkan sebagai permintaan izin, bukan konfirmasi (B65)",
+        [
+            Sunting(
+                f"{MODUL}/agents/percakapan.py",
+                '        "kind": "confirmation" if k.jenis == "konfirmasi" else "permission",',
+                '        "kind": "permission",',
+            )
+        ],
+        _pytest(f"{UJI_PERCAKAPAN}::test_r3_lewat_percakapan_dikonfirmasi_tanpa_bisa_diingat"),
+        harus_memuat="R3 dialirkan sebagai permintaan izin",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.8",
+        "kursor riwayat percakapan lain diterima (B66)",
+        [
+            Sunting(
+                f"{MODUL}/agents/percakapan.py",
+                'sesudah = platform.baca_kursor_waktu(f"messages:{percakapan_id}", kursor)',
+                'sesudah = platform.baca_kursor_waktu("messages", kursor)',
+            ),
+            Sunting(
+                f"{MODUL}/agents/percakapan.py",
+                '                f"messages:{percakapan_id}", baris[-1].created_at, baris[-1].id',
+                '                "messages", baris[-1].created_at, baris[-1].id',
+            ),
+        ],
+        _pytest(f"{UJI_PERCAKAPAN}::test_kursor_riwayat_terikat_percakapannya"),
+        harus_memuat="kursor riwayat percakapan lain diterima",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.5",
+        "jawaban yang diputar ulang saat giliran ulangan ditahan lagi terbaca processing (B67)",
+        [
+            Sunting(
+                f"{MODUL}/agents/percakapan.py",
+                '    if ada_balasan or run is None or run.status == "blocked":',
+                "    if ada_balasan or run is None:",
+            )
+        ],
+        _pytest(
+            f"{UJI_PERCAKAPAN}::"
+            "test_jawaban_diputar_ulang_saat_giliran_ulangan_ditahan_lagi_completed"
+        ),
+        harus_memuat="giliran ulangan yang ditahan lagi dibaca ulang sebagai",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.8",
+        "api yang berhenti menunggu giliran, bukan membatalkannya (B68)",
+        [
+            Sunting(
+                f"{MODUL}/agents/percakapan.py", "            tugas.cancel()", "            pass"
+            )
+        ],
+        _pytest(f"{UJI_PERCAKAPAN}::test_api_berhenti_membatalkan_giliran_yang_masih_berjalan"),
+        harus_memuat="api yang berhenti menunggu giliran yang tertahan",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.8",
+        "lifespan tidak menutup giliran — tugas latar yatim, run running (B69)",
+        [
+            Sunting(
+                "apps/api/src/hvx/main.py",
+                "            await app.state.percakapan.tutup()",
+                "            pass",
+            )
+        ],
+        _pytest(f"{UJI_PERCAKAPAN}::test_lifespan_yang_berhenti_menutup_giliran_yang_berjalan"),
+        harus_memuat="api berhenti meninggalkan giliran yatim",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.8",
+        "pesan > 4.000 karakter diterima (B83)",
+        [
+            Sunting(
+                f"{MODUL}/agents/schemas.py",
+                "IsiPesan = Annotated[platform.TeksBerisi, Field(min_length=1, max_length=4000)]",
+                "IsiPesan = Annotated[platform.TeksBerisi, Field(min_length=1, max_length=40000)]",
+            )
+        ],
+        _pytest(f"{UJI_PERCAKAPAN}::test_badan_percakapan_yang_salah_bentuk_ditolak_400"),
+        harus_memuat="pesan 4.001 karakter tidak ditolak 400",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.8",
+        "kunci asing di badan pesan diabaikan (B84)",
+        [
+            Sunting(
+                f"{MODUL}/agents/schemas.py",
+                'class KirimPesan(BaseModel):\n    model_config = ConfigDict(extra="forbid")',
+                'class KirimPesan(BaseModel):\n    model_config = ConfigDict(extra="ignore")',
+            )
+        ],
+        _pytest(f"{UJI_PERCAKAPAN}::test_badan_percakapan_yang_salah_bentuk_ditolak_400"),
+        harus_memuat="kunci asing di pesan tidak ditolak 400",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.8",
+        "kunci asing di jawaban konfirmasi diabaikan (B85)",
+        [
+            Sunting(
+                f"{MODUL}/agents/schemas.py",
+                'class JawabKonfirmasi(BaseModel):\n    model_config = ConfigDict(extra="forbid")',
+                'class JawabKonfirmasi(BaseModel):\n    model_config = ConfigDict(extra="ignore")',
+            )
+        ],
+        _pytest(f"{UJI_PERCAKAPAN}::test_badan_percakapan_yang_salah_bentuk_ditolak_400"),
+        harus_memuat="kunci asing di jawaban konfirmasi tidak ditolak 400",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.8",
+        "kunci asing di percakapan baru diabaikan (B86)",
+        [
+            Sunting(
+                f"{MODUL}/agents/schemas.py",
+                'class BuatPercakapan(BaseModel):\n    model_config = ConfigDict(extra="forbid")',
+                'class BuatPercakapan(BaseModel):\n    model_config = ConfigDict(extra="ignore")',
+            )
+        ],
+        _pytest(f"{UJI_PERCAKAPAN}::test_badan_percakapan_yang_salah_bentuk_ditolak_400"),
+        harus_memuat="kunci asing di percakapan baru tidak ditolak 400",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.8",
+        "judul percakapan > 200 karakter diterima (B87)",
+        [
+            Sunting(
+                f"{MODUL}/agents/schemas.py",
+                "Judul = Annotated[platform.TeksBerisi, Field(min_length=1, max_length=200)]",
+                "Judul = Annotated[platform.TeksBerisi, Field(min_length=1, max_length=2000)]",
+            )
+        ],
+        _pytest(f"{UJI_PERCAKAPAN}::test_badan_percakapan_yang_salah_bentuk_ditolak_400"),
+        harus_memuat="judul 201 karakter tidak ditolak 400",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.8",
+        "last_message_at percakapan tidak diperbarui (B89)",
+        [
+            Sunting(
+                f"{MODUL}/agents/repository.py",
+                "    SET last_message_at = :waktu, message_count = message_count + 1",
+                "    SET message_count = message_count + 1",
+            )
+        ],
+        _pytest(
+            f"{UJI_PERCAKAPAN}::"
+            "test_balasan_deterministik_mengalir_dan_tersimpan_seperti_balasan_agent"
+        ),
+        harus_memuat="last_message_at tidak diperbarui",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.8",
+        "pesan yang diputar ulang selagi gilirannya berjalan terbaca completed (B91)",
+        [
+            Sunting(
+                f"{MODUL}/agents/percakapan.py",
+                '    return "processing" if run.status == "running" else "failed"',
+                '    return "completed"',
+            )
+        ],
+        _pytest(
+            f"{UJI_PERCAKAPAN}::test_pesan_yang_diputar_ulang_selagi_gilirannya_berjalan_processing"
+        ),
+        harus_memuat="pesan yang diputar ulang selagi gilirannya berjalan terbaca completed",
+        kelompok="db",
+    ),
+    # ── akhir penegak buta G5-percakapan ──
+    # ── Sprint 4 · temuan dari pekerja penegak buta (E-212 · E-213) + kolom spec/05 ──
+    Mutasi(
+        "4.8",
+        "giliran gagal yang diputar ulang terbaca processing selamanya (E-212)",
+        [
+            Sunting(
+                f"{MODUL}/agents/percakapan.py",
+                '    return "processing" if run.status == "running" else "failed"',
+                '    return "processing"',
+            )
+        ],
+        _pytest(f"{UJI_PERCAKAPAN}::test_giliran_gagal_yang_diputar_ulang_terbaca_failed"),
+        harus_memuat="giliran gagal yang diputar ulang terbaca processing",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.8",
+        "cap waktu pesan mengikuti jam basis data yang mundur (E-213)",
+        [
+            Sunting(
+                f"{MODUL}/agents/repository.py",
+                "            GREATEST(clock_timestamp(),"  # noqa: S608 - teks sumber, bukan kueri
+                + NL
+                + "                     (SELECT last_message_at + interval '1 microsecond' FROM ai_conversations"
+                + NL
+                + "                      WHERE id = :conversation_id AND user_id = :user_id)))",
+                "            clock_timestamp())",
+            )
+        ],
+        _pytest(f"{UJI_PERCAKAPAN}::test_cap_waktu_pesan_monoton_walau_jam_basis_data_mundur"),
+        harus_memuat="cap waktu pesan mundur melewati yang lalu",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.8",
+        "last_message_at bukan cap waktu pesan terakhir (E-213)",
+        [
+            Sunting(
+                f"{MODUL}/agents/repository.py",
+                "    SET last_message_at = :waktu, message_count = message_count + 1",
+                "    SET last_message_at = clock_timestamp(), message_count = message_count + 1",
+            )
+        ],
+        _pytest(f"{UJI_PERCAKAPAN}::test_cap_waktu_pesan_monoton_walau_jam_basis_data_mundur"),
+        harus_memuat="last_message_at bukan cap waktu pesan terakhir",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.3",
+        "batas laju tool menyimpang dari tabel spec/05",
+        [
+            Sunting(
+                f"{MODUL}/agents/alat/memory.write.yaml",
+                "rate_limit: 20/min/user",
+                "rate_limit: 60/min/user",
+            )
+        ],
+        _pytest(f"{UJI_REGISTRI_BERKAS}::test_batas_laju_tiap_tool_sama_dengan_tabel_spec05"),
+        harus_memuat="batas laju tool ≠ tabel spec/05",
+    ),
+    # ── Sprint 4 · penegak buta G4-program ──
+    Mutasi(
+        "4.3",
+        "memory.search melebar ke luar manifest pemanggil — journal_raw untuk coach (B4)",
+        [
+            Sunting(
+                f"{MODUL}/agents/alat_v0.py",
+                "            scope_manifest=k.jalannya.agent.memory.read,",
+                '            scope_manifest=[*k.jalannya.agent.memory.read, "journal_raw"],',
+            )
+        ],
+        _pytest(f"{UJI_ALAT}::test_memory_search_tidak_melebar_ke_luar_manifest_pemanggil"),
+        harus_memuat="memory.search menanyakan izin journal_raw",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.3",
+        "ingatan yang dihapus dihitung “sudah diingat” (B20)",
+        [
+            Sunting(
+                f"{MODUL}/memory/repository.py",
+                "    WHERE kind = 'semantic' AND scope = :scope AND content = :content"
+                " AND deleted_at IS NULL",
+                "    WHERE kind = 'semantic' AND scope = :scope AND content = :content",
+            )
+        ],
+        _pytest(f"{UJI_ALAT}::test_ingatan_yang_dihapus_bukan_sudah_diingat"),
+        harus_memuat="ingatan yang dihapus dihitung “sudah diingat”",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.7",
+        "alasan coach tidak dipotong 300 karakter — satu fakta panjang menggagalkan jawaban (B21)",
+        [
+            Sunting(
+                f"{MODUL}/agents/program_v0.py",
+                "    alasan = [f[:300] for f in fakta][:8] or [",
+                "    alasan = [f for f in fakta][:8] or [",
+            )
+        ],
+        _pytest(f"{UJI_AGENT_V0}::test_alasan_coach_dipotong_bukan_menggagalkan_jawaban"),
+        harus_memuat="satu fakta panjang menggagalkan jawaban coach",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.1",
+        "“terlewat” dicatat selesai (B22)",
+        [
+            Sunting(
+                f"{MODUL}/agents/niat.py",
+                '_LEWATI = frozenset({"lewati", "lewatkan", "skip", "dilewati", "terlewat"})',
+                '_LEWATI = frozenset({"lewati", "lewatkan", "skip", "dilewati"})',
+            )
+        ],
+        _pytest(f"{UJI_NIAT}::test_kata_lewati_mencatat_dilewati_bukan_selesai"),
+        harus_memuat="“tandai lari terlewat” dicatat done",
+    ),
+    Mutasi(
+        "4.3",
+        "habit.list menyertakan habit yang diarsipkan (B23)",
+        [Sunting(f"{MODUL}/agents/alat_v0.py", '        status="active",', "        status=None,")],
+        _pytest(f"{UJI_ALAT}::test_habit_list_hanya_habit_aktif"),
+        harus_memuat="habit.list menyertakan habit yang diarsipkan",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.4",
+        "memory.write tidak mencatat scope yang ditulisnya (B24)",
+        [
+            Sunting(
+                f"{MODUL}/agents/alat_v0.py", '    k.jalannya.catat_scope(m["scope"])', "    pass"
+            )
+        ],
+        _pytest(f"{UJI_ALAT}::test_tool_mencatat_scope_yang_disentuhnya"),
+        harus_memuat="memory.write tidak mencatat scope yang disentuhnya",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.1",
+        "coach selalu memakai model besar — “halo” dibayar kelas reasoning (B26)",
+        [
+            Sunting(
+                f"{MODUL}/agents/program_v0.py",
+                '        kelas="reasoning" if niat.rute == "reasoning" else "simple",',
+                '        kelas="reasoning",',
+            )
+        ],
+        _pytest(f"{UJI_AGENT_V0}::test_coach_memilih_kelas_model_dari_niat"),
+        harus_memuat="“halo” dijawab uji/besar, bukan uji/kecil",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.3",
+        "memory.write tanpa kunci per (pengguna, scope) — ingat serentak jadi dua baris (B33)",
+        [
+            Sunting(
+                f"{MODUL}/memory/repository.py",
+                '    await conn.execute(_KUNCI_INGAT, {"kunci": f"memori-ingat:{user_id}:{scope}"})',
+                "    pass",
+            )
+        ],
+        _pytest(f"{UJI_ALAT}::test_ingat_serentak_tidak_melahirkan_dua_baris"),
+        harus_memuat="ingatan yang sama ditulis serentak dua kali",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.3",
+        "isi memori tanpa batas 4.000 karakter (B34)",
+        [
+            Sunting(
+                f"{MODUL}/memory/ingatan.py",
+                "    if not rapi or len(rapi) > ISI_MAKS:",
+                "    if not rapi:",
+            )
+        ],
+        _pytest(
+            f"{UJI_PELAKSANA}::test_masukan_yang_pasti_ditolak_pemiliknya_tidak_sampai_ke_gerbang"
+        ),
+        harus_memuat="memory.write (AttributeError) sampai ke gerbang",
+    ),
+    Mutasi(
+        "4.3",
+        "judul rekomendasi tanpa batas 200 karakter (B35)",
+        [
+            Sunting(
+                f"{MODUL}/intelligence/rekomendasi.py",
+                "    if not _BERISI.search(title) or len(title) > JUDUL_MAKS:",
+                "    if not _BERISI.search(title):",
+            )
+        ],
+        _pytest(f"{UJI_ALAT}::test_rekomendasi_di_luar_batas_pemiliknya_ditolak_tanpa_baris"),
+        harus_memuat="rekomendasi dengan judul 201 karakter disimpan",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.3",
+        "rekomendasi tidak terikat run yang membuatnya — agent_run_id NULL (B37)",
+        [
+            Sunting(
+                f"{MODUL}/agents/alat_v0.py",
+                "            agent_run_id=k.jalannya.id if k.jalannya.tersimpan else None,",
+                "            agent_run_id=None,",
+            )
+        ],
+        _pytest(f"{UJI_ALAT}::test_rekomendasi_terikat_run_yang_membuatnya"),
+        harus_memuat="rekomendasi tidak terikat run yang membuatnya",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.3",
+        "goal.list mengabaikan saringan status — goal tercapai disebut aktif (B40)",
+        [
+            Sunting(
+                f"{MODUL}/agents/alat_v0.py",
+                'status=m.get("status"), batas=GOAL_MAKS',
+                "status=None, batas=GOAL_MAKS",
+            )
+        ],
+        _pytest(f"{UJI_ALAT}::test_goal_list_menyaring_status"),
+        harus_memuat="goal.list mengabaikan status",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.7",
+        "alasan coach 9 fakta + 2 kalimat sumber = 11 — run gagal saat data paling banyak (B42)",
+        [
+            Sunting(
+                f"{MODUL}/agents/program_v0.py",
+                "    alasan = [f[:300] for f in fakta][:8] or [",
+                "    alasan = [f[:300] for f in fakta][:9] or [",
+            )
+        ],
+        _pytest(
+            f"{UJI_AGENT_V0}::test_alasan_coach_paling_banyak_sepuluh_walau_semua_sumber_berisi"
+        ),
+        harus_memuat="alasan coach melewati 10 saat semua sumber berisi",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.7",
+        "habit agent: keyakinan judul sebagian sama dengan persis (B70)",
+        [
+            Sunting(
+                f"{MODUL}/agents/program_v0.py",
+                "        KEYAKINAN_JUDUL_PERSIS if persis else KEYAKINAN_JUDUL_SEBAGIAN,",
+                "        KEYAKINAN_JUDUL_PERSIS,",
+            )
+        ],
+        _pytest(f"{UJI_AGENT_V0}::test_habit_agent_keyakinan_judul_sebagian"),
+        harus_memuat="keyakinan judul yang hanya cocok sebagian",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.7",
+        "memory-agent diam atas scope ingatan yang belum diizinkan (B71)",
+        [
+            Sunting(
+                f"{MODUL}/agents/program_v0.py",
+                "            alasan.append(f\"Belum kamu izinkan dibaca: {', '.join(cari['perlu_izin'])}.\")",
+                "            pass",
+            )
+        ],
+        _pytest(f"{UJI_AGENT_V0}::test_memory_agent_menyatakan_ingatan_yang_belum_diizinkan"),
+        harus_memuat="memory-agent melewati scope `tanya aku` diam-diam",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.3",
+        "mood.recent mengabaikan `hari` — selalu 7 hari (B72)",
+        [
+            Sunting(
+                f"{MODUL}/agents/alat_v0.py",
+                "        dari=datetime.now(UTC) - timedelta(days=hari),",
+                "        dari=datetime.now(UTC) - timedelta(days=MOOD_HARI_BAWAAN),",
+            )
+        ],
+        _pytest(f"{UJI_ALAT}::test_mood_recent_membaca_jendela_hari_yang_diminta"),
+        harus_memuat="mood.recent mengabaikan `hari`",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.3",
+        "memory.search tanpa batas menyerahkan 50, bukan 5 (B73)",
+        [
+            Sunting(
+                f"{MODUL}/agents/alat_v0.py",
+                'batas=m.get("batas", 5),',
+                'batas=m.get("batas", 50),',
+            )
+        ],
+        _pytest(f"{UJI_ALAT}::test_memory_search_tanpa_batas_lima_hasil"),
+        harus_memuat="memory.search tanpa batas menyerahkan 7 hasil, bukan 5",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.4",
+        "recommendation.create tidak mencatat scope coaching_notes (B74)",
+        [
+            Sunting(
+                f"{MODUL}/agents/alat_v0.py",
+                '    k.jalannya.catat_scope("coaching_notes")',
+                "    pass",
+            )
+        ],
+        _pytest(f"{UJI_ALAT}::test_tool_mencatat_scope_yang_disentuhnya"),
+        harus_memuat="recommendation.create tidak mencatat scope yang disentuhnya",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.4",
+        "habit.streak tidak mencatat scope habits (B75)",
+        [
+            Sunting(
+                f"{MODUL}/agents/alat_v0.py",
+                '    k.jalannya.catat_scope("habits")\n    r = await habits.rentetan_habit(',
+                "    r = await habits.rentetan_habit(",
+            )
+        ],
+        _pytest(f"{UJI_ALAT}::test_tool_mencatat_scope_yang_disentuhnya"),
+        harus_memuat="habit.streak tidak mencatat scope yang disentuhnya",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.3",
+        "domain rekomendasi di luar spec/01 diterima pemanggil langsung (B76)",
+        [
+            Sunting(
+                f"{MODUL}/intelligence/rekomendasi.py",
+                "    if domain not in DOMAIN:",
+                "    if False:",
+            )
+        ],
+        _pytest(f"{UJI_ALAT}::test_layanan_tulis_menjaga_daftarnya_tanpa_skema_tool"),
+        harus_memuat="rekomendasi ber-domain 'keuangan' disimpan",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.3",
+        "isi rekomendasi tanpa batas 2.000 karakter (B77)",
+        [
+            Sunting(
+                f"{MODUL}/intelligence/rekomendasi.py",
+                "    if body is not None and len(body) > ISI_MAKS:",
+                "    if False:",
+            )
+        ],
+        _pytest(f"{UJI_ALAT}::test_rekomendasi_di_luar_batas_pemiliknya_ditolak_tanpa_baris"),
+        harus_memuat="rekomendasi dengan isi 2.001 karakter disimpan",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.3",
+        "rekomendasi dengan lebih dari 10 alasan disimpan (B78)",
+        [
+            Sunting(
+                f"{MODUL}/intelligence/rekomendasi.py",
+                "        or len(rationale) > ALASAN_MAKS\n",
+                "        or False\n",
+            )
+        ],
+        _pytest(f"{UJI_ALAT}::test_rekomendasi_di_luar_batas_pemiliknya_ditolak_tanpa_baris"),
+        harus_memuat="rekomendasi dengan 11 alasan disimpan",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.3",
+        "alasan rekomendasi tanpa isi diterima (B79)",
+        [
+            Sunting(
+                f"{MODUL}/intelligence/rekomendasi.py",
+                "        or not all(isinstance(a, str) and _BERISI.search(a) for a in rationale)",
+                "        or not all(isinstance(a, str) for a in rationale)",
+            )
+        ],
+        _pytest(f"{UJI_ALAT}::test_rekomendasi_di_luar_batas_pemiliknya_ditolak_tanpa_baris"),
+        harus_memuat="rekomendasi dengan alasan tanpa isi disimpan",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.3",
+        "scope memori di luar daftar resmi diterima pemanggil langsung (B80)",
+        [
+            Sunting(
+                f"{MODUL}/memory/ingatan.py",
+                "    if scope not in identity.SCOPE_RESMI:",
+                "    if False:",
+            )
+        ],
+        _pytest(f"{UJI_ALAT}::test_layanan_tulis_menjaga_daftarnya_tanpa_skema_tool"),
+        harus_memuat="memori ber-scope 'location' disimpan",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.3",
+        "ingatan yang kedaluwarsa dihitung “sudah diingat” (B81)",
+        [
+            Sunting(
+                f"{MODUL}/memory/repository.py",
+                "      AND (valid_until > now() OR valid_until IS NULL)\n    LIMIT 1",
+                "    LIMIT 1",
+            )
+        ],
+        _pytest(f"{UJI_ALAT}::test_ingatan_kedaluwarsa_bukan_sudah_diingat"),
+        harus_memuat="ingatan yang kedaluwarsa dihitung “sudah diingat”",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.3",
+        "memori episodik menghalangi “ingat bahwa …” (B82)",
+        [
+            Sunting(
+                f"{MODUL}/memory/repository.py",
+                "    WHERE kind = 'semantic' AND scope = :scope AND content",
+                "    WHERE scope = :scope AND content",
+            )
+        ],
+        _pytest(f"{UJI_ALAT}::test_hanya_ingatan_semantik_yang_menghalangi_tulisan_ulang"),
+        harus_memuat="memori episodik dihitung “sudah diingat”",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.3",
+        "batas laju tool melonggar ke 60 per 6 dtk — ledakan tetap 60 (uji berkedip diperbaiki)",
+        [
+            Sunting(
+                f"{MODUL}/agents/pelaksana_alat.py",
+                '_JENDELA_S = {"min": 60, "hour": 3_600}',
+                '_JENDELA_S = {"min": 6, "hour": 3_600}',
+            )
+        ],
+        _pytest(f"{UJI_ALAT}::test_batas_laju_tool_per_pengguna"),
+        harus_memuat="batasnya bukan 60/min",
+        kelompok="db",
+    ),
+    # ── akhir penegak buta G4-program ──
     # ── alat ini sendiri: mutasi yang menggantung dihentikan beserta turunannya ──
     Mutasi(
         "alat",

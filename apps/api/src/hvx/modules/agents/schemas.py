@@ -12,7 +12,8 @@ from hvx.modules import platform
 
 Judul = Annotated[platform.TeksBerisi, Field(min_length=1, max_length=200)]
 IsiPesan = Annotated[platform.TeksBerisi, Field(min_length=1, max_length=4000)]
-StatusGiliran = Literal["processing", "completed"]
+# `failed`: giliran berakhir dengan SSE `error` — tanpa balasan tersimpan (E-212).
+StatusGiliran = Literal["processing", "completed", "failed"]
 # spec/04: jawaban atas `confirmation_required` — kode API berbahasa Inggris.
 KeputusanKonfirmasi = Literal["allow_always", "allow_once", "reject"]
 

@@ -58,6 +58,7 @@ from .schemas import (
     KirimPesan,
     Percakapan,
     Pesan,
+    StatusGiliran,
     TerimaKonfirmasi,
     TerimaPesan,
 )
@@ -206,13 +207,14 @@ class LayananPercakapan:
             p = await repository.baca_pesan(conn, user_id, pesan_id)
             if p is None or p.role != "user":
                 return None
-            selesai = p.agent_run_id is None or (
-                await repository.pesan_run(conn, user_id, p.agent_run_id, "assistant") is not None
-            )
+            if p.agent_run_id is None:  # perintah deterministik — dijawab saat itu juga
+                return TerimaPesan(message_id=p.id, agent_run_id=None, status="completed")
+            run = await repository.baca_run(conn, p.agent_run_id)
+            balasan = await repository.pesan_run(conn, user_id, p.agent_run_id, "assistant")
         return TerimaPesan(
             message_id=p.id,
             agent_run_id=p.agent_run_id,
-            status="completed" if selesai else "processing",
+            status=_status_giliran(balasan is not None, run),
         )
 
     async def baca_terima_konfirmasi(self, user_id: UUID, run_id: UUID) -> TerimaKonfirmasi | None:
@@ -221,10 +223,8 @@ class LayananPercakapan:
             if run is None:
                 return None
             balasan = await repository.pesan_run(conn, user_id, run_id, "assistant")
-        selesai = balasan is not None or run.status == "blocked"
-        return TerimaKonfirmasi(
-            agent_run_id=run_id, status="completed" if selesai else "processing"
-        )
+        status = _status_giliran(balasan is not None, run)
+        return TerimaKonfirmasi(agent_run_id=run_id, status=status)
 
     # ── giliran ─────────────────────────────────────────────────────────────
     async def _pastikan_ada(self, user_id: UUID, percakapan_id: UUID) -> None:
@@ -492,6 +492,16 @@ class LayananPercakapan:
             tugas.cancel()
         if self._tugas:
             await asyncio.gather(*self._tugas, return_exceptions=True)
+
+
+def _status_giliran(ada_balasan: bool, run: repository.BarisRun | None) -> StatusGiliran:
+    """Keadaan giliran yang diputar ulang (Idempotency-Key) — dari balasannya DAN run
+    akarnya. Giliran yang gagal tidak menyimpan balasan: dulu terbaca `processing` selamanya,
+    dan klien yang menunggu tidak pernah berhenti menunggu (E-212, tinjauan Sprint 4). Run
+    `blocked` = selesai: pertanyaannya ADALAH balasannya."""
+    if ada_balasan or run is None or run.status == "blocked":
+        return "completed"
+    return "processing" if run.status == "running" else "failed"
 
 
 def _konfirmasi_tidak_sah() -> platform.GalatApi:

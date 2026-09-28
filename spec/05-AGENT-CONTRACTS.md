@@ -246,20 +246,26 @@ rate_limit:   60/min/user
 
 Tool V0 — **9 tool + 3 entri `kind: agent`**:
 
-| Tool | Kind | Risk | Dipakai | Scope 🔧 |
-|---|---|---|---|---|
-| `habit.list` | read | 0 | Coach, Habit | habits |
-| `habit.streak` | read | 0 | Coach, Habit | habits |
-| `habit.complete` | write | 2 | Habit | habits |
-| `goal.list` | read | 0 | Coach | goals |
-| `checkin.get` | read | 0 | Coach | checkins |
-| `mood.recent` | read | 0 | Coach | mood |
-| `memory.search` | read | 0 | Coach, Memory | yang diminta manifest pemanggil — semua scope resmi |
-| `memory.write` | write | 2 | Memory | satu scope yang diizinkan — semua kecuali `journal_raw` |
-| `recommendation.create` | write | 1 | Coach | coaching_notes |
-| `agent.coach` | **agent** | 1 | Orchestrator | scope baca & tulis `coach-agent` |
-| `agent.habit` | **agent** | 2 | Orchestrator | habits |
-| `agent.memory` | **agent** | 2 | Orchestrator | scope `memory-agent` |
+| Tool | Kind | Risk | Dipakai | Scope 🔧 | Batas laju 🔧 |
+|---|---|---|---|---|---|
+| `habit.list` | read | 0 | Coach, Habit | habits | 60/min/user |
+| `habit.streak` | read | 0 | Coach, Habit | habits | 60/min/user |
+| `habit.complete` | write | 2 | Habit | habits | 20/min/user |
+| `goal.list` | read | 0 | Coach | goals | 60/min/user |
+| `checkin.get` | read | 0 | Coach | checkins | 60/min/user |
+| `mood.recent` | read | 0 | Coach | mood | 60/min/user |
+| `memory.search` | read | 0 | Coach, Memory | yang diminta manifest pemanggil — semua scope resmi | 60/min/user |
+| `memory.write` | write | 2 | Memory | satu scope yang diizinkan — semua kecuali `journal_raw` | 20/min/user |
+| `recommendation.create` | write | 1 | Coach | coaching_notes | 20/min/user |
+| `agent.coach` | **agent** | 1 | Orchestrator | scope baca & tulis `coach-agent` | 30/min/user |
+| `agent.habit` | **agent** | 2 | Orchestrator | habits | 30/min/user |
+| `agent.memory` | **agent** | 2 | Orchestrator | scope `memory-agent` | 30/min/user |
+
+> 🔧 **Kolom *Batas laju* ditambahkan 28 Sep 2026** (tinjauan penegak buta Sprint 4):
+> `rate_limit` tiap tool — per pengguna, dipakai pelaksana SEBELUM gerbang — hidup di
+> YAML-nya tanpa sumber di berkas ini; satu-satunya contohnya menulis `60/min/user`.
+> Tulisan (`write`) lebih ketat daripada bacaan; delegasi di antaranya. Kini
+> `tests/unit/test_registri_agent.py` membandingkan kolom ini dengan registry.
 
 > 🔧 **Kolom *Scope* ditambahkan 24 Sep 2026 (E-191, tugas 4.2).** Skema tool
 > menuntut `scopes` — *scope memory/data yang disentuh* — tetapi tabel V0 tidak

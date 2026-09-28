@@ -11,7 +11,7 @@ import math
 import os
 import subprocess
 import sys
-from uuid import UUID, uuid4
+from uuid import UUID
 
 import pytest
 
@@ -45,11 +45,18 @@ def test_penyemat_proses_tidak_menyemat_sendiri() -> None:
 
 def test_tiap_pengguna_ruang_vektornya_sendiri() -> None:
     """Tinjauan keamanan Sprint 3 (S1): teks yang sama dari dua pengguna tidak sebanding —
-    akun penyerang tidak bisa menyemat kamus lalu membandingkannya dengan vektor korban."""
-    lain = P.untuk(uuid4()).semat("ingin berhenti")
+    akun penyerang tidak bisa menyemat kamus lalu membandingkannya dengan vektor korban.
 
-    assert abs(_kosinus(S.semat("ingin berhenti"), lain)) < 0.3, "vektor dua pengguna sebanding"
-    assert S.semat("ingin berhenti") == P.untuk(U).semat("ingin berhenti")
+    Diukur atas 500 pengguna TETAP, bukan satu `uuid4` acak: dua ruang hash kebetulan
+    mirip (|kosinus| ≥ 0,3) pada ±0,35% pasangan — uji satu pasangan acak berkedip."""
+    teks = "ingin berhenti"
+    milik = S.semat(teks)
+    kemiripan = [abs(_kosinus(milik, P.untuk(UUID(int=i)).semat(teks))) for i in range(2, 502)]
+    sebanding = sum(k >= 0.3 for k in kemiripan)
+
+    assert sum(kemiripan) / len(kemiripan) < 0.1, "vektor dua pengguna sebanding (rata-rata)"
+    assert sebanding <= 10, f"vektor dua pengguna sebanding: {sebanding} dari 500"
+    assert S.semat(teks) == P.untuk(U).semat(teks)
 
 
 def test_ternormalkan_dan_teks_tanpa_kata_vektor_nol() -> None:

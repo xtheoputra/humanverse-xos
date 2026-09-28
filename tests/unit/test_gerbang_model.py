@@ -111,6 +111,22 @@ def test_model_berbayar_tanpa_harga_ditolak_saat_dirakit() -> None:
     GerbangModel(penyedia, model, {"luar/besar": HargaModel(Decimal(1), Decimal(2))})  # type: ignore[arg-type]
 
 
+def test_biaya_dibulatkan_setengah_ke_atas_ke_sen_mikro() -> None:
+    """Tinjauan penegak buta Sprint 4: harga uji di atas (3 · 15 per sejuta) selalu
+    menghasilkan biaya yang pas di enam desimal, jadi pembulatannya tidak pernah
+    teruji. `agent_runs.cost_usd` numeric(12,6), dan anggaran harian (4.9) menjumlah
+    biaya ini — pemotongan (atau HALF_EVEN bawaan Decimal) mencatat separuh sen-mikro
+    sebagai nol, dan panggilan murah yang banyak tidak pernah menghabiskan anggaran."""
+    separuh = HargaModel(Decimal("0.5"), Decimal(0)).biaya(1, 0)
+
+    assert separuh == Decimal("0.000001"), (
+        f"separuh sen-mikro dibulatkan ke bawah: {separuh} — biaya diremehkan"
+    )
+    assert separuh.as_tuple().exponent == -6, "skala biaya ≠ numeric(12,6)"
+    assert HargaModel(Decimal("2.5"), Decimal(0)).biaya(1, 0) == Decimal("0.000003")
+    assert HargaModel(Decimal(0), Decimal("0.4")).biaya(0, 1) == Decimal(0)
+
+
 def test_penyedia_tak_dikenal_ditolak_saat_dirakit() -> None:
     with pytest.raises(GalatModel, match="penyedia 'hilang'"):
         GerbangModel({"lokal": PenyediaLokal()}, {**MODEL, "reasoning": "hilang/x"}, {})

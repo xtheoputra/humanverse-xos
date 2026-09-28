@@ -10,6 +10,7 @@ K-14), lulus validator yang sama.
 from __future__ import annotations
 
 import copy
+import time
 from collections.abc import Callable
 from decimal import Decimal
 from importlib import resources
@@ -29,6 +30,8 @@ pytestmark = pytest.mark.integration
 
 HABIT = identity.Subjek("agent", "habit-agent")
 COACH = identity.Subjek("agent", "coach-agent")
+MEMORY = identity.Subjek("agent", "memory-agent")
+ORKESTRATOR = identity.Subjek("agent", "orchestrator-agent")
 HARI = "2026-09-20"
 
 
@@ -235,6 +238,11 @@ async def test_risk_4_ditolak_tanpa_bertanya(api_bersama: ApiUji) -> None:
         "R4 bisa dikonfirmasi"
     )
     assert _selesai(api_bersama, uid) == 0
+    # R4 adalah penolakan GERBANG — run `blocked`, dan percakapan membalas *“Tidak
+    # dijalankan”*; run `failed` membuat percakapan mengirim `error` (percakapan.py).
+    assert sql(api_bersama, "SELECT status, decision FROM agent_runs WHERE user_id = %s", uid) == [
+        ("blocked", {"action": "denied", "tool": "habit.complete", "code": "risiko_terlarang"})
+    ], "R4 tercatat sebagai kegagalan, bukan penolakan gerbang"
 
 
 async def test_r0_jalan_tanpa_bertanya_kecuali_pengguna_minta_ditanya(api_bersama: ApiUji) -> None:
@@ -295,6 +303,13 @@ async def test_jawaban_sekali_pakai(api_bersama: ApiUji) -> None:
 
     assert run(api_bersama, p.run_id)["confirmed_by_user"] is False
     assert _selesai(api_bersama, uid) == 0
+    assert sql(
+        api_bersama,
+        "SELECT action, subject_id FROM audit_logs WHERE user_id = %s AND action LIKE 'agent.%%'",
+        uid,
+    ) == [("agent.action_rejected", "habit.complete")], (
+        "penolakan pengguna tercatat sebagai persetujuan — jejak audit bohong"
+    )
 
 
 async def test_token_milik_pengguna_lain_ditolak(api_bersama: ApiUji) -> None:
@@ -346,10 +361,16 @@ def _isi(p: agents.PermintaanKonfirmasi) -> dict[str, Any]:
     }
 
 
-async def test_delegasi_tidak_ditanya_dua_kali(api_bersama: ApiUji) -> None:
-    """Orchestrator → agent.habit (R2) → habit.complete (R2): SATU pertanyaan, di tulisannya."""
+@pytest.mark.parametrize("risiko", [2, 3])
+async def test_delegasi_tidak_ditanya_dua_kali(api_bersama: ApiUji, risiko: int) -> None:
+    """Orchestrator → agent.habit (R) → habit.complete (R): SATU pertanyaan, di tulisannya —
+    juga di R3: delegasi tidak dikonfirmasi sendiri, konfirmasinya milik tulisan itu (E-192).
+
+    Pertanyaannya menunjuk run ANAK yang ditahan — satu-satunya yang menyimpan jawabannya
+    (`confirmed_by_user`); run induk hanya ikut berhenti."""
     uid, token = await api_bersama.pengguna_baru()
     await buat_habit(api_bersama, token)
+    registri = REGISTRI if risiko == 2 else _registri_dengan_risiko(risiko)
 
     async def orkestrator(k: agents.KonteksAgent, pesan: str) -> agents.Keputusan:
         balasan = await k.alat("agent.habit", {"pesan": pesan})
@@ -360,12 +381,19 @@ async def test_delegasi_tidak_ditanya_dua_kali(api_bersama: ApiUji) -> None:
             {"action": "delegate", "agent": "habit-agent"},
         )
 
-    runtime = _runtime(api_bersama, {"orchestrator-agent": orkestrator, "habit-agent": _tandai()})
+    runtime = _runtime(
+        api_bersama, {"orchestrator-agent": orkestrator, "habit-agent": _tandai()}, registri
+    )
     p = await _ditahan(runtime, uid, "orchestrator-agent")
     assert (p.agent, p.alat) == ("habit-agent", "habit.complete"), (
         f"delegasi ditanyakan sendiri: {p.agent} → {p.alat}"
     )
+    (ditahan,) = _anak(api_bersama, uid)
+    assert p.run_id == ditahan[0], "permintaan menunjuk run induk, bukan run anak yang DITAHAN"
     persetujuan = await _jawab(api_bersama, uid, p, "izinkan_sekali")
+    assert run(api_bersama, ditahan[0])["confirmed_by_user"] is True, (
+        "run anak yang ditahan tidak tercatat dijawab"
+    )
     hasil = await runtime.jalankan(
         uid, "orchestrator-agent", "tandai", pemicu="user", persetujuan=frozenset({persetujuan})
     )
@@ -408,3 +436,219 @@ async def test_izin_selalu_disimpan_bersama_jawabannya_atau_tidak_sama_sekali(
         "jawaban yang gagal tidak bisa diulang"
     )
     assert await _izin(api_bersama).cek(uid, HABIT, "habits", "write") == "allow"
+
+
+# ── Tinjauan penegak buta Sprint 4: janji gerbang yang dulu tidak dijaga uji mana pun ──
+
+
+async def _coba(
+    runtime: agents.RuntimeAgent, uid: UUID, agent: str, pesan: str, **kw: Any
+) -> agents.HasilRun | agents.AlatDitolak:
+    """Hasil satu giliran — atau penolakan/penahanan gerbangnya, sebagai nilai."""
+    try:
+        return await runtime.jalankan(uid, agent, pesan, pemicu="user", **kw)
+    except agents.AlatDitolak as galat:
+        return galat
+
+
+def _ringkas(h: agents.HasilRun | agents.AlatDitolak) -> tuple[str, str | None, bool] | str:
+    """`(kode, tool, ditahan?)` sebuah penolakan gerbang — atau `"dijalankan"`."""
+    if isinstance(h, agents.HasilRun):
+        return "dijalankan"
+    return (h.kode, h.alat, h.konfirmasi is not None)
+
+
+def _permintaan(h: agents.HasilRun | agents.AlatDitolak) -> agents.PermintaanKonfirmasi:
+    assert isinstance(h, agents.AlatDitolak), "gerbang tidak menahan — dijalankan tanpa bertanya"
+    assert h.konfirmasi is not None, f"ditolak ({h.kode}), bukan ditahan"
+    return h.konfirmasi
+
+
+async def _penjawab(k: agents.KonteksAgent, pesan: str) -> agents.Keputusan:
+    """coach-agent tiruan tanpa tool — yang diuji di sini gerbang DELEGASINYA."""
+    return agents.Keputusan("dijawab coach", Decimal("0.5"), ("alasan coach",), {"action": "reply"})
+
+
+def _delegasi(api: ApiUji) -> agents.RuntimeAgent:
+    """`orchestrator-agent` sungguhan: *“bagaimana hariku?”* → `agent.coach` (lima scope),
+    *“tandai lari selesai”* → `agent.habit`."""
+    return _runtime(
+        api,
+        {
+            "orchestrator-agent": agents.orkestrator,
+            "coach-agent": _penjawab,
+            "habit-agent": _tandai(),
+        },
+    )
+
+
+def _anak(api: ApiUji, uid: UUID) -> list[tuple[Any, ...]]:
+    """Run anak (`parent_run_id` terisi) milik pengguna — `(id, confirmed_by_user)`."""
+    return sql(
+        api,
+        "SELECT id, confirmed_by_user FROM agent_runs"
+        " WHERE user_id = %s AND parent_run_id IS NOT NULL",
+        uid,
+    )
+
+
+async def test_deny_mendahului_konfirmasi_r3(api_bersama: ApiUji) -> None:
+    """spec/05 gerbang V0 (2): `deny` ditolak & dicatat SEBELUM konfirmasi R3. Aksi yang
+    pengguna larang tidak boleh berubah menjadi pertanyaan — tombol *izinkan* di layar
+    konfirmasi membukanya kembali dengan satu ketukan."""
+    uid, token = await api_bersama.pengguna_baru()
+    await buat_habit(api_bersama, token)
+    await _izin(api_bersama).tetapkan(uid, HABIT, "habits", "write", "deny")
+    runtime = _runtime(api_bersama, {"habit-agent": _tandai()}, _registri_dengan_risiko(3))
+
+    hasil = await _coba(runtime, uid, "habit-agent", "tandai")
+
+    assert _ringkas(hasil) == ("ditolak_pengguna", "habit.complete", False), (
+        f"deny pengguna atas R3 ditanyakan sebagai konfirmasi: {_ringkas(hasil)}"
+    )
+    assert sql(
+        api_bersama,
+        "SELECT count(*) FROM audit_logs WHERE user_id = %s AND action = 'agent.tool_denied'",
+        uid,
+    ) == [(1,)]
+    assert _selesai(api_bersama, uid) == 0
+
+
+async def test_deny_di_scope_mana_pun_menolak_delegasi(api_bersama: ApiUji) -> None:
+    """`agent.coach` menyentuh lima scope; `deny` pengguna di scope KEEMPAT (`mood`) menolak
+    delegasinya — bukan hanya keputusan scope pertama yang dibaca (spec/05 gerbang V0 (2))."""
+    uid, _token = await api_bersama.pengguna_baru()
+    await _izin(api_bersama).tetapkan(uid, ORKESTRATOR, "mood", "execute", "deny")
+
+    hasil = await _coba(_delegasi(api_bersama), uid, "orchestrator-agent", "bagaimana hariku?")
+
+    assert _ringkas(hasil) == ("ditolak_pengguna", "agent.coach", False), (
+        f"deny pengguna di scope selain yang pertama diabaikan: {_ringkas(hasil)}"
+    )
+    assert _anak(api_bersama, uid) == [], "agent yang delegasinya ditolak tetap dijalankan"
+
+
+async def test_tanya_aku_di_scope_mana_pun_menahan_delegasi(api_bersama: ApiUji) -> None:
+    """*“Tanya aku”* pengguna di scope KEDUA (`goals`) delegasi ke coach menahannya."""
+    uid, _token = await api_bersama.pengguna_baru()
+    await _izin(api_bersama).tetapkan(uid, ORKESTRATOR, "goals", "execute", "ask")
+
+    hasil = await _coba(_delegasi(api_bersama), uid, "orchestrator-agent", "bagaimana hariku?")
+
+    assert _ringkas(hasil) == ("perlu_izin", "agent.coach", True), (
+        f"ask pengguna di scope selain yang pertama dilewati: {_ringkas(hasil)}"
+    )
+    assert _anak(api_bersama, uid) == []
+
+
+async def test_izinkan_selalu_mengingat_seluruh_scope_permintaan(api_bersama: ApiUji) -> None:
+    """Satu jawaban *izinkan selalu* atas permintaan lima scope = lima izin tersimpan; yang
+    hanya menyimpan sebagian menanyakan hal yang sama lagi di giliran berikutnya."""
+    uid, _token = await api_bersama.pengguna_baru()
+    izin = _izin(api_bersama)
+    for scope in ("goals", "mood"):
+        await izin.tetapkan(uid, ORKESTRATOR, scope, "execute", "ask")
+    runtime = _delegasi(api_bersama)
+
+    p = _permintaan(await _coba(runtime, uid, "orchestrator-agent", "bagaimana hariku?"))
+    await _jawab(api_bersama, uid, p, "izinkan_selalu")
+    berikutnya = await _coba(runtime, uid, "orchestrator-agent", "bagaimana hariku?")
+    tersimpan = [await izin.cek(uid, ORKESTRATOR, s, "execute") for s in p.scopes]
+
+    assert _ringkas(berikutnya) == "dijalankan", (
+        "izinkan_selalu hanya mengingat sebagian scope permintaan — ditanya lagi: "
+        f"{_ringkas(berikutnya)}"
+    )
+    assert tersimpan == ["allow"] * 5, f"izin yang diingat per scope: {tersimpan}"
+
+
+async def test_permintaan_izin_hanya_scope_pemanggilannya(api_bersama: ApiUji) -> None:
+    """E-195: `memory.write` ke `coaching_notes` menanyakan `coaching_notes` — bukan kelima
+    scope tool itu. Izin yang diingat dari jawabannya tidak melebar ke `habits` tanpa
+    pernah dilihat pengguna."""
+    uid, _token = await api_bersama.pengguna_baru()
+    runtime = _runtime(api_bersama, {"memory-agent": agents.PROGRAM_V0["memory-agent"]})
+
+    p = _permintaan(await _coba(runtime, uid, "memory-agent", "ingat bahwa aku alergi kacang"))
+    await _jawab(api_bersama, uid, p, "izinkan_selalu")
+
+    assert (p.alat, p.scopes) == ("memory.write", ("coaching_notes",)), (
+        f"permintaan izin memuat scope yang tidak disentuh pemanggilannya: {p.scopes}"
+    )
+    assert await _izin(api_bersama).cek(uid, MEMORY, "habits", "write") == "ask"
+
+
+async def test_r1_yang_belum_diputuskan_jalan_tanpa_bertanya(api_bersama: ApiUji) -> None:
+    """Tabel bawaan spec/05: R1 = `allow` bila pengguna belum memutuskan — coach menyimpan
+    rekomendasinya (`recommendation.create`, satu-satunya tool R1) tanpa bertanya."""
+    uid, _token = await api_bersama.pengguna_baru()
+
+    async def sarankan(k: agents.KonteksAgent, pesan: str) -> agents.Keputusan:
+        await k.alat(
+            "recommendation.create",
+            {"domain": "habit", "title": "Tidur lebih awal", "confidence": 0.6,
+             "rationale": ["Tidur rata-rata 5 jam"]},
+        )  # fmt: skip
+        return agents.Keputusan("Disarankan.", Decimal("0.6"), ("Tidur",), {"action": "reply"})
+
+    hasil = await _coba(_runtime(api_bersama, {"coach-agent": sarankan}), uid, "coach-agent", "?")
+
+    assert _ringkas(hasil) == "dijalankan", (
+        f"R1 yang belum diputuskan pengguna ditanyakan: {_ringkas(hasil)}"
+    )
+    assert sql(api_bersama, "SELECT count(*) FROM recommendations WHERE user_id = %s", uid) == [
+        (1,)
+    ]
+
+
+async def test_persetujuan_terikat_agentnya(api_bersama: ApiUji) -> None:
+    """4.5: persetujuan = agent + tool + sidik masukan. Persetujuan milik coach-agent atas
+    tool dan masukan yang SAMA tidak meloloskan habit-agent."""
+    uid, p = await _satu_permintaan(api_bersama)
+    milik_lain = agents.PersetujuanAksi("coach-agent", p.alat, p.sidik)
+
+    hasil = await _coba(
+        _runtime(api_bersama, {"habit-agent": _tandai()}),
+        uid,
+        "habit-agent",
+        "tandai",
+        persetujuan=frozenset({milik_lain}),
+    )
+
+    assert _ringkas(hasil) == ("perlu_izin", "habit.complete", True), (
+        f"persetujuan untuk agent lain meloloskan pemanggilan ini: {_ringkas(hasil)}"
+    )
+    assert _selesai(api_bersama, uid) == 0
+
+
+async def test_delegasi_ditanyakan_sebagai_izin_execute(api_bersama: ApiUji) -> None:
+    """`AKSI_IZIN`: delegasi (`kind: agent`) = `execute`. *Jangan biarkan orchestrator
+    menyerahkan ke habit-agent* adalah `deny` `execute` — dan itu yang ditanyakan gerbang;
+    `deny` `read` bukan larangan menyerahkan."""
+    uid, token = await api_bersama.pengguna_baru()
+    await buat_habit(api_bersama, token, title="Lari")
+    izin = _izin(api_bersama)
+    await izin.tetapkan(uid, ORKESTRATOR, "habits", "read", "deny")
+    await izin.tetapkan(uid, HABIT, "habits", "write", "allow")
+
+    boleh = await _coba(_delegasi(api_bersama), uid, "orchestrator-agent", "tandai lari selesai")
+    await izin.tetapkan(uid, ORKESTRATOR, "habits", "execute", "deny")
+    dilarang = await _coba(_delegasi(api_bersama), uid, "orchestrator-agent", "tandai lari selesai")
+
+    assert _ringkas(boleh) == "dijalankan", (
+        f"deny read menghalangi delegasi — aksi delegasi bukan execute: {_ringkas(boleh)}"
+    )
+    assert _ringkas(dilarang) == ("ditolak_pengguna", "agent.habit", False), (
+        f"deny execute pengguna atas delegasi tidak berlaku: {_ringkas(dilarang)}"
+    )
+
+
+async def test_token_konfirmasi_berumur_15_menit(api_bersama: ApiUji) -> None:
+    """Lebih lama dari itu, pengguna menjawab keadaan yang sudah lewat. Diperiksa pada
+    penanda yang DIRAKIT aplikasi (`hvx.main`), bukan pada konstantanya."""
+    _uid, p = await _satu_permintaan(api_bersama)
+
+    dirakit = api_bersama.app.state.percakapan._tanda.buat(**_isi(p))
+    sisa = dirakit.kedaluwarsa - time.time()
+
+    assert 14 * 60 < sisa <= 15 * 60, f"token konfirmasi berumur {sisa:.0f} dtk, bukan 15 menit"

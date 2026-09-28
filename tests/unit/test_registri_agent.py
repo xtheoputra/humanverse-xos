@@ -261,3 +261,157 @@ def test_tool_tanpa_risk_level_tidak_menyembunyikan_pelanggaran_lainnya() -> Non
 
     aturan = {p.aturan for p in galat.value.pelanggaran if p.subjek == "goal.list"}
     assert aturan == {"8", "2"}, f"pelanggaran lain tersembunyi di balik aturan 8: {aturan}"
+
+
+# ── Tinjauan penegak buta Sprint 4 (G2-registri) ──────────────────────────────────
+# Tiap kasus di bawah dulu LOLOS seluruh suite bila pemeriksanya dirusak: kasus di
+# atas memakai tool R0 untuk aturan 7, hanya `memory.read` untuk aturan 2 · 6 · 9, dan
+# tidak pernah mengirim medan asing, teks di tempat angka, atau nama yang tidak cocok.
+
+
+def _pihak_ketiga_menulis(m: Mentah, scope: str) -> None:
+    """Scope terlarang lewat `memory.write` SAJA. `habit-agent`, bukan `coach-agent`:
+    tool coach (`memory.search`) sudah menyentuh `journal_raw`, jadi aturan 6 berbunyi
+    lewat tool-nya walau `memory.write` tidak diperiksa sama sekali."""
+    m["habit-agent"]["kind"] = "third_party"
+    m["habit-agent"]["memory"]["write"].append(scope)
+
+
+KASUS_BUTA: list[tuple[str, str, Callable[[Mentah, Mentah], None]]] = [
+    # Aturan 7 lahir dari *send low-risk message* — tool R2 yang sampai ke orang lain.
+    (
+        "7",
+        "tool R2 yang menyentuh orang lain",
+        lambda a, m: a["habit.complete"].update(reaches_third_party=True),
+    ),
+    # Aturan 2 untuk scope TOOL: gerbang menanyai mesin izin scope-scope ini (E-191).
+    (
+        "2",
+        "scope tool di luar daftar resmi",
+        lambda a, m: a["goal.list"]["scopes"].append("fashion"),
+    ),
+    (
+        "2",
+        "scope tulis manifest di luar daftar resmi",
+        lambda a, m: m["coach-agent"]["memory"]["write"].append("fashion"),
+    ),
+    ("6", "pihak ketiga menulis journal_raw", lambda a, m: _pihak_ketiga_menulis(m, "journal_raw")),
+    ("9", "pihak ketiga menulis lokasi", lambda a, m: _pihak_ketiga_menulis(m, "location")),
+    # Bentuk ketat: medan yang tidak dikenal DITOLAK — janji yang salah tempat
+    # (`requires_confirmation` di manifest) atau salah eja tidak berlaku diam-diam.
+    (
+        "bentuk",
+        "medan manifest yang tidak dikenal",
+        lambda a, m: m["coach-agent"].update(requires_confirmation=True),
+    ),
+    (
+        "bentuk",
+        "medan tool salah eja",
+        lambda a, m: a["habit.list"].update(menyaring_ijin=True),
+    ),
+    # E-193: penyaring izin hanya BACAAN TANPA EFEK — tulisan selalu ditanya gerbang.
+    (
+        "bentuk",
+        "tool penyaring izin yang menulis",
+        lambda a, m: a["memory.search"].update(side_effects="writes_user_data"),
+    ),
+    ("A-1", "risk sebagai properti agent", lambda a, m: m["habit-agent"].update(risk=2)),
+    # Dua berkas bernama sama saling menimpa diam-diam di `alat[a.name]`.
+    (
+        "bentuk",
+        "nama tool berbeda dengan nama berkasnya",
+        lambda a, m: a["habit.list"].update(name="habit.lists"),
+    ),
+    # Tanpa koersi: `'0'` bukan `0`, `'0.99'` bukan `0.99` (E-170 di sisi registry).
+    (
+        "bentuk",
+        "risk_level berupa teks",
+        lambda a, m: a["goal.list"].update(risk_level="0"),
+    ),
+    (
+        "bentuk",
+        "gerbang keselamatan berupa teks",
+        lambda a, m: m["coach-agent"]["evaluation"]["gates"].update(safety="0.99"),
+    ),
+]
+
+
+@pytest.mark.parametrize(
+    ("aturan", "_maksud", "rusak"), KASUS_BUTA, ids=[f"{k[0]}-{k[1]}" for k in KASUS_BUTA]
+)
+def test_registry_yang_melanggar_ditolak_buta(
+    aturan: str, _maksud: str, rusak: Callable[[Mentah, Mentah], None]
+) -> None:
+    test_manifest_yang_melanggar_ditolak(aturan, _maksud, rusak)
+
+
+def test_nama_manifest_berbeda_dengan_berkasnya_dilaporkan_bukan_meledak() -> None:
+    """Pelanggaran dilaporkan SEMUA sekaligus sebagai `RegistriTidakSah` (K-29 (1)) — nama
+    manifest yang tidak cocok dengan berkasnya dulu hanya terlihat sebagai `KeyError` di
+    tengah perakitan registry, tanpa satu pun pelanggaran lain."""
+    manifest = copy.deepcopy(MANIFEST)
+    manifest["coach"] = manifest.pop("coach-agent")
+
+    try:
+        validasi_registri(copy.deepcopy(ALAT), manifest)
+    except RegistriTidakSah as galat:
+        dilanggar = {(p.subjek, p.aturan) for p in galat.pelanggaran}
+    except Exception as galat:
+        pytest.fail(
+            f"nama manifest ≠ nama berkas meledak sebagai {type(galat).__name__}"
+            " — bukan pelanggaran yang dilaporkan"
+        )
+    else:
+        dilanggar = set()
+
+    assert ("coach", "bentuk") in dilanggar, (
+        f"nama manifest ≠ nama berkas tidak dilaporkan: {dilanggar}"
+    )
+
+
+@pytest.mark.parametrize("status", ["draft", "deprecated", "disabled"])
+def test_hanya_manifest_aktif_yang_dimuat(status: str) -> None:
+    """Aturan 5 dihitung atas `status: active` saja, dan hanya itu yang boleh BERJALAN —
+    draft yang dimuat adalah agent yang belum lulus evaluasinya menjawab pengguna."""
+    manifest = copy.deepcopy(MANIFEST)
+    manifest["orchestrator-agent"]["status"] = status
+
+    r = validasi_registri(copy.deepcopy(ALAT), manifest)
+
+    assert "orchestrator-agent" not in r.agent, (
+        f"manifest `status: {status}` dimuat sebagai agent aktif"
+    )
+    assert "orchestrator-agent" not in r.mentah
+
+
+def test_tool_tulis_dibatasi_lebih_ketat_daripada_bacaan() -> None:
+    """Tiap tulisan agent yang lolos adalah baris baru atau aksi yang harus diurungkan
+    pengguna; bacaan tidak. Tulisan dibatasi `20/min/user`, bacaan `60/min/user` —
+    batas yang dilonggarkan tanpa sengaja tidak terlihat di uji mana pun selain ini
+    (angkanya belum ada di tabel spec/05: tabel itu tidak punya kolom `rate_limit`)."""
+    alat = muat_registri().alat
+    tulis = {n: a.rate_limit for n, a in alat.items() if a.kind == "write"}
+
+    assert tulis == dict.fromkeys(
+        ("habit.complete", "memory.write", "recommendation.create"), "20/min/user"
+    ), f"batas laju tool tulis ≠ 20/min/user: {tulis}"
+    assert {a.rate_limit for a in alat.values() if a.kind == "read"} == {"60/min/user"}
+
+
+def test_batas_laju_tiap_tool_sama_dengan_tabel_spec05() -> None:
+    """Kolom *Batas laju* spec/05 = `rate_limit` YAML tiap tool — dulu angka ini hidup di
+    YAML tanpa sumber di kontraknya (tinjauan penegak buta Sprint 4)."""
+    import re
+    from pathlib import Path
+
+    teks = (Path(__file__).resolve().parents[2] / "spec/05-AGENT-CONTRACTS.md").read_text(
+        encoding="utf-8"
+    )
+    tabel = dict(
+        re.findall(r"^\| `([a-z][a-z0-9_.]*)` \|.*\| (\d+/(?:min|hour)/user) \|$", teks, re.M)
+    )
+
+    assert tabel, "kolom batas laju spec/05 tidak terbaca"
+    assert {n: a.rate_limit for n, a in muat_registri().alat.items()} == tabel, (
+        "batas laju tool ≠ tabel spec/05"
+    )

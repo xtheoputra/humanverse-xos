@@ -20,7 +20,15 @@ from zoneinfo import ZoneInfo
 
 import psycopg
 import pytest
-from _bantuan_agent import HARGA_BESAR, REGISTRI, PenyediaUji, gerbang_model_uji, run, runtime_uji
+from _bantuan_agent import (
+    HARGA_BESAR,
+    REGISTRI,
+    PenyediaUji,
+    gerbang_model_uji,
+    run,
+    runtime_uji,
+    sql,
+)
 from _bantuan_db import ApiUji, auth, psycopg_dsn
 
 from hvx.modules import agents
@@ -267,4 +275,41 @@ async def test_jatah_dilunasi_sesudah_panggilan(api_bersama: ApiUji) -> None:
 
     assert r["model_used"] == "uji/besar", (
         f"jatah panggilan pertama tidak dilunasi — panggilan kedua turun kelas: {r['model_used']}"
+    )
+
+
+async def _induk_berbiaya_lalu_delegasi(k: agents.KonteksAgent, pesan: str) -> agents.Keputusan:
+    """Run induk yang MEMANGGIL model besar sebelum menyerahkan giliran — orchestrator V0
+    tidak, tetapi agent yang kelak menyusun jawaban dari jawaban anaknya akan."""
+    await k.model(
+        tugas="jawab",
+        pertanyaan=pesan,
+        bahan=["satu fakta"],
+        kelas="reasoning",
+        maks_token=TOKEN_KELUAR,
+    )
+    anak = await k.alat("agent.coach", {"pesan": pesan})
+    return agents.Keputusan(anak["teks"], Decimal("0.5"), ("uji",), {"action": "delegate"})
+
+
+async def test_biaya_run_leluhur_yang_masih_berjalan_ikut_dihitung(api_bersama: ApiUji) -> None:
+    """K-32: anggaran = tepat satu panggilan besar, dan run induk memakainya. Saat run anak
+    memesan jatahnya, induknya masih `running` — biayanya tetap bagian dari yang dibayar
+    hari ini, jadi anak turun ke model kecil. Anggaran yang hanya melihat run yang sudah
+    ditutup (dan run itu sendiri) meloloskan satu panggilan besar per tingkat pohon."""
+    uid, _token = await api_bersama.pengguna_baru()
+    rt = runtime_uji(
+        api_bersama,
+        {"orchestrator-agent": _induk_berbiaya_lalu_delegasi, "coach-agent": _jawab_pas},
+        anggaran=SATU_PANGGILAN_BESAR,
+    )
+
+    hasil = await rt.jalankan(uid, "orchestrator-agent", "halo", pemicu="user")
+    anak = sql(
+        api_bersama, "SELECT model_used FROM agent_runs WHERE parent_run_id = %s", hasil.run_id
+    )
+
+    assert run(api_bersama, hasil.run_id)["model_used"] == "uji/besar"
+    assert anak == [("uji/kecil",)], (
+        f"biaya run leluhur yang masih berjalan tidak dihitung anggaran — anak memakai {anak}"
     )

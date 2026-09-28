@@ -112,6 +112,27 @@ def test_niat_memilih_agent(teks: str, jenis: str, sasaran: str | None, status: 
 @pytest.mark.parametrize(
     "teks",
     [
+        "tandai lari dilewati",
+        "tandai lari terlewat",
+        "lewati lari",
+        "lewatkan lari pagi",
+        "skip meditasi hari ini",
+    ],
+)
+def test_kata_lewati_mencatat_dilewati_bukan_selesai(teks: str) -> None:
+    """Kata *lewati* di depan (perintah) atau di belakang (keadaan) mencatat `skipped`. Salah
+    baca di sini bukan jawaban yang dangkal: habit yang dilewati TERTULIS selesai — data
+    pengguna yang salah, dan rentetannya ikut salah."""
+    niat = kenali(teks)
+
+    assert (niat.jenis, niat.status) == ("tandai_habit", "skipped"), (
+        f"“{teks}” dicatat {niat.status} — habit yang dilewati tertulis selesai"
+    )
+
+
+@pytest.mark.parametrize(
+    "teks",
+    [
         "ingatkan aku minum obat jam 7",  # minta DIINGATKAN — bukan minta diingat
         "aku mau tandai lari nanti",  # bukan diawali kata perintahnya
         "kenapa aku selalu lewati lari?",

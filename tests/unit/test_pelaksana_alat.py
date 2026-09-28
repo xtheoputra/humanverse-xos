@@ -7,13 +7,14 @@ yang mencatat apakah mereka disentuh. Implementasi sungguhan: `test_alat_v0.py`.
 
 from __future__ import annotations
 
+from collections import Counter
 from collections.abc import Mapping
 from typing import Any, get_args
 from uuid import uuid4
 
 import pytest
 
-from hvx.modules import goals, habits, intelligence, memory
+from hvx.modules import goals, habits, intelligence, memory, platform
 from hvx.modules.agents import (
     IMPLEMENTASI,
     Alat,
@@ -80,10 +81,10 @@ def _tiruan(alat: Alat) -> Any:
     return jalan
 
 
-def _pelaksana(gerbang: _GerbangPencatat, **ganti: Any) -> PelaksanaAlat:
+def _pelaksana(gerbang: _GerbangPencatat, *, pembatas: Any = None, **ganti: Any) -> PelaksanaAlat:
     tiruan = {n: _tiruan(a) for n, a in REGISTRI.alat.items() if a.kind != "agent"}
     agent = {n: i for n, i in IMPLEMENTASI.items() if n.startswith("agent.")}
-    return PelaksanaAlat(REGISTRI, {**tiruan, **agent, **ganti}, gerbang, None)
+    return PelaksanaAlat(REGISTRI, {**tiruan, **agent, **ganti}, gerbang, pembatas)
 
 
 async def _panggil(
@@ -142,6 +143,10 @@ async def test_agent_hanya_memanggil_tool_manifestnya() -> None:
         ("habit.list", {"for_date": "20260901"}),  # bentuk dasar ISO — fromisoformat menerimanya
         ("habit.list", {"for_date": 1758672000}),  # detik Unix bukan tanggal (E-170)
         ("mood.recent", {"hari": True}),  # boolean bukan bilangan
+        (  # …juga untuk `number`: dulu lolos, lalu meledak `internal` di Decimal pemiliknya
+            "recommendation.create",
+            {"domain": "habit", "title": "t", "confidence": True, "rationale": ["a"]},
+        ),
         ("mood.recent", {"hari": "7"}),
         ("memory.search", {"kueri": 3}),
         # batas NILAI skema — ditolak sebelum gerbang: tidak ada konfirmasi R2 yang sia-sia
@@ -450,3 +455,140 @@ def test_pemeriksa_pemilik_data_menolak_yang_ditolak_layanannya() -> None:
     with pytest.raises(ValueError, match="isi memori"):
         memory.periksa_ingatan(scope="coaching_notes", isi=" \n ")
     assert memory.periksa_ingatan(scope="coaching_notes", isi=" a   b ") == "a b"
+
+
+# ── Penegak buta Sprint 4 (G3): batas laju per tool · kapan jatah dipakai · boolean
+# ketat · risiko run = yang tertinggi ─────────────────────────────────────────────
+
+
+class _PembatasHitung:
+    """Pembatas laju tiruan: tepat `jumlah` jatah per (nama batas, subjek), TANPA pengisian
+    ulang. Yang diuji di sini JALAN pemanggilan — ember mana yang dipakai, dan kapan —
+    bukan GCRA-nya (1.7, `test_batas_laju.py`): GCRA sungguhan mengisi satu jatah tiap
+    detik, jadi uji "60 lalu yang ke-61" di mesin yang lambat berkedip."""
+
+    def __init__(self) -> None:
+        self.dipakai: Counter[tuple[str, str]] = Counter()
+
+    async def ambil(self, batas: platform.BatasLaju, subjek: str) -> platform.HasilLaju:
+        kunci = (batas.nama, subjek)
+        if self.dipakai[kunci] >= batas.jumlah:
+            return platform.HasilLaju(lolos=False, sisa=0, coba_lagi_ms=1_000)
+        self.dipakai[kunci] += 1
+        return platform.HasilLaju(
+            lolos=True, sisa=batas.jumlah - self.dipakai[kunci], coba_lagi_ms=0
+        )
+
+
+async def _kode(p: PelaksanaAlat, j: Jalannya, nama: str, masukan: dict[str, Any]) -> str | None:
+    """Kode penolakan satu pemanggilan; `None` bila dijalankan."""
+    try:
+        await _panggil(p, j, nama, masukan)
+    except AlatDitolak as galat:
+        return galat.kode
+    return None
+
+
+def _selesai_sah() -> dict[str, Any]:
+    return {"habit_id": str(uuid4()), "for_date": "2026-09-24", "status": "done"}
+
+
+async def test_batas_laju_milik_tiap_tool_bukan_satu_ember() -> None:
+    """spec/05: `rate_limit` adalah milik TIAP tool. Satu ember untuk semua tool membuat
+    agent yang banyak membaca (habit.list 60/min) kehabisan jatah untuk MENULIS
+    (habit.complete 20/min) — dan batas tool tulis yang lebih ketat tidak berarti apa-apa."""
+    p = _pelaksana(_GerbangPencatat(), pembatas=_PembatasHitung())
+    j = _jalannya("habit-agent")
+
+    for _ in range(60):
+        assert await _kode(p, j, "habit.list", {}) is None
+    ke_61 = await _kode(p, j, "habit.list", {})
+    tulis = await _kode(p, j, "habit.complete", _selesai_sah())
+
+    assert ke_61 == "terlalu_sering", "batas laju habit.list tidak ditegakkan"
+    assert tulis is None, (
+        f"jatah habit.list menghabiskan jatah habit.complete ({tulis}) — batas laju bukan per tool"
+    )
+
+
+async def test_batas_laju_dipakai_sebelum_gerbang() -> None:
+    """spec/07 4.3 — urutannya batas laju LALU gerbang. Terbalik, pemanggilan yang ditolak
+    gerbang tidak memakai jatah: agent yang terus memanggil tool yang di-deny ditanyakan
+    ke gerbang — dan menulis `audit_logs` `tool_denied` — tanpa batas."""
+    gerbang = _GerbangPencatat(tolak_mulai=0)
+    p = _pelaksana(gerbang, pembatas=_PembatasHitung())
+    j = _jalannya("habit-agent")
+
+    kode = [await _kode(p, j, "habit.complete", _selesai_sah()) for _ in range(21)]
+
+    assert kode[-1] == "terlalu_sering", (
+        f"penolakan gerbang tidak memakai jatah batas laju — panggilan ke-21: {kode[-1]}"
+    )
+    assert len(gerbang.ditanya) == 20, "gerbang ditanya melewati batas laju tool"
+
+
+_SALAH_TANPA_JATAH = [
+    # ditolak skema tool (enum `status`)
+    ("skema tool", {"habit_id": str(uuid4()), "for_date": "2026-09-24", "status": "x"}),
+    # ditolak pemeriksa pemilik datanya (E-204): tier_used tidak berarti untuk skipped
+    ("pemilik data", {"habit_id": str(uuid4()), "for_date": "2026-09-24", "status": "skipped",
+                      "tier_used": 0}),
+]  # fmt: skip
+
+
+@pytest.mark.parametrize(
+    ("maksud", "salah"), _SALAH_TANPA_JATAH, ids=[s[0] for s in _SALAH_TANPA_JATAH]
+)
+async def test_masukan_salah_ditolak_tanpa_memakai_jatah(
+    maksud: str, salah: dict[str, Any]
+) -> None:
+    """spec/07 4.3 — masukan diperiksa SEBELUM batas laju: model yang salah menulis
+    pemanggilan (20× berturut-turut) tidak boleh menghabiskan jatah pemanggilan sah
+    pengguna. Implementasi sungguhan, supaya pemeriksa pemilik datanya ikut berjalan."""
+    gerbang = _GerbangPencatat(tolak_mulai=0)
+    p = PelaksanaAlat(REGISTRI, IMPLEMENTASI, gerbang, _PembatasHitung())  # type: ignore[arg-type]
+    j = _jalannya("habit-agent")
+
+    for _ in range(20):
+        assert await _kode(p, j, "habit.complete", salah) == "masukan_salah"
+    sah = await _kode(p, j, "habit.complete", _selesai_sah())
+
+    assert sah == "perlu_izin", (
+        f"masukan salah ({maksud}) memakai jatah batas laju — pemanggilan sah berikutnya: {sah}"
+    )
+
+
+def _alat_boolean() -> Alat:
+    """Tak ada tool V0 bermasukan boolean — tool uji: goal.list dengan satu medan boolean."""
+    mentah = REGISTRI.alat["goal.list"].model_dump(by_alias=True)
+    mentah["input"] = {"arsip": {"type": "boolean", "required": True}}
+    return Alat.model_validate(mentah)
+
+
+@pytest.mark.parametrize("nilai", [1, 0])
+def test_boolean_ketat_bilangan_bukan_boolean(nilai: int) -> None:
+    """E-170 di sisi agent: `1` bukan `true` — model yang menulis pemanggilan tidak
+    ditaati karena nilainya kebetulan bisa dikoersi."""
+    alat = _alat_boolean()
+
+    try:
+        diterima: Any = periksa_masukan(alat, {"arsip": nilai})
+    except AlatDitolak as galat:
+        diterima = galat.kode
+
+    assert diterima == "masukan_salah", f"medan boolean menerima bilangan {nilai!r}: {diterima}"
+    assert periksa_masukan(alat, {"arsip": True}) == {"arsip": True}
+
+
+async def test_risiko_run_yang_tertinggi_bukan_yang_terakhir() -> None:
+    """spec/07 4.4 — `agent_runs.risk_level` = risiko TERTINGGI yang dipakai run: tool R2
+    lalu tool R0 tetap run R2. Alur V0 kebetulan memanggil tool dengan risiko naik."""
+    p = _pelaksana(_GerbangPencatat())
+    j = _jalannya("habit-agent")
+
+    await _panggil(p, j, "habit.complete", _selesai_sah())
+    await _panggil(p, j, "habit.list", {})
+
+    assert j.risiko_tertinggi == 2, (
+        f"risk_level run = risiko tool terakhir ({j.risiko_tertinggi}), bukan yang tertinggi"
+    )

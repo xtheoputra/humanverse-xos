@@ -172,6 +172,48 @@ def test_harga_model_dibaca_dari_json_dan_yang_salah_ditolak(
         Settings()
 
 
+@pytest.mark.parametrize(
+    ("harga", "maksud"),
+    [
+        ("[1, -1]", "harga keluar negatif"),
+        ('["Infinity", 1]', "harga masuk tak hingga"),
+        ('[1, "-Infinity"]', "harga keluar tak hingga"),
+        ('[1, "NaN"]', "harga keluar NaN"),
+    ],
+    ids=["keluar-negatif", "masuk-tak-hingga", "keluar-tak-hingga", "keluar-nan"],
+)
+def test_harga_model_keluar_negatif_atau_tak_hingga_ditolak_saat_mulai(
+    monkeypatch: pytest.MonkeyPatch, harga: str, maksud: str
+) -> None:
+    """Tinjauan penegak buta Sprint 4: uji di atas hanya mengirim harga MASUK negatif.
+    Harga keluar negatif membuat jawaban panjang MENGURANGI biaya run, jadi anggaran
+    harian (4.9) tidak pernah habis; harga tak hingga lolos mulai lalu meledak di
+    `quantize` pada SETIAP panggilan model — gerbangnya mati, bukan menolak mulai."""
+    _isi(monkeypatch)
+    monkeypatch.setenv("HVX_MODEL_HARGA", '{"lokal/hvx-nalar-v1": ' + harga + "}")
+
+    try:
+        diterima = Settings().model_harga
+    except ValidationError:
+        return
+    raise AssertionError(f"HVX_MODEL_HARGA {maksud} diterima: {diterima}")
+
+
+def test_bawaan_model_simple_dan_reasoning_berbeda(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Model Router menurunkan `reasoning` ke `simple` saat anggaran habis (4.9, K-32).
+    Bawaan yang sama untuk kedua kelas membuat penurunan itu tidak menurunkan apa pun,
+    dan `agent_runs.model_used` tidak lagi membedakan kelas yang dipakai run."""
+    _isi(monkeypatch)
+    monkeypatch.delenv("HVX_MODEL_SIMPLE", raising=False)
+    monkeypatch.delenv("HVX_MODEL_REASONING", raising=False)
+
+    s = Settings()
+
+    assert s.model_simple != s.model_reasoning, (
+        f"bawaan kelas simple dan reasoning memakai model yang sama: {s.model_simple}"
+    )
+
+
 def test_anggaran_harian_negatif_ditolak() -> None:
     """4.9 — anggaran negatif = setiap panggilan model di atas anggaran, diam-diam."""
     from decimal import Decimal

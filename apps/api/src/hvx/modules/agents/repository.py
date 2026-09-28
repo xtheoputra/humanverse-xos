@@ -164,7 +164,11 @@ async def jawab_run(conn: AsyncConnection, run_id: UUID, setuju: bool) -> bool:
 # ── Percakapan (spec/07 4.8) — ai_conversations · ai_messages ─────────────────
 # `user_id = :user_id` di tiap kueri DI SAMPING RLS — pertahanan kedua, sama dengan
 # modul domain lain. Pesan bercap `clock_timestamp()`: dua pesan satu transaksi
-# (pesan pengguna + balasan deterministik) tidak berbagi waktu `now()`.
+# (pesan pengguna + balasan deterministik) tidak berbagi waktu `now()`. 🔧 E-213: cap itu
+# MONOTON per percakapan — `GREATEST(clock_timestamp(), last_message_at + 1 µs)`, di bawah
+# kunci `FOR UPDATE` percakapannya (`kunci_percakapan`). Jam basis data bisa melangkah
+# mundur (VM Docker: ±3 dtk tiap ±28 dtk, diukur tinjauan Sprint 4) — dulu balasan tampil
+# LEBIH TUA dari pertanyaannya di riwayat yang terurut `(created_at, id)`.
 
 _BUAT_PERCAKAPAN = text(
     """
@@ -199,7 +203,7 @@ _DAFTAR_PERCAKAPAN = text(
 _SENTUH_PERCAKAPAN = text(
     """
     UPDATE ai_conversations
-    SET last_message_at = clock_timestamp(), message_count = message_count + 1
+    SET last_message_at = :waktu, message_count = message_count + 1
     WHERE id = :id AND user_id = :user_id
     """
 )
@@ -210,7 +214,10 @@ _SISIP_PESAN = text(
                              created_at)
     VALUES (:id, :conversation_id, :user_id, :role, :content, :agent_run_id, :model,
             :tokens_in, :tokens_out, :latency_ms, :cost_usd, :confidence,
-            CAST(:rationale AS jsonb), clock_timestamp())
+            CAST(:rationale AS jsonb),
+            GREATEST(clock_timestamp(),
+                     (SELECT last_message_at + interval '1 microsecond' FROM ai_conversations
+                      WHERE id = :conversation_id AND user_id = :user_id)))
     RETURNING id, conversation_id, role, content, agent_run_id, model, tokens_in, tokens_out,
            latency_ms, cost_usd, confidence, rationale, created_at
     """
@@ -354,7 +361,9 @@ async def sisip_pesan(
         },
     )
     pesan = BarisPesan(**hasil.mappings().one())
-    await conn.execute(_SENTUH_PERCAKAPAN, {"id": conversation_id, "user_id": user_id})
+    await conn.execute(
+        _SENTUH_PERCAKAPAN, {"id": conversation_id, "user_id": user_id, "waktu": pesan.created_at}
+    )
     return pesan
 
 

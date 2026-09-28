@@ -9,6 +9,7 @@ berhasil tidak menjawab pertanyaan audit mana pun.
 from __future__ import annotations
 
 import asyncio
+from collections.abc import AsyncIterator
 from decimal import Decimal
 from typing import Any
 
@@ -24,7 +25,7 @@ from _bantuan_agent import (
 from _bantuan_db import ApiUji
 from test_habits import buat_habit
 
-from hvx.modules import agents
+from hvx.modules import agents, platform
 
 pytestmark = pytest.mark.integration
 
@@ -245,3 +246,132 @@ async def test_run_anak_tidak_bisa_menunjuk_run_pengguna_lain(api_bersama: ApiUj
         await runtime.mulai(b, "coach-agent", pemicu="agent", induk=induk_a)
     with pytest.raises(ValueError, match="tidak punya program"):
         await runtime.mulai(b, "habit-agent", pemicu="user")
+
+
+# ── Penegak buta Sprint 4 (G3): yang dicatat run = yang TERJADI, seluruhnya ──────────
+
+
+async def test_habit_complete_sendiri_mencatat_scope_habits(api_bersama: ApiUji) -> None:
+    """Di alur V0 habit-agent membaca `habit.list` lebih dulu, dan scope itu menutupi
+    `habit.complete` yang lupa mencatat dirinya. Tool yang dipanggil sendiri — program
+    lain, pemanggilan ulang sesudah konfirmasi — meninggalkan run yang menyentuh habit
+    tanpa `habits` di `memory_scopes`."""
+    uid, token = await api_bersama.pengguna_baru()
+    habit = await buat_habit(api_bersama, token)
+
+    async def tandai(k: agents.KonteksAgent, pesan: str) -> agents.Keputusan:
+        await k.alat(
+            "habit.complete", {"habit_id": habit["id"], "for_date": "2026-09-20", "status": "done"}
+        )
+        return agents.Keputusan("Ditandai.", Decimal("0.9"), ("uji",), {"action": "reply"})
+
+    hasil = await runtime_uji(api_bersama, {"habit-agent": tandai}).jalankan(
+        uid, "habit-agent", "tandai", pemicu="user"
+    )
+    r = run(api_bersama, hasil.run_id)
+
+    assert r["tools_used"] == ["habit.complete"]
+    assert r["memory_scopes"] == ["habits"], (
+        f"scope yang disentuh habit.complete tidak tercatat: {r['memory_scopes']}"
+    )
+
+
+async def _jawab_dua_kali(k: agents.KonteksAgent, pesan: str) -> agents.Keputusan:
+    await k.model(tugas="jawab", pertanyaan=pesan, bahan=["satu fakta"])
+    kedua = await k.model(tugas="jawab", pertanyaan=pesan, bahan=["satu dua tiga"])
+    return agents.Keputusan(kedua.teks, Decimal("0.5"), ("uji",), {"action": "reply"})
+
+
+async def test_token_dan_biaya_run_jumlah_seluruh_panggilan_model(api_bersama: ApiUji) -> None:
+    """spec/07 4.4 · 4.9 — `tokens_in`/`tokens_out`/`cost_usd` run = JUMLAH seluruh
+    panggilan modelnya. Hanya yang terakhir = tagihan dan anggaran yang kurang hitung."""
+    uid, _token = await api_bersama.pengguna_baru()
+
+    hasil = await runtime_uji(api_bersama, {"coach-agent": _jawab_dua_kali}).jalankan(
+        uid, "coach-agent", "halo", pemicu="user"
+    )
+    r = run(api_bersama, hasil.run_id)
+
+    # "jawab halo satu fakta" 4 masuk, 2 keluar; "jawab halo satu dua tiga" 5 masuk, 3 keluar
+    assert (r["tokens_in"], r["tokens_out"]) == (4 + 5, 2 + 3), (
+        f"token run hanya panggilan model terakhir: {r['tokens_in']}/{r['tokens_out']}"
+    )
+    biaya = HARGA_BESAR.biaya(4, 2) + HARGA_BESAR.biaya(5, 3)
+    assert r["cost_usd"] == biaya == hasil.biaya_usd, (
+        f"biaya run hanya panggilan model terakhir: {r['cost_usd']} ≠ {biaya}"
+    )
+
+
+class _PenyediaMati(PenyediaUji):
+    """AI Gateway yang gagal sebelum token pertama — galat model, bukan galat program."""
+
+    async def alirkan(self, model: str, p: platform.PermintaanModel) -> AsyncIterator[str]:
+        self.dipanggil.append(model)
+        if self.dipanggil:
+            raise platform.GalatModel("penyedia tidak menjawab")
+        yield ""  # pragma: no cover - tetap generator async
+
+
+async def test_galat_model_tercatat_model_gagal(api_bersama: ApiUji) -> None:
+    """spec/01 §8 `error.code`: kegagalan AI Gateway dibedakan dari cacat program
+    (`internal`) — yang pertama urusan penyedia, yang kedua urusan kita."""
+    uid, _token = await api_bersama.pengguna_baru()
+    ids: list[Any] = []
+
+    async def jawab(k: agents.KonteksAgent, pesan: str) -> agents.Keputusan:
+        ids.append(k.jalannya.id)
+        await k.model(tugas="jawab", pertanyaan=pesan)
+        raise AssertionError("penyedia tidak gagal")
+
+    runtime = runtime_uji(
+        api_bersama, {"coach-agent": jawab}, gerbang_model=gerbang_model_uji(_PenyediaMati())
+    )
+    with pytest.raises(platform.GalatModel):
+        await runtime.jalankan(uid, "coach-agent", "halo", pemicu="user")
+    r = run(api_bersama, ids[0])
+
+    assert r["status"] == "failed"
+    assert r["error"] == {"code": "model_gagal", "type": "GalatModel"}, (
+        f"galat AI Gateway tercatat dengan kode lain: {r['error']}"
+    )
+
+
+async def test_latency_ms_mengukur_lamanya_run(api_bersama: ApiUji) -> None:
+    """spec/07 4.4 — `latency_ms` adalah lamanya run, bukan sekadar `>= 0`: angka yang
+    selalu nol lolos semua uji yang hanya memeriksa tandanya."""
+    uid, _token = await api_bersama.pengguna_baru()
+
+    async def lambat(k: agents.KonteksAgent, pesan: str) -> agents.Keputusan:
+        await asyncio.sleep(0.1)
+        return agents.Keputusan("ok", Decimal("0.5"), ("uji",), {"action": "reply"})
+
+    hasil = await runtime_uji(api_bersama, {"coach-agent": lambat}).jalankan(
+        uid, "coach-agent", "halo", pemicu="user"
+    )
+
+    # 50, bukan 100: jam asyncio di Windows boleh membangunkan sedikit lebih awal.
+    latensi = run(api_bersama, hasil.run_id)["latency_ms"]
+    assert latensi >= 50, f"latency_ms tidak mengukur lamanya run: {latensi} ms untuk ≥100 ms"
+
+
+async def test_hari_ini_agent_menurut_zona_waktu_profil_bukan_utc(api_bersama: ApiUji) -> None:
+    """*“Tandai lari selesai”* pukul 01.30 WIB adalah hari itu di Jakarta — `tanggal_lokal`
+    membaca zona waktu profil, bukan jam server. Dulu tidak dijaga uji mana pun: seluruh
+    suite berjalan saat tanggal UTC kebetulan sama dengan tanggal Jakarta."""
+    from datetime import UTC, datetime
+
+    uid, _token = await api_bersama.pengguna_baru()  # Asia/Jakarta
+    saat = datetime(2026, 9, 24, 18, 30, tzinfo=UTC)  # = 25 Sep 01.30 WIB
+
+    async def hari(k: agents.KonteksAgent, pesan: str) -> agents.Keputusan:
+        tanggal = (await k.tanggal_lokal()).isoformat()
+        aksi = {"action": "reply", "hari": tanggal}
+        return agents.Keputusan("ok", Decimal("0.5"), ("uji",), aksi)
+
+    hasil = await runtime_uji(api_bersama, {"coach-agent": hari}, jam=lambda: saat).jalankan(
+        uid, "coach-agent", "halo", pemicu="user"
+    )
+
+    assert hasil.keputusan.aksi["hari"] == "2026-09-25", (
+        f"hari ini agent bukan tanggal zona waktu profil: {hasil.keputusan.aksi['hari']}"
+    )

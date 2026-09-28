@@ -47,6 +47,21 @@ bawah). Tiap temuan dibuktikan dengan uji yang MERAH pada `588765c` — 47 uji b
 berubah, semuanya merah di sana dan hijau sesudahnya — lalu dibetulkan di kode **dan**
 spec yang menyebutnya.
 
+> 🔍 **Penegak buta: 175 kerusakan dirancang tanpa melihat uji, 91 LOLOS seluruh suite**
+> (5 high · 35 medium · 51 low) — lebih banyak daripada Sprint 2 (39) dan Sprint 3 (49).
+> Yang paling mahal lolos di jantung gerbang: `deny` pengguna diabaikan untuk R3 ·
+> `deny` hanya dibaca di scope PERTAMA delegasi · token konfirmasi membawa semua scope
+> tool (satu *izinkan selalu* = izin tulis di lima scope) · `memory.search` coach
+> melebar ke `journal_raw` · api hidup tanpa batas laju tool. Kelimanya **benar di
+> kode** — tidak dijaga uji mana pun. Lima pekerja serentak (worktree & tumpukan
+> sendiri, dikelompokkan menurut berkas uji) menutup semuanya: **tiap kerusakan kini
+> punya uji yang merah padanya dan mutasinya — 94 mutasi, semuanya berbunyi**. Tidak
+> satu pun ternyata cacat kode; dua cacat lain justru ketahuan di sela pekerjaan itu
+> (**E-212**, **E-213**), dan empat uji yang berkedip terbukti salahnya di uji atau di
+> jam: batas laju GCRA yang terisi ulang tiap detik (uji menuntut 61 panggilan dalam
+> 1 dtk), urutan riwayat menurut jam PostgreSQL yang mundur, kemiripan dua ruang vektor
+> acak (±0,35%), dan satu asersi yang **selalu lolos** (UUID dibandingkan dengan teks).
+
 ### 🛑 E-197 — satu pesan sah membekukan seluruh proses api 75 detik (keamanan, high)
 
 `_TANDAI` (`.+?` malas diikuti `\s+…?` · `\s*[.!]*\s*$`) menelusur mundur O(n³) atas
@@ -154,6 +169,17 @@ tidak mundur di antara keduanya — dan jam VM Docker Desktop **diukur mundur 3,
 dalam 20 detik (Sprint 2 mengukur 0,76–1,18 dtk, penyerapnya 2 dtk). ✅ Penyerap 5 dtk,
 kasus uji 4 dtk + mutasinya — tetap jauh dari *jam disetel mundur satu jam* yang
 sengaja tidak diserap.
+
+#### 🔴 E-212 · E-213 — dua cacat yang ditemukan pekerja penegak buta, bukan lensanya
+
+**E-212:** giliran yang GAGAL tidak menyimpan balasan, dan `POST …/messages` yang diputar
+ulang (Idempotency-Key) menilai *selesai* hanya dari ada-tidaknya balasan — jawabannya
+`processing` selamanya. ✅ Status dibaca dari balasan **dan** run akarnya; nilai baru
+`failed` (spec/04). **E-213:** uji riwayat yang berkedip ternyata jam PostgreSQL di VM
+Docker yang **mundur ±3 dtk kira-kira tiap 28 dtk** (32 kali dalam 15 menit, 134.350
+sampel) — balasan bercap lebih tua dari pertanyaannya. ✅ Cap waktu pesan monoton per
+percakapan di bawah kunci yang sudah ada: `GREATEST(clock_timestamp(), last_message_at +
+1 µs)`; `last_message_at` = cap pesan terakhir.
 
 #### Juga dari tinjauan: token rusak ber-non-ASCII → 500, bukan 422 (keamanan, low)
 

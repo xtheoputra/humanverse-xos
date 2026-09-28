@@ -40,6 +40,8 @@ RUSAK = [
     ("aksi bersarang — penalaran", {"aksi": {"action": "reply", "langkah": {"1": "pikir"}}}),
     ("aksi berisi tulisan panjang", {"aksi": {"action": "reply", "isi": "x" * 121}}),
     ("kunci aksi bukan snake_case", {"aksi": {"action": "reply", "Isi Pesan": 1}}),
+    # Sebelas skalar pendek pun sudah cukup untuk menyelundupkan penalaran sepotong-sepotong.
+    ("aksi lebih dari 10 kunci", {"aksi": {"action": "reply", **{f"k{i}": i for i in range(10)}}}),
 ]
 
 

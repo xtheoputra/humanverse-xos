@@ -14,7 +14,7 @@ from uuid import UUID
 
 import pytest
 from _bantuan_agent import HARGA_BESAR, REGISTRI, run, runtime_uji, sql
-from _bantuan_db import ApiUji
+from _bantuan_db import ApiUji, auth
 
 from hvx.modules import agents
 
@@ -133,3 +133,58 @@ async def test_perintah_deterministik_tidak_dijalankan_agent(api_bersama: ApiUji
         "SELECT count(*) FROM agent_runs WHERE user_id = %s AND parent_run_id IS NOT NULL",
         uid,
     ) == [(0,)]
+
+
+# ── Penegak buta Sprint 4 (G3): pohon satu giliran utuh — percakapannya, biayanya ─────
+
+
+async def test_run_anak_membawa_percakapan_induknya(api_bersama: ApiUji) -> None:
+    """spec/07 4.6 — jejak satu giliran adalah satu pohon DI SATU percakapan: run anak
+    dengan `conversation_id` NULL hilang dari pertanyaan audit *"apa saja yang dijalankan
+    agent di percakapan ini"*, padahal ialah yang menyentuh data."""
+    uid, token = await api_bersama.pengguna_baru()
+    r = await api_bersama.klien.post(
+        "/v1/conversations", json={"title": "Uji"}, headers=auth(token)
+    )
+    assert r.status_code == 201, r.text
+    cid = UUID(r.json()["id"])
+
+    hasil = await runtime_uji(api_bersama, PROGRAM).jalankan(
+        uid, "orchestrator-agent", "bagaimana tidurku?", pemicu="user", percakapan_id=cid
+    )
+    anak = sql(
+        api_bersama, "SELECT conversation_id FROM agent_runs WHERE parent_run_id = %s", hasil.run_id
+    )
+
+    assert run(api_bersama, hasil.run_id)["conversation_id"] == cid
+    assert anak == [(cid,)], f"run anak lepas dari percakapan induknya: {anak}"
+
+
+async def _dua_delegasi(k: agents.KonteksAgent, pesan: str) -> agents.Keputusan:
+    await k.alat("agent.coach", {"pesan": pesan})
+    kedua = await k.alat("agent.coach", {"pesan": f"{pesan} lagi"})
+    return agents.Keputusan(
+        kedua["teks"], Decimal("0.4"), ("dua jawaban",), {"action": "delegate", "agent": "coach"}
+    )
+
+
+async def test_biaya_seluruh_run_anak_dijumlah(api_bersama: ApiUji) -> None:
+    """SSE `done` membawa biaya SATU PERMINTAAN = seluruh pohonnya (spec/04). Orchestrator V0
+    kebetulan menyerahkan ke satu agent per giliran — biaya anak yang DITIMPA, bukan
+    dijumlah, baru terlihat pada giliran yang memanggil dua."""
+    uid, _token = await api_bersama.pengguna_baru()
+
+    program = {**PROGRAM, "orchestrator-agent": _dua_delegasi}
+    hasil = await runtime_uji(api_bersama, program).jalankan(
+        uid, "orchestrator-agent", "halo", pemicu="user"
+    )
+    baris = sql(
+        api_bersama, "SELECT cost_usd FROM agent_runs WHERE parent_run_id = %s", hasil.run_id
+    )
+    anak = [c for (c,) in baris]
+
+    assert len(anak) == 2, f"dua delegasi, run anak: {anak}"
+    assert min(anak) > 0, f"run anak tanpa biaya: {anak}"
+    assert hasil.biaya_usd == sum(anak), (
+        f"biaya run anak ditimpa, bukan dijumlah: {hasil.biaya_usd} ≠ {' + '.join(map(str, anak))}"
+    )

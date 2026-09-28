@@ -338,6 +338,12 @@ Peristiwa SSE `done`:
 >   (`not_found`, `invalid_tier`, `for_date_in_future`, …).
 > * **`GET /conversations`** — terbaru **dibuat** dulu, kursor `(created_at, id)`:
 >   urutan yang tidak bergeser saat percakapan lain menerima pesan (E-210).
+> * **`status` giliran** di `202` dan saat diputar ulang (Idempotency-Key): `processing` ·
+>   `completed` · 🆕 `failed` — giliran yang berakhir SSE `error` tidak menyimpan balasan,
+>   dan dulu terbaca `processing` selamanya (E-212).
+> * **Riwayat terurut `(created_at, id)`, dan cap waktunya monoton per percakapan**
+>   (E-213): jam basis data yang melangkah mundur tidak lagi membuat balasan tampak lebih
+>   tua dari pertanyaannya.
 
 ---
 

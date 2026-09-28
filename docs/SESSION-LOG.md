@@ -4,6 +4,24 @@
 
 ---
 
+## Sesi 34 — 28 September 2026
+
+**Pemilik: *“lanjutkan”*** — meneruskan catatan serah-terima Sesi 33: tinjauan tiga
+lensa Sprint 4 → gerbang penuh → PR.
+
+| Hal | Hasil |
+|---|---|
+| Naskah baru | **tidak ada** |
+| Keputusan pemilik | tidak ada yang baru |
+| Keputusan sendiri | **K-32 diubah** — anggaran per 24 jam **bergulir**, jatah terburuk dipesan di bawah kunci per pengguna (hari lokal bisa digeser lewat zona waktu profil) · K-28 · K-29 · K-30 · K-31 ditambahi temuan tinjauan |
+| Temuan ditutup | 🆕 **E-196 … E-213** — 16 dari tinjauan keamanan & kontrak, 2 (E-212 · E-213) dari pekerja penegak buta, 1 (E-211) dari uji Sprint 1 yang berkedip |
+| `spec/` diubah | `01` (bentuk `decision`/`error` run yang tidak berhasil · `confirmed_by_user` · jatah di `cost_usd` · indeks percakapan) · `04` (id kembar 409 · kode galat SSE · `status` `failed` · token dua izin · urutan riwayat) · `05` (nama jawaban · pemeriksa pra-gerbang · jejak tulisan agent · keluaran bersarang · aturan 6 lewat tool · kolom *Batas laju*) · `07` (status Sprint 4) |
+| Kode | 🔧 perbaikan tinjauan di `v0/sprint-4-ai`, migrasi **0009** — **1.138 uji Python** (958 → 1.138) + 40 uji Flutter, mutasi kode **476 → 612**, semuanya berbunyi |
+| Tinjauan sebelum PR | 🔍 **tiga lensa serentak** — keamanan (6: pengenal niat ReDoS membekukan proses api 75 dtk, anggaran dikosongkan lewat zona waktu & dilewati giliran serentak) · kontrak (17: giliran dua izin tak bisa diselesaikan, tulisan agent tanpa `audit_logs`, catatan bebas bersarang lolos skema keluaran) · penegak buta (**91 dari 175 kerusakan lolos seluruh suite** — kini tiap satu punya uji & mutasi, dikerjakan lima pekerja serentak) |
+| Uji yang berkedip | empat, tak satu pun dibiarkan: jam Redis & PostgreSQL VM Docker **mundur ±3 dtk tiap ±28 dtk** (E-211 · E-213), batas laju GCRA yang terisi ulang tiap detik, kemiripan acak dua ruang vektor; plus satu asersi yang selalu lolos |
+
+---
+
 ## Sesi 33 — 24 September 2026
 
 **Pemilik: *“kerjakan semua tugas yang belum terselesaikan dengan sempurna”*** —

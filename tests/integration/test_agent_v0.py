@@ -9,10 +9,10 @@ jadi yang terbaca di balasan adalah persis fakta yang disiapkan agent.
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any
-from uuid import UUID
+from uuid import UUID, uuid4
 from zoneinfo import ZoneInfo
 
 import pytest
@@ -33,7 +33,8 @@ def _hari_ini() -> str:
     return datetime.now(ZoneInfo("Asia/Jakarta")).date().isoformat()
 
 
-def _runtime(api: ApiUji) -> agents.RuntimeAgent:
+def _runtime(api: ApiUji, pencari: Any = None) -> agents.RuntimeAgent:
+    """`pencari` — pengganti `memory.PencariMemori` (tanpa Qdrant bila tidak diberikan)."""
     s = api.app.state.settings
     tanda = agents.TokenKonfirmasi(lambda isi: platform.sidik(s, "konfirmasi-agent", isi))
     gerbang = agents.GerbangRisiko(api.app.state.engine, _izin(api), tanda)
@@ -43,6 +44,7 @@ def _runtime(api: ApiUji) -> agents.RuntimeAgent:
         agents.PROGRAM_V0,
         agents.PelaksanaAlat(REGISTRI, agents.IMPLEMENTASI, gerbang, None),
         gerbang_model_uji(),
+        pencari_memori=pencari,
     )
 
 
@@ -358,3 +360,143 @@ async def test_coach_menyatakan_ingatan_yang_belum_diizinkan(api_bersama: ApiUji
 class _GerbangBuka:
     async def periksa(self, j: agents.Jalannya, alat: agents.Alat, m: Any) -> None:
         return None
+
+
+# ── Tinjauan penegak buta Sprint 4 (G4): janji program agent yang dulu tidak dijaga ──────
+
+
+class _PencariBerisi:
+    """Pencari tetap: ingatan `isi` cocok, dan `coaching_notes` menunggu keputusan pengguna."""
+
+    def __init__(self, isi: list[str]) -> None:
+        self.isi = isi
+
+    async def cari(
+        self, *, user_id: UUID, agent: str, scope_manifest: list[str], kueri: str, batas: int
+    ) -> Any:
+        from hvx.modules import memory
+
+        kini = datetime.now(UTC)
+        items = [
+            memory.MemoriDitemukan(
+                memory.Memori(
+                    id=uuid4(),
+                    kind="episodic",
+                    scope="mood",
+                    content=teks,
+                    summary=None,
+                    confidence=Decimal("0.8"),
+                    evidence_count=1,
+                    model_version=None,
+                    source_event_id=None,
+                    valid_from=kini,
+                    valid_until=None,
+                    created_at=kini,
+                ),
+                0.9,
+            )
+            for teks in self.isi[:batas]
+        ]
+        dipakai = [s for s in scope_manifest if s != "coaching_notes"]
+        return memory.HasilCariMemori(items, dipakai, ["coaching_notes"])
+
+
+async def test_alasan_coach_dipotong_bukan_menggagalkan_jawaban(api_bersama: ApiUji) -> None:
+    """K-30 · `runtime.ALASAN_PANJANG_MAKS`: tiap alasan ≤ 300 karakter. Fakta yang lebih
+    panjang — dua judul goal 200 karakter, satu ingatan 4.000 — dipotong DI ALASAN; tanpa itu
+    satu data panjang menggagalkan SETIAP jawaban coach untuk pengguna itu."""
+    uid, token = await api_bersama.pengguna_baru()
+    for huruf in "ab":
+        r = await api_bersama.klien.post(
+            "/v1/goals", json={"title": huruf * 200, "domain": "health"}, headers=auth(token)
+        )
+        assert r.status_code == 201, r.text
+
+    try:
+        hasil = await _giliran(api_bersama, uid, "bagaimana hariku?")
+    except agents.KeputusanTidakSah as galat:
+        pytest.fail(f"satu fakta panjang menggagalkan jawaban coach: {galat}")
+
+    alasan = hasil.keputusan.rationale
+    assert all(len(a) <= 300 for a in alasan)
+    assert [len(a) for a in alasan if a.startswith("2 goal aktif:")] == [300], (
+        f"fakta goal tidak dipotong di alasan — dibuang: {alasan}"
+    )
+
+
+async def test_alasan_coach_paling_banyak_sepuluh_walau_semua_sumber_berisi(
+    api_bersama: ApiUji,
+) -> None:
+    """`runtime.ALASAN_MAKS` = 10: coach menyisakan tempat untuk DUA kalimat sumber — yang
+    ditolak dan yang belum diizinkan. Sembilan fakta (5 habit, check-in, goal, 2 ingatan)
+    ditambah keduanya = 11 — dan run coach gagal tepat saat datanya paling banyak."""
+    uid, token = await api_bersama.pengguna_baru()
+    h, k = auth(token), api_bersama.klien
+    for i in range(5):
+        await buat_habit(api_bersama, token, title=f"Habit {i}")
+    await k.put(f"/v1/checkins/{_hari_ini()}", json={"energy": 3}, headers=h)
+    await k.post("/v1/goals", json={"title": "Lari 10K", "domain": "health"}, headers=h)
+    await _izin(api_bersama).tetapkan(uid, COACH, "mood", "read", "deny")
+    runtime = _runtime(api_bersama, _PencariBerisi(["ingatan satu", "ingatan dua"]))
+
+    try:
+        hasil = await runtime.jalankan(uid, "coach-agent", "halo", pemicu="user")
+    except agents.KeputusanTidakSah as galat:
+        pytest.fail(f"alasan coach melewati 10 saat semua sumber berisi: {galat}")
+
+    alasan = hasil.keputusan.rationale
+    assert len(alasan) == 10
+    assert alasan[-2:] == (
+        "Tidak dibaca karena kamu menolak aksesnya: mood.",
+        "Ingatan yang belum kamu izinkan kubaca: coaching_notes — tidak dipakai.",
+    ), f"kalimat sumber tergeser fakta: {alasan}"
+
+
+@pytest.mark.parametrize(
+    ("pesan", "model"),
+    [("halo", "uji/kecil"), ("kenapa aku capek terus minggu ini?", "uji/besar")],
+)
+async def test_coach_memilih_kelas_model_dari_niat(
+    api_bersama: ApiUji, pesan: str, model: str
+) -> None:
+    """4.1 Model Router: niat `simple` → model kecil, `reasoning` → model besar. *“Halo”*
+    tidak membayar model besar yang dinyatakan manifest coach (`model.class: reasoning`)."""
+    uid, _token = await api_bersama.pengguna_baru()
+
+    hasil = await _giliran(api_bersama, uid, pesan)
+
+    dipakai = _anak(api_bersama, hasil.run_id)["model_used"]
+    assert dipakai == model, f"“{pesan}” dijawab {dipakai}, bukan {model}"
+
+
+async def test_habit_agent_keyakinan_judul_sebagian(api_bersama: ApiUji) -> None:
+    """K-30: aksi atas habit yang judulnya hanya MEMUAT yang disebut kurang pasti daripada
+    judul yang sama persis — keyakinannya berbeda (`KEYAKINAN_JUDUL_SEBAGIAN`)."""
+    uid, token = await api_bersama.pengguna_baru()
+    await buat_habit(api_bersama, token, title="Lari pagi")
+    await _izin(api_bersama).tetapkan(
+        uid, identity.Subjek("agent", "habit-agent"), "habits", "write", "allow"
+    )
+
+    b = (await _giliran(api_bersama, uid, "tandai lari selesai")).keputusan
+
+    assert b.teks == f"“Lari pagi” ditandai selesai untuk {_hari_ini()}."
+    assert b.confidence == agents.KEYAKINAN_JUDUL_SEBAGIAN, (
+        f"keyakinan judul yang hanya cocok sebagian: {b.confidence}"
+    )
+
+
+async def test_memory_agent_menyatakan_ingatan_yang_belum_diizinkan(api_bersama: ApiUji) -> None:
+    """3.7: scope *“tanya aku”* tidak dicari DAN dilaporkan — memory-agent yang menjawab
+    *“0 ingatan yang cocok”* tanpa menyebutnya melewati pilihan pengguna diam-diam."""
+    uid, _token = await api_bersama.pengguna_baru()
+
+    b = (
+        await _runtime(api_bersama, _PencariTanyaAku()).jalankan(
+            uid, "memory-agent", "apa yang kamu ingat tentang kacang?", pemicu="user"
+        )
+    ).keputusan
+
+    assert "Belum kamu izinkan dibaca: coaching_notes." in b.rationale, (
+        f"memory-agent melewati scope `tanya aku` diam-diam — alasan: {b.rationale}"
+    )
