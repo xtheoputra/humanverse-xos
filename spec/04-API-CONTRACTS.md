@@ -314,6 +314,30 @@ Peristiwa SSE `done`:
 >   milik satu pengguna dan satu percakapan, **sekali pakai**: jawaban kedua →
 >   `409 confirmation_answered`; token rusak, kedaluwarsa, atau milik percakapan lain
 >   → `422 invalid_confirmation` (tanpa membedakan ketiganya).
+>
+> 🔧 **Tinjauan tiga lensa sebelum PR (28 Sep 2026)** — yang ditambahkan:
+>
+> * **Satu giliran bisa ditanya lebih dari sekali** (E-199) — *“tanya aku”* untuk
+>   bacaan, lalu tulisan R2. Token membawa pesan pengguna yang memulai giliran dan
+>   persetujuan yang sudah dipegangnya; jawaban berikutnya mengulang giliran dengan
+>   **semuanya**. Semua yang bisa menolak jawaban — token, `allow_always` untuk
+>   `confirmation`, percakapannya, *sudah dijawab* — diperiksa **sebelum** giliran
+>   baru dimulai: ketukan ganda saat giliran ulangan masih berjalan →
+>   `409 confirmation_answered`, bukan `turn_in_progress` (E-202).
+> * **Permintaan yang ditolak bukan giliran** (E-202): `409` · `422` pada
+>   `…/messages` atau `…/confirmations` tidak menyentuh `GET …/stream` — aliran
+>   tetap giliran terakhir yang sungguh terjadi.
+> * **Id buatan klien** (tabel *Umum*): `POST /conversations` dan `POST …/messages`
+>   dengan `id` yang sudah ada → `409 already_exists`, seperti modul lain — juga id
+>   milik pengguna lain. Run yang terlanjur ditulis sebelum pesannya ditolak ditutup
+>   `failed` (E-200).
+> * **`error.code` SSE** (E-203) — kode API berbahasa Inggris, bukan kode internal:
+>   `rate_limited` (batas laju tool) · `agent_error` (program agent memanggil tool atau
+>   memutuskan secara salah — bukan salah klien) · `model_unavailable` · `cancelled`
+>   · `internal_error` · kode layanan pemilik data yang menolak tulisan tool
+>   (`not_found`, `invalid_tier`, `for_date_in_future`, …).
+> * **`GET /conversations`** — terbaru **dibuat** dulu, kursor `(created_at, id)`:
+>   urutan yang tidak bergeser saat percakapan lain menerima pesan (E-210).
 
 ---
 

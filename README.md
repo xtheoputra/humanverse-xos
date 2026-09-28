@@ -488,7 +488,7 @@ membalikkannya**:
 | **K-29** 🆕 | **Katalog agent** — manifest YAML di paket api, dibekukan migrasi, api menolak mulai bila berbeda | `agents/registri.py` · migrasi `0007` |
 | **K-30** 🆕 | **Program agent V0** — jawaban dari fakta tool; keyakinan = banyaknya bukti, dilaporkan tidak dipakai memutuskan | `agents/program_v0.py` · `test_agent_v0.py` |
 | **K-31** 🆕 | **Aliran percakapan di dalam proses**, satu giliran per percakapan; isi tidak ke Redis | `agents/aliran.py` · `test_percakapan.py` |
-| **K-32** 🆕 | **Anggaran biaya model per pengguna per hari lokalnya** — habis → turun ke model kecil | `agents/runtime.py` · `test_anggaran.py` |
+| **K-32** 🆕 | **Anggaran biaya model per pengguna per 24 jam bergulir**, jatah dipesan di bawah kunci per pengguna — habis → turun ke model kecil | `agents/runtime.py` · `test_anggaran.py` |
 
 🛑 **Yang sengaja TIDAK saya putuskan:** [#139](../../issues/139) (waktu pemilik) ·
 [#3](../../issues/3) (orang) · [#20](../../issues/20) (merek) · **seluruh butir C**

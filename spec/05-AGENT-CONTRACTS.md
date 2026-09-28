@@ -75,10 +75,16 @@ aktif, dengan `risk_level` = `max_risk`-nya):
 | 3 🔧 | **Setiap tool di `tools:` wajib punya `risk_level <= max_risk`.** Manifest yang mendaftarkan tool lebih berisiko daripada pagunya **ditolak**. (Menggantikan aturan lama *“`risk_level >= 3` wajib punya `requires_confirmation`”* — [#52](../../issues/52) sudah memindahkan `requires_confirmation` ke Policy Engine.) |
 | 4 | `evaluation.gates.safety` **wajib** ada dan `>= 0.95`. |
 | 5 | Satu `name` hanya boleh punya **satu** baris `status: active`. |
-| 6 | `kind: third_party` **tidak boleh** meminta scope `journal`, `journal_raw` 🔧, `finance`, atau `health`. |
+| 6 | `kind: third_party` **tidak boleh** meminta scope `journal`, `journal_raw` 🔧, `finance`, atau `health` — 🔧 lewat `memory.read`/`write` **maupun** lewat `scopes` tool yang didaftarkannya (E-207: dulu hanya yang pertama diperiksa, padahal scope tool-lah yang ditanyakan gerbang). |
 | 7 🔧 | Tool yang akibatnya sampai kepada **orang selain pemegang akun** (`reaches_third_party: true`) **wajib** `risk_level >= 3`. Manifest yang menurunkannya **ditolak**. |
 | 8 🔧 | Tool **tanpa** `risk_level` **ditolak** saat registrasi. **Tidak ada bawaan** — kelalaian berhenti di validator, bukan di produksi. |
 | 9 🔧 | Perluasan aturan 6: `kind: third_party` juga **tidak boleh** meminta scope `spatial`, `location`, `people`, atau `csi`. |
+
+> 🔧 **Tinjauan kontrak Sprint 4 (E-207).** *“Semua pelanggaran sekaligus”* kini juga
+> untuk tool tanpa `risk_level`: aturan 8 dilaporkan dan pemeriksaan tool itu
+> **berlanjut** (dulu berhenti di sana, menyembunyikan pelanggaran lainnya).
+> `capabilities` wajib snake_case (`^[a-z][a-z0-9_]{0,63}$`) — komentar skema di atas
+> sebelumnya tidak ditegakkan siapa pun.
 
 ## 🔧 Daftar scope resmi V0 (aturan 2 · E-180)
 
@@ -220,6 +226,9 @@ output:                            # 🔧 = GET /habits/{id}/streak (04, E-176)
   current:              integer
   longest:              integer
   completion_rate_30d:  number | null   # null = belum ada periode jatuh tempo
+# 🔧 E-206: `array`/`object` WAJIB menyatakan isinya — `{ type: array, items: <tipe> }`
+#   atau `{ type: object | null, fields: { <medan>: <tipe> } }`, bersarang sedalam perlu.
+#   Pelaksana menolak medan yang tidak dinyatakan DI KEDALAMAN MANA PUN.
 side_effects: none                 # none | writes_user_data | external_call
 menyaring_izin: false              # 🔧 E-193: true = tool BACA yang menanyai mesin izin
                                    #   per scope sendiri (memory.search) — gerbang tidak
@@ -273,7 +282,15 @@ Tool V0 — **9 tool + 3 entri `kind: agent`**:
 > dinyatakan adalah **cacat implementasi**, bukan fitur. Yang ditolak di (1)–(3) tidak
 > memakai jatah dan tidak pernah sampai ke gerbang — tidak ada konfirmasi R2 untuk aksi
 > yang pasti gagal. Batas nilai skema **menyalin** modul pemiliknya (status habit dan
-> goal, domain rekomendasi, batas pencarian), dan salinannya diuji sama.
+> goal, domain rekomendasi, batas pencarian), dan salinannya diuji sama. 🔧 **E-204
+> (tinjauan kontrak Sprint 4):** batas yang tidak bisa ditulis sebagai
+> `enum`/`min`/`max` — `tier_used` untuk `skipped`, isi memori yang kosong atau lebih
+> dari 4.000 karakter, judul rekomendasi kosong — diperiksa **pemeriksa pemilik datanya**
+> (`agents.Implementasi.periksa`, fungsi murni modul pemilik) di langkah (3) juga;
+> tanggal di luar `1900-01-01` … `2999-12-31` (spec/04) dan bilangan tak hingga
+> (`NaN` lolos `min`/`max`) ditolak semua tool. Dulu ketiganya sampai ke gerbang, dan
+> pengguna diminta mengizinkan aksi yang lalu ditolak pemiliknya. **Keluaran**
+> diperiksa sampai ke medan bersarang (E-206) — `note` di dalam `items[]` dulu lolos.
 >
 > Tiap implementasi memanggil **pintu keluar modul pemilik datanya** — layanan yang
 > sama dengan rute HTTP-nya, di bawah RLS pengguna yang dilayani run itu:
@@ -438,9 +455,16 @@ jalankan · catat agent_runs · catat audit_logs
 >    (`audit_logs` `agent.tool_denied`) — 🔧 *sebelum* konfirmasi R3: meminta manusia
 >    mengonfirmasi aksi yang toh akan ditolak hanya membuang perhatiannya.
 > 3. **R3 → konfirmasi setiap kali**, bahkan bila izinnya `allow`.
-> 4. **`ask` → minta izin**. Jawabannya tiga: `izinkan_selalu` (izin `allow` disimpan
->    per scope — *minta izin sekali*; tidak tersedia untuk R3), `izinkan_sekali`
->    (hanya pemanggilan ini), `tolak`.
+> 4. **`ask` → minta izin**. Jawabannya tiga (nama API spec/04 — 🔧 E-196: berkas ini
+>    dulu memakai nama internalnya): `allow_always` (izin `allow` disimpan per scope —
+>    *minta izin sekali*; tidak tersedia untuk R3 — **di transaksi yang sama** dengan
+>    jawabannya), `allow_once` (hanya pemanggilan ini), `reject`.
+> 5. 🔧 **Jalankan · catat `agent_runs` · catat `audit_logs`** (E-205) — diagram di atas
+>    kini ditepati utuh: tulisan agent atas data pengguna (`habit.complete` ·
+>    `memory.write` · `recommendation.create`) meninggalkan `agent.tool_executed`
+>    (agent, tool, risiko, run, disetujui atau tidak — tanpa isinya) **di transaksi
+>    tulisannya**, hanya bila sesuatu berubah; event yang lahir dari tulisan agent
+>    bersumber `agent` (spec/03), bukan `app`.
 >
 > Yang ditahan: run-nya `blocked`, dan pengguna menerima permintaan **bertanda tangan**
 > (HMAC berlabel `HVX_IP_HASH_KEY`, 15 menit) yang memuat agent, tool, risiko, scope,
@@ -449,7 +473,11 @@ jalankan · catat agent_runs · catat audit_logs
 > run yang ditahan) dan tercatat (`agent.action_approved` · `agent.action_rejected`).
 > Giliran yang disetujui **diulang dari awal** dengan persetujuan itu; gerbang
 > meloloskan pemanggilan yang agent, tool, dan sidik masukannya sama — dan hanya itu.
-> Persetujuan diwarisi run anak (orchestrator → agent).
+> Persetujuan diwarisi run anak (orchestrator → agent). 🔧 **E-199:** satu giliran bisa
+> ditanya lebih dari sekali (*“tanya aku”* untuk bacaan, lalu tulisan R2) — token
+> membawa pesan pengguna yang memulai giliran dan persetujuan yang sudah dipegangnya,
+> jadi ulangan berikutnya membawa **semuanya**; run `blocked` menunggu jawaban
+> (`confirmed_by_user` NULL) walau ia sendiri memakai persetujuan sebelumnya.
 >
 > 🔧 **Delegasi tidak ditanyakan sendiri (E-192).** K-14 membuat pemanggilan agent
 > lain melewati gerbang ini; dibaca harfiah bersama *“risk 2 minta izin”*, satu

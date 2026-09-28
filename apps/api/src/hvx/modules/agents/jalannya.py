@@ -33,6 +33,9 @@ class Jalannya:
     tersimpan: bool = False
     # Pemanggilan yang disetujui pengguna untuk giliran ini (4.5) — diwarisi run anak.
     persetujuan: frozenset[PersetujuanAksi] = field(default_factory=frozenset)
+    # Pesan pengguna yang memulai giliran ini — diwarisi run anak, dibawa token konfirmasi:
+    # run ULANGAN tidak punya pesannya sendiri (E-199).
+    pesan_id: UUID | None = None
     alat_dipakai: list[str] = field(default_factory=list)
     scope_dipakai: set[str] = field(default_factory=set)
     risiko_tertinggi: int | None = None

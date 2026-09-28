@@ -190,14 +190,25 @@ class GerbangModel:
         """Model Router: anggaran harian habis → turun ke model KECIL, bukan gagal (4.9)."""
         return "simple" if anggaran_habis else kelas
 
-    def alirkan(self, permintaan: PermintaanModel) -> AliranModel:
+    def _rute(self, permintaan: PermintaanModel) -> tuple[str, Penyedia, HargaModel, int]:
+        """(model, penyedia, harganya, token masuk) satu permintaan."""
         model = self._model[permintaan.kelas]
         penyedia = self._penyedia[model.split("/", 1)[0]]
-        harga = self._harga.get(model, GRATIS)
-        mulai = time.perf_counter()
         token_masuk = penyedia.hitung_token(
             " ".join((permintaan.tugas, permintaan.pertanyaan, *permintaan.bahan))
         )
+        return model, penyedia, self._harga.get(model, GRATIS), token_masuk
+
+    def perkiraan_biaya(self, permintaan: PermintaanModel) -> Decimal:
+        """Biaya TERBURUK satu panggilan — token masuknya + `maks_token` keluar, harga
+        kelasnya. Jatah yang dipesan anggaran (4.9) sebelum panggilan: penyedia tidak
+        mengeluarkan lebih dari `maks_token`, jadi biaya sebenarnya tidak melampauinya."""
+        _model, _penyedia, harga, token_masuk = self._rute(permintaan)
+        return harga.biaya(token_masuk, permintaan.maks_token)
+
+    def alirkan(self, permintaan: PermintaanModel) -> AliranModel:
+        model, penyedia, harga, token_masuk = self._rute(permintaan)
+        mulai = time.perf_counter()
 
         def selesai(teks: str) -> JawabanModel:
             token_keluar = penyedia.hitung_token(teks)

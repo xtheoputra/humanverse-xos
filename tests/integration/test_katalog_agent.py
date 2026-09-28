@@ -52,6 +52,8 @@ async def test_katalog_migrasi_sama_dengan_manifest(v0_bersama: BasisDataV0) -> 
         "UPDATE agents SET manifest = jsonb_set(manifest, '{max_risk}', '\"R4\"') "
         "WHERE name = 'habit-agent'",
         "UPDATE agents SET status = 'disabled' WHERE name = 'memory-agent'",
+        # E-209: aksi tool — yang ditanyakan gerbang — ikut dibandingkan
+        "UPDATE agent_tools SET permission = 'execute' WHERE tool_name = 'habit.list'",
     ],
 )
 async def test_api_menolak_mulai_bila_katalog_berbeda_dari_manifest(
@@ -74,3 +76,20 @@ def test_peran_aplikasi_tidak_bisa_mengubah_katalog(v0_bersama: BasisDataV0) -> 
         pytest.raises(errors.InsufficientPrivilege),
     ):
         k.execute("UPDATE agents SET max_risk = 4")
+
+
+def test_izin_katalog_sesuai_jenis_tool(v0_bersama: BasisDataV0) -> None:
+    """E-209: `agent_tools.permission` = aksi yang ditanyakan gerbang untuk jenis tool-nya —
+    migrasi 0007 memakai bawaan `execute` untuk SEMUA, termasuk tool baca."""
+    registri = agents.muat_registri()
+    with psycopg.connect(psycopg_dsn(v0_bersama.dsn_pemilik)) as k:
+        baris = k.execute(
+            "SELECT DISTINCT t.tool_name, t.permission FROM agent_tools t"
+            " JOIN agents a ON a.id = t.agent_id WHERE a.status = 'active'"
+        ).fetchall()
+
+    assert sorted(baris) == sorted(
+        (nama, agents.AKSI_IZIN[registri.alat[nama].kind]) for nama, _p in baris
+    ), f"aksi katalog ≠ jenis tool-nya: {sorted(baris)}"
+    assert ("habit.list", "read") in baris
+    assert ("habit.complete", "write") in baris

@@ -60,9 +60,7 @@ async def _giliran(
         permintaan = galat.konfirmasi
     s = api.app.state.settings
     tanda = agents.TokenKonfirmasi(lambda isi: platform.sidik(s, "konfirmasi-agent", isi))
-    setuju = await agents.jawab_konfirmasi(
-        api.app.state.engine, _izin(api), tanda, uid, permintaan.token, izinkan
-    )
+    setuju = await agents.jawab_konfirmasi(_izin(api), tanda, uid, permintaan.token, izinkan)
     assert setuju is not None
     return await runtime.jalankan(
         uid, "orchestrator-agent", pesan, pemicu="user", persetujuan=frozenset({setuju})
@@ -100,6 +98,7 @@ async def test_coach_menjawab_dari_data_pengguna_tanpa_catatan_bebasnya(
         "action": "reply",
         "sumber": 4,
         "dilewati": 0,
+        "perlu_izin": 0,
     }
 
 
@@ -316,3 +315,46 @@ async def test_habit_agent_jujur_bila_tanggalnya_tercatat_bersamaan(api_bersama:
 
 def test_tiap_agent_aktif_punya_program() -> None:
     assert sorted(agents.PROGRAM_V0) == sorted(REGISTRI.agent), "agent aktif tanpa program"
+
+
+# ── E-208: coach menyatakan scope ingatan yang belum diputuskan ──────────────────────
+
+
+class _PencariTanyaAku:
+    """Seperti `memory.PencariMemori` (3.7) untuk pengguna yang memilih *“tanya aku”* atas
+    `coaching_notes`: scope itu tidak dicari dan dilaporkan di `perlu_izin`."""
+
+    async def cari(
+        self, *, user_id: UUID, agent: str, scope_manifest: list[str], kueri: str, batas: int
+    ) -> Any:
+        from hvx.modules import memory
+
+        dipakai = [s for s in scope_manifest if s != "coaching_notes"]
+        return memory.HasilCariMemori([], dipakai, ["coaching_notes"])
+
+
+async def test_coach_menyatakan_ingatan_yang_belum_diizinkan(api_bersama: ApiUji) -> None:
+    """spec/07 4.7 *“tanya aku” ditanyakan*; memory/pencarian.py *“bukan pencarian yang
+    diam-diam melewatinya”*. Sejak E-193 gerbang tidak menanyakan `memory.search` — dulu
+    coach mengabaikan `perlu_izin` dan berkata *“belum ada … ingatan yang tercatat”*."""
+    uid, _token = await api_bersama.pengguna_baru()
+    runtime = agents.RuntimeAgent(
+        api_bersama.app.state.engine,
+        REGISTRI,
+        agents.PROGRAM_V0,
+        agents.PelaksanaAlat(REGISTRI, agents.IMPLEMENTASI, _GerbangBuka(), None),
+        gerbang_model_uji(),
+        pencari_memori=_PencariTanyaAku(),  # type: ignore[arg-type]
+    )
+
+    hasil = await runtime.jalankan(uid, "coach-agent", "halo", pemicu="user")
+
+    assert any("coaching_notes" in a for a in hasil.keputusan.rationale), (
+        f"scope `tanya aku` dilewati diam-diam — alasan: {hasil.keputusan.rationale}"
+    )
+    assert hasil.keputusan.aksi["perlu_izin"] == 1
+
+
+class _GerbangBuka:
+    async def periksa(self, j: agents.Jalannya, alat: agents.Alat, m: Any) -> None:
+        return None

@@ -31,6 +31,7 @@ from .pelaksana_alat import (
     AlatDitolak,
     AlatGagal,
     Gerbang,
+    Implementasi,
     KonteksAlat,
     LayananAlat,
     PelaksanaAgent,
@@ -49,6 +50,7 @@ from .program_v0 import (
     PROGRAM_V0,
 )
 from .registri import (
+    AKSI_IZIN,
     RUANG_ID_AGENT,
     Alat,
     KatalogBerbeda,
@@ -76,6 +78,7 @@ from .runtime import (
 
 __all__ = [
     "AGENT_UNTUK",
+    "AKSI_IZIN",
     "CARA_MENGISI_MOOD",
     "IMPLEMENTASI",
     "KEYAKINAN_INGATAN",
@@ -96,6 +99,7 @@ __all__ = [
     "GiliranBerjalan",
     "HasilDeterministik",
     "HasilRun",
+    "Implementasi",
     "Jalannya",
     "JawabanKonfirmasi",
     "JenisNiat",

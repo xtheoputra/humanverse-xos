@@ -11,8 +11,17 @@ input:
   kueri: { type: string, required: true }
   batas: { type: integer, required: false, min: 1, max: 50 }  # memory.MAKS_HASIL
 output:
-  items: array
-  perlu_izin: array        # scope manifest yang pengguna belum putuskan (3.7)
+  items:
+    type: array
+    items:
+      type: object
+      fields:
+        id: uuid
+        kind: string
+        scope: string
+        content: string
+        skor: number
+  perlu_izin: { type: array, items: string }   # scope manifest yang pengguna belum putuskan (3.7)
 side_effects: none
 reaches_third_party: false
 rate_limit: 60/min/user

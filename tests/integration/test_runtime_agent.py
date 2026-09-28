@@ -176,7 +176,7 @@ async def test_run_yang_dibatalkan_di_tengah_aliran_tetap_ditutup_dan_dibayar(
 
     r = run(api_bersama, ids[0])
     assert r["status"] == "cancelled", "run yang dibatalkan tidak ditutup"
-    assert r["error"] == {"code": "cancelled"}
+    assert r["error"] == {"code": "cancelled", "type": "CancelledError"}
     assert r["finished_at"] is not None
     assert r["tools_used"] == ["goal.list"]
     assert r["tokens_out"] >= 1, "token aliran yang terputus tidak tercatat"

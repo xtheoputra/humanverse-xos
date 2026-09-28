@@ -20,7 +20,7 @@ from _bantuan_db import ApiUji, auth, psycopg_dsn
 from test_habits import buat_habit
 from test_memori import COACH, _izin, _pencari, _siapkan_pengguna, koleksi  # noqa: F401 - fixture
 
-from hvx.modules import agents, platform
+from hvx.modules import agents, identity, platform
 
 pytestmark = pytest.mark.integration
 
@@ -274,3 +274,127 @@ async def test_batas_laju_tool_per_pengguna(api_bersama: ApiUji) -> None:
 
     assert galat.value.kode == "terlalu_sering", "batas laju tool tidak ditegakkan"
     assert lain == {"items": [], "terpotong": False}
+
+
+# ── E-205: tulisan agent berjejak di audit_logs, di transaksi tulisannya ────────────
+
+_TULIS = [
+    ("habit-agent", "habit.complete"),
+    ("memory-agent", "memory.write"),
+    ("coach-agent", "recommendation.create"),
+]
+
+
+async def _masukan_tulis(api: ApiUji, token: str, nama: str) -> dict[str, Any]:
+    if nama == "habit.complete":
+        habit = await buat_habit(api, token)
+        return {"habit_id": habit["id"], "for_date": "2026-09-20", "status": "done"}
+    if nama == "memory.write":
+        return {"scope": "coaching_notes", "isi": "aku alergi kacang"}
+    return {"domain": "habit", "title": "Tidur awal", "confidence": 0.6, "rationale": ["a"]}
+
+
+@pytest.mark.parametrize(("agent", "nama"), _TULIS)
+async def test_tulisan_agent_meninggalkan_jejak_audit(
+    api_bersama: ApiUji, agent: str, nama: str
+) -> None:
+    """spec/05 *Risk gate*: *jalankan · catat agent_runs · catat audit_logs* — dulu hanya
+    penolakan dan jawaban konfirmasi yang tercatat, tulisan agentnya tidak (E-205)."""
+    uid, token = await api_bersama.pengguna_baru()
+    j = _jalannya(agent, uid)
+    masukan = await _masukan_tulis(api_bersama, token, nama)
+
+    await _panggil(api_bersama, j, nama, masukan)
+
+    assert _sql(
+        api_bersama,
+        "SELECT actor_type, actor_id, subject_type, subject_id, metadata->>'run'"
+        " FROM audit_logs WHERE user_id = %s AND action = 'agent.tool_executed'",
+        uid,
+    ) == [("agent", agent, "tool", nama, str(j.id))], f"tulisan agent tanpa jejak audit: {nama}"
+
+
+async def test_tulisan_yang_tidak_mengubah_apa_pun_tidak_berjejak(api_bersama: ApiUji) -> None:
+    """Kirim ulang yang mengembalikan baris lama — tidak ada yang berubah, tidak ada jejak."""
+    uid, token = await api_bersama.pengguna_baru()
+    for agent, nama in _TULIS[:2]:  # yang punya "sudah ada"
+        masukan = await _masukan_tulis(api_bersama, token, nama)
+        await _panggil(api_bersama, _jalannya(agent, uid), nama, masukan)
+        await _panggil(api_bersama, _jalannya(agent, uid), nama, masukan)
+
+    assert _sql(
+        api_bersama,
+        "SELECT subject_id, count(*) FROM audit_logs WHERE user_id = %s"
+        " AND action = 'agent.tool_executed' GROUP BY subject_id ORDER BY subject_id",
+        uid,
+    ) == [("habit.complete", 1), ("memory.write", 1)], (
+        "tulisan yang tidak mengubah apa pun berjejak"
+    )
+
+
+@pytest.mark.parametrize(("agent", "nama"), _TULIS)
+async def test_jejak_yang_gagal_membatalkan_tulisannya(
+    api_bersama: ApiUji, monkeypatch: pytest.MonkeyPatch, agent: str, nama: str
+) -> None:
+    """Satu transaksi: tulisan tanpa jejak tidak bisa terjadi."""
+    uid, token = await api_bersama.pengguna_baru()
+    masukan = await _masukan_tulis(api_bersama, token, nama)
+
+    async def gagal(*_a: Any, **_k: Any) -> None:
+        raise RuntimeError("audit gagal")
+
+    monkeypatch.setattr(identity, "audit", gagal)
+    with pytest.raises(RuntimeError, match="audit gagal"):
+        await _panggil(api_bersama, _jalannya(agent, uid), nama, masukan)
+    monkeypatch.undo()
+
+    tabel = {
+        "habit.complete": "habit_completions",
+        "memory.write": "memories",
+        "recommendation.create": "recommendations",
+    }[nama]
+    assert _sql(api_bersama, f"SELECT count(*) FROM {tabel} WHERE user_id = %s", uid) == [(0,)], (
+        f"{nama} tersimpan tanpa jejak auditnya"
+    )
+
+
+async def test_event_tulisan_agent_bersumber_agent(api_bersama: ApiUji) -> None:
+    """spec/03 `source`: `app` · `agent` … — `habit.completed` yang lahir dari agent dulu
+    bersumber `app`: asal-usul tulisan agent hilang dari aliran event."""
+    uid, token = await api_bersama.pengguna_baru()
+    masukan = await _masukan_tulis(api_bersama, token, "habit.complete")
+
+    await _panggil(api_bersama, _jalannya("habit-agent", uid), "habit.complete", masukan)
+
+    assert _sql(
+        api_bersama,
+        "SELECT event_type, source FROM events WHERE user_id = %s ORDER BY recorded_at",
+        uid,
+    ) == [("habit.created", "app"), ("habit.completed", "agent")], (
+        "event tulisan agent tidak bersumber agent"
+    )
+
+
+@pytest.mark.parametrize(("agent", "nama"), _TULIS)
+async def test_jejak_ikut_batal_bersama_tulisannya(
+    api_bersama: ApiUji, monkeypatch: pytest.MonkeyPatch, agent: str, nama: str
+) -> None:
+    """Satu transaksi, arah sebaliknya: tulisan yang batal SESUDAH jejaknya ditulis tidak
+    meninggalkan jejak — jejak tanpa tulisan tidak bisa terjadi."""
+    uid, token = await api_bersama.pengguna_baru()
+    masukan = await _masukan_tulis(api_bersama, token, nama)
+    asli = agents.KonteksAlat.jejak
+
+    async def lalu_gagal(self: agents.KonteksAlat, conn: Any) -> None:
+        await asli(self, conn)
+        raise RuntimeError("tulisan batal sesudah jejaknya")
+
+    monkeypatch.setattr(agents.KonteksAlat, "jejak", lalu_gagal)
+    with pytest.raises(RuntimeError, match="sesudah jejaknya"):
+        await _panggil(api_bersama, _jalannya(agent, uid), nama, masukan)
+
+    assert _sql(
+        api_bersama,
+        "SELECT count(*) FROM audit_logs WHERE user_id = %s AND action = 'agent.tool_executed'",
+        uid,
+    ) == [(0,)], f"jejak audit tersimpan untuk tulisan yang dibatalkan: {nama}"

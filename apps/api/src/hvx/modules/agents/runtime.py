@@ -27,8 +27,8 @@ import asyncio
 import re
 import time
 from collections.abc import Awaitable, Callable, Mapping, Sequence
-from dataclasses import dataclass
-from datetime import UTC, date, datetime
+from dataclasses import dataclass, replace
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 from typing import Any, Literal, Protocol
 from uuid import UUID, uuid4
@@ -55,6 +55,9 @@ TEKS_MAKS = 8_000
 AKSI_KUNCI_MAKS = 10
 AKSI_NILAI_MAKS = 120
 _KUNCI_AKSI = re.compile(r"^[a-z][a-z0-9_]{0,39}$")
+# Anggaran biaya model (4.9, K-32): jendela yang BERGULIR, bukan hari kalender — hari lokal
+# bisa digeser pengguna lewat zona waktu profilnya (E-201).
+JENDELA_ANGGARAN = timedelta(hours=24)
 
 
 class KeputusanTidakSah(ValueError):
@@ -121,12 +124,19 @@ def _aksi_tertahan(galat: BaseException) -> dict[str, NilaiAksi]:
         "tool": k.alat,
         "agent": k.agent,
         "risk_level": k.risk_level,
-        "jenis": k.jenis,
+        "kind": "confirmation" if k.jenis == "konfirmasi" else "permission",  # = SSE spec/04
     }
 
 
+def _galat_run(galat: BaseException) -> dict[str, str]:
+    """Kolom `error` run (spec/01 §8): `{code, type}` — tanpa pesan, apa pun akhirnya."""
+    return {"code": _kode_galat(galat), "type": type(galat).__name__}
+
+
 def _kode_galat(galat: BaseException) -> str:
-    if isinstance(galat, AlatDitolak | AlatGagal):
+    if isinstance(galat, asyncio.CancelledError):
+        return "cancelled"
+    if isinstance(galat, AlatDitolak | AlatGagal | platform.GalatApi):
         return galat.kode
     if isinstance(galat, KeputusanTidakSah):
         return "keputusan_tidak_sah"
@@ -192,18 +202,19 @@ class KonteksAgent:
     ) -> platform.JawabanModel:
         """Satu panggilan AI Gateway — tokennya mengalir ke pendengar, biayanya ke run ini.
 
-        `kelas` bawaan = `model.class` manifest. Aliran yang terputus (dibatalkan)
-        tetap tercatat sebatas yang sudah keluar: token yang sudah dibayar tidak
-        hilang dari jejak dan dari anggaran (4.9).
+        `kelas` bawaan = `model.class` manifest. Kelas yang dipakai dipilih — dan jatah
+        anggarannya DIPESAN — sebelum panggilan (`RuntimeAgent.pesan_model`, 4.9). Aliran
+        yang terputus (dibatalkan) tetap tercatat sebatas yang sudah keluar: token yang
+        sudah dibayar tidak hilang dari jejak dan dari anggaran.
         """
         diminta = kelas or self._runtime.kelas_bawaan(self.jalannya)
-        habis = await self._runtime.anggaran_habis(self.jalannya)
-        pilihan = self._runtime.gerbang_model.pilih_kelas(diminta, anggaran_habis=habis)
-        if pilihan != diminta:
-            self.jalannya.turun_kelas = True
-        aliran = self._runtime.gerbang_model.alirkan(
-            platform.PermintaanModel(pilihan, tugas, pertanyaan, tuple(bahan), maks_token)
+        permintaan = await self._runtime.pesan_model(
+            self.jalannya,
+            platform.PermintaanModel(diminta, tugas, pertanyaan, tuple(bahan), maks_token),
         )
+        if permintaan.kelas != diminta:
+            self.jalannya.turun_kelas = True
+        aliran = self._runtime.gerbang_model.alirkan(permintaan)
         potongan = aliran.__aiter__()
         try:
             async for p in potongan:
@@ -214,6 +225,9 @@ class KonteksAgent:
                 self.jalannya.catat_model(aliran.jawaban)
         if aliran.jawaban is None:  # pragma: no cover - aliran yang habis selalu mengisinya
             raise platform.GalatModel("aliran model berhenti tanpa jawaban")
+        # Jatah diganti biaya sebenarnya. Jalur galat & pembatalan tidak perlu: penutup
+        # run (`_tutup`) menulis biaya akhirnya apa pun yang terjadi.
+        await self._runtime.lunasi_model(self.jalannya)
         return aliran.jawaban
 
 
@@ -250,23 +264,41 @@ class RuntimeAgent:
             zona = await profile.zona_waktu(conn, user_id)
         return self._jam().astimezone(ZoneInfo(zona or "UTC"))
 
-    async def anggaran_habis(self, j: Jalannya) -> bool:
-        """Biaya hari lokal pengguna ini ≥ anggarannya (4.9, K-32)? Yang dihitung: run yang
-        sudah ditutup hari ini, DITAMBAH run yang masih berjalan di pohon ini — panggilan
-        kedua satu giliran melihat biaya panggilan pertamanya."""
-        if self.anggaran_harian_usd is None:
-            return False
-        awal_hari = (await self.kini_lokal(j.user_id)).replace(
-            hour=0, minute=0, second=0, microsecond=0
-        )
+    async def pesan_model(
+        self, j: Jalannya, permintaan: platform.PermintaanModel
+    ) -> platform.PermintaanModel:
+        """Model Router berjatah (4.9, K-32): kelas yang dipakai panggilan ini, dan jatahnya.
+
+        Di bawah kunci anggaran PER PENGGUNA: biaya 24 jam terakhir — run yang sudah
+        ditutup DAN jatah run yang masih berjalan, di pohon mana pun — ditambah perkiraan
+        TERBURUK panggilan ini (token masuk + `maks_token` keluar). Anggaran sudah habis,
+        atau panggilan ini akan melewatinya → turun ke `simple`, bukan gagal. Jatahnya
+        ditulis ke `cost_usd` run ini SEBELUM kunci dilepas, jadi giliran serentak —
+        percakapan lain, perangkat lain — melihatnya (E-201: dulu tiap giliran hanya
+        melihat pohonnya sendiri, dan empat giliran serentak memakai model besar dengan
+        anggaran untuk satu).
+        """
+        anggaran = self.anggaran_harian_usd
+        if anggaran is None:
+            return permintaan
+        gm = self.gerbang_model
         async with platform.transaksi_pengguna(self.engine, j.user_id) as conn:
-            terpakai = await repository.biaya_sejak(conn, j.user_id, awal_hari)
-        berjalan = Decimal(0)
-        run: Jalannya | None = j
-        while run is not None:
-            berjalan += run.biaya_usd
-            run = run.induk
-        return terpakai + berjalan >= self.anggaran_harian_usd
+            await repository.kunci_anggaran(conn, j.user_id)
+            terpakai = await repository.biaya_sejak(conn, j.user_id, self._jam() - JENDELA_ANGGARAN)
+            habis = terpakai >= anggaran or terpakai + gm.perkiraan_biaya(permintaan) > anggaran
+            kelas = gm.pilih_kelas(permintaan.kelas, anggaran_habis=habis)
+            dipilih = replace(permintaan, kelas=kelas)
+            await repository.catat_biaya_berjalan(
+                conn, j.id, j.biaya_usd + gm.perkiraan_biaya(dipilih)
+            )
+        return dipilih
+
+    async def lunasi_model(self, j: Jalannya) -> None:
+        """Jatah panggilan yang selesai diganti biaya sebenarnya (`cost_usd` run berjalan)."""
+        if self.anggaran_harian_usd is None:
+            return
+        async with platform.transaksi_pengguna(self.engine, j.user_id) as conn:
+            await repository.catat_biaya_berjalan(conn, j.id, j.biaya_usd)
 
     def kelas_bawaan(self, jalannya: Jalannya) -> platform.KelasModel:
         kelas = jalannya.agent.model.kelas
@@ -283,6 +315,7 @@ class RuntimeAgent:
         induk: Jalannya | None = None,
         percakapan_id: UUID | None = None,
         persetujuan: frozenset[PersetujuanAksi] = frozenset(),
+        pesan_id: UUID | None = None,
     ) -> Jalannya:
         """Tulis baris `agent_runs` (`running`) — id-nya sah dirujuk sejak saat ini."""
         manifest = self.registri.agent.get(agent)
@@ -298,6 +331,7 @@ class RuntimeAgent:
             induk=induk,
             percakapan_id=percakapan_id,
             persetujuan=persetujuan if induk is None else induk.persetujuan,
+            pesan_id=pesan_id if induk is None else induk.pesan_id,
         )
         async with platform.transaksi_pengguna(self.engine, user_id) as conn:
             await repository.mulai_run(
@@ -322,9 +356,9 @@ class RuntimeAgent:
         try:
             keputusan = await self._program[j.agent.name](k, pesan)
             periksa_keputusan(keputusan)
-        except asyncio.CancelledError:
+        except asyncio.CancelledError as galat:
             # Penutupnya sendiri tidak ikut dibatalkan: run tanpa akhir adalah jejak yang bohong.
-            await asyncio.shield(self._tutup(j, "cancelled", None, {"code": "cancelled"}, mulai))
+            await asyncio.shield(self._tutup(j, "cancelled", None, _galat_run(galat), mulai))
             raise
         except Exception as galat:
             status: StatusRun = (
@@ -336,13 +370,20 @@ class RuntimeAgent:
                 j,
                 status,
                 None,
-                {"code": _kode_galat(galat), "type": type(galat).__name__},
+                _galat_run(galat),
                 mulai,
                 aksi=_aksi_tertahan(galat) if status == "blocked" else None,
             )
             raise
         await self._tutup(j, "succeeded", keputusan, None, mulai)
         return HasilRun(j.id, keputusan, j.biaya_usd + j.biaya_turunan_usd)
+
+    async def gagalkan(self, j: Jalannya, galat: BaseException) -> None:
+        """Tutup run yang programnya TIDAK PERNAH berjalan: `mulai` sudah menulisnya, lalu
+        langkah sesudahnya gagal atau dibatalkan (pesan pengguna ditolak, klien pergi). Tanpa
+        ini barisnya `running` selamanya — tidak ada penyapu di V0 (E-200)."""
+        status: StatusRun = "cancelled" if isinstance(galat, asyncio.CancelledError) else "failed"
+        await self._tutup(j, status, None, _galat_run(galat), time.perf_counter())
 
     async def jalankan(
         self,
@@ -390,7 +431,10 @@ class RuntimeAgent:
                 memory_scopes=sorted(j.scope_dipakai),
                 model_used=",".join(j.model_dipakai) or None,
                 risk_level=j.risiko_tertinggi,
-                confirmed_by_user=j.dikonfirmasi,
+                # Run yang DITAHAN: kolom ini jawaban atas pertanyaannya — NULL sampai dijawab,
+                # sekali pakai. Run ulangan yang memakai persetujuan lalu ditahan lagi pun
+                # menunggu jawaban baru (E-199); run lain: memakai aksi yang disetujui.
+                confirmed_by_user=None if status == "blocked" else j.dikonfirmasi,
                 decision=keputusan_run,
                 confidence=None if keputusan is None else keputusan.confidence,
                 error=galat,

@@ -433,17 +433,32 @@ async def ringkas_pohon(conn: AsyncConnection, user_id: UUID, run_id: UUID) -> R
     return RingkasanPohon(Decimal(baris.biaya), int(baris.masuk), int(baris.keluar), baris.model)
 
 
-# Anggaran harian (4.9): biaya run yang SUDAH ditutup sejak awal hari lokal pengguna — run
-# yang masih berjalan belum punya `cost_usd` (NULL tidak ikut dijumlah), dan dihitung dari
-# ingatan proses oleh runtime.
+# Anggaran (4.9, K-32): biaya run pengguna sejak `sejak` — yang sudah ditutup (biaya akhirnya)
+# DAN yang masih berjalan (biaya sejauh ini + jatah panggilan model yang sedang berjalan,
+# `catat_biaya_berjalan`). Dibaca di bawah `kunci_anggaran`: giliran serentak di percakapan
+# atau perangkat lain melihat jatah satu sama lain (E-201).
 _BIAYA_SEJAK = text(
     """
     SELECT coalesce(sum(cost_usd), 0) FROM agent_runs
     WHERE user_id = :user_id AND started_at >= :sejak
     """
 )
+_KUNCI_ANGGARAN = text("SELECT pg_advisory_xact_lock(hashtextextended(:kunci, 0))")
+# Hanya run yang masih berjalan — run yang sudah ditutup memegang biaya akhirnya.
+_BIAYA_BERJALAN = text(
+    "UPDATE agent_runs SET cost_usd = :biaya WHERE id = :id AND status = 'running'"
+)
 
 
 async def biaya_sejak(conn: AsyncConnection, user_id: UUID, sejak: datetime) -> Decimal:
     hasil = await conn.execute(_BIAYA_SEJAK, {"user_id": user_id, "sejak": sejak})
     return Decimal(hasil.scalar_one())
+
+
+async def kunci_anggaran(conn: AsyncConnection, user_id: UUID) -> None:
+    """Anggaran satu pengguna dibaca dan dipesan SERIAL — sampai transaksi ini selesai."""
+    await conn.execute(_KUNCI_ANGGARAN, {"kunci": f"anggaran-ai:{user_id}"})
+
+
+async def catat_biaya_berjalan(conn: AsyncConnection, run_id: UUID, biaya: Decimal) -> None:
+    await conn.execute(_BIAYA_BERJALAN, {"id": run_id, "biaya": biaya})

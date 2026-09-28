@@ -23,6 +23,14 @@ Giliran yang disetujui dijalankan ULANG dari awal dengan persetujuan itu: gerban
 meloloskan pemanggilan yang sidiknya sama, dan hanya itu. Program yang pada
 ulangannya memanggil sesuatu yang lain ditanyakan lagi — persetujuan tidak bisa
 dipindahkan ke aksi yang tidak dilihat pengguna.
+
+🔧 **Satu giliran bisa ditanya lebih dari sekali** (E-199, tinjauan kontrak Sprint 4):
+*“tanya aku”* untuk bacaan habit-agent, lalu `habit.complete` R2. Token karena itu
+membawa **pesan pengguna yang memulai giliran** (`pesan_id` — run ulangan tidak punya
+pesannya sendiri) dan **persetujuan yang sudah dipegang giliran itu**: jawaban kedua
+mengulang giliran dengan KEDUANYA. Dulu token kedua ditolak `422` (pesannya dicari di
+run akar ulangan, yang tidak punya pesan), dan persetujuan pertama hilang di ulangan
+berikutnya — `izinkan_sekali` menanyakan hal yang sama tanpa akhir.
 """
 
 from __future__ import annotations
@@ -37,23 +45,13 @@ from dataclasses import dataclass
 from typing import Any, Literal, cast
 from uuid import UUID
 
-from sqlalchemy.ext.asyncio import AsyncEngine
-
-from hvx.modules import identity, platform
+from hvx.modules import identity
 
 from . import repository
 
 JenisKonfirmasi = Literal["izin", "konfirmasi"]
 JawabanKonfirmasi = Literal["izinkan_selalu", "izinkan_sekali", "tolak"]
 UMUR_TOKEN_S = 900  # 15 menit — lebih lama dari itu, pengguna menjawab keadaan yang sudah lewat
-
-# Aksi mesin izin (spec/01 `permissions.action`) untuk tiap `kind` tool.
-AKSI_IZIN: Mapping[str, identity.Aksi] = {
-    "read": "read",
-    "write": "write",
-    "external": "execute",
-    "agent": "execute",
-}
 
 
 class KonfirmasiTidakSah(ValueError):
@@ -95,6 +93,10 @@ class PermintaanKonfirmasi:
     aksi: identity.Aksi
     sidik: str
     kedaluwarsa: int  # detik epoch
+    # Pesan pengguna yang memulai giliran ini — yang diulang bila disetujui (E-199).
+    pesan_id: UUID | None = None
+    # Persetujuan yang sudah dipegang giliran ini; diulang bersama jawaban ini (E-199).
+    persetujuan_lalu: tuple[PersetujuanAksi, ...] = ()
     token: str = ""
 
     def persetujuan(self) -> PersetujuanAksi:
@@ -128,10 +130,13 @@ class TokenKonfirmasi:
         scopes: tuple[str, ...],
         aksi: identity.Aksi,
         sidik: str,
+        pesan_id: UUID | None = None,
+        persetujuan_lalu: frozenset[PersetujuanAksi] = frozenset(),
     ) -> PermintaanKonfirmasi:
+        lalu = tuple(sorted(persetujuan_lalu, key=lambda x: (x.agent, x.alat, x.sidik)))
         p = PermintaanKonfirmasi(
             jenis, user_id, run_id, agent, alat, risk_level, scopes, aksi, sidik,
-            int(time.time()) + self._umur_s,
+            int(time.time()) + self._umur_s, pesan_id, lalu,
         )  # fmt: skip
         isi = json.dumps(
             {
@@ -145,6 +150,8 @@ class TokenKonfirmasi:
                 "x": p.aksi,
                 "h": p.sidik,
                 "e": p.kedaluwarsa,
+                "m": None if p.pesan_id is None else str(p.pesan_id),
+                "p": [[x.agent, x.alat, x.sidik] for x in p.persetujuan_lalu],
             },
             separators=(",", ":"),
         )
@@ -157,7 +164,9 @@ class TokenKonfirmasi:
             isi = _unb64(bagian_isi).decode()
         except (ValueError, UnicodeDecodeError):
             raise KonfirmasiTidakSah("token konfirmasi rusak") from None
-        if not hmac.compare_digest(self._penanda(isi), tanda):
+        # Dibandingkan sebagai BYTE: `compare_digest` atas `str` ber-non-ASCII melempar
+        # TypeError — token rusak menjadi 500, bukan 422 (tinjauan keamanan Sprint 4).
+        if not hmac.compare_digest(self._penanda(isi).encode(), tanda.encode()):
             raise KonfirmasiTidakSah("token konfirmasi rusak")
         d = json.loads(isi)
         if d["u"] != str(user_id):
@@ -167,29 +176,34 @@ class TokenKonfirmasi:
         return PermintaanKonfirmasi(
             d["j"], user_id, UUID(d["r"]), d["a"], d["t"], d["k"], tuple(d["s"]),
             cast(identity.Aksi, d["x"]),
-            d["h"], d["e"], token,
+            d["h"], d["e"],
+            None if d["m"] is None else UUID(d["m"]),
+            tuple(PersetujuanAksi(*x) for x in d["p"]),
+            token,
         )  # fmt: skip
 
 
 async def jawab_konfirmasi(
-    engine: AsyncEngine,
     mesin_izin: identity.MesinIzin,
     tanda: TokenKonfirmasi,
     user_id: UUID,
     token: str,
     jawaban: JawabanKonfirmasi,
 ) -> PersetujuanAksi | None:
-    """Catat jawaban pengguna — sekali. Persetujuan untuk giliran yang diulang, atau None."""
+    """Catat jawaban pengguna — sekali. Persetujuan untuk giliran yang diulang, atau None.
+
+    `izinkan_selalu` menyimpan izinnya di transaksi YANG SAMA dengan jawabannya: token
+    yang terpakai tanpa izin tersimpan — atau izin tersimpan dari jawaban yang ditolak
+    karena sudah dijawab — tidak bisa terjadi.
+    """
     p = tanda.baca(token, user_id)
-    if jawaban == "izinkan_selalu" and p.jenis != "izin":
-        # R3: *minta setiap kali* — persetujuan tidak bisa menjadi izin yang diingat.
-        raise KonfirmasiTidakSah("konfirmasi risiko 3 tidak bisa diingat")
+    periksa_jawaban(p, jawaban)
     setuju = jawaban != "tolak"
-    async with platform.transaksi_pengguna(engine, user_id) as conn:
-        if not await repository.jawab_run(conn, p.run_id, setuju):
+    async with mesin_izin.ubah(user_id) as u:
+        if not await repository.jawab_run(u.conn, p.run_id, setuju):
             raise KonfirmasiTerjawab("permintaan ini sudah dijawab")
         await identity.audit(
-            conn,
+            u.conn,
             aksi="agent.action_approved" if setuju else "agent.action_rejected",
             aktor_tipe="user",
             aktor_id=str(user_id),
@@ -204,8 +218,15 @@ async def jawab_konfirmasi(
                 "run": str(p.run_id),
             },
         )
-    if jawaban == "izinkan_selalu":
-        subjek = identity.Subjek("agent", p.agent)
-        for scope in p.scopes:
-            await mesin_izin.tetapkan(user_id, subjek, scope, p.aksi, "allow")
+        if jawaban == "izinkan_selalu":
+            subjek = identity.Subjek("agent", p.agent)
+            for scope in p.scopes:
+                await u.tetapkan(subjek, scope, p.aksi, "allow")
     return p.persetujuan() if setuju else None
+
+
+def periksa_jawaban(p: PermintaanKonfirmasi, jawaban: JawabanKonfirmasi) -> None:
+    """Jawaban yang tidak boleh untuk permintaan ini — diperiksa SEBELUM apa pun dicatat."""
+    if jawaban == "izinkan_selalu" and p.jenis != "izin":
+        # R3: *minta setiap kali* — persetujuan tidak bisa menjadi izin yang diingat.
+        raise KonfirmasiTidakSah("konfirmasi risiko 3 tidak bisa diingat")

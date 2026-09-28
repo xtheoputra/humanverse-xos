@@ -38,6 +38,137 @@ Diperbarui: 24 September 2026 · Mencakup **dua puluh empat naskah**:
 
 ---
 
+## 🔍 Tinjauan tiga lensa Sprint 4 (28 Sep 2026) — sebelum PR
+
+Tiga peninjau serentak, masing-masing di worktree dan tumpukan uji sendiri, atas
+`v0/sprint-4-ai` di `588765c`: **keamanan** (6 terbukti: 1 high · 1 medium · 4 low) ·
+**kontrak** (17: 16 dengan uji merah, 1 dengan kutipan) · **penegak buta** (lihat di
+bawah). Tiap temuan dibuktikan dengan uji yang MERAH pada `588765c` — 47 uji baru atau
+berubah, semuanya merah di sana dan hijau sesudahnya — lalu dibetulkan di kode **dan**
+spec yang menyebutnya.
+
+### 🛑 E-197 — satu pesan sah membekukan seluruh proses api 75 detik (keamanan, high)
+
+`_TANDAI` (`.+?` malas diikuti `\s+…?` · `\s*[.!]*\s*$`) menelusur mundur O(n³) atas
+deretan spasi: *“tandai x”* + 3.991 spasi + *“y”* — 4.000 karakter, lolos skema — 75,7
+detik per `kenali()`, dipanggil **sinkron di event loop** tiga kali per pesan. Semua
+pengguna, SSE, dan `/health` berhenti; batas laju 300/menit membiarkannya diulang tanpa
+akhir. ✅ Teks perintah dirapatkan per kata sebelum pola mana pun melihatnya, ekor pola
+hanya kata utuh; uji di proses anak berbatas waktu atas delapan pesan jahat terpanjang.
+
+### 🔴 E-198 — *“mood 3 hari lalu buruk sekali”* tercatat sebagai mood BARU (kontrak)
+
+`_AWALAN_MOOD` membuat kata perintahnya opsional, padahal K-28 dan AGENTS.md menulis
+*deterministic hanya untuk perintah yang DIAWALI kata perintahnya*. ✅ Kata perintah wajib.
+
+### 🔴 E-199 — giliran yang butuh DUA izin tidak bisa diselesaikan (kontrak, high)
+
+*“Tanya aku”* untuk bacaan habit-agent, lalu `habit.complete` R2: token kedua lahir di
+pohon run ULANGAN, yang tidak punya pesan pengguna — jawabannya `422`. Di baliknya dua
+cacat lagi: ulangan hanya membawa persetujuan TERAKHIR (`allow_once` menanyakan hal yang
+sama tanpa akhir), dan `confirmed_by_user` punya dua arti — run ulangan yang memakai
+persetujuan lalu ditahan lagi tercatat "sudah dijawab" sebelum ditanyakan. ✅ Token
+membawa pesan giliran dan persetujuan yang sudah dipegangnya; run `blocked` = NULL
+sampai dijawab. Ikut dibetulkan: `allow_always` kini disimpan di transaksi **jawabannya**
+(`MesinIzin.ubah`) — dulu jawaban di-commit lebih dulu, izinnya menyusul.
+
+### 🔴 E-200 — run ditinggal `running` selamanya dalam operasi biasa (keamanan · kontrak)
+
+Pesan ber-id buatan klien yang dikirim ulang: run akar ditulis, pesan ditolak (PK), klien
+menerima 500, run `running` selamanya — kolom *Yang BELUM* 4.4 hanya menyebut proses
+yang mati. ✅ Id kembar `409 already_exists` (pesan **dan** percakapan — yang kedua juga
+500), diperiksa sebelum run ditulis; run yang terlanjur ditulis ditutup `failed`.
+
+### 🔴 E-201 — anggaran harian bisa dikosongkan dan dilewati (keamanan, medium · low)
+
+(1) Hari LOKAL dibaca dari zona waktu profil, yang bisa diganti kapan saja: pindah ke
+zona yang tengah malamnya baru lewat membuang biaya sejam terakhir — anggaran harian
+menjadi per jam. (2) Periksa-lalu-pakai tanpa pemesanan: tiap giliran hanya melihat
+pohonnya sendiri — empat giliran serentak, empat panggilan besar, anggaran untuk satu.
+✅ **K-32 diubah**: 24 jam bergulir; jatah TERBURUK tiap panggilan dipesan ke `cost_usd`
+run yang berjalan, di bawah kunci per pengguna.
+
+### 🔴 E-202 — permintaan yang ditolak menimpa aliran giliran terakhir (kontrak)
+
+`jawab` memulai giliran baru SEBELUM memeriksa jawabannya, lalu mengirim `error` ke
+giliran kosong itu: klien yang menyambung ulang kehilangan `done` yang sungguh terjadi;
+ketukan ganda saat giliran ulangan berjalan menerima `turn_in_progress`. ✅ Semua yang
+bisa menolak diperiksa lebih dulu; giliran yang batal sebelum apa pun terjadi di-`urungkan`.
+
+### 🔴 E-203 — `error.code` SSE = kode internal berbahasa Indonesia (kontrak)
+
+`terlalu_sering`, `masukan_salah`, `bukan_alat_agent` sampai ke klien apa adanya
+(AGENTS.md §7). ✅ `rate_limited` · `agent_error` · `model_unavailable` · `cancelled` ·
+`internal_error` · kode layanan pemilik data — spec/04.
+
+### 🔴 E-204 — pengguna diminta mengizinkan aksi yang pasti ditolak (kontrak · keamanan)
+
+spec/05 menjanjikan *tidak ada konfirmasi R2 untuk aksi yang pasti gagal*, tetapi batas
+yang tidak bisa ditulis sebagai `enum`/`min`/`max` — `tier_used` untuk `skipped`, isi
+memori kosong, tanggal 0999 — sampai ke gerbang; `NaN` lolos `min`/`max`. ✅ Pemeriksa
+murni milik modul pemilik data dijalankan sebelum gerbang; tanggal & bilangan tak hingga
+ditolak semua tool.
+
+### 🔴 E-205 — tulisan agent tanpa `audit_logs` (kontrak)
+
+Diagram spec/05 *jalankan · catat agent_runs · catat audit_logs*; hanya penolakan dan
+jawaban yang tercatat. ✅ `agent.tool_executed` di TRANSAKSI tulisannya (`platform.
+JejakTulisan`, dijalankan modul pemilik bila sesuatu berubah); `habit.completed` yang
+lahir dari agent bersumber `agent` (spec/03), bukan `app`.
+
+### 🔴 E-206 — skema keluaran tidak menjaga medan bersarang (kontrak)
+
+`items: array` tidak menyatakan isinya: `note` (C-32) di dalam `items[]` atau `checkin{}`
+lolos pemeriksa yang *dijanjikan menjaganya*. ✅ `array`/`object` wajib `items`/`fields`,
+diperiksa sampai ke kedalaman mana pun.
+
+### 🔴 E-207 — validator registry: tiga janji yang tidak ditegakkan (kontrak)
+
+Aturan 8 menyembunyikan pelanggaran lain di tool yang sama; aturan 6 · 9 hanya memeriksa
+`memory.read/write` (pihak ketiga dengan tool ber-scope `journal_raw` diterima);
+`capabilities` tidak snake_case. ✅ Ketiganya.
+
+### 🔴 E-208 — coach diam-diam melewati scope ingatan *“tanya aku”* (kontrak)
+
+✅ Dinyatakan di `rationale`; K-30 dan spec/07 4.7 kini menulisnya dengan benar —
+dinyatakan, bukan ditanyakan (E-193).
+
+### 🔴 E-209 · E-210 — katalog dan indeks yang tidak dibaca siapa pun (kontrak)
+
+`agent_tools.permission` = `execute` untuk semua tool, termasuk bacaan, dan tidak
+dibandingkan; `ai_conversations_user_idx` menyusun kolom yang tidak dipakai kueri daftar.
+✅ Migrasi `0009`; K-29 membandingkan aksinya.
+
+### 🔴 E-196 — dua nama untuk tiga jawaban konfirmasi (kontrak)
+
+spec/05 `izinkan_selalu` · `izinkan_sekali` · `tolak`; spec/04 dan API `allow_always` ·
+`allow_once` · `reject`. ✅ spec/05 memakai nama API. Ikut dirapikan: bentuk `decision`
+run yang ditahan kini ditulis spec/01 (kuncinya `kind`, bukan `jenis`), dan `error` run
+`cancelled` membawa `type` seperti run lain.
+
+#### 🔴 E-211 — uji Sprint 1 yang berkedip ternyata jam, dan batas penyerapnya terlalu kecil
+
+`test_login_gagal_dibatasi_per_akun…` merah 1 dari 3 kali, sendirian: 429 untuk tebakan
+kedua yang sah. Batas *2 gagal per hari* hanya meloloskan tebakan kedua bila jam Redis
+tidak mundur di antara keduanya — dan jam VM Docker Desktop **diukur mundur 3,1 dtk**
+dalam 20 detik (Sprint 2 mengukur 0,76–1,18 dtk, penyerapnya 2 dtk). ✅ Penyerap 5 dtk,
+kasus uji 4 dtk + mutasinya — tetap jauh dari *jam disetel mundur satu jam* yang
+sengaja tidak diserap.
+
+#### Juga dari tinjauan: token rusak ber-non-ASCII → 500, bukan 422 (keamanan, low)
+
+`hmac.compare_digest(str, str)` melempar TypeError untuk non-ASCII. ✅ Dibandingkan
+sebagai byte.
+
+#### Yang TIDAK dibetulkan, dari tinjauan ini
+
+| Temuan | Kenapa | Ke mana |
+|---|---|---|
+| *Prompt injection* tersimpan — tulisan pengguna (judul, isi ingatan) masuk `bahan` model apa adanya | penyedia lokal V0 tidak menalar dan tidak memilih tool; tidak terbukti di V0 | **K-28** (*Harga yang diakui*) — syarat penyedia sungguhan |
+| Satu giliran per percakapan hanya per PROSES api | V0 satu proses api | **K-31** (ditambahkan) |
+| Menurunkan risiko tool di YAML tanpa migrasi tetap membuat api mulai | tool registry adalah kode — lewat PR dan ujinya; katalog hanya mencatat tool milik agent dan aksinya | **K-29** (ditambahkan) |
+| Migrasi `0007` turun gagal sesudah run pertama (FK `agent_runs → agents`) | memang benar gagal: jejak audit tidak dihapus demi migrasi turun | — |
+
 ## 🔨 Sprint 4 dikodekan (24 Sep 2026) — apa yang berubah bagi berkas ini
 
 Sprint 4 (`spec/07` 4.1–4.9, *AI*) dikerjakan di branch `v0/sprint-4-ai`, **di

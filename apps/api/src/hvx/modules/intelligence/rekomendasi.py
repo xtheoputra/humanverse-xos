@@ -27,18 +27,13 @@ ALASAN_MAKS = 10
 _BERISI = re.compile(r"\S")
 
 
-async def buat_rekomendasi(
-    engine: AsyncEngine,
-    user_id: UUID,
-    *,
-    agent_id: UUID,
-    agent_run_id: UUID | None,
-    domain: str,
-    title: str,
-    body: str | None,
-    confidence: Decimal,
-    rationale: list[str],
-) -> UUID:
+def periksa_rekomendasi(
+    *, domain: str, title: str, body: str | None, confidence: Decimal, rationale: list[str]
+) -> None:
+    """`ValueError` bila rekomendasi ini akan ditolak — murni, tanpa basis data: pemanggil
+    memeriksanya sebelum gerbang risiko (agents, E-204)."""
+    if not confidence.is_finite():
+        raise ValueError("confidence wajib bilangan hingga")
     if domain not in DOMAIN:
         raise ValueError(f"domain rekomendasi di luar {sorted(DOMAIN)}")
     if not _BERISI.search(title) or len(title) > JUDUL_MAKS:
@@ -53,8 +48,27 @@ async def buat_rekomendasi(
         or not all(isinstance(a, str) and _BERISI.search(a) for a in rationale)
     ):
         raise ValueError(f"rationale wajib 1–{ALASAN_MAKS} alasan berisi")
+
+
+async def buat_rekomendasi(
+    engine: AsyncEngine,
+    user_id: UUID,
+    *,
+    agent_id: UUID,
+    agent_run_id: UUID | None,
+    domain: str,
+    title: str,
+    body: str | None,
+    confidence: Decimal,
+    rationale: list[str],
+    jejak: platform.JejakTulisan | None = None,
+) -> UUID:
+    """`jejak` dijalankan di transaksi tulisannya (E-205)."""
+    periksa_rekomendasi(
+        domain=domain, title=title, body=body, confidence=confidence, rationale=rationale
+    )
     async with platform.transaksi_pengguna(engine, user_id) as conn:
-        return await repository.sisip(
+        rid = await repository.sisip(
             conn,
             user_id=user_id,
             agent_id=agent_id,
@@ -65,3 +79,6 @@ async def buat_rekomendasi(
             confidence=confidence.quantize(Decimal("0.001")),
             rationale=rationale,
         )
+        if jejak is not None:
+            await jejak(conn)
+    return rid

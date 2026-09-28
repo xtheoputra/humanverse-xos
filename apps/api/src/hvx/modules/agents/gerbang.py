@@ -37,9 +37,9 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 from hvx.modules import identity, platform
 
 from .jalannya import Jalannya
-from .konfirmasi import AKSI_IZIN, JenisKonfirmasi, TokenKonfirmasi, sidik_masukan
+from .konfirmasi import JenisKonfirmasi, TokenKonfirmasi, sidik_masukan
 from .pelaksana_alat import AlatDitolak, scope_panggilan
-from .registri import Alat
+from .registri import AKSI_IZIN, Alat
 
 RISIKO_TERLARANG = 4
 RISIKO_KONFIRMASI = 3
@@ -88,6 +88,8 @@ class GerbangRisiko:
             scopes=scopes,
             aksi=AKSI_IZIN[alat.kind],
             sidik=sidik,
+            pesan_id=j.pesan_id,
+            persetujuan_lalu=j.persetujuan,
         )
         kode = "perlu_konfirmasi" if jenis == "konfirmasi" else "perlu_izin"
         return AlatDitolak(

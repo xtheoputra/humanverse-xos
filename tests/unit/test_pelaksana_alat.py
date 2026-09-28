@@ -24,6 +24,7 @@ from hvx.modules.agents import (
     PelaksanaAlat,
     muat_registri,
     periksa_keluaran,
+    periksa_masukan,
 )
 
 REGISTRI = muat_registri()
@@ -57,15 +58,24 @@ _NILAI = {
 }
 
 
+def _nilai_sah(spek: Any) -> Any:
+    """Nilai terkecil yang sah menurut skema keluaran — termasuk susunan bersarang."""
+    tipe = spek if isinstance(spek, str) else spek.type
+    if "null" in tipe:
+        return None
+    if isinstance(spek, str):
+        return _NILAI[tipe.strip()]()
+    if spek.items is not None:
+        return []
+    return {n: _nilai_sah(s) for n, s in spek.fields.items()}
+
+
 def _tiruan(alat: Alat) -> Any:
     """Implementasi yang selalu berhasil dengan keluaran sah — kerusakan di JALAN
     pemanggilannya terbaca sebagai "tidak ditolak", bukan sebagai galat lain."""
 
     async def jalan(k: KonteksAlat, m: dict[str, Any]) -> dict[str, Any]:
-        return {
-            n: None if "null" in tipe else _NILAI[tipe.split("|")[0].strip()]()
-            for n, tipe in alat.output.items()
-        }
+        return {n: _nilai_sah(s) for n, s in alat.output.items()}
 
     return jalan
 
@@ -301,3 +311,142 @@ def test_keluaran_kosong_hanya_bila_skemanya_nullable() -> None:
         periksa_keluaran(REGISTRI.alat["habit.streak"], {"current": None, "longest": 2})
     with pytest.raises(RuntimeError, match="bukan integer"):
         periksa_keluaran(REGISTRI.alat["habit.streak"], {"current": True, "longest": 2})
+
+
+# ── Tinjauan Sprint 4: E-204 (pemeriksa pemilik, NaN, rentang tanggal) · E-206 (bersarang) ──
+
+_PASTI_DITOLAK = [
+    # platform.Tanggal (spec/04 1900-01-01 … 2999-12-31) — juga untuk tool BACA
+    ("habit-agent", "habit.complete", {"habit_id": str(uuid4()), "for_date": "0999-12-31",
+                                       "status": "done"}),
+    ("coach-agent", "habit.list", {"for_date": "3000-01-01"}),
+    # CatatPenyelesaian: tier_used tidak berarti untuk skipped — hanya pemiliknya yang tahu
+    ("habit-agent", "habit.complete", {"habit_id": str(uuid4()), "for_date": "2026-09-24",
+                                       "status": "skipped", "tier_used": 0}),
+    # memory.periksa_ingatan: isi 1–4.000 karakter berisi
+    ("memory-agent", "memory.write", {"scope": "coaching_notes", "isi": "   "}),
+    ("memory-agent", "memory.write", {"scope": "coaching_notes", "isi": "x" * 4001}),
+    # `number` min 0 max 1 — NaN lolos kedua perbandingan; tak hingga bukan bilangan hingga
+    ("coach-agent", "recommendation.create", {"domain": "habit", "title": "t",
+                                              "confidence": float("nan"), "rationale": ["a"]}),
+    ("coach-agent", "recommendation.create", {"domain": "habit", "title": "t",
+                                              "confidence": float("inf"), "rationale": ["a"]}),
+    # intelligence.periksa_rekomendasi: judul berisi, alasan berisi
+    ("coach-agent", "recommendation.create", {"domain": "habit", "title": "   ",
+                                              "confidence": 0.5, "rationale": ["a"]}),
+    ("coach-agent", "recommendation.create", {"domain": "habit", "title": "t",
+                                              "confidence": 0.5, "rationale": []}),
+]  # fmt: skip
+
+
+@pytest.mark.parametrize(("agent", "nama", "masukan"), _PASTI_DITOLAK)
+async def test_masukan_yang_pasti_ditolak_pemiliknya_tidak_sampai_ke_gerbang(
+    agent: str, nama: str, masukan: dict[str, Any]
+) -> None:
+    """E-204 (tinjauan kontrak Sprint 4): tidak ada konfirmasi R2 untuk aksi yang pasti
+    ditolak pemilik datanya — implementasi SUNGGUHAN, dengan pemeriksanya."""
+    gerbang = _GerbangPencatat()
+    pelaksana = PelaksanaAlat(REGISTRI, IMPLEMENTASI, gerbang, None)
+
+    try:
+        await _panggil(pelaksana, _jalannya(agent), nama, masukan)
+    except AlatDitolak as galat:
+        kode: str | None = galat.kode
+    except Exception as galat:
+        kode = type(galat).__name__
+    else:
+        kode = None
+
+    assert (kode, gerbang.ditanya) == ("masukan_salah", []), (
+        f"{nama} ({kode}) sampai ke gerbang — pengguna diminta mengizinkan aksi yang pasti ditolak"
+    )
+
+
+@pytest.mark.parametrize(
+    ("agent", "nama", "masukan"),
+    [
+        ("habit-agent", "habit.complete",
+         {"habit_id": str(uuid4()), "for_date": "2026-09-24", "status": "done", "tier_used": 0}),
+        ("memory-agent", "memory.write", {"scope": "coaching_notes", "isi": "aku alergi kacang"}),
+        ("coach-agent", "recommendation.create",
+         {"domain": "habit", "title": "Tidur lebih awal", "confidence": 0.5, "rationale": ["a"]}),
+    ],
+)  # fmt: skip
+async def test_masukan_sah_lolos_pemeriksa_dan_ditanyakan_gerbang(
+    agent: str, nama: str, masukan: dict[str, Any]
+) -> None:
+    """Pemeriksa tidak menolak yang sah — pemanggilannya sampai ke gerbang."""
+    gerbang = _GerbangPencatat(tolak_mulai=0)
+
+    with pytest.raises(AlatDitolak, match="risk"):
+        await _panggil(
+            PelaksanaAlat(REGISTRI, IMPLEMENTASI, gerbang, None), _jalannya(agent), nama, masukan
+        )
+
+    assert gerbang.ditanya == [nama]
+
+
+_BOCOR_BERSARANG = [
+    ("mood.recent", {"terpotong": False, "items": [
+        {"valence": 3, "label": None, "occurred_at": "2026-09-24T06:30:00+00:00",
+         "note": "tulisan bebas pengguna"}]}),
+    ("checkin.get", {"checkin": {
+        "for_date": "2026-09-24", "energy": 2, "focus": 3, "sleep_hours": 5.5,
+        "note": "tulisan bebas pengguna"}}),
+    ("habit.list", {"items": [
+        {"id": str(uuid4()), "title": "Lari", "period": "daily", "target_count": 1, "tiers": [],
+         "day": {"for_date": "2026-09-24", "status": None, "suggested_tier": None,
+                 "energy": None, "note": "tulisan bebas pengguna"}}]}),
+    ("memory.search", {"perlu_izin": [], "items": [
+        {"id": str(uuid4()), "kind": "episodic", "scope": "mood", "content": "x", "skor": 1.0,
+         "user_id": str(uuid4())}]}),
+    ("agent.coach", {"teks": "x", "confidence": 0.5, "rationale": [{"isi": "bukan kalimat"}]}),
+    ("goal.list", {"terpotong": False, "items": ["bukan objek"]}),
+]  # fmt: skip
+
+
+@pytest.mark.parametrize(("nama", "keluaran"), _BOCOR_BERSARANG)
+def test_keluaran_bersarang_di_luar_skema_adalah_cacat(nama: str, keluaran: dict[str, Any]) -> None:
+    """E-206: `items: array` saja tidak menyatakan isinya — catatan bebas (C-32) di dalam
+    `items[]` atau `checkin{}` lolos pemeriksa yang dijanjikan menjaganya."""
+    with pytest.raises(RuntimeError, match=r"tidak dinyatakan|bukan"):
+        periksa_keluaran(REGISTRI.alat[nama], keluaran)
+
+
+def test_keluaran_bersarang_yang_sah_diterima() -> None:
+    periksa_keluaran(
+        REGISTRI.alat["habit.list"],
+        {"items": [
+            {"id": str(uuid4()), "title": "Lari", "period": "daily", "target_count": 1,
+             "tiers": ["jalan kaki", None],
+             "day": {"for_date": "2026-09-24", "status": "done", "suggested_tier": 0,
+                     "energy": 2}},
+            {"id": str(uuid4()), "title": "Baca", "period": "daily", "target_count": 1,
+             "tiers": []},
+        ]},
+    )  # fmt: skip
+    periksa_keluaran(REGISTRI.alat["checkin.get"], {"checkin": None})
+
+
+@pytest.mark.parametrize("nilai", [float("nan"), float("inf"), float("-inf")])
+def test_bilangan_tak_hingga_ditolak_semua_tool(nilai: float) -> None:
+    """E-204: `NaN` lolos `min`/`max` — kedua perbandingannya False. Ditolak di pelaksana,
+    untuk tiap medan `number`, bukan hanya di pemilik data yang kebetulan memeriksanya."""
+    alat = REGISTRI.alat["recommendation.create"]
+    masukan = {"domain": "habit", "title": "t", "confidence": nilai, "rationale": ["x"]}
+
+    with pytest.raises(AlatDitolak, match="confidence wajib bertipe number"):
+        periksa_masukan(alat, masukan)
+
+
+def test_pemeriksa_pemilik_data_menolak_yang_ditolak_layanannya() -> None:
+    """Pemeriksa murni modul pemilik = aturan yang SAMA dengan layanannya (E-204)."""
+    from decimal import Decimal
+
+    with pytest.raises(ValueError, match="bilangan hingga"):
+        intelligence.periksa_rekomendasi(
+            domain="habit", title="t", body=None, confidence=Decimal("NaN"), rationale=["x"]
+        )
+    with pytest.raises(ValueError, match="isi memori"):
+        memory.periksa_ingatan(scope="coaching_notes", isi=" \n ")
+    assert memory.periksa_ingatan(scope="coaching_notes", isi=" a   b ") == "a b"

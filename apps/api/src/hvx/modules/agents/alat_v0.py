@@ -12,6 +12,12 @@ membaca angka dan label, bukan tulisan pengguna (C-32, spec/05 kolom *Scope*). S
 
 Scope yang benar-benar disentuh dicatat ke run (`agent_runs.memory_scopes`, 4.4) oleh
 tiap implementasi — untuk `memory.search` itu scope yang DIIZINKAN, bukan yang diminta.
+
+🔧 Tiga tool TULIS (`habit.complete` · `memory.write` · `recommendation.create`):
+**pemeriksa** pemilik datanya dijalankan pelaksana sebelum gerbang (E-204), dan
+tulisannya meninggalkan `audit_logs` `agent.tool_executed` di transaksi tulisan itu
+(`KonteksAlat.jejak`, E-205); event `habit.completed` yang lahir dari agent bersumber
+`agent` (spec/03), bukan `app`.
 """
 
 from __future__ import annotations
@@ -22,7 +28,7 @@ from typing import Any
 
 from hvx.modules import checkins, goals, habits, intelligence, memory, profile
 
-from .pelaksana_alat import AlatDitolak, AlatGagal, ImplementasiAlat, KonteksAlat
+from .pelaksana_alat import AlatDitolak, AlatGagal, Implementasi, ImplementasiAlat, KonteksAlat
 
 # Batas NILAI masukan ada di skema tool (`alat/*.yaml`, enum/min/max) — pelaksana
 # menolaknya sebelum gerbang; yang di sini hanya ukuran jawaban.
@@ -72,15 +78,26 @@ async def _habit_streak(k: KonteksAlat, m: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _badan_penyelesaian(m: dict[str, Any]) -> habits.CatatPenyelesaian:
+    """Skema `POST /habits/{id}/completions` yang sama — `ValueError` bila ditolaknya."""
+    return habits.CatatPenyelesaian(
+        for_date=m["for_date"], status=m["status"], tier_used=m.get("tier_used")
+    )
+
+
+def _periksa_habit_complete(m: dict[str, Any]) -> None:
+    _badan_penyelesaian(m)
+
+
 async def _habit_complete(k: KonteksAlat, m: dict[str, Any]) -> dict[str, Any]:
     k.jalannya.catat_scope("habits")
     try:
-        badan = habits.CatatPenyelesaian(
-            for_date=m["for_date"], status=m["status"], tier_used=m.get("tier_used")
-        )
+        badan = _badan_penyelesaian(m)
     except ValueError:
         raise AlatDitolak("masukan_salah", "habit.complete: status atau tier tidak sah") from None
-    hasil = await habits.catat_penyelesaian(k.engine, k.jalannya.user_id, m["habit_id"], badan)
+    hasil = await habits.catat_penyelesaian(
+        k.engine, k.jalannya.user_id, m["habit_id"], badan, sumber="agent", jejak=k.jejak
+    )
     return {"id": str(hasil.penyelesaian.id), "status": hasil.penyelesaian.status}
 
 
@@ -173,6 +190,10 @@ async def _memory_search(k: KonteksAlat, m: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _periksa_memory_write(m: dict[str, Any]) -> None:
+    memory.periksa_ingatan(scope=m["scope"], isi=m["isi"])
+
+
 async def _memory_write(k: KonteksAlat, m: dict[str, Any]) -> dict[str, Any]:
     agent = k.jalannya.agent  # scope-nya sudah di pagu manifest (pelaksana, sebelum gerbang)
     k.jalannya.catat_scope(m["scope"])
@@ -183,10 +204,25 @@ async def _memory_write(k: KonteksAlat, m: dict[str, Any]) -> dict[str, Any]:
             scope=m["scope"],
             isi=m["isi"],
             penulis=f"{agent.name}@{agent.version}",
+            jejak=k.jejak,
         )
     except ValueError:
         raise AlatDitolak("masukan_salah", "memory.write: isi atau scope tidak sah") from None
     return {"id": str(hasil.id), "baru": hasil.baru}
+
+
+def _isi_rekomendasi(m: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "domain": m["domain"],
+        "title": m["title"],
+        "body": m.get("body"),
+        "confidence": Decimal(str(m["confidence"])),
+        "rationale": m["rationale"],
+    }
+
+
+def _periksa_recommendation_create(m: dict[str, Any]) -> None:
+    intelligence.periksa_rekomendasi(**_isi_rekomendasi(m))
 
 
 async def _recommendation_create(k: KonteksAlat, m: dict[str, Any]) -> dict[str, Any]:
@@ -197,11 +233,8 @@ async def _recommendation_create(k: KonteksAlat, m: dict[str, Any]) -> dict[str,
             k.jalannya.user_id,
             agent_id=k.jalannya.agent.id_katalog,
             agent_run_id=k.jalannya.id if k.jalannya.tersimpan else None,
-            domain=m["domain"],
-            title=m["title"],
-            body=m.get("body"),
-            confidence=Decimal(str(m["confidence"])),
-            rationale=m["rationale"],
+            jejak=k.jejak,
+            **_isi_rekomendasi(m),
         )
     except ValueError:
         raise AlatDitolak("masukan_salah", "recommendation.create: isi tidak sah") from None
@@ -212,7 +245,7 @@ def _agent(nama: str) -> ImplementasiAlat:
     async def panggil(k: KonteksAlat, m: dict[str, Any]) -> dict[str, Any]:
         pelaksana = k.layanan.pelaksana_agent
         if pelaksana is None:
-            raise AlatGagal("agent_tidak_tersedia", f"{nama} tidak bisa dipanggil di sini")
+            raise AlatGagal("agent_unavailable", f"{nama} tidak bisa dipanggil di sini")
         return await pelaksana(nama, m["pesan"], k.jalannya)
 
     return panggil
@@ -221,13 +254,13 @@ def _agent(nama: str) -> ImplementasiAlat:
 IMPLEMENTASI: dict[str, ImplementasiAlat] = {
     "habit.list": _habit_list,
     "habit.streak": _habit_streak,
-    "habit.complete": _habit_complete,
+    "habit.complete": Implementasi(_habit_complete, _periksa_habit_complete),
     "goal.list": _goal_list,
     "checkin.get": _checkin_get,
     "mood.recent": _mood_recent,
     "memory.search": _memory_search,
-    "memory.write": _memory_write,
-    "recommendation.create": _recommendation_create,
+    "memory.write": Implementasi(_memory_write, _periksa_memory_write),
+    "recommendation.create": Implementasi(_recommendation_create, _periksa_recommendation_create),
     "agent.coach": _agent("coach-agent"),
     "agent.habit": _agent("habit-agent"),
     "agent.memory": _agent("memory-agent"),

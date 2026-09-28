@@ -10,7 +10,7 @@ input:
 output:
   teks: string
   confidence: number
-  rationale: array
+  rationale: { type: array, items: string }
 side_effects: writes_user_data
 reaches_third_party: false
 rate_limit: 30/min/user

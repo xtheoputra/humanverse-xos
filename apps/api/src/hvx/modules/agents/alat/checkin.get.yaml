@@ -6,8 +6,14 @@ scopes: [checkins]
 risk_level: 0
 input:
   for_date: { type: date, required: true }
-output:
-  checkin: object | null
+output:                     # tanpa `note` — tulisan pengguna bukan bahan coach (C-32)
+  checkin:
+    type: object | null
+    fields:
+      for_date: string
+      energy: integer | null
+      focus: integer | null
+      sleep_hours: number | null
 side_effects: none
 reaches_third_party: false
 rate_limit: 60/min/user

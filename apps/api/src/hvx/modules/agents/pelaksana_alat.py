@@ -13,16 +13,25 @@ agent`, K-14) — dan urutannya tetap:
    di sisi agent: model kelak menulis pemanggilan ini, dan model tidak ditaati karena
    yakin). Medan bernama `scope` adalah scope yang disentuh pemanggilan itu
    (`memory.write`): wajib di `scopes` tool DAN di pagu manifest pemanggil — izin
-   pengguna tidak pernah melebarkan manifest (spec/05 aturan 2);
+   pengguna tidak pernah melebarkan manifest (spec/05 aturan 2). 🔧 Lalu **pemeriksa
+   pemilik datanya** (`Implementasi.periksa`, E-204): batas yang tidak bisa ditulis
+   sebagai `enum`/`min`/`max` — `tier_used` untuk `skipped`, isi memori yang kosong —
+   ditolak di sini juga; dulu sampai ke gerbang, dan pengguna diminta mengizinkan
+   (R2) aksi yang lalu ditolak pemiliknya. Tanggal di luar `1900-01-01` … `2999-12-31`
+   dan bilangan yang tidak hingga (`NaN`) ditolak semua tool — spec/04 *Bentuk masukan*;
 4. **batas laju** — `rate_limit` tool, per pengguna (spec/05 `60/min/user`);
 5. **gerbang risiko** — `Gerbang.periksa` (spec/07 4.5);
-6. lalu dijalankan, dan **keluarannya** diperiksa terhadap skema `output`: tool yang
-   mengembalikan medan yang tidak dinyatakan (catatan bebas pengguna, misalnya)
-   adalah cacat, bukan fitur.
+6. lalu dijalankan — tulisan atas data pengguna meninggalkan `audit_logs`
+   `agent.tool_executed` di TRANSAKSI TULISAN ITU (`KonteksAlat.jejak`; spec/05 *Risk
+   gate*: *jalankan · catat agent_runs · catat audit_logs* — E-205) — dan
+   **keluarannya** diperiksa terhadap skema `output`, SAMPAI KE MEDAN BERSARANG: tool
+   yang mengembalikan medan yang tidak dinyatakan (catatan bebas pengguna di dalam
+   `items[]`, misalnya — E-206) adalah cacat, bukan fitur.
 """
 
 from __future__ import annotations
 
+import math
 import re
 from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass
@@ -30,13 +39,13 @@ from datetime import date
 from typing import Any, Protocol
 from uuid import UUID
 
-from sqlalchemy.ext.asyncio import AsyncEngine
+from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine
 
-from hvx.modules import memory, platform
+from hvx.modules import identity, memory, platform
 
 from .jalannya import Jalannya
 from .konfirmasi import PermintaanKonfirmasi
-from .registri import Alat, RegistriAgent
+from .registri import Alat, Keluaran, RegistriAgent, bagian_tipe
 
 _JENDELA_S = {"min": 60, "hour": 3_600}
 _TANGGAL = re.compile(r"^\d{4}-\d{2}-\d{2}$")
@@ -86,9 +95,46 @@ class KonteksAlat:
     engine: AsyncEngine
     jalannya: Jalannya
     layanan: LayananAlat
+    alat: Alat
+
+    async def jejak(self, conn: AsyncConnection) -> None:
+        """Jejak TULISAN agent atas data pengguna (spec/05 *Risk gate*: *catat audit_logs*,
+        E-205) — dipanggil layanan pemilik datanya DI TRANSAKSI tulisannya, hanya bila
+        sesuatu sungguh berubah: tulisan tanpa jejak, atau jejak tanpa tulisan, tidak bisa
+        terjadi. Siapa (agent), apa (tool, risiko), dalam run mana, disetujui atau tidak —
+        tanpa isinya."""
+        await identity.audit(
+            conn,
+            aksi="agent.tool_executed",
+            aktor_tipe="agent",
+            aktor_id=self.jalannya.agent.name,
+            user_id=self.jalannya.user_id,
+            subjek_tipe="tool",
+            subjek_id=self.alat.name,
+            metadata={
+                "risk": self.alat.risk_level,
+                "run": str(self.jalannya.id),
+                "confirmed": bool(self.jalannya.dikonfirmasi),
+            },
+        )
 
 
 ImplementasiAlat = Callable[[KonteksAlat, dict[str, Any]], Awaitable[dict[str, Any]]]
+# Batas modul pemilik data yang tidak bisa ditulis di skema tool — `ValueError` bila salah.
+PemeriksaMasukan = Callable[[dict[str, Any]], None]
+
+
+@dataclass(frozen=True)
+class Implementasi:
+    """Implementasi tool yang membawa pemeriksa masukannya: dijalankan pelaksana SEBELUM
+    batas laju dan gerbang (E-204) — tidak ada konfirmasi R2 untuk aksi yang pasti
+    ditolak pemilik datanya."""
+
+    jalankan: ImplementasiAlat
+    periksa: PemeriksaMasukan
+
+    async def __call__(self, k: KonteksAlat, m: dict[str, Any]) -> dict[str, Any]:
+        return await self.jalankan(k, m)
 
 
 class Gerbang(Protocol):
@@ -109,16 +155,22 @@ def _masukan_ke(tipe: str, nilai: Any) -> Any:
         return nilai if isinstance(nilai, UUID) else UUID(nilai)
     if tipe == "date":
         if isinstance(nilai, date):
-            return nilai
-        if not isinstance(nilai, str) or not _TANGGAL.fullmatch(nilai):
+            tanggal = nilai
+        elif isinstance(nilai, str) and _TANGGAL.fullmatch(nilai):
+            tanggal = date.fromisoformat(nilai)
+        else:
             raise ValueError
-        return date.fromisoformat(nilai)
+        if not platform.TANGGAL_MIN <= tanggal <= platform.TANGGAL_MAKS:  # spec/04, E-204
+            raise ValueError
+        return tanggal
     if tipe == "integer":
         if isinstance(nilai, bool) or not isinstance(nilai, int):
             raise ValueError
         return nilai
     if tipe == "number":
         if isinstance(nilai, bool) or not isinstance(nilai, int | float):
+            raise ValueError
+        if not math.isfinite(nilai):  # NaN lolos `min`/`max` — kedua perbandingannya False
             raise ValueError
         return nilai
     cocok = {"string": str, "boolean": bool, "array": list, "object": dict}[tipe]
@@ -183,21 +235,44 @@ _TIPE_KELUAR: dict[str, tuple[type, ...]] = {
 }
 
 
-def periksa_keluaran(alat: Alat, keluaran: Mapping[str, Any]) -> None:
-    """Keluaran = skema `output` persis — cacat implementasi, bukan salah pemanggil."""
-    asing = sorted(set(keluaran) - set(alat.output))
+def _periksa_objek(
+    alat: Alat, jalur: str, medan: Mapping[str, Keluaran], nilai: Mapping[str, Any]
+) -> None:
+    asing = sorted(set(nilai) - set(medan))
     if asing:
-        raise RuntimeError(f"{alat.name} mengembalikan medan yang tidak dinyatakan: {asing}")
-    for nama, tipe in alat.output.items():
-        bagian = [t.strip() for t in tipe.split("|")]
-        nilai = keluaran.get(nama)
-        if nilai is None:
-            if "null" not in bagian:
-                raise RuntimeError(f"{alat.name}: medan keluaran {nama} kosong")
-            continue
+        di = f" di {jalur}" if jalur else ""
+        raise RuntimeError(f"{alat.name} mengembalikan medan yang tidak dinyatakan{di}: {asing}")
+    for nama, spek in medan.items():
+        _periksa_nilai(alat, f"{jalur}.{nama}" if jalur else nama, spek, nilai.get(nama))
+
+
+def _periksa_nilai(alat: Alat, jalur: str, spek: Keluaran, nilai: Any) -> None:
+    tipe = spek if isinstance(spek, str) else spek.type
+    bagian = bagian_tipe(tipe)
+    if nilai is None:
+        if "null" not in bagian:
+            raise RuntimeError(f"{alat.name}: medan keluaran {jalur} kosong")
+        return
+    if isinstance(spek, str):
         boleh = tuple(t for b in bagian if b != "null" for t in _TIPE_KELUAR[b])
         if (isinstance(nilai, bool) and bool not in boleh) or not isinstance(nilai, boleh):
-            raise RuntimeError(f"{alat.name}: medan keluaran {nama} bukan {tipe}")
+            raise RuntimeError(f"{alat.name}: medan keluaran {jalur} bukan {tipe}")
+        return
+    if spek.items is not None:
+        if not isinstance(nilai, list):
+            raise RuntimeError(f"{alat.name}: medan keluaran {jalur} bukan {tipe}")
+        for i, isi in enumerate(nilai):
+            _periksa_nilai(alat, f"{jalur}[{i}]", spek.items, isi)
+        return
+    if not isinstance(nilai, dict) or spek.fields is None:
+        raise RuntimeError(f"{alat.name}: medan keluaran {jalur} bukan {tipe}")
+    _periksa_objek(alat, jalur, spek.fields, nilai)
+
+
+def periksa_keluaran(alat: Alat, keluaran: Mapping[str, Any]) -> None:
+    """Keluaran = skema `output` persis, sampai ke medan bersarang (E-206) — cacat
+    implementasi, bukan salah pemanggil."""
+    _periksa_objek(alat, "", alat.output, keluaran)
 
 
 class PelaksanaAlat:
@@ -247,11 +322,17 @@ class PelaksanaAlat:
             )
         bersih = periksa_masukan(alat, masukan)
         _periksa_pagu_scope(jalannya, alat, bersih)
+        impl = self._impl[nama]
+        if isinstance(impl, Implementasi):
+            try:
+                impl.periksa(bersih)
+            except ValueError:
+                raise _salah(nama, "ditolak pemilik datanya") from None
         await self._batasi(jalannya, alat)
         await self._gerbang.periksa(jalannya, alat, bersih)
         jalannya.catat_alat(alat.name, alat.risk_level)
         try:
-            keluaran = await self._impl[nama](KonteksAlat(engine, jalannya, layanan), bersih)
+            keluaran = await impl(KonteksAlat(engine, jalannya, layanan, alat), bersih)
         except platform.GalatApi as galat:
             raise AlatGagal(galat.kode, str(galat)) from None
         periksa_keluaran(alat, keluaran)

@@ -7,7 +7,23 @@ risk_level: 0
 input:
   for_date: { type: date, required: false }
 output:
-  items: array
+  items:
+    type: array
+    items:
+      type: object
+      fields:
+        id: uuid
+        title: string
+        period: string
+        target_count: integer
+        tiers: { type: array, items: string | null }
+        day:                  # hanya dengan for_date
+          type: object | null
+          fields:
+            for_date: string
+            status: string | null
+            suggested_tier: integer | null
+            energy: integer | null
 side_effects: none
 reaches_third_party: false
 rate_limit: 60/min/user

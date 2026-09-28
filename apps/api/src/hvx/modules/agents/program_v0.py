@@ -97,7 +97,13 @@ def _fakta_mood(items: Sequence[Mapping[str, Any]]) -> str:
 
 
 async def coach(k: KonteksAgent, pesan: str) -> Keputusan:
-    """Jawab dari data pengguna sendiri — habit, check-in, mood, goal, dan ingatan."""
+    """Jawab dari data pengguna sendiri — habit, check-in, mood, goal, dan ingatan.
+
+    Sumber yang DITOLAK dilewati dan dinyatakan; scope ingatan yang belum diputuskan
+    (*“tanya aku”*) dinyatakan juga — `memory.search` menyaringnya sendiri dan tidak
+    menahan jawaban (E-193), jadi alasanlah tempat pengguna melihatnya. 🔧 E-208: dulu
+    coach diam saja, dan alasannya malah berbunyi *“belum ada … ingatan yang tercatat”*.
+    """
     niat = kenali(pesan)
     hari = (await k.tanggal_lokal()).isoformat()
     fakta: list[str] = []
@@ -142,16 +148,27 @@ async def coach(k: KonteksAgent, pesan: str) -> Keputusan:
         bahan=fakta,
         kelas="reasoning" if niat.rute == "reasoning" else "simple",
     )
-    alasan = [f[:300] for f in fakta][:9] or [
+    # ≤ 8 fakta + 2 kalimat sumber — `rationale` paling banyak 10 (runtime.ALASAN_MAKS).
+    alasan = [f[:300] for f in fakta][:8] or [
         "Belum ada habit, check-in, mood, goal, atau ingatan yang tercatat."
     ]
     if dilewati:
         alasan.append(f"Tidak dibaca karena kamu menolak aksesnya: {', '.join(dilewati)}.")
+    perlu_izin = list(ingatan["perlu_izin"]) if ingatan else []
+    if perlu_izin:
+        alasan.append(
+            f"Ingatan yang belum kamu izinkan kubaca: {', '.join(perlu_izin)} — tidak dipakai."
+        )
     return Keputusan(
         jawaban.teks,
         KEYAKINAN_SUMBER[sumber],
         tuple(alasan),
-        {"action": "reply", "sumber": sumber, "dilewati": len(dilewati)},
+        {
+            "action": "reply",
+            "sumber": sumber,
+            "dilewati": len(dilewati),
+            "perlu_izin": len(perlu_izin),
+        },
     )
 
 

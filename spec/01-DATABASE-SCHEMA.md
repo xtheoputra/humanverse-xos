@@ -626,7 +626,7 @@ CREATE TABLE ai_conversations (
   UNIQUE (id, user_id)
 );
 CREATE INDEX ai_conversations_user_idx
-  ON ai_conversations (user_id, last_message_at DESC NULLS LAST)
+  ON ai_conversations (user_id, created_at DESC, id DESC)
   WHERE deleted_at IS NULL;
 
 -- @retention   : until-account-deleted
@@ -660,6 +660,11 @@ CREATE INDEX ai_messages_conversation_idx
 > `cost_usd` per pesan sejak V0 adalah penerapan **AI Cost Engine** (naskah 4
 > §48). Tanpa dicatat sejak awal, biaya baru terlihat di tagihan bulanan —
 > saat sudah terlambat.
+>
+> 🔧 **`ai_conversations_user_idx` = urutan daftar yang sungguh dipakai** (migrasi
+> `0009`, E-210): `GET /conversations` terurut `(created_at, id)` — kursor keyset
+> yang tidak bergeser saat percakapan lain menerima pesan (spec/04). Indeks 0001
+> menyusun `last_message_at`, yang tidak dipakai kueri mana pun.
 
 ```sql
 -- @retention   : until-account-deleted
@@ -899,12 +904,25 @@ ALTER TABLE recommendations
 > yang melewati gerbang, urut pertama dipakai; `memory_scopes` = scope yang
 > **benar-benar** disentuh; `model_used` = model yang dipakai, dipisah koma bila
 > lebih dari satu (turun kelas di tengah run, 4.9); `decision` = skalar pendek
-> (`action` wajib — `reply` · `delegate` · id yang disentuh), dan run yang tidak
-> berhasil `{"action": "<status>"}`; `error` = `{code, type}` — **tanpa pesan**, sebab
-> pesan galat bisa mengutip tulisan pengguna. `cost_usd` = run itu sendiri; biaya
-> satu permintaan (SSE `done`) = seluruh pohonnya. Anggaran harian (4.9, K-32) dibaca
-> dari kolom yang sama; run yang diturunkan ke model kecil membawa
-> `decision.model_downgraded = true`.
+> (`action` wajib — `reply` · `delegate` · id yang disentuh). 🔧 Run yang tidak
+> berhasil (tinjauan kontrak Sprint 4 — bentuknya kini ditulis, bukan hanya ada di
+> kode): `failed` · `cancelled` → `{"action": "<status>"}`; `blocked` →
+> `{"action": "awaiting_confirmation", "tool", "agent", "risk_level", "kind"}` (`kind`
+> = `permission` · `confirmation`, sama dengan SSE spec/04) atau `{"action": "denied",
+> "tool", "code"}` (`deny` pengguna, R4). `error` = `{code, type}` — **tanpa pesan**,
+> sebab pesan galat bisa mengutip tulisan pengguna — juga run `cancelled`
+> (`{"code": "cancelled", "type": "CancelledError"}`), dan juga run yang programnya
+> **tidak pernah berjalan** karena langkah sesudah `running` gagal (pesan pengguna
+> ber-id kembar — E-200: dulu run itu `running` selamanya). `confirmed_by_user`
+> (🔧 E-199): run `blocked` = **jawaban atas pertanyaannya** — NULL sampai dijawab,
+> sekali pakai; run lain = `true` bila memakai aksi yang disetujui pengguna. Dulu
+> keduanya satu arti, dan run ulangan yang memakai persetujuan lalu ditahan lagi
+> tercatat "sudah dijawab" sebelum ditanyakan. `cost_usd` = run itu sendiri; biaya
+> satu permintaan (SSE `done`) = seluruh pohonnya. Run yang masih `running` memegang
+> biaya **sejauh ini + jatah panggilan model yang sedang berjalan** — anggaran (4.9,
+> K-32, **24 jam bergulir**) dibaca dari kolom yang sama di bawah kunci per pengguna,
+> jadi giliran serentak melihat jatah satu sama lain (E-201); run yang diturunkan ke
+> model kecil membawa `decision.model_downgraded = true`.
 
 ```sql
 -- @retention   : forever

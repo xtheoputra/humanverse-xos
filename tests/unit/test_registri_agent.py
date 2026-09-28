@@ -188,3 +188,76 @@ def test_galat_bentuk_tidak_memantulkan_isi_manifest() -> None:
         validasi_registri(copy.deepcopy(ALAT), manifest)
 
     assert "RAHASIA" not in str(galat.value), str(galat.value)
+
+
+# ── Tinjauan Sprint 4 (E-206 · E-207) ─────────────────────────────────────────────
+
+
+def _pihak_ketiga_lewat_tool(a: Mentah, m: Mentah) -> None:
+    """Scope yang diminta LEWAT tool — bukan lewat `memory.read` manifest."""
+    a["jurnal.baca"] = {
+        **copy.deepcopy(a["goal.list"]),
+        "name": "jurnal.baca",
+        "scopes": ["journal_raw"],
+        "input": {},
+    }
+    m["coach-agent"]["kind"] = "third_party"
+    m["coach-agent"]["tools"].append("jurnal.baca")
+
+
+KASUS_TINJAUAN: list[tuple[str, str, Callable[[Mentah, Mentah], None]]] = [
+    ("6", "pihak ketiga meminta journal_raw lewat tool", _pihak_ketiga_lewat_tool),
+    (
+        "bentuk",
+        "capability bukan snake_case",
+        lambda a, m: m["coach-agent"].update(capabilities=["Daily Coaching!"]),
+    ),
+    ("bentuk", "capability kosong", lambda a, m: m["coach-agent"].update(capabilities=[""])),
+    (
+        "bentuk",
+        "keluaran array tanpa isinya",
+        lambda a, m: a["habit.list"]["output"].update(items="array"),
+    ),
+    (
+        "bentuk",
+        "keluaran object tanpa medan",
+        lambda a, m: a["checkin.get"]["output"].update(checkin={"type": "object", "fields": {}}),
+    ),
+    (
+        "bentuk",
+        "keluaran array dengan fields",
+        lambda a, m: a["memory.search"]["output"].update(
+            perlu_izin={"type": "array", "fields": {"x": "string"}}
+        ),
+    ),
+    (
+        "bentuk",
+        "keluaran skalar yang tidak dikenal",
+        lambda a, m: a["habit.streak"]["output"].update(current="bilangan"),
+    ),
+]
+
+
+@pytest.mark.parametrize(
+    ("aturan", "_maksud", "rusak"),
+    KASUS_TINJAUAN,
+    ids=[f"{k[0]}-{k[1]}" for k in KASUS_TINJAUAN],
+)
+def test_registry_yang_melanggar_ditolak_tinjauan(
+    aturan: str, _maksud: str, rusak: Callable[[Mentah, Mentah], None]
+) -> None:
+    test_manifest_yang_melanggar_ditolak(aturan, _maksud, rusak)
+
+
+def test_tool_tanpa_risk_level_tidak_menyembunyikan_pelanggaran_lainnya() -> None:
+    """E-207 (K-29 (1): *SEMUA pelanggaran dilaporkan sekaligus*): tool tanpa `risk_level`
+    dulu berhenti di aturan 8 — scope di luar daftar resmi di tool yang sama hilang."""
+    alat, manifest = copy.deepcopy(ALAT), copy.deepcopy(MANIFEST)
+    alat["goal.list"].pop("risk_level")
+    alat["goal.list"]["scopes"] = ["finance"]
+
+    with pytest.raises(RegistriTidakSah) as galat:
+        validasi_registri(alat, manifest)
+
+    aturan = {p.aturan for p in galat.value.pelanggaran if p.subjek == "goal.list"}
+    assert aturan == {"8", "2"}, f"pelanggaran lain tersembunyi di balik aturan 8: {aturan}"

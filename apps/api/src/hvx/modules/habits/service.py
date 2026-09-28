@@ -251,8 +251,16 @@ class HasilCatat:
 
 
 async def catat(
-    engine: AsyncEngine, user_id: UUID, habit_id: UUID, badan: CatatPenyelesaian
+    engine: AsyncEngine,
+    user_id: UUID,
+    habit_id: UUID,
+    badan: CatatPenyelesaian,
+    *,
+    sumber: events.Sumber = "app",
+    jejak: platform.JejakTulisan | None = None,
 ) -> HasilCatat:
+    """`sumber` = `source` event-nya (spec/03: `app` · `agent` …); `jejak` dijalankan di
+    transaksi ini bila baris BARU lahir — tulisan agent tercatat di `audit_logs` (E-205)."""
     async with platform.transaksi_pengguna(engine, user_id) as conn:
         habit = await repository.ambil_untuk_catat(conn, habit_id)
         if habit is None:
@@ -281,7 +289,9 @@ async def catat(
             note=badan.note,
         )
         if baru is not None:
-            await _terbitkan_penyelesaian(conn, user_id, baru)
+            await _terbitkan_penyelesaian(conn, user_id, baru, sumber)
+            if jejak is not None:
+                await jejak(conn)
             return HasilCatat(baru, baru=True)
         ada = await repository.selesai_pada(conn, habit_id, badan.for_date)
     if ada is None:  # pragma: no cover - habit terkunci, dan DO NOTHING berarti barisnya ada
@@ -309,7 +319,9 @@ async def hapus_catatan(engine: AsyncEngine, user_id: UUID, habit_id: UUID, for_
             )
 
 
-async def _terbitkan_penyelesaian(conn: AsyncConnection, user_id: UUID, p: Penyelesaian) -> None:
+async def _terbitkan_penyelesaian(
+    conn: AsyncConnection, user_id: UUID, p: Penyelesaian, sumber: events.Sumber = "app"
+) -> None:
     """`habit.completed` (done · partial) atau `habit.skipped` — kunci = baris yang lahir."""
     if p.status == "skipped":
         jenis = "habit.skipped"
@@ -326,6 +338,7 @@ async def _terbitkan_penyelesaian(conn: AsyncConnection, user_id: UUID, p: Penye
         idempotency_key=f"habit-completion:{p.id}",
         subject_type="habit",
         subject_id=p.habit_id,
+        source=sumber,
         payload=payload,
     )
 

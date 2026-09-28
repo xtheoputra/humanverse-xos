@@ -32,16 +32,30 @@ class HasilIngat:
     baru: bool  # False = isi yang sama sudah diingat di scope itu
 
 
-async def ingat(
-    engine: AsyncEngine, user_id: UUID, *, scope: str, isi: str, penulis: str
-) -> HasilIngat:
-    """`penulis` = agent dan versinya (`memory-agent@1.0.0`) — dicatat di `model_version`:
-    CARA memori ini lahir, tempat ambang keyakinan #34 kelak membaca."""
+def periksa_ingatan(*, scope: str, isi: str) -> str:
+    """Isi yang AKAN disimpan (spasi dirapikan) — atau `ValueError`. Murni, tanpa basis
+    data: pemanggil memeriksanya sebelum meminta izin pengguna (agents, E-204)."""
     if scope not in identity.SCOPE_RESMI:
         raise ValueError("scope di luar daftar resmi spec/05")
     rapi = " ".join(isi.split())
     if not rapi or len(rapi) > ISI_MAKS:
         raise ValueError(f"isi memori wajib 1–{ISI_MAKS} karakter")
+    return rapi
+
+
+async def ingat(
+    engine: AsyncEngine,
+    user_id: UUID,
+    *,
+    scope: str,
+    isi: str,
+    penulis: str,
+    jejak: platform.JejakTulisan | None = None,
+) -> HasilIngat:
+    """`penulis` = agent dan versinya (`memory-agent@1.0.0`) — dicatat di `model_version`:
+    CARA memori ini lahir, tempat ambang keyakinan #34 kelak membaca. `jejak` dijalankan
+    di transaksi ini bila baris BARU lahir (E-205)."""
+    rapi = periksa_ingatan(scope=scope, isi=isi)
     async with platform.transaksi_pengguna(engine, user_id) as conn:
         id_, baru = await repository.ingat(
             conn,
@@ -51,4 +65,6 @@ async def ingat(
             confidence=KEYAKINAN_LAPORAN_SENDIRI,
             model_version=penulis,
         )
+        if baru and jejak is not None:
+            await jejak(conn)
     return HasilIngat(id_, baru)

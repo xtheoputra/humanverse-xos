@@ -28,17 +28,25 @@ import json
 from collections.abc import Mapping
 from dataclasses import dataclass
 from importlib import resources
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 from uuid import UUID, uuid5
 
 import yaml
-from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
+from pydantic import AfterValidator, BaseModel, ConfigDict, Field, ValidationError, model_validator
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from hvx.modules import identity, platform
 
 KindAlat = Literal["read", "write", "external", "agent"]
+# Aksi mesin izin (spec/01 `permissions.action`, `agent_tools.permission`) tiap `kind` tool —
+# yang ditanyakan gerbang risiko (4.5) DAN yang tercatat di katalog (E-209).
+AKSI_IZIN: Mapping[str, identity.Aksi] = {
+    "read": "read",
+    "write": "write",
+    "external": "execute",
+    "agent": "execute",
+}
 EfekSamping = Literal["none", "writes_user_data", "external_call"]
 TipeMedan = Literal["uuid", "date", "integer", "number", "string", "boolean", "array", "object"]
 
@@ -53,6 +61,14 @@ RUANG_ID_AGENT = UUID("7d0f4f8e-5a53-4c0e-9d3f-2a6b1e0c4b21")
 
 _SEMVER = r"^\d+\.\d+\.\d+$"
 _KETAT = ConfigDict(extra="forbid", frozen=True, strict=True)
+# Tipe keluaran skalar; `array`/`object` wajib menyatakan isinya (`_Susunan`, E-206).
+_SKALAR = frozenset({"uuid", "integer", "number", "string", "boolean"})
+_SUSUNAN = frozenset({"array", "object"})
+
+
+def bagian_tipe(tipe: str) -> list[str]:
+    """`"string | null"` → `["string", "null"]`."""
+    return [t.strip() for t in tipe.split("|")]
 
 
 class _Medan(BaseModel):
@@ -77,6 +93,42 @@ class _Medan(BaseModel):
         return self
 
 
+class _Susunan(BaseModel):
+    """Keluaran `array`/`object` BESERTA isinya — `items` (tipe tiap unsur) atau `fields`
+    (tiap medan objek). 🔧 E-206 (tinjauan kontrak Sprint 4): `items: array` saja tidak
+    menyatakan apa pun tentang isinya, jadi catatan bebas pengguna (`note`) di dalam
+    `items[]` lolos pemeriksa keluaran yang dijanjikan menjaganya (C-32)."""
+
+    model_config = _KETAT
+    type: str
+    items: Keluaran | None = None
+    fields: dict[str, Keluaran] | None = None
+
+    @model_validator(mode="after")
+    def _isi_sesuai_tipe(self) -> _Susunan:
+        bagian = bagian_tipe(self.type)
+        inti = [b for b in bagian if b != "null"]
+        if len(inti) != 1 or inti[0] not in _SUSUNAN or len(bagian) != len(set(bagian)):
+            raise ValueError("susunan wajib `array` atau `object`, boleh `| null`")
+        if inti[0] == "array" and (self.items is None or self.fields is not None):
+            raise ValueError("array wajib `items`, tanpa `fields`")
+        if inti[0] == "object" and (not self.fields or self.items is not None):
+            raise ValueError("object wajib `fields` berisi, tanpa `items`")
+        return self
+
+
+def _skalar_sah(tipe: str) -> str:
+    bagian = bagian_tipe(tipe)
+    inti = [b for b in bagian if b != "null"]
+    if len(inti) != 1 or inti[0] not in _SKALAR or len(bagian) != len(set(bagian)):
+        raise ValueError("keluaran skalar wajib satu tipe skalar, boleh `| null`")
+    return tipe
+
+
+Keluaran = Annotated[str, AfterValidator(_skalar_sah)] | _Susunan
+_Susunan.model_rebuild()
+
+
 class Alat(BaseModel):
     """Satu entri tool registry (spec/05 *Tool registry*)."""
 
@@ -90,7 +142,7 @@ class Alat(BaseModel):
     # Aturan 8: TANPA bawaan — kelalaian berhenti di validator, bukan di produksi (K-12).
     risk_level: int = Field(ge=0, le=4)
     input: dict[str, _Medan]
-    output: dict[str, str]
+    output: dict[str, Keluaran]
     side_effects: EfekSamping
     reaches_third_party: bool
     rate_limit: str = Field(pattern=r"^[1-9][0-9]{0,4}/(min|hour)/user$")
@@ -142,7 +194,10 @@ class Manifest(BaseModel):
     kind: Literal["core", "domain", "third_party"]
     status: Literal["draft", "active", "deprecated", "disabled"]
     purpose: list[str] = Field(min_length=1, max_length=5)
-    capabilities: list[str] = Field(min_length=1)
+    # spec/05: *kontrak mesin; nama snake_case* (tinjauan kontrak Sprint 4).
+    capabilities: list[Annotated[str, Field(pattern=r"^[a-z][a-z0-9_]{0,63}$")]] = Field(
+        min_length=1
+    )
     tools: list[str]
     memory: _Memori
     model: _Model
@@ -196,13 +251,18 @@ def _bentuk(subjek: str, galat: ValidationError) -> list[Pelanggaran]:
 def _periksa_alat(
     nama_berkas: str, mentah: Mapping[str, Any]
 ) -> tuple[Alat | None, list[Pelanggaran]]:
+    salah: list[Pelanggaran] = []
     if "risk_level" not in mentah:
-        return None, [Pelanggaran(nama_berkas, "8", "tool tanpa `risk_level` — tidak ada bawaan")]
+        # Aturan 8 dilaporkan — dan pemeriksaan BERLANJUT dengan risiko sementara, supaya
+        # pelanggaran lain tool yang sama tidak bersembunyi di baliknya (E-207). Tool-nya
+        # tetap tidak terdaftar: tanpa `risk_level` ia tidak pernah bisa dipanggil.
+        salah.append(Pelanggaran(nama_berkas, "8", "tool tanpa `risk_level` — tidak ada bawaan"))
+        _alat, lain = _periksa_alat(nama_berkas, {**mentah, "risk_level": 0})
+        return None, salah + lain
     try:
         alat = Alat.model_validate(mentah)
     except ValidationError as galat:
         return None, _bentuk(nama_berkas, galat)
-    salah: list[Pelanggaran] = []
     if alat.name != nama_berkas:
         salah.append(Pelanggaran(nama_berkas, "bentuk", f"berkas {nama_berkas}, nama {alat.name}"))
     if alat.reaches_third_party and alat.risk_level < 3:
@@ -265,6 +325,9 @@ def _periksa_manifest(
             )
         )
     if m.kind == "third_party":  # aturan 6 · 9
+        # Scope yang DIMINTA juga lewat tool-nya (yang ditanyakan gerbang ke mesin izin,
+        # E-191) — bukan hanya `memory.read/write` manifest (E-207).
+        scope |= {s for t in m.tools if t in alat for s in alat[t].scopes}
         for aturan, terlarang in (
             ("6", SCOPE_TERLARANG_PIHAK_KETIGA_6),
             ("9", SCOPE_TERLARANG_PIHAK_KETIGA_9),
@@ -348,7 +411,7 @@ class KatalogBerbeda(RuntimeError):
 _KATALOG = text(
     """
     SELECT a.id, a.name, a.version, a.kind, a.max_risk, a.manifest,
-           coalesce(array_agg(t.tool_name ORDER BY t.tool_name)
+           coalesce(array_agg(t.tool_name || ':' || t.permission ORDER BY t.tool_name)
                     FILTER (WHERE t.tool_name IS NOT NULL), '{}') AS tools
     FROM agents a LEFT JOIN agent_tools t ON t.agent_id = a.id
     WHERE a.status = 'active'
@@ -370,7 +433,9 @@ async def pastikan_katalog(engine: AsyncEngine, registri: RegistriAgent) -> None
                 f"{nama}: {'tidak ada di registry' if m is None else 'tidak ada di katalog'}"
             )
             continue
-        harapan = (m.id_katalog, m.version, m.kind, m.pagu_risiko, sorted(m.tools))
+        # Tool beserta aksinya (`agent_tools.permission`, E-209) — `nama:aksi`.
+        tools = sorted(f"{t}:{AKSI_IZIN[registri.alat[t].kind]}" for t in m.tools)
+        harapan = (m.id_katalog, m.version, m.kind, m.pagu_risiko, tools)
         ada = (b.id, b.version, b.kind, b.max_risk, list(b.tools))
         if harapan != ada or json.loads(manifest_json(registri.mentah[nama])) != b.manifest:
             beda.append(f"{nama}: katalog basis data berbeda dengan manifest {m.version}")

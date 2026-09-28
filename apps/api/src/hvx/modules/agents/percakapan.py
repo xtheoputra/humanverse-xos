@@ -12,6 +12,11 @@ Giliran yang ditahan gerbang (4.5) berakhir dengan `confirmation_required` + `do
 berisi pertanyaannya; jawabannya (`POST …/confirmations`) mengulang giliran yang sama
 dari pesan penggunanya, dengan persetujuan itu. Tiap giliran berakhir dengan `done`
 atau `error` — klien tidak pernah menunggu aliran yang tidak akan selesai.
+
+Permintaan yang DITOLAK sebelum apa pun tercatat — id kembar, token yang sudah dijawab
+— bukan giliran: alirannya di-`urungkan` (E-202), dan run yang terlanjur ditulis
+ditutup (E-200). `error.code` di SSE adalah kode API berbahasa Inggris (AGENTS.md §7,
+E-203), bukan kode internal pelaksana tool.
 """
 
 from __future__ import annotations
@@ -24,12 +29,13 @@ from typing import Any
 from uuid import UUID, uuid4, uuid5
 
 import structlog
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from hvx.modules import identity, platform
 
 from . import repository
-from .aliran import AliranPercakapan, GiliranBerjalan
+from .aliran import AliranPercakapan, Giliran, GiliranBerjalan
 from .deterministik import jalankan_deterministik
 from .jalannya import Jalannya
 from .konfirmasi import (
@@ -42,8 +48,8 @@ from .konfirmasi import (
     jawab_konfirmasi,
 )
 from .niat import kenali
-from .pelaksana_alat import AlatDitolak
-from .runtime import KODE_GERBANG, RuntimeAgent
+from .pelaksana_alat import AlatDitolak, AlatGagal
+from .runtime import KODE_GERBANG, KeputusanTidakSah, RuntimeAgent
 from .schemas import (
     BuatPercakapan,
     HalamanPercakapan,
@@ -75,6 +81,19 @@ _ALASAN_DETERMINISTIK = {
 
 def _tidak_ditemukan() -> platform.GalatApi:
     return platform.GalatApi(404, "not_found", "Percakapan tidak ditemukan.")
+
+
+def _id_kembar(galat: IntegrityError, constraint: str, pesan: str) -> platform.GalatApi | None:
+    """Id buatan klien yang sudah ada (spec/04 *klien boleh membuat id sendiri*) → 409,
+    sama dengan modul lain — bukan 500 (tinjauan kontrak Sprint 4)."""
+    p = platform.rincian_pelanggaran(galat)
+    if p.sqlstate == platform.UNIQUE_VIOLATION and p.constraint == constraint:
+        return platform.GalatApi(409, "already_exists", pesan)
+    return None
+
+
+def _pesan_kembar() -> platform.GalatApi:
+    return platform.GalatApi(409, "already_exists", "Pesan dengan id ini sudah ada.")
 
 
 def _percakapan(b: repository.BarisPercakapan) -> Percakapan:
@@ -132,10 +151,18 @@ class LayananPercakapan:
 
     # ── baca ────────────────────────────────────────────────────────────────
     async def buat(self, user_id: UUID, badan: BuatPercakapan) -> Percakapan:
-        async with platform.transaksi_pengguna(self._engine, user_id) as conn:
-            b = await repository.buat_percakapan(
-                conn, id=badan.id or uuid4(), user_id=user_id, title=badan.title
+        try:
+            async with platform.transaksi_pengguna(self._engine, user_id) as conn:
+                b = await repository.buat_percakapan(
+                    conn, id=badan.id or uuid4(), user_id=user_id, title=badan.title
+                )
+        except IntegrityError as galat:
+            kembar = _id_kembar(
+                galat, "ai_conversations_pkey", "Percakapan dengan id ini sudah ada."
             )
+            if kembar is None:
+                raise
+            raise kembar from None
         return _percakapan(b)
 
     async def baca(self, user_id: UUID, percakapan_id: UUID) -> Percakapan | None:
@@ -204,9 +231,9 @@ class LayananPercakapan:
         if await self.baca(user_id, percakapan_id) is None:
             raise _tidak_ditemukan()
 
-    def _mulai_giliran(self, percakapan_id: UUID) -> None:
+    def _mulai_giliran(self, percakapan_id: UUID) -> Giliran | None:
         try:
-            self.aliran.mulai(percakapan_id)
+            return self.aliran.mulai(percakapan_id)
         except GiliranBerjalan:
             raise platform.GalatApi(
                 409, "turn_in_progress", "Percakapan ini masih menjawab pesan sebelumnya."
@@ -214,22 +241,40 @@ class LayananPercakapan:
 
     async def kirim(self, user_id: UUID, percakapan_id: UUID, badan: KirimPesan) -> TerimaPesan:
         await self._pastikan_ada(user_id, percakapan_id)
-        self._mulai_giliran(percakapan_id)
         pesan_id = badan.id or uuid4()
+        async with platform.transaksi_pengguna(self._engine, user_id) as conn:
+            if await repository.baca_pesan(conn, user_id, pesan_id) is not None:
+                raise _pesan_kembar()  # kiriman ulang klien luring — sebelum run ditulis
+        lama = self._mulai_giliran(percakapan_id)
         niat = kenali(badan.content)
+        j: Jalannya | None = None
         try:
             if niat.rute == "deterministic":
                 await self._simpan(user_id, percakapan_id, pesan_id, "user", badan.content)
-                return await self._deterministik(user_id, percakapan_id, pesan_id, badan.content)
-            j = await self.runtime.mulai(
-                user_id, AGENT_AKAR, pemicu="user", percakapan_id=percakapan_id
-            )
-            await self._simpan(
-                user_id, percakapan_id, pesan_id, "user", badan.content, agent_run_id=j.id
-            )
+            else:
+                j = await self.runtime.mulai(
+                    user_id,
+                    AGENT_AKAR,
+                    pemicu="user",
+                    percakapan_id=percakapan_id,
+                    pesan_id=pesan_id,
+                )
+                await self._simpan(
+                    user_id, percakapan_id, pesan_id, "user", badan.content, agent_run_id=j.id
+                )
         except BaseException as galat:
-            await self.aliran.kirim(percakapan_id, "error", {"code": _kode(galat)})
+            # Pesannya tidak tercatat: permintaan ini gagal, bukan giliran. Run yang
+            # terlanjur ditulis ditutup — tanpa itu ia `running` selamanya (E-200).
+            if j is not None:
+                await asyncio.shield(self.runtime.gagalkan(j, galat))
+            await self.aliran.urungkan(percakapan_id, lama)
             raise
+        if j is None:
+            try:
+                return await self._deterministik(user_id, percakapan_id, pesan_id, badan.content)
+            except BaseException as galat:
+                await self.aliran.kirim(percakapan_id, "error", {"code": _kode(galat)})
+                raise
         self._latar(self._giliran(user_id, percakapan_id, j, badan.content))
         return TerimaPesan(message_id=pesan_id, agent_run_id=j.id, status="processing")
 
@@ -264,18 +309,24 @@ class LayananPercakapan:
         isi: str,
         **kolom: Any,
     ) -> repository.BarisPesan:
-        async with platform.transaksi_pengguna(self._engine, user_id) as conn:
-            if not await repository.kunci_percakapan(conn, user_id, percakapan_id):
-                raise _tidak_ditemukan()
-            return await repository.sisip_pesan(
-                conn,
-                id=pesan_id,
-                conversation_id=percakapan_id,
-                user_id=user_id,
-                role=role,
-                content=isi,
-                **kolom,
-            )
+        try:
+            async with platform.transaksi_pengguna(self._engine, user_id) as conn:
+                if not await repository.kunci_percakapan(conn, user_id, percakapan_id):
+                    raise _tidak_ditemukan()
+                return await repository.sisip_pesan(
+                    conn,
+                    id=pesan_id,
+                    conversation_id=percakapan_id,
+                    user_id=user_id,
+                    role=role,
+                    content=isi,
+                    **kolom,
+                )
+        except IntegrityError as galat:
+            kembar = _id_kembar(galat, "ai_messages_pkey", "Pesan dengan id ini sudah ada.")
+            if kembar is None:
+                raise
+            raise kembar from None
 
     def _latar(self, kerja: Any) -> None:
         tugas: asyncio.Task[None] = asyncio.create_task(kerja)
@@ -353,7 +404,14 @@ class LayananPercakapan:
     async def jawab(
         self, user_id: UUID, percakapan_id: UUID, badan: JawabKonfirmasi
     ) -> TerimaKonfirmasi:
-        """Jawaban atas `confirmation_required` — lalu giliran yang sama diulang (4.5)."""
+        """Jawaban atas `confirmation_required` — lalu giliran yang sama diulang (4.5).
+
+        Yang bisa MENOLAK jawaban ini diperiksa sebelum giliran baru dimulai (E-202):
+        token, percakapannya, dan apakah permintaannya sudah dijawab — ketukan ganda
+        saat giliran ulangan masih berjalan menerima `409 confirmation_answered`, bukan
+        `turn_in_progress`. Yang baru ketahuan saat jawabannya dicatat (`allow_always`
+        untuk R3, balapan dua jawaban) meng-`urungkan` giliran yang belum terjadi.
+        """
         await self._pastikan_ada(user_id, percakapan_id)
         try:
             permintaan = self._tanda.baca(badan.token, user_id)
@@ -361,16 +419,30 @@ class LayananPercakapan:
             raise _konfirmasi_tidak_sah() from None
         async with platform.transaksi_pengguna(self._engine, user_id) as conn:
             akar = await repository.akar_run(conn, user_id, permintaan.run_id)
+            ditahan = await repository.baca_run(conn, permintaan.run_id)
             pesan_awal = (
                 None
-                if akar is None or akar[1] != percakapan_id
-                else await repository.pesan_run(conn, user_id, akar[0], "user")
+                if permintaan.pesan_id is None
+                else await repository.baca_pesan(conn, user_id, permintaan.pesan_id)
             )
-        if akar is None or pesan_awal is None:
+        if (
+            akar is None
+            or akar[1] != percakapan_id
+            or ditahan is None
+            or pesan_awal is None
+            or pesan_awal.role != "user"
+            or pesan_awal.conversation_id != percakapan_id
+        ):
             raise _konfirmasi_tidak_sah()  # bukan milik percakapan ini
-        self._mulai_giliran(percakapan_id)
+        if ditahan.status != "blocked" or ditahan.confirmed_by_user is not None:
+            raise _sudah_dijawab()
+        lama = self._mulai_giliran(percakapan_id)
         try:
             setuju = await self._jawab(user_id, badan)
+        except BaseException:
+            await self.aliran.urungkan(percakapan_id, lama)  # tidak ada yang tercatat
+            raise
+        try:
             if setuju is None:
                 balasan = await self._simpan(
                     user_id,
@@ -385,12 +457,14 @@ class LayananPercakapan:
                 )
                 await self.aliran.kirim(percakapan_id, "done", _done(balasan))
                 return TerimaKonfirmasi(agent_run_id=akar[0], status="completed")
+            # Persetujuan yang sudah dipegang giliran ini ikut diulang (E-199).
             j = await self.runtime.mulai(
                 user_id,
                 AGENT_AKAR,
                 pemicu="user",
                 percakapan_id=percakapan_id,
-                persetujuan=frozenset({setuju}),
+                persetujuan=frozenset(permintaan.persetujuan_lalu) | {setuju},
+                pesan_id=pesan_awal.id,
             )
         except BaseException as galat:
             await self.aliran.kirim(percakapan_id, "error", {"code": _kode(galat)})
@@ -401,7 +475,6 @@ class LayananPercakapan:
     async def _jawab(self, user_id: UUID, badan: JawabKonfirmasi) -> PersetujuanAksi | None:
         try:
             return await jawab_konfirmasi(
-                self._engine,
                 self._izin,
                 self._tanda,
                 user_id,
@@ -409,9 +482,7 @@ class LayananPercakapan:
                 _JAWABAN[badan.decision],
             )
         except KonfirmasiTerjawab:
-            raise platform.GalatApi(
-                409, "confirmation_answered", "Permintaan ini sudah dijawab."
-            ) from None
+            raise _sudah_dijawab() from None
         except KonfirmasiTidakSah:
             raise _konfirmasi_tidak_sah() from None
 
@@ -428,6 +499,10 @@ def _konfirmasi_tidak_sah() -> platform.GalatApi:
     return platform.GalatApi(422, "invalid_confirmation", "Token konfirmasi tidak sah.")
 
 
+def _sudah_dijawab() -> platform.GalatApi:
+    return platform.GalatApi(409, "confirmation_answered", "Permintaan ini sudah dijawab.")
+
+
 def _permintaan(k: PermintaanKonfirmasi) -> dict[str, Any]:
     """SSE `confirmation_required` — yang dilihat pengguna sebelum menjawab (tanpa masukan)."""
     return {
@@ -442,11 +517,23 @@ def _permintaan(k: PermintaanKonfirmasi) -> dict[str, Any]:
     }
 
 
+# SSE `error.code` (spec/04) — kode API berbahasa Inggris (AGENTS.md §7), bukan kode
+# internal pelaksana tool (E-203): klien tidak bisa berbuat apa pun atas `masukan_salah`.
+_KODE_API_ALAT = {"terlalu_sering": "rate_limited"}
+KODE_GALAT_AGENT = "agent_error"  # program agent memanggil tool/keputusan secara salah
+
+
 def _kode(galat: BaseException) -> str:
     if isinstance(galat, platform.GalatApi):
         return galat.kode
-    if isinstance(galat, AlatDitolak):
-        return galat.kode
     if isinstance(galat, asyncio.CancelledError):
         return "cancelled"
-    return "internal"
+    if isinstance(galat, AlatDitolak):
+        return _KODE_API_ALAT.get(galat.kode, KODE_GALAT_AGENT)
+    if isinstance(galat, AlatGagal):
+        return galat.kode  # kode API layanan pemilik datanya: `not_found`, `invalid_tier`, …
+    if isinstance(galat, KeputusanTidakSah):
+        return KODE_GALAT_AGENT
+    if isinstance(galat, platform.GalatModel):
+        return "model_unavailable"
+    return "internal_error"

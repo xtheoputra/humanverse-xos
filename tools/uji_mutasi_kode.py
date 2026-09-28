@@ -305,6 +305,9 @@ UJI_ORKESTRATOR = "tests/integration/test_orkestrator.py"
 UJI_AGENT_V0 = "tests/integration/test_agent_v0.py"
 UJI_PERCAKAPAN = "tests/integration/test_percakapan.py"
 UJI_ANGGARAN = "tests/integration/test_anggaran.py"
+UJI_KONFIRMASI_TANDA = "tests/unit/test_token_konfirmasi.py"
+UJI_GALAT_SSE = "tests/unit/test_galat_percakapan.py"
+UJI_REGISTRI_BERKAS = "tests/unit/test_registri_agent.py"
 FK_MILESTONE = (
     "  FOREIGN KEY (goal_id, user_id) REFERENCES goals (id, user_id) ON DELETE CASCADE" + NL + ");"
 )
@@ -1285,18 +1288,18 @@ MUTASI: list[Mutasi] = [
         [
             Sunting(
                 f"{MODUL}/identity/izin.py",
-                "            await audit("
+                "        await audit("
                 + NL
-                + "                conn,"
+                + "            self.conn,"
                 + NL
-                + "                aksi=_AKSI_AUDIT[keputusan],",
-                "            await conn.commit()"
+                + "            aksi=_AKSI_AUDIT[keputusan],",
+                "        await self.conn.commit()"
                 + NL
-                + "            await audit("
+                + "        await audit("
                 + NL
-                + "                conn,"
+                + "            self.conn,"
                 + NL
-                + "                aksi=_AKSI_AUDIT[keputusan],",
+                + "            aksi=_AKSI_AUDIT[keputusan],",
             )
         ],
         _pytest(f"{UJI_IZIN}::test_perubahan_izin_tidak_tersimpan_tanpa_jejak_audit"),
@@ -5422,8 +5425,8 @@ MUTASI: list[Mutasi] = [
         [
             Sunting(
                 f"{MODUL}/agents/pelaksana_alat.py",
-                "        if not isinstance(nilai, str) or not _TANGGAL.fullmatch(nilai):",
-                "        if not isinstance(nilai, str):",
+                "        elif isinstance(nilai, str) and _TANGGAL.fullmatch(nilai):",
+                "        elif isinstance(nilai, str):",
             )
         ],
         _pytest(f"{UJI_PELAKSANA}::test_masukan_yang_salah_ditolak_sebelum_gerbang"),
@@ -5889,7 +5892,7 @@ MUTASI: list[Mutasi] = [
         [
             Sunting(
                 f"{MODUL}/agents/runtime.py",
-                '            await self._tutup(\n                j,\n                status,\n                None,\n                {"code": _kode_galat(galat), "type": type(galat).__name__},\n                mulai,\n                aksi=_aksi_tertahan(galat) if status == "blocked" else None,\n            )\n',
+                '            await self._tutup(\n                j,\n                status,\n                None,\n                _galat_run(galat),\n                mulai,\n                aksi=_aksi_tertahan(galat) if status == "blocked" else None,\n            )\n',
                 "",
             )
         ],
@@ -5931,7 +5934,7 @@ MUTASI: list[Mutasi] = [
         [
             Sunting(
                 f"{MODUL}/agents/runtime.py",
-                '            await asyncio.shield(self._tutup(j, "cancelled", None, {"code": "cancelled"}, mulai))\n',
+                '            await asyncio.shield(self._tutup(j, "cancelled", None, _galat_run(galat), mulai))\n',
                 "",
             )
         ],
@@ -6028,8 +6031,8 @@ MUTASI: list[Mutasi] = [
         [
             Sunting(
                 f"{MODUL}/agents/konfirmasi.py",
-                '            await mesin_izin.tetapkan(user_id, subjek, scope, p.aksi, "allow")',
-                "            pass",
+                '                await u.tetapkan(subjek, scope, p.aksi, "allow")',
+                "                pass",
             )
         ],
         _pytest(f"{UJI_GERBANG}::test_risk_2_minta_izin_sekali"),
@@ -6194,7 +6197,7 @@ MUTASI: list[Mutasi] = [
         [
             Sunting(
                 f"{MODUL}/agents/konfirmasi.py",
-                "        if not hmac.compare_digest(self._penanda(isi), tanda):",
+                "        if not hmac.compare_digest(self._penanda(isi).encode(), tanda.encode()):",
                 "        if False:",
             )
         ],
@@ -6325,8 +6328,8 @@ MUTASI: list[Mutasi] = [
         [
             Sunting(
                 f"{MODUL}/agents/niat.py",
-                '    r"^\\s*(?:tolong\\s+)?ingat(?:lah)?',
-                '    r"^\\s*(?:tolong\\s+)?ingat(?:lah|kan)?',
+                '    r"^(?:tolong )?ingat(?:lah)?',
+                '    r"^(?:tolong )?ingat(?:lah|kan)?',
             )
         ],
         _pytest("tests/unit/test_niat.py::test_yang_bukan_perintah_agent_ke_coach"),
@@ -6338,7 +6341,7 @@ MUTASI: list[Mutasi] = [
         [
             Sunting(
                 f"{MODUL}/agents/niat.py",
-                '    r"^\\s*(?:tolong\\s+)?(?P<kata>tandai|',
+                '    r"^(?:tolong )?(?P<kata>tandai|',
                 '    r".*?(?P<kata>tandai|',
             )
         ],
@@ -6456,7 +6459,7 @@ MUTASI: list[Mutasi] = [
         [
             Sunting(
                 f"{MODUL}/agents/program_v0.py",
-                "    alasan = [f[:300] for f in fakta][:9] or [",
+                "    alasan = [f[:300] for f in fakta][:8] or [",
                 "    alasan = [",
             )
         ],
@@ -6690,9 +6693,14 @@ MUTASI: list[Mutasi] = [
         [
             Sunting(
                 f"{MODUL}/agents/percakapan.py",
-                "                if akar is None or akar[1] != percakapan_id",
-                "                if akar is None",
-            )
+                "            or akar[1] != percakapan_id" + NL,
+                "",
+            ),
+            Sunting(
+                f"{MODUL}/agents/percakapan.py",
+                "            or pesan_awal.conversation_id != percakapan_id" + NL,
+                "",
+            ),
         ],
         _pytest(f"{UJI_PERCAKAPAN}::test_token_konfirmasi_percakapan_lain_ditolak"),
         harus_memuat="token konfirmasi percakapan lain diterima",
@@ -6747,8 +6755,8 @@ MUTASI: list[Mutasi] = [
         [
             Sunting(
                 f"{MODUL}/agents/runtime.py",
-                "        pilihan = self._runtime.gerbang_model.pilih_kelas(diminta, anggaran_habis=habis)",
-                "        pilihan = self._runtime.gerbang_model.pilih_kelas(diminta, anggaran_habis=False)",
+                "            kelas = gm.pilih_kelas(permintaan.kelas, anggaran_habis=habis)",
+                "            kelas = gm.pilih_kelas(permintaan.kelas, anggaran_habis=False)",
             )
         ],
         _pytest(f"{UJI_ANGGARAN}::test_anggaran_habis_turun_ke_model_kecil_bukan_gagal"),
@@ -6771,16 +6779,16 @@ MUTASI: list[Mutasi] = [
     ),
     Mutasi(
         "4.9",
-        "biaya sebelum hari ini ikut dihitung",
+        "biaya lebih dari 24 jam lalu ikut dihitung",
         [
             Sunting(
                 f"{MODUL}/agents/runtime.py",
-                "            hour=0, minute=0, second=0, microsecond=0",
-                "            year=2000, hour=0, minute=0, second=0, microsecond=0",
+                "self._jam() - JENDELA_ANGGARAN)",
+                "self._jam() - JENDELA_ANGGARAN * 2)",
             )
         ],
-        _pytest(f"{UJI_ANGGARAN}::test_biaya_kemarin_waktu_lokal_tidak_dihitung"),
-        harus_memuat="biaya hari kemarin (waktu lokal) ikut dihitung",
+        _pytest(f"{UJI_ANGGARAN}::test_biaya_lebih_dari_24_jam_lalu_tidak_dihitung"),
+        harus_memuat="biaya lebih dari 24 jam lalu ikut dihitung",
         kelompok="db",
     ),
     Mutasi(
@@ -6802,9 +6810,10 @@ MUTASI: list[Mutasi] = [
         "biaya run yang sedang berjalan tidak dihitung",
         [
             Sunting(
-                f"{MODUL}/agents/runtime.py",
-                "            berjalan += run.biaya_usd",
-                "            berjalan += 0",
+                f"{MODUL}/agents/repository.py",
+                "    WHERE user_id = :user_id AND started_at >= :sejak" + NL,
+                "    WHERE user_id = :user_id AND started_at >= :sejak AND status <> 'running'"
+                + NL,
             )
         ],
         _pytest(f"{UJI_ANGGARAN}::test_panggilan_kedua_satu_run_melihat_biaya_yang_pertama"),
@@ -6893,8 +6902,8 @@ MUTASI: list[Mutasi] = [
         [
             Sunting(
                 f"{MODUL}/agents/niat.py",
-                '    r"^\\s*(?:(?:catat|log|simpan|isi)\\s+)?mood',
-                '    r"\\s*(?:(?:catat|log|simpan|isi)\\s+)?mood',
+                '    r"^\\s*(?:catat|log|simpan|isi)\\s+mood\\b',
+                '    r"\\s*(?:catat|log|simpan|isi)\\s+mood\\b',
             ),
             Sunting(
                 f"{MODUL}/agents/niat.py",
@@ -7176,6 +7185,751 @@ MUTASI: list[Mutasi] = [
         ],
         _pytest(f"{UJI_KATALOG}::test_api_menolak_mulai_bila_katalog_berbeda_dari_manifest"),
         harus_memuat="DID NOT RAISE",
+        kelompok="db",
+    ),
+    # ── Sprint 4 · tinjauan tiga lensa (28 Sep 2026): E-196 … E-210 ─────────────────
+    Mutasi(
+        "4.1",
+        "pola perintah menelusur mundur atas deretan spasi (E-197)",
+        [
+            Sunting(
+                f"{MODUL}/agents/niat.py",
+                '    return " ".join(teks.split()).rstrip(_PENUTUP)',
+                "    return teks",
+            ),
+            Sunting(
+                f"{MODUL}/agents/niat.py",
+                '    r"(?: hari ini)?$",',
+                '    r"(?:\\s+hari\\s+ini)?\\s*[.!]*\\s*$",',
+            ),
+        ],
+        _pytest(f"{UJI_NIAT}::test_pengenal_niat_linear_atas_pesan_terpanjang_yang_sah"),
+        harus_memuat="pola perintah menelusur mundur",
+    ),
+    Mutasi(
+        "4.1",
+        "spasi pesan tidak dirapatkan — niatnya berubah (E-197)",
+        [
+            Sunting(
+                f"{MODUL}/agents/niat.py",
+                '    return " ".join(teks.split()).rstrip(_PENUTUP)',
+                "    return teks.rstrip(_PENUTUP)",
+            )
+        ],
+        _pytest(f"{UJI_NIAT}::test_pesan_jahat_tetap_dibaca_sama_dengan_bentuk_rapinya"),
+        harus_memuat="spasi atau tanda baca penutup mengubah niat",
+    ),
+    Mutasi(
+        "4.1",
+        "tanda baca penutup ikut menjadi judul habit (E-197)",
+        [
+            Sunting(
+                f"{MODUL}/agents/niat.py",
+                '    return " ".join(teks.split()).rstrip(_PENUTUP)',
+                '    return " ".join(teks.split())',
+            )
+        ],
+        _pytest(f"{UJI_NIAT}::test_pesan_jahat_tetap_dibaca_sama_dengan_bentuk_rapinya"),
+        harus_memuat="spasi atau tanda baca penutup mengubah niat",
+    ),
+    Mutasi(
+        "4.1",
+        "kata perintah mood opsional — cerita dicatat sebagai mood baru (E-198)",
+        [
+            Sunting(
+                f"{MODUL}/agents/niat.py",
+                '    r"^\\s*(?:catat|log|simpan|isi)\\s+mood\\b',
+                '    r"^\\s*(?:(?:catat|log|simpan|isi)\\s+)?mood\\b',
+            )
+        ],
+        _pytest(f"{UJI_NIAT}::test_yang_bukan_perintah_tidak_dijalankan"),
+        harus_memuat="dijalankan sebagai perintah",
+    ),
+    Mutasi(
+        "4.5",
+        "token tidak membawa pesan giliran — izin kedua tidak bisa dijawab (E-199)",
+        [Sunting(f"{MODUL}/agents/gerbang.py", "            pesan_id=j.pesan_id," + NL, "")],
+        _pytest(
+            f"{UJI_PERCAKAPAN}::test_dua_izin_dalam_satu_giliran_bisa_dijawab_dan_keduanya_berlaku"
+        ),
+        harus_memuat="izin pertama ditolak",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.5",
+        "token tidak membawa persetujuan sebelumnya — ditanya lagi tanpa akhir (E-199)",
+        [
+            Sunting(
+                f"{MODUL}/agents/gerbang.py", "            persetujuan_lalu=j.persetujuan," + NL, ""
+            )
+        ],
+        _pytest(
+            f"{UJI_PERCAKAPAN}::test_dua_izin_dalam_satu_giliran_bisa_dijawab_dan_keduanya_berlaku"
+        ),
+        harus_memuat="persetujuan pertama hilang",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.5",
+        "ulangan hanya membawa persetujuan terakhir (E-199)",
+        [
+            Sunting(
+                f"{MODUL}/agents/percakapan.py",
+                "                persetujuan=frozenset(permintaan.persetujuan_lalu) | {setuju},",
+                "                persetujuan=frozenset({setuju}),",
+            )
+        ],
+        _pytest(
+            f"{UJI_PERCAKAPAN}::test_dua_izin_dalam_satu_giliran_bisa_dijawab_dan_keduanya_berlaku"
+        ),
+        harus_memuat="persetujuan pertama hilang",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.5",
+        "run ditahan yang memakai persetujuan tercatat sudah dijawab (E-199)",
+        [
+            Sunting(
+                f"{MODUL}/agents/runtime.py",
+                '                confirmed_by_user=None if status == "blocked" else j.dikonfirmasi,',
+                "                confirmed_by_user=j.dikonfirmasi,",
+            )
+        ],
+        _pytest(
+            f"{UJI_PERCAKAPAN}::test_dua_izin_dalam_satu_giliran_bisa_dijawab_dan_keduanya_berlaku"
+        ),
+        harus_memuat="izin kedua ditolak",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.5",
+        "izin selalu disimpan SESUDAH jawabannya di-commit",
+        [
+            Sunting(
+                f"{MODUL}/agents/konfirmasi.py",
+                '        if jawaban == "izinkan_selalu":'
+                + NL
+                + '            subjek = identity.Subjek("agent", p.agent)'
+                + NL
+                + "            for scope in p.scopes:"
+                + NL
+                + '                await u.tetapkan(subjek, scope, p.aksi, "allow")'
+                + NL
+                + "    return p.persetujuan() if setuju else None",
+                '    if jawaban == "izinkan_selalu":'
+                + NL
+                + '        subjek = identity.Subjek("agent", p.agent)'
+                + NL
+                + "        for scope in p.scopes:"
+                + NL
+                + '            await mesin_izin.tetapkan(user_id, subjek, scope, p.aksi, "allow")'
+                + NL
+                + "    return p.persetujuan() if setuju else None",
+            )
+        ],
+        _pytest(
+            f"{UJI_GERBANG}::test_izin_selalu_disimpan_bersama_jawabannya_atau_tidak_sama_sekali"
+        ),
+        harus_memuat="jawaban tercatat tanpa izin",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.5",
+        "tanda tangan dibandingkan sebagai str — token non-ASCII menjadi 500",
+        [
+            Sunting(
+                f"{MODUL}/agents/konfirmasi.py",
+                "        if not hmac.compare_digest(self._penanda(isi).encode(), tanda.encode()):",
+                "        if not hmac.compare_digest(self._penanda(isi), tanda):",
+            )
+        ],
+        _pytest(f"{UJI_KONFIRMASI_TANDA}::test_tanda_tangan_non_ascii_ditolak_sebagai_token_rusak"),
+        harus_memuat="non-ASCII",
+    ),
+    Mutasi(
+        "4.5",
+        "persetujuan sebelumnya tidak ikut ditandatangani",
+        [
+            Sunting(
+                f"{MODUL}/agents/konfirmasi.py",
+                '                "p": [[x.agent, x.alat, x.sidik] for x in p.persetujuan_lalu],'
+                + NL,
+                "",
+            ),
+            Sunting(
+                f"{MODUL}/agents/konfirmasi.py",
+                '            tuple(PersetujuanAksi(*x) for x in d["p"]),',
+                '            tuple(PersetujuanAksi(*x) for x in d.get("p", [])),',
+            ),
+        ],
+        _pytest(
+            f"{UJI_KONFIRMASI_TANDA}::test_token_membawa_pesan_giliran_dan_persetujuan_sebelumnya"
+        ),
+        harus_memuat="assert set() == ",
+    ),
+    Mutasi(
+        "4.8",
+        "run yang ditulis sebelum pesannya ditolak dibiarkan running (E-200)",
+        [
+            Sunting(
+                f"{MODUL}/agents/percakapan.py",
+                "                await asyncio.shield(self.runtime.gagalkan(j, galat))",
+                "                pass",
+            )
+        ],
+        _pytest(
+            f"{UJI_PERCAKAPAN}::"
+            "test_id_pesan_milik_pengguna_lain_run_yang_terlanjur_ditulis_ditutup"
+        ),
+        harus_memuat="tidak ditutup",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.8",
+        "id pesan kembar diperiksa SESUDAH run ditulis (E-200)",
+        [
+            Sunting(
+                f"{MODUL}/agents/percakapan.py",
+                "                raise _pesan_kembar()  # kiriman ulang klien luring — sebelum run ditulis",
+                "                pass",
+            )
+        ],
+        _pytest(f"{UJI_PERCAKAPAN}::test_id_pesan_kembar_409_dan_aliran_giliran_terakhir_utuh"),
+        harus_memuat="id kembar menulis run lalu menggagalkannya",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.8",
+        "permintaan yang ditolak meninggalkan giliran di aliran (E-202)",
+        [
+            Sunting(
+                f"{MODUL}/agents/percakapan.py",
+                "            await self.aliran.urungkan(percakapan_id, lama)"
+                + NL
+                + "            raise"
+                + NL
+                + "        if j is None:",
+                '            await self.aliran.kirim(percakapan_id, "error", {"code": _kode(galat)})'
+                + NL
+                + "            raise"
+                + NL
+                + "        if j is None:",
+            )
+        ],
+        _pytest(
+            f"{UJI_PERCAKAPAN}::"
+            "test_id_pesan_milik_pengguna_lain_run_yang_terlanjur_ditulis_ditutup"
+        ),
+        harus_memuat="meninggalkan giliran di aliran",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.8",
+        "jawaban yang kalah balapan menimpa aliran (E-202)",
+        [
+            Sunting(
+                f"{MODUL}/agents/percakapan.py",
+                "            await self.aliran.urungkan(percakapan_id, lama)  # tidak ada yang tercatat",
+                '            await self.aliran.kirim(percakapan_id, "error", {"code": "x"})',
+            )
+        ],
+        _pytest(f"{UJI_PERCAKAPAN}::test_jawaban_yang_kalah_balapan_tidak_menimpa_aliran"),
+        harus_memuat="kalah balapan menimpa aliran",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.8",
+        "sudah-dijawab diperiksa SESUDAH giliran dimulai — ketukan ganda turn_in_progress (E-202)",
+        [
+            Sunting(
+                f"{MODUL}/agents/percakapan.py",
+                '        if ditahan.status != "blocked" or ditahan.confirmed_by_user is not None:',
+                "        if False:",
+            )
+        ],
+        _pytest(
+            f"{UJI_PERCAKAPAN}::"
+            "test_ketukan_ganda_saat_giliran_ulangan_berjalan_dijawab_sudah_dijawab"
+        ),
+        harus_memuat="turn_in_progress",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.8",
+        "kode internal pelaksana sampai ke klien lewat SSE (E-203)",
+        [
+            Sunting(
+                f"{MODUL}/agents/percakapan.py",
+                "        return _KODE_API_ALAT.get(galat.kode, KODE_GALAT_AGENT)",
+                "        return galat.kode",
+            )
+        ],
+        _pytest(UJI_GALAT_SSE),
+        harus_memuat="SSE error.code 'terlalu_sering'",
+    ),
+    Mutasi(
+        "4.8",
+        "batas laju tool tidak menjadi rate_limited (E-203)",
+        [
+            Sunting(
+                f"{MODUL}/agents/percakapan.py",
+                '_KODE_API_ALAT = {"terlalu_sering": "rate_limited"}',
+                "_KODE_API_ALAT: dict[str, str] = {}",
+            )
+        ],
+        _pytest(UJI_GALAT_SSE),
+        harus_memuat="harapan 'rate_limited'",
+    ),
+    Mutasi(
+        "4.8",
+        "galat model dilaporkan internal_error (E-203)",
+        [
+            Sunting(
+                f"{MODUL}/agents/percakapan.py",
+                '        return "model_unavailable"',
+                '        return "internal_error"',
+            )
+        ],
+        _pytest(UJI_GALAT_SSE),
+        harus_memuat="harapan 'model_unavailable'",
+    ),
+    Mutasi(
+        "4.3",
+        "pemeriksa pemilik data tidak dijalankan sebelum gerbang (E-204)",
+        [
+            Sunting(
+                f"{MODUL}/agents/pelaksana_alat.py",
+                "        if isinstance(impl, Implementasi):",
+                "        if False:",
+            )
+        ],
+        _pytest(
+            f"{UJI_PELAKSANA}::test_masukan_yang_pasti_ditolak_pemiliknya_tidak_sampai_ke_gerbang"
+        ),
+        harus_memuat="sampai ke gerbang",
+    ),
+    Mutasi(
+        "4.3",
+        "tanggal di luar 1900–2999 diterima tool (E-204)",
+        [
+            Sunting(
+                f"{MODUL}/agents/pelaksana_alat.py",
+                "        if not platform.TANGGAL_MIN <= tanggal <= platform.TANGGAL_MAKS:  # spec/04, E-204",
+                "        if False:",
+            )
+        ],
+        _pytest(
+            f"{UJI_PELAKSANA}::test_masukan_yang_pasti_ditolak_pemiliknya_tidak_sampai_ke_gerbang"
+        ),
+        harus_memuat="sampai ke gerbang",
+    ),
+    Mutasi(
+        "4.3",
+        "NaN lolos min/max masukan tool (E-204)",
+        [
+            Sunting(
+                f"{MODUL}/agents/pelaksana_alat.py",
+                "        if not math.isfinite(nilai):",
+                "        if False:",
+            )
+        ],
+        _pytest(f"{UJI_PELAKSANA}::test_bilangan_tak_hingga_ditolak_semua_tool"),
+        harus_memuat="DID NOT RAISE",
+    ),
+    Mutasi(
+        "4.3",
+        "pemeriksa rekomendasi menerima NaN (E-204)",
+        [
+            Sunting(
+                f"{MODUL}/intelligence/rekomendasi.py",
+                "    if not confidence.is_finite():",
+                "    if False:",
+            )
+        ],
+        _pytest(f"{UJI_PELAKSANA}::test_pemeriksa_pemilik_data_menolak_yang_ditolak_layanannya"),
+        harus_memuat="InvalidOperation",
+    ),
+    Mutasi(
+        "4.3",
+        "habit.complete oleh agent tanpa jejak audit (E-205)",
+        [
+            Sunting(
+                f"{MODUL}/habits/service.py",
+                "            if jejak is not None:"
+                + NL
+                + "                await jejak(conn)"
+                + NL
+                + "            return HasilCatat(baru, baru=True)",
+                "            return HasilCatat(baru, baru=True)",
+            )
+        ],
+        _pytest(f"{UJI_ALAT}::test_tulisan_agent_meninggalkan_jejak_audit"),
+        harus_memuat="tulisan agent tanpa jejak audit: habit.complete",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.3",
+        "memory.write oleh agent tanpa jejak audit (E-205)",
+        [
+            Sunting(
+                f"{MODUL}/memory/ingatan.py",
+                "        if baru and jejak is not None:"
+                + NL
+                + "            await jejak(conn)"
+                + NL,
+                "",
+            )
+        ],
+        _pytest(f"{UJI_ALAT}::test_tulisan_agent_meninggalkan_jejak_audit"),
+        harus_memuat="tulisan agent tanpa jejak audit: memory.write",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.3",
+        "memory.write yang tidak mengubah apa pun tetap berjejak (E-205)",
+        [
+            Sunting(
+                f"{MODUL}/memory/ingatan.py",
+                "        if baru and jejak is not None:",
+                "        if jejak is not None:",
+            )
+        ],
+        _pytest(f"{UJI_ALAT}::test_tulisan_yang_tidak_mengubah_apa_pun_tidak_berjejak"),
+        harus_memuat="tulisan yang tidak mengubah apa pun berjejak",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.3",
+        "recommendation.create oleh agent tanpa jejak audit (E-205)",
+        [
+            Sunting(
+                f"{MODUL}/intelligence/rekomendasi.py",
+                "        if jejak is not None:" + NL + "            await jejak(conn)" + NL,
+                "",
+            )
+        ],
+        _pytest(f"{UJI_ALAT}::test_tulisan_agent_meninggalkan_jejak_audit"),
+        harus_memuat="tulisan agent tanpa jejak audit: recommendation.create",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.3",
+        "jejak tulisan agent di transaksinya SENDIRI (E-205)",
+        [
+            Sunting(
+                f"{MODUL}/agents/pelaksana_alat.py",
+                "        await identity.audit(" + NL + "            conn,",
+                "        async with platform.transaksi_pengguna(self.engine, self.jalannya.user_id) as c2:"
+                + NL
+                + "          await identity.audit("
+                + NL
+                + "            c2,",
+            )
+        ],
+        _pytest(f"{UJI_ALAT}::test_jejak_ikut_batal_bersama_tulisannya"),
+        harus_memuat="jejak audit tersimpan untuk tulisan yang dibatalkan",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.3",
+        "event tulisan agent bersumber app (E-205)",
+        [
+            Sunting(
+                f"{MODUL}/agents/alat_v0.py",
+                'badan, sumber="agent", jejak=k.jejak',
+                "badan, jejak=k.jejak",
+            )
+        ],
+        _pytest(f"{UJI_ALAT}::test_event_tulisan_agent_bersumber_agent"),
+        harus_memuat="event tulisan agent tidak bersumber agent",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.3",
+        "isi array keluaran tool tidak diperiksa (E-206)",
+        [
+            Sunting(
+                f"{MODUL}/agents/pelaksana_alat.py",
+                "        for i, isi in enumerate(nilai):"
+                + NL
+                + '            _periksa_nilai(alat, f"{jalur}[{i}]", spek.items, isi)'
+                + NL,
+                "",
+            )
+        ],
+        _pytest(f"{UJI_PELAKSANA}::test_keluaran_bersarang_di_luar_skema_adalah_cacat"),
+        harus_memuat="DID NOT RAISE",
+    ),
+    Mutasi(
+        "4.3",
+        "objek bersarang keluaran tool tidak diperiksa (E-206)",
+        [
+            Sunting(
+                f"{MODUL}/agents/pelaksana_alat.py",
+                "    _periksa_objek(alat, jalur, spek.fields, nilai)" + NL,
+                "",
+            )
+        ],
+        _pytest(f"{UJI_PELAKSANA}::test_keluaran_bersarang_di_luar_skema_adalah_cacat"),
+        harus_memuat="DID NOT RAISE",
+    ),
+    Mutasi(
+        "4.2",
+        "keluaran array tanpa isinya diterima registry (E-206)",
+        [
+            Sunting(
+                f"{MODUL}/agents/registri.py",
+                '        raise ValueError("keluaran skalar wajib satu tipe skalar, boleh `| null`")',
+                "        pass",
+            )
+        ],
+        _pytest(f"{UJI_REGISTRI_BERKAS}::test_registry_yang_melanggar_ditolak_tinjauan"),
+        harus_memuat="keluaran array tanpa isinya",
+    ),
+    Mutasi(
+        "4.2",
+        "keluaran array dengan fields diterima registry (E-206)",
+        [
+            Sunting(
+                f"{MODUL}/agents/registri.py",
+                '        if inti[0] == "array" and (self.items is None or self.fields is not None):',
+                "        if False:",
+            )
+        ],
+        _pytest(f"{UJI_REGISTRI_BERKAS}::test_registry_yang_melanggar_ditolak_tinjauan"),
+        harus_memuat="keluaran array dengan fields",
+    ),
+    Mutasi(
+        "4.2",
+        "keluaran object tanpa medan diterima registry (E-206)",
+        [
+            Sunting(
+                f"{MODUL}/agents/registri.py",
+                '        if inti[0] == "object" and (not self.fields or self.items is not None):',
+                "        if False:",
+            )
+        ],
+        _pytest(f"{UJI_REGISTRI_BERKAS}::test_registry_yang_melanggar_ditolak_tinjauan"),
+        harus_memuat="keluaran object tanpa medan",
+    ),
+    Mutasi(
+        "4.2",
+        "aturan 8 menyembunyikan pelanggaran lain di tool yang sama (E-207)",
+        [
+            Sunting(
+                f"{MODUL}/agents/registri.py",
+                '        _alat, lain = _periksa_alat(nama_berkas, {**mentah, "risk_level": 0})'
+                + NL
+                + "        return None, salah + lain",
+                "        return None, salah",
+            )
+        ],
+        _pytest(
+            f"{UJI_REGISTRI_BERKAS}::"
+            "test_tool_tanpa_risk_level_tidak_menyembunyikan_pelanggaran_lainnya"
+        ),
+        harus_memuat="tersembunyi di balik aturan 8",
+    ),
+    Mutasi(
+        "4.2",
+        "aturan 6 tidak memeriksa scope yang diminta lewat tool (E-207)",
+        [
+            Sunting(
+                f"{MODUL}/agents/registri.py",
+                "        scope |= {s for t in m.tools if t in alat for s in alat[t].scopes}",
+                "        pass",
+            )
+        ],
+        _pytest(f"{UJI_REGISTRI_BERKAS}::test_registry_yang_melanggar_ditolak_tinjauan"),
+        harus_memuat="pihak ketiga meminta journal_raw lewat tool",
+    ),
+    Mutasi(
+        "4.2",
+        "capabilities bukan snake_case diterima (E-207)",
+        [
+            Sunting(
+                f"{MODUL}/agents/registri.py",
+                '    capabilities: list[Annotated[str, Field(pattern=r"^[a-z][a-z0-9_]{0,63}$")]] = Field(',
+                "    capabilities: list[str] = Field(",
+            )
+        ],
+        _pytest(f"{UJI_REGISTRI_BERKAS}::test_registry_yang_melanggar_ditolak_tinjauan"),
+        harus_memuat="capability bukan snake_case",
+    ),
+    Mutasi(
+        "4.7",
+        "coach diam atas scope ingatan tanya-aku (E-208)",
+        [
+            Sunting(
+                f"{MODUL}/agents/program_v0.py",
+                "    if perlu_izin:" + NL + "        alasan.append(",
+                "    if False:" + NL + "        alasan.append(",
+            )
+        ],
+        _pytest(f"{UJI_AGENT_V0}::test_coach_menyatakan_ingatan_yang_belum_diizinkan"),
+        harus_memuat="dilewati diam-diam",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.2",
+        "aksi tool katalog tidak dibandingkan saat mulai (E-209)",
+        [
+            Sunting(
+                f"{MODUL}/agents/registri.py",
+                "           coalesce(array_agg(t.tool_name || ':' || t.permission ORDER BY t.tool_name)",
+                "           coalesce(array_agg(t.tool_name ORDER BY t.tool_name)",
+            ),
+            Sunting(
+                f"{MODUL}/agents/registri.py",
+                '        tools = sorted(f"{t}:{AKSI_IZIN[registri.alat[t].kind]}" for t in m.tools)',
+                "        tools = sorted(m.tools)",
+            ),
+        ],
+        _pytest(f"{UJI_KATALOG}::test_api_menolak_mulai_bila_katalog_berbeda_dari_manifest"),
+        harus_memuat="DID NOT RAISE",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.2",
+        "migrasi 0009 tidak membetulkan aksi tool baca (E-209)",
+        [
+            Sunting(
+                f"{MIGRASI}/0009_katalog_izin_dan_urutan_percakapan.up.sql",
+                "UPDATE agent_tools SET permission = 'read'",
+                "UPDATE agent_tools SET permission = 'execute'",
+            )
+        ],
+        _pytest(f"{UJI_KATALOG}::test_izin_katalog_sesuai_jenis_tool"),
+        harus_memuat="aksi katalog ≠ jenis tool-nya",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.8",
+        "indeks daftar percakapan tetap menyusun last_message_at (E-210)",
+        [
+            Sunting(
+                f"{MIGRASI}/0009_katalog_izin_dan_urutan_percakapan.up.sql",
+                "  ON ai_conversations (user_id, created_at DESC, id DESC)",
+                "  ON ai_conversations (user_id, last_message_at DESC NULLS LAST)",
+            )
+        ],
+        _pytest(UJI_MIGRASI),
+        harus_memuat="ai_conversations_user_idx",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.9",
+        "jatah panggilan model tidak dipesan (E-201)",
+        [
+            Sunting(
+                f"{MODUL}/agents/runtime.py",
+                "                conn, j.id, j.biaya_usd + gm.perkiraan_biaya(dipilih)",
+                "                conn, j.id, j.biaya_usd",
+            )
+        ],
+        _pytest(f"{UJI_ANGGARAN}::test_giliran_serentak_tidak_melewati_anggaran"),
+        harus_memuat="giliran serentak melewati anggaran",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.9",
+        "anggaran dibaca tanpa kunci per pengguna (E-201)",
+        [
+            Sunting(
+                f"{MODUL}/agents/runtime.py",
+                "            await repository.kunci_anggaran(conn, j.user_id)" + NL,
+                "",
+            )
+        ],
+        _pytest(f"{UJI_ANGGARAN}::test_pemesanan_jatah_serial_di_bawah_kunci"),
+        harus_memuat="jatah dipesan tanpa kunci",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.9",
+        "jatah bukan biaya terburuk — maks_token diabaikan (E-201)",
+        [
+            Sunting(
+                f"{MODUL}/platform/model.py",
+                "        return harga.biaya(token_masuk, permintaan.maks_token)",
+                "        return harga.biaya(token_masuk, 0)",
+            )
+        ],
+        _pytest(f"{UJI_ANGGARAN}::test_jatah_terburuk_dipesan_bukan_biaya_yang_diharapkan"),
+        harus_memuat="panggilan yang bisa melewati anggaran tetap besar",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.9",
+        "jatah tidak dilunasi sesudah panggilan (E-201)",
+        [
+            Sunting(
+                f"{MODUL}/agents/runtime.py",
+                "            await repository.catat_biaya_berjalan(conn, j.id, j.biaya_usd)",
+                "            pass",
+            )
+        ],
+        _pytest(f"{UJI_ANGGARAN}::test_jatah_dilunasi_sesudah_panggilan"),
+        harus_memuat="jatah panggilan pertama tidak dilunasi",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.9",
+        "anggaran kembali ke hari lokal — ganti zona waktu mengosongkannya (E-201)",
+        [
+            Sunting(
+                f"{MODUL}/agents/runtime.py",
+                "self._jam() - JENDELA_ANGGARAN)",
+                "(await self.kini_lokal(j.user_id)).replace("
+                "hour=0, minute=0, second=0, microsecond=0))",
+            )
+        ],
+        _pytest(f"{UJI_ANGGARAN}::test_ganti_zona_waktu_tidak_mengosongkan_anggaran"),
+        harus_memuat="ganti zona waktu mengosongkan anggaran",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.4",
+        "error run tanpa type (E-196)",
+        [
+            Sunting(
+                f"{MODUL}/agents/runtime.py",
+                '    return {"code": _kode_galat(galat), "type": type(galat).__name__}',
+                '    return {"code": _kode_galat(galat)}',
+            )
+        ],
+        _pytest(
+            f"{UJI_RUNTIME}::test_run_yang_dibatalkan_di_tengah_aliran_tetap_ditutup_dan_dibayar"
+        ),
+        harus_memuat="'type': 'CancelledError'",
+        kelompok="db",
+    ),
+    Mutasi(
+        "4.5",
+        "decision run yang ditahan berkunci bahasa internal (E-196)",
+        [
+            Sunting(
+                f"{MODUL}/agents/runtime.py",
+                '        "kind": "confirmation" if k.jenis == "konfirmasi" else "permission",  # = SSE spec/04',
+                '        "jenis": k.jenis,',
+            )
+        ],
+        _pytest(f"{UJI_GERBANG}::test_risk_2_minta_izin_sekali"),
+        harus_memuat="decision run yang ditahan",
+        kelompok="db",
+    ),
+    Mutasi(
+        "1.7",
+        "langkah mundur jam Redis 3 dtk tidak diserap — 429 palsu (E-211)",
+        [
+            Sunting(
+                f"{MODUL}/platform/batas_laju.py",
+                "_MUNDUR_DISERAP_MS = 5_000",
+                "_MUNDUR_DISERAP_MS = 2_000",
+            )
+        ],
+        _pytest(f"{UJI_LAJU}::test_langkah_mundur_jam_redis_kecil_diserap_besar_tidak"),
+        harus_memuat="langkah mundur 4000 ms",
         kelompok="db",
     ),
     # ── alat ini sendiri: mutasi yang menggantung dihentikan beserta turunannya ──

@@ -9,6 +9,12 @@ Satu giliran per percakapan pada satu waktu. Peristiwanya disimpan sampai gilira
 selesai dan `SIMPAN_S` sesudahnya, supaya klien yang menyambung SESUDAH `POST
 …/messages` — urutan yang wajar di jaringan seluler — tetap menerima seluruh
 aliran dari token pertama, bukan separuhnya.
+
+🔧 **Permintaan yang ditolak bukan giliran** (E-202): giliran yang batal SEBELUM ada
+yang terjadi — jawaban konfirmasi yang sudah dijawab, pesan ber-id kembar — di-
+`urungkan`, dan aliran kembali ke giliran sebelumnya. Dulu penolakannya mengirim
+`error` ke giliran baru yang kosong: klien yang menyambung ulang kehilangan `done`
+giliran yang sungguh terjadi.
 """
 
 from __future__ import annotations
@@ -29,30 +35,49 @@ class GiliranBerjalan(RuntimeError):
 
 
 @dataclass
-class _Giliran:
+class Giliran:
     peristiwa: list[tuple[str, dict[str, Any]]] = field(default_factory=list)
     selesai: bool = False
     kondisi: asyncio.Condition = field(default_factory=asyncio.Condition)
+    buang_pada: float | None = None  # jam loop saat giliran yang selesai dibuang
 
 
-def _ada_yang_baru(g: _Giliran, dibaca: int) -> bool:
+def _ada_yang_baru(g: Giliran, dibaca: int) -> bool:
     return dibaca < len(g.peristiwa) or g.selesai
 
 
 class AliranPercakapan:
     def __init__(self, simpan_s: float = SIMPAN_S) -> None:
         self._simpan_s = simpan_s
-        self._giliran: dict[UUID, _Giliran] = {}
+        self._giliran: dict[UUID, Giliran] = {}
 
     def sibuk(self, percakapan_id: UUID) -> bool:
         g = self._giliran.get(percakapan_id)
         return g is not None and not g.selesai
 
-    def mulai(self, percakapan_id: UUID) -> None:
-        """Giliran baru — `GiliranBerjalan` bila yang sebelumnya belum selesai."""
+    def mulai(self, percakapan_id: UUID) -> Giliran | None:
+        """Giliran baru — `GiliranBerjalan` bila yang sebelumnya belum selesai. Yang
+        dikembalikan: giliran sebelumnya, untuk `urungkan`."""
         if self.sibuk(percakapan_id):
             raise GiliranBerjalan("percakapan ini sedang menjawab")
-        self._giliran[percakapan_id] = _Giliran()
+        lama = self._giliran.get(percakapan_id)
+        self._giliran[percakapan_id] = Giliran()
+        return lama
+
+    async def urungkan(self, percakapan_id: UUID, lama: Giliran | None) -> None:
+        """Giliran yang batal sebelum mengirim satu peristiwa pun: aliran kembali ke `lama`."""
+        g = self._giliran.get(percakapan_id)
+        if g is None or g.peristiwa or g.selesai:
+            return
+        async with g.kondisi:
+            g.selesai = True  # pengikut yang terlanjur menunggu giliran kosong ini berhenti
+            g.kondisi.notify_all()
+        loop = asyncio.get_running_loop()
+        if lama is None or lama.buang_pada is None or loop.time() >= lama.buang_pada:
+            del self._giliran[percakapan_id]
+            return
+        self._giliran[percakapan_id] = lama
+        loop.call_at(lama.buang_pada, self._buang, percakapan_id, lama)
 
     async def kirim(self, percakapan_id: UUID, jenis: str, data: Mapping[str, Any]) -> None:
         g = self._giliran.get(percakapan_id)
@@ -62,10 +87,12 @@ class AliranPercakapan:
             g.peristiwa.append((jenis, dict(data)))
             if jenis in PERISTIWA_AKHIR:
                 g.selesai = True
-                asyncio.get_running_loop().call_later(self._simpan_s, self._buang, percakapan_id, g)
+                loop = asyncio.get_running_loop()
+                g.buang_pada = loop.time() + self._simpan_s
+                loop.call_at(g.buang_pada, self._buang, percakapan_id, g)
             g.kondisi.notify_all()
 
-    def _buang(self, percakapan_id: UUID, g: _Giliran) -> None:
+    def _buang(self, percakapan_id: UUID, g: Giliran) -> None:
         if self._giliran.get(percakapan_id) is g:
             del self._giliran[percakapan_id]
 

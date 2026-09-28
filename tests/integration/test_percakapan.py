@@ -19,13 +19,13 @@ from typing import Any
 
 import httpx
 import pytest
-from _bantuan_agent import sql
+from _bantuan_agent import REGISTRI, sql
 from _bantuan_db import ApiUji, BasisDataV0, auth
 from asgi_lifespan import LifespanManager
 from test_habits import buat_habit
 
 from hvx.main import create_app
-from hvx.modules import platform
+from hvx.modules import identity, platform
 from hvx.modules.platform import Settings, buat_engine
 
 pytestmark = pytest.mark.integration
@@ -377,3 +377,207 @@ async def test_pesan_yang_dikirim_ulang_tidak_melahirkan_giliran_kedua(api: ApiU
     assert sql(
         api, "SELECT count(*) FROM agent_runs WHERE user_id = %s AND parent_run_id IS NULL", uid
     ) == [(1,)]
+
+
+# ── Tinjauan Sprint 4 (E-199 · E-200 · E-202 · E-203) ──────────────────────────────
+
+
+def _kode(r: httpx.Response) -> str | None:
+    kode: str | None = r.json().get("error", {}).get("code")
+    return kode
+
+
+async def _jawab(api: ApiUji, token: str, cid: str, tok: str, keputusan: str) -> httpx.Response:
+    return await api.klien.post(
+        f"/v1/conversations/{cid}/confirmations",
+        json={"token": tok, "decision": keputusan},
+        headers=auth(token),
+    )
+
+
+async def test_id_percakapan_buatan_klien_yang_sudah_ada_409(api: ApiUji) -> None:
+    """spec/04 *klien boleh membuat id sendiri* — id kembar `409 already_exists` seperti
+    modul lain, bukan 500 (tinjauan kontrak Sprint 4) — juga id milik pengguna lain."""
+    _a, token_a = await api.pengguna_baru()
+    _b, token_b = await api.pengguna_baru()
+    cid = str(uuid.uuid4())
+
+    awal = await api.klien.post("/v1/conversations", json={"id": cid}, headers=auth(token_a))
+    ulang = await api.klien.post("/v1/conversations", json={"id": cid}, headers=auth(token_a))
+    lain = await api.klien.post("/v1/conversations", json={"id": cid}, headers=auth(token_b))
+
+    assert awal.status_code == 201, awal.text
+    assert [(r.status_code, _kode(r)) for r in (ulang, lain)] == [(409, "already_exists")] * 2
+
+
+async def test_id_pesan_kembar_409_dan_aliran_giliran_terakhir_utuh(api: ApiUji) -> None:
+    """E-200: kiriman ulang klien luring (id buatannya, tanpa Idempotency-Key yang sama) —
+    dulu 500, run akarnya ditinggal `running` selamanya, dan `error` menimpa aliran."""
+    uid, token = await api.pengguna_baru()
+    cid = await _percakapan(api, token)
+    kirim = {"id": str(uuid.uuid4()), "content": "halo"}
+
+    a = await api.klien.post(f"/v1/conversations/{cid}/messages", json=kirim, headers=auth(token))
+    assert a.status_code == 202, a.text
+    giliran = await _aliran(api, token, cid)
+    b = await api.klien.post(f"/v1/conversations/{cid}/messages", json=kirim, headers=auth(token))
+    sesudah = await _aliran(api, token, cid)
+
+    assert (b.status_code, _kode(b)) == (409, "already_exists"), b.text
+    assert sql(
+        api, "SELECT count(*) FROM agent_runs WHERE user_id = %s AND status = 'running'", uid
+    ) == [(0,)], "run ditinggal running"
+    assert sql(
+        api, "SELECT count(*) FROM agent_runs WHERE user_id = %s AND status = 'failed'", uid
+    ) == [(0,)], "id kembar menulis run lalu menggagalkannya — diperiksa sesudah, bukan sebelum"
+    assert sesudah == giliran, "permintaan yang ditolak menimpa aliran giliran terakhir"
+
+
+async def test_id_pesan_milik_pengguna_lain_run_yang_terlanjur_ditulis_ditutup(api: ApiUji) -> None:
+    """Id pesan pengguna LAIN tidak terlihat sebelum run ditulis (RLS) — tabrakannya baru
+    ketahuan saat pesan disisipkan. Run yang terlanjur ditulis ditutup `failed` (E-200)."""
+    _a, token_a = await api.pengguna_baru()
+    uid_b, token_b = await api.pengguna_baru()
+    cid_a, cid_b = await _percakapan(api, token_a), await _percakapan(api, token_b)
+    kirim = {"id": str(uuid.uuid4()), "content": "halo"}
+    r = await api.klien.post(
+        f"/v1/conversations/{cid_a}/messages", json=kirim, headers=auth(token_a)
+    )
+    assert r.status_code == 202, r.text
+    await _aliran(api, token_a, cid_a)
+
+    b = await api.klien.post(
+        f"/v1/conversations/{cid_b}/messages", json=kirim, headers=auth(token_b)
+    )
+    runs = sql(api, "SELECT status, error FROM agent_runs WHERE user_id = %s", uid_b)
+    aliran_b = await api.klien.get(f"/v1/conversations/{cid_b}/stream", headers=auth(token_b))
+
+    assert (b.status_code, _kode(b)) == (409, "already_exists"), b.text
+    assert runs == [("failed", {"code": "already_exists", "type": "GalatApi"})], (
+        f"run yang ditulis sebelum pesannya ditolak tidak ditutup: {runs}"
+    )
+    assert aliran_b.status_code == 204, "permintaan yang ditolak meninggalkan giliran di aliran"
+
+
+async def test_dua_izin_dalam_satu_giliran_bisa_dijawab_dan_keduanya_berlaku(
+    api: ApiUji,
+) -> None:
+    """E-199: pengguna memilih *“tanya aku”* untuk habit-agent MEMBACA habits, lalu
+    `habit.complete` (R2) meminta izin kedua — dulu token kedua ditolak `422` (pesannya
+    dicari di run akar ulangan), dan persetujuan pertama hilang di ulangan berikutnya."""
+    uid, token = await api.pengguna_baru()
+    habit = await buat_habit(api, token, title="Lari pagi")
+    izin = api.app.state.percakapan._izin
+    await izin.tetapkan(uid, identity.Subjek("agent", "habit-agent"), "habits", "read", "ask")
+    cid = await _percakapan(api, token)
+
+    pertama = await _tahan(api, token, cid, "tandai lari pagi selesai")
+    r1 = await _jawab(api, token, cid, pertama["token"], "allow_once")
+    assert r1.status_code == 202, f"izin pertama ditolak: {r1.text}"
+    ulang = await _aliran(api, token, cid)
+    (kedua,) = [d for j, d in ulang if j == "confirmation_required"]
+    r2 = await _jawab(api, token, cid, kedua["token"], "allow_once")
+    assert r2.status_code == 202, f"izin kedua ditolak: {r2.text}"
+    akhir = await _aliran(api, token, cid)
+
+    assert (pertama["tool"], kedua["tool"]) == ("habit.list", "habit.complete")
+    assert [j for j, _ in akhir if j == "confirmation_required"] == [], (
+        "persetujuan pertama hilang di ulangan kedua — ditanya lagi"
+    )
+    (done,) = [d for j, d in akhir if j == "done"]
+    assert done["content"].startswith("“Lari pagi” ditandai selesai untuk ")
+    assert sql(api, "SELECT count(*) FROM habit_completions WHERE habit_id = %s", habit["id"]) == [
+        (1,)
+    ]
+
+
+async def test_jawaban_konfirmasi_yang_ditolak_tidak_menimpa_aliran(api: ApiUji) -> None:
+    """E-202: `GET …/stream` = seluruh peristiwa giliran TERAKHIR. Jawaban kedua (409) bukan
+    giliran — dulu `jawab` memulai giliran baru SEBELUM memeriksanya, lalu mengirim
+    `error`: klien yang menyambung ulang kehilangan `done` yang sungguh terjadi."""
+    _uid, token = await api.pengguna_baru()
+    await buat_habit(api, token, title="Lari pagi")
+    cid = await _percakapan(api, token)
+    tanya = await _tahan(api, token, cid, "tandai lari pagi selesai")
+    r = await _jawab(api, token, cid, tanya["token"], "allow_once")
+    assert r.status_code == 202, r.text
+    giliran = await _aliran(api, token, cid)
+
+    lagi = await _jawab(api, token, cid, tanya["token"], "allow_once")
+    rusak = await _jawab(api, token, cid, tanya["token"] + "x", "allow_once")
+    sesudah = await _aliran(api, token, cid)
+
+    assert (lagi.status_code, _kode(lagi)) == (409, "confirmation_answered")
+    assert (rusak.status_code, _kode(rusak)) == (422, "invalid_confirmation")
+    assert sesudah == giliran, "jawaban yang ditolak menimpa aliran giliran terakhir"
+
+
+async def test_ketukan_ganda_saat_giliran_ulangan_berjalan_dijawab_sudah_dijawab(
+    api: ApiUji, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """spec/04: jawaban kedua → `409 confirmation_answered` — juga saat giliran ulangannya
+    masih berjalan (dulu `turn_in_progress`: giliran diperiksa sebelum tokennya)."""
+    _uid, token = await api.pengguna_baru()
+    await buat_habit(api, token, title="Lari pagi")
+    cid = await _percakapan(api, token)
+    tanya = await _tahan(api, token, cid, "tandai lari pagi selesai")
+    lepas = asyncio.Event()
+    pelaksana = api.app.state.percakapan.runtime.pelaksana
+    asli = pelaksana._impl["habit.complete"]
+
+    async def tertahan(k: Any, m: dict[str, Any]) -> dict[str, Any]:
+        await lepas.wait()
+        hasil: dict[str, Any] = await asli(k, m)
+        return hasil
+
+    monkeypatch.setitem(pelaksana._impl, "habit.complete", tertahan)
+
+    r1 = await _jawab(api, token, cid, tanya["token"], "allow_once")
+    r2 = await _jawab(api, token, cid, tanya["token"], "allow_once")
+    lepas.set()
+    await _aliran(api, token, cid)
+
+    assert r1.status_code == 202, r1.text
+    assert (r2.status_code, _kode(r2)) == (409, "confirmation_answered")
+
+
+async def test_galat_sse_berkode_api_bukan_kode_internal(api: ApiUji) -> None:
+    """E-203 (AGENTS.md §7): `error.code` di SSE = kode API berbahasa Inggris — batas laju
+    tool menjadi `rate_limited` (spec/04), bukan `terlalu_sering` pelaksana."""
+    uid, token = await api.pengguna_baru()
+    cid = await _percakapan(api, token)
+    pembatas: platform.PembatasLaju = api.app.state.percakapan.runtime.pelaksana._pembatas
+    jumlah = int(REGISTRI.alat["agent.coach"].rate_limit.split("/")[0])
+    batas = platform.BatasLaju("alat-agent-coach", jumlah, 60)
+    for _ in range(jumlah):
+        await pembatas.ambil(batas, str(uid))
+
+    await _kirim(api, token, cid, "halo")
+    peristiwa = await _aliran(api, token, cid)
+
+    assert peristiwa[-1] == ("error", {"code": "rate_limited"}), f"SSE: {peristiwa}"
+
+
+async def test_jawaban_yang_kalah_balapan_tidak_menimpa_aliran(
+    api: ApiUji, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Dua jawaban serentak: keduanya lolos pemeriksaan awal, satu kalah saat dicatat
+    (`UPDATE … WHERE confirmed_by_user IS NULL`). Yang kalah bukan giliran — giliran yang
+    sudah dimulainya di-`urungkan`, aliran tetap giliran terakhir (E-202)."""
+    from hvx.modules.agents import repository
+
+    _uid, token = await api.pengguna_baru()
+    await buat_habit(api, token, title="Lari pagi")
+    cid = await _percakapan(api, token)
+    tanya = await _tahan(api, token, cid, "tandai lari pagi selesai")
+    sebelum = await _aliran(api, token, cid)
+
+    async def kalah(*_a: Any, **_k: Any) -> bool:
+        return False
+
+    monkeypatch.setattr(repository, "jawab_run", kalah)
+    r = await _jawab(api, token, cid, tanya["token"], "allow_once")
+    sesudah = await _aliran(api, token, cid)
+
+    assert (r.status_code, _kode(r)) == (409, "confirmation_answered")
+    assert sesudah == sebelum, "jawaban yang kalah balapan menimpa aliran giliran terakhir"

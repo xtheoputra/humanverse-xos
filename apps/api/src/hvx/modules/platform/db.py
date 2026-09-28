@@ -26,7 +26,7 @@ yang sedang dilayani.
 
 from __future__ import annotations
 
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from uuid import UUID
@@ -154,6 +154,12 @@ async def pastikan_peran_aplikasi(engine: AsyncEngine, *, pekerja: bool = False)
 
 
 _SETEL_PENGGUNA = text("SELECT set_config('hvx.user_id', :user_id, true)")
+
+# Jejak sebuah tulisan — mis. audit tulisan agent (spec/05 *Risk gate*). Dijalankan modul
+# PEMILIK datanya di transaksi tulisannya, hanya bila sesuatu sungguh berubah: modul
+# pemilik tidak perlu mengenal siapa yang mencatat, dan tulisan tanpa jejaknya — atau
+# jejak tanpa tulisannya — tidak bisa terjadi.
+JejakTulisan = Callable[[AsyncConnection], Awaitable[None]]
 
 
 @asynccontextmanager

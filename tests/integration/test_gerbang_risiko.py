@@ -106,9 +106,7 @@ def _selesai(api: ApiUji, uid: UUID) -> int:
 async def _jawab(
     api: ApiUji, uid: UUID, p: agents.PermintaanKonfirmasi, jawaban: agents.JawabanKonfirmasi
 ) -> agents.PersetujuanAksi | None:
-    return await agents.jawab_konfirmasi(
-        api.app.state.engine, _izin(api), _tanda(api), uid, p.token, jawaban
-    )
+    return await agents.jawab_konfirmasi(_izin(api), _tanda(api), uid, p.token, jawaban)
 
 
 async def test_risk_2_minta_izin_sekali(api_bersama: ApiUji) -> None:
@@ -125,8 +123,8 @@ async def test_risk_2_minta_izin_sekali(api_bersama: ApiUji) -> None:
         "tool": "habit.complete",
         "agent": "habit-agent",
         "risk_level": 2,
-        "jenis": "izin",
-    }
+        "kind": "permission",
+    }, f"decision run yang ditahan: {ditahan['decision']}"
     assert _selesai(api_bersama, uid) == 0, "tulisan R2 dijalankan sebelum diizinkan"
 
     persetujuan = await _jawab(api_bersama, uid, p, "izinkan_selalu")
@@ -144,9 +142,13 @@ async def test_risk_2_minta_izin_sekali(api_bersama: ApiUji) -> None:
     assert await _izin(api_bersama).cek(uid, HABIT, "habits", "write") == "allow"
     assert sql(
         api_bersama,
-        "SELECT action, subject_id FROM audit_logs WHERE user_id = %s AND action LIKE 'agent.%%'",
+        "SELECT action, subject_id FROM audit_logs WHERE user_id = %s AND action LIKE 'agent.%%'"
+        " ORDER BY id",
         uid,
-    ) == [("agent.action_approved", "habit.complete")], "jawaban pengguna tidak tercatat"
+    ) == [
+        ("agent.action_approved", "habit.complete"),
+        ("agent.tool_executed", "habit.complete"),  # tulisan agent berjejak (E-205)
+    ], "jawaban pengguna atau tulisan agent tidak tercatat"
 
 
 async def test_risk_2_izinkan_sekali_tidak_diingat(api_bersama: ApiUji) -> None:
@@ -327,9 +329,7 @@ async def test_token_kedaluwarsa_ditolak(api_bersama: ApiUji) -> None:
 
 
 async def _jawab_token(api: ApiUji, uid: UUID, token: str) -> None:
-    await agents.jawab_konfirmasi(
-        api.app.state.engine, _izin(api), _tanda(api), uid, token, "tolak"
-    )
+    await agents.jawab_konfirmasi(_izin(api), _tanda(api), uid, token, "tolak")
 
 
 def _isi(p: agents.PermintaanKonfirmasi) -> dict[str, Any]:
@@ -378,3 +378,33 @@ async def test_delegasi_tidak_ditanya_dua_kali(api_bersama: ApiUji) -> None:
     )
     assert anak == [(True,)], "persetujuan giliran tidak sampai ke run anak"
     assert _selesai(api_bersama, uid) == 1
+
+
+async def test_izin_selalu_disimpan_bersama_jawabannya_atau_tidak_sama_sekali(
+    api_bersama: ApiUji, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Dulu jawaban dicatat dan di-commit LEBIH DULU, izinnya disimpan sesudahnya: izin
+    yang gagal disimpan meninggalkan token terpakai tanpa izin — jawaban kedua `409`, dan
+    pengguna ditanya lagi di giliran berikutnya. Kini satu transaksi (`MesinIzin.ubah`)."""
+    uid, token = await api_bersama.pengguna_baru()
+    await buat_habit(api_bersama, token)
+    p = await _ditahan(_runtime(api_bersama, {"habit-agent": _tandai()}), uid)
+
+    async def gagal(*_a: Any, **_k: Any) -> None:
+        raise RuntimeError("izin gagal disimpan")
+
+    monkeypatch.setattr(identity.UbahanIzin, "tetapkan", gagal)
+    with pytest.raises(RuntimeError, match="izin gagal disimpan"):
+        await _jawab(api_bersama, uid, p, "izinkan_selalu")
+    monkeypatch.undo()
+
+    assert run(api_bersama, p.run_id)["confirmed_by_user"] is None, "jawaban tercatat tanpa izin"
+    assert sql(
+        api_bersama,
+        "SELECT count(*) FROM audit_logs WHERE user_id = %s AND action LIKE 'agent.%%'",
+        uid,
+    ) == [(0,)]
+    assert await _jawab(api_bersama, uid, p, "izinkan_selalu") is not None, (
+        "jawaban yang gagal tidak bisa diulang"
+    )
+    assert await _izin(api_bersama).cek(uid, HABIT, "habits", "write") == "allow"
