@@ -5493,7 +5493,16 @@ MUTASI: list[Mutasi] = [
                 f"{MODUL}/agents/alat_v0.py",
                 '            "sleep_hours": c.sleep_hours,\n',
                 '            "sleep_hours": c.sleep_hours,\n            "note": c.note,\n',
-            )
+            ),
+            # `note` dinyatakan di skema keluaran juga: tanpa ini gerbang keluaran
+            # (E-206) menolak medan asing LEBIH DULU, dan uji C-32 (baris 103) tak
+            # pernah benar-benar menyentuh isinya — bocornya yang harus ketahuan di
+            # sana, bukan skemanya. Dengan `note` dinyatakan, leleh sampai ke baris 103.
+            Sunting(
+                f"{MODUL}/agents/alat/checkin.get.yaml",
+                "      sleep_hours: number | null\n",
+                "      sleep_hours: number | null\n      note: string | null\n",
+            ),
         ],
         _pytest(f"{UJI_ALAT}::test_alat_baca_coach_tanpa_catatan_bebas_pengguna"),
         harus_memuat="catatan bebas pengguna keluar",
@@ -5507,7 +5516,14 @@ MUTASI: list[Mutasi] = [
                 f"{MODUL}/agents/alat_v0.py",
                 '{"valence": x.valence, "label": x.label, "occurred_at": x.occurred_at.isoformat()}',
                 '{"valence": x.valence, "label": x.label, "note": x.note, "occurred_at": x.occurred_at.isoformat()}',
-            )
+            ),
+            # idem checkin.get: `note` dinyatakan di skema supaya bocornya sampai ke
+            # baris 103 (C-32), bukan dihentikan gerbang keluaran (E-206) karena alasan lain.
+            Sunting(
+                f"{MODUL}/agents/alat/mood.recent.yaml",
+                "        label: string | null\n",
+                "        label: string | null\n        note: string | null\n",
+            ),
         ],
         _pytest(f"{UJI_ALAT}::test_alat_baca_coach_tanpa_catatan_bebas_pengguna"),
         harus_memuat="catatan bebas pengguna keluar",

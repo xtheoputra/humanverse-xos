@@ -186,6 +186,22 @@ percakapan di bawah kunci yang sudah ada: `GREATEST(clock_timestamp(), last_mess
 `hmac.compare_digest(str, str)` melempar TypeError untuk non-ASCII. ✅ Dibandingkan
 sebagai byte.
 
+#### 🔴 E-214 — gerbang penuh (1 Okt 2026): dua mutasi C-32 ditangkap gerbang keluaran, bukan uji C-32
+
+Putaran mutasi basis data yang **penuh** — tak pernah tuntas di Sesi 34, dihentikan pemilik
+pada mutasi ke-84 dari 415, maka klaim *“0 diam”* saat itu hanya atas 84 — menemukan dua mutasi
+`4.3` **DIAM/SALAH ALASAN**: `checkin.get` dan `mood.recent` yang **membocorkan `note` pengguna**
+(C-32). Keduanya ditulis sebelum gerbang keluaran (**E-206**) ada; sesudahnya, medan `note` yang
+tak dinyatakan ditolak gerbang keluaran LEBIH DULU (`RuntimeError: … mengembalikan medan yang tidak
+dinyatakan … ['note']`), sehingga uji C-32 (`test_alat_baca_coach_tanpa_catatan_bebas_pengguna`,
+`assert "rahasia" not in …`) tak pernah menyentuh isinya — penjaga yang tak bisa merah pada mutasi
+itu (arch/11: *“pemeriksa yang tak pernah merah tak dihitung ada”*). ✅ Mutasinya kini **menyatakan
+`note` di skema keluaran tool juga** (`checkin.get.yaml` · `mood.recent.yaml`), supaya bocornya leleh
+sampai ke uji C-32 — kini merah dengan alasan yang benar (*“catatan bebas pengguna keluar dari tool
+coach (C-32)”*). Dua lapis C-32 kini punya mutasi masing-masing: gerbang keluaran (E-206) untuk medan
+asing, uji C-32 untuk medan yang **dinyatakan**. Putaran penuh: `84 → 415` mutasi db, **415/415
+berbunyi, 0 diam**.
+
 #### Yang TIDAK dibetulkan, dari tinjauan ini
 
 | Temuan | Kenapa | Ke mana |
