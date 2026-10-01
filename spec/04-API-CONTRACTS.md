@@ -247,6 +247,7 @@ POST   /conversations                    { title? }
 GET    /conversations/{id}/messages      ?cursor=
 POST   /conversations/{id}/messages      { content }   → 202, balasan lewat stream
 GET    /conversations/{id}/stream        → SSE: token, tool_call, done
+POST   /conversations/{id}/confirmations { token, decision }   → 202  🔧 E-195
 ```
 
 Balasan `POST /messages`:
@@ -274,6 +275,75 @@ Peristiwa SSE `done`:
 > `confidence` dan `rationale` ikut di **setiap** balasan AI, bukan hanya
 > rekomendasi — itu penerapan Confidence Layer (§19) dan Explainable AI
 > (naskah 4 §29) di lapisan API, bukan sekadar di basis data.
+
+> 🔧 **Diterapkan Sprint 4 (tugas 4.8, 24 Sep 2026) — dan yang ditambahkan.**
+>
+> * **Giliran.** `POST …/messages` menjawab `202` sesudah run akarnya ditulis
+>   (`agent_run_id` sah dirujuk). Perintah berbentuk tetap (*“catat mood 3”*, 4.1)
+>   dijalankan saat itu juga, **tanpa agent dan tanpa model**: `agent_run_id: null`,
+>   `status: "completed"`, `done.cost_usd: 0`. Satu giliran per percakapan —
+>   pesan kedua saat yang pertama masih dijawab → `409 turn_in_progress`.
+> * **`GET …/stream`** — seluruh peristiwa giliran terakhir **dari yang pertama**
+>   (klien boleh menyambung sesudah `POST`), berakhir dengan `done` atau `error {code}`;
+>   `204` bila tidak ada giliran yang sedang atau baru saja berjalan — di SSE, 204
+>   berarti *jangan menyambung ulang* (balasan yang sudah selesai dibaca dari
+>   `GET …/messages`). `tool_call` = `{tool, agent}` — tanpa masukannya. Aliran hidup di
+>   proses api yang menjalankan gilirannya (**K-31**). `done` juga memuat `message_id`;
+>   `cost_usd` = seluruh pohon run giliran itu.
+> * 🔧 **E-194 — riwayat membawa alasannya.** `GET …/messages` (terbaru dulu, kursor
+>   `(created_at, id)`) mengembalikan `confidence`, `rationale`, dan `cost_usd` tiap
+>   balasan — `ai_messages` semula tanpa kedua kolom pertama (migrasi `0008`), jadi
+>   balasan yang dibaca ulang kehilangan alasannya.
+> * 🔧 **E-195 — konfirmasi punya rute.** spec/05 menulis *“`ask` → minta izin”* dan
+>   spec/07 4.5 *“risk 2 minta izin sekali”*, tetapi tidak ada rute untuk MENJAWABNYA.
+>   Giliran yang ditahan gerbang mengalirkan `confirmation_required`:
+>
+>   ```json
+>   {
+>     "token": "…", "kind": "permission", "agent": "habit-agent",
+>     "tool": "habit.complete", "risk_level": 2, "scopes": ["habits"],
+>     "remember_allowed": true, "expires_at": "2026-09-24T10:15:00+00:00"
+>   }
+>   ```
+>
+>   lalu `done` berisi pertanyaannya. `POST …/confirmations { token, decision }` —
+>   `decision` ∈ `allow_always` (hanya bila `remember_allowed`: izin disimpan, tidak
+>   ditanya lagi) · `allow_once` · `reject` — menjawab `202 { agent_run_id, status }`,
+>   dan giliran yang sama diulang dari pesan penggunanya; hasilnya lewat `…/stream`.
+>   `kind: "confirmation"` (R3) tidak bisa diingat. Token bertanda tangan, 15 menit,
+>   milik satu pengguna dan satu percakapan, **sekali pakai**: jawaban kedua →
+>   `409 confirmation_answered`; token rusak, kedaluwarsa, atau milik percakapan lain
+>   → `422 invalid_confirmation` (tanpa membedakan ketiganya).
+>
+> 🔧 **Tinjauan tiga lensa sebelum PR (28 Sep 2026)** — yang ditambahkan:
+>
+> * **Satu giliran bisa ditanya lebih dari sekali** (E-199) — *“tanya aku”* untuk
+>   bacaan, lalu tulisan R2. Token membawa pesan pengguna yang memulai giliran dan
+>   persetujuan yang sudah dipegangnya; jawaban berikutnya mengulang giliran dengan
+>   **semuanya**. Semua yang bisa menolak jawaban — token, `allow_always` untuk
+>   `confirmation`, percakapannya, *sudah dijawab* — diperiksa **sebelum** giliran
+>   baru dimulai: ketukan ganda saat giliran ulangan masih berjalan →
+>   `409 confirmation_answered`, bukan `turn_in_progress` (E-202).
+> * **Permintaan yang ditolak bukan giliran** (E-202): `409` · `422` pada
+>   `…/messages` atau `…/confirmations` tidak menyentuh `GET …/stream` — aliran
+>   tetap giliran terakhir yang sungguh terjadi.
+> * **Id buatan klien** (tabel *Umum*): `POST /conversations` dan `POST …/messages`
+>   dengan `id` yang sudah ada → `409 already_exists`, seperti modul lain — juga id
+>   milik pengguna lain. Run yang terlanjur ditulis sebelum pesannya ditolak ditutup
+>   `failed` (E-200).
+> * **`error.code` SSE** (E-203) — kode API berbahasa Inggris, bukan kode internal:
+>   `rate_limited` (batas laju tool) · `agent_error` (program agent memanggil tool atau
+>   memutuskan secara salah — bukan salah klien) · `model_unavailable` · `cancelled`
+>   · `internal_error` · kode layanan pemilik data yang menolak tulisan tool
+>   (`not_found`, `invalid_tier`, `for_date_in_future`, …).
+> * **`GET /conversations`** — terbaru **dibuat** dulu, kursor `(created_at, id)`:
+>   urutan yang tidak bergeser saat percakapan lain menerima pesan (E-210).
+> * **`status` giliran** di `202` dan saat diputar ulang (Idempotency-Key): `processing` ·
+>   `completed` · 🆕 `failed` — giliran yang berakhir SSE `error` tidak menyimpan balasan,
+>   dan dulu terbaca `processing` selamanya (E-212).
+> * **Riwayat terurut `(created_at, id)`, dan cap waktunya monoton per percakapan**
+>   (E-213): jam basis data yang melangkah mundur tidak lagi membuat balasan tampak lebih
+>   tua dari pertanyaannya.
 
 ---
 

@@ -24,6 +24,7 @@ from .ekstraksi import (
     id_memori,
     selaraskan_jurnal,
 )
+from .ingatan import ISI_MAKS, HasilIngat, ingat, periksa_ingatan
 from .pencarian import MAKS_HASIL, PencariMemori
 from .penyelaras import INDEKS_PAYLOAD, MAKS_TEKS_SEMAT, PenyelarasVektor
 from .schemas import HasilCariMemori, Memori, MemoriDitemukan
@@ -31,17 +32,21 @@ from .schemas import HasilCariMemori, Memori, MemoriDitemukan
 __all__ = [
     "BUKTI_SATU_KEJADIAN",
     "INDEKS_PAYLOAD",
+    "ISI_MAKS",
     "JENIS_EVENT",
     "KEYAKINAN_LAPORAN_SENDIRI",
     "MAKS_HASIL",
     "MAKS_TEKS_SEMAT",
     "VERSI_EKSTRAKSI",
     "HasilCariMemori",
+    "HasilIngat",
     "Memori",
     "MemoriDitemukan",
     "PencariMemori",
     "PenyelarasVektor",
     "ekstrak",
     "id_memori",
+    "ingat",
+    "periksa_ingatan",
     "selaraskan_jurnal",
 ]

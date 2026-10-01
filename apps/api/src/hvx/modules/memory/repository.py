@@ -114,6 +114,26 @@ _BUANG = text(
     "DELETE FROM memories WHERE id = ANY(CAST(:ids AS uuid[])) AND deleted_at IS NOT NULL"
 )
 
+# memory.write (spec/05, 4.3): memori yang pengguna MINTA diingat. Dikunci per
+# (pengguna, scope) supaya dua permintaan serentak yang sama tidak melahirkan dua baris.
+_KUNCI_INGAT = text("SELECT pg_advisory_xact_lock(hashtextextended(:kunci, 0))")
+_SUDAH_DIINGAT = text(
+    """
+    SELECT id FROM memories
+    WHERE kind = 'semantic' AND scope = :scope AND content = :content AND deleted_at IS NULL
+      AND (valid_until > now() OR valid_until IS NULL)
+    LIMIT 1
+    """
+)
+_SISIP_INGATAN = text(
+    """
+    INSERT INTO memories (user_id, kind, scope, content, confidence, evidence_count,
+                          model_version)
+    VALUES (:user_id, 'semantic', :scope, :content, :confidence, 1, :model_version)
+    RETURNING id
+    """
+)
+
 
 @dataclass(frozen=True)
 class BarisSelaras:
@@ -207,3 +227,32 @@ async def tandai_tersemat(conn: AsyncConnection, baris: list[BarisSelaras], mode
 async def buang(conn: AsyncConnection, ids: list[UUID]) -> None:
     if ids:
         await conn.execute(_BUANG, {"ids": ids})
+
+
+async def ingat(
+    conn: AsyncConnection,
+    *,
+    user_id: UUID,
+    scope: str,
+    content: str,
+    confidence: Decimal,
+    model_version: str,
+) -> tuple[UUID, bool]:
+    """(id, baru) — `baru=False`: isi yang sama sudah diingat di scope itu."""
+    await conn.execute(_KUNCI_INGAT, {"kunci": f"memori-ingat:{user_id}:{scope}"})
+    ada = (await conn.execute(_SUDAH_DIINGAT, {"scope": scope, "content": content})).first()
+    if ada is not None:
+        return ada.id, False
+    baris = (
+        await conn.execute(
+            _SISIP_INGATAN,
+            {
+                "user_id": user_id,
+                "scope": scope,
+                "content": content,
+                "confidence": confidence,
+                "model_version": model_version,
+            },
+        )
+    ).one()
+    return baris.id, True

@@ -22,6 +22,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from hvx import __version__
 from hvx.modules import (
     activities,
+    agents,
     checkins,
     goals,
     habits,
@@ -38,6 +39,9 @@ DOKUMENTASI_TERBUKA: frozenset[str] = frozenset({"local", "test", "ci"})
 def create_app(settings: platform.Settings | None = None) -> FastAPI:
     settings = settings or platform.Settings()  # dari lingkungan (HVX_*)
     platform.konfigurasi_log(level=settings.log_level, json=settings.log_json)
+    # spec/07 4.2: manifest & tool registry divalidasi SEBELUM api bisa dibuat —
+    # satu pelanggaran aturan spec/05 dan tidak ada yang melayani (K-29).
+    registri = agents.muat_registri()
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
@@ -45,6 +49,8 @@ def create_app(settings: platform.Settings | None = None) -> FastAPI:
         try:
             # B-40: api tidak pernah melayani sebagai peran yang melewati RLS.
             await platform.pastikan_peran_aplikasi(engine)
+            # K-29: katalog `agents` (dikelola migrasi) == manifest yang divalidasi.
+            await agents.pastikan_katalog(engine, registri)
         except BaseException:
             await engine.dispose()
             raise
@@ -59,9 +65,47 @@ def create_app(settings: platform.Settings | None = None) -> FastAPI:
             "db": partial(platform.ping_db, engine),
             "redis": partial(platform.ping_redis, redis),
         }
+        # spec/07 4.3–4.8: agent hanya lewat runtime ini — tool lewat pelaksana (registry,
+        # manifest, masukan, batas laju, gerbang risiko), model lewat AI Gateway.
+        mesin_izin = identity.MesinIzin(
+            engine, redis, settings.redis_prefix, settings.permission_cache_ttl_s
+        )
+        tanda = agents.TokenKonfirmasi(partial(platform.sidik, settings, "konfirmasi-agent"))
+        vektor = platform.klien_vektor_dari(settings)
+        pencari = (
+            memory.PencariMemori(
+                engine,
+                mesin_izin,
+                vektor,
+                platform.penyemat_dari(settings),
+                settings.qdrant_koleksi,
+            )
+            if vektor
+            else None
+        )
+        runtime = agents.RuntimeAgent(
+            engine,
+            registri,
+            agents.PROGRAM_V0,
+            agents.PelaksanaAlat(
+                registri,
+                agents.IMPLEMENTASI,
+                agents.GerbangRisiko(engine, mesin_izin, tanda),
+                platform.PembatasLaju(redis, settings.redis_prefix),
+            ),
+            platform.gerbang_model_dari(settings),
+            pencari,
+            anggaran_harian_usd=settings.ai_anggaran_harian_usd,
+        )
+        app.state.percakapan = agents.LayananPercakapan(
+            engine, runtime, agents.AliranPercakapan(), mesin_izin, tanda
+        )
         try:
             yield
         finally:
+            await app.state.percakapan.tutup()
+            if vektor:
+                await vektor.tutup()
             await redis.aclose()
             await engine.dispose()
 
@@ -78,6 +122,7 @@ def create_app(settings: platform.Settings | None = None) -> FastAPI:
     )
     app.state.settings = settings
     app.state.versi = __version__
+    app.state.registri_agent = registri
     # Titik rakit menyambung modul yang tidak boleh saling impor (K-17): identity
     # mengumumkan pendaftaran, profile membuat profil — di transaksi yang sama.
     app.state.pendengar_pendaftaran = (profile.buat_profil_awal,)
@@ -121,4 +166,5 @@ def create_app(settings: platform.Settings | None = None) -> FastAPI:
     app.include_router(checkins.router)
     app.include_router(journal.router)
     app.include_router(activities.router)
+    app.include_router(agents.router)
     return app

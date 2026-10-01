@@ -12,8 +12,9 @@ Berkas ini satu-satunya pintu keluar modul (spec/06 aturan 1).
 """
 
 from .routes import router
-from .schemas import Goal, GoalRinci, Milestone, SimpulPohon
+from .schemas import Goal, GoalRinci, Milestone, SimpulPohon, StatusGoal
 from .service import MAKS_GOAL, MAKS_MILESTONE, PendengarGoalDihapus, kunci_goal_hidup
+from .service import daftar as daftar_goal  # tool goal.list (spec/07 4.3)
 
 __all__ = [
     "MAKS_GOAL",
@@ -23,6 +24,8 @@ __all__ = [
     "Milestone",
     "PendengarGoalDihapus",
     "SimpulPohon",
+    "StatusGoal",
+    "daftar_goal",
     "kunci_goal_hidup",
     "router",
 ]

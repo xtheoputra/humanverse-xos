@@ -13,18 +13,27 @@ Berkas ini satu-satunya pintu keluar modul (spec/06 aturan 1).
 
 from .rentetan import Rentetan, hitung_rentetan
 from .routes import router
-from .schemas import Habit
+from .schemas import CatatPenyelesaian, Habit
 from .service import PembacaEnergi, PembacaGoalHidup, PembacaZonaWaktu, lepas_goal
+
+# Jalur tool agent (spec/05 habit.list · habit.streak · habit.complete, spec/07 4.3).
+from .service import catat as catat_penyelesaian
+from .service import daftar as daftar_habit
+from .service import rentetan as rentetan_habit
 from .tier import tier_untuk_energi
 
 __all__ = [
+    "CatatPenyelesaian",
     "Habit",
     "PembacaEnergi",
     "PembacaGoalHidup",
     "PembacaZonaWaktu",
     "Rentetan",
+    "catat_penyelesaian",
+    "daftar_habit",
     "hitung_rentetan",
     "lepas_goal",
+    "rentetan_habit",
     "router",
     "tier_untuk_energi",
 ]

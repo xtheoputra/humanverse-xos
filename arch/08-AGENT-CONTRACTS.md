@@ -103,6 +103,13 @@ pekerja, tanpa manifest. `memory-agent` di percakapan (`memory.write` atas
 permintaan pengguna, 4.7) masih terbuka: kalau ia menilai kelayakan sebelum
 menulis, ia agent.
 
+✅ **Separuh kedua dijawab Sprint 4 (24 Sep 2026, tugas 4.7, K-30):**
+`memory-agent` di percakapan **memutuskan** — permintaan tanpa isi tidak ditulis,
+isi yang sudah diingat tidak melahirkan baris kedua (`memory.write` mengembalikan
+`baru: false`, dan balasannya *“itu sudah kuingat”*), dan ia memilih di antara
+`memory.search` dan `memory.write` menurut niat pesannya. Vonis: **agent** —
+lulus uji (b). Jalur ekstraksi dari event tetap service.
+
 ---
 
 ## §3 Manifest v2 — empat medan yang belum ada, dan kenapa masing-masing perlu

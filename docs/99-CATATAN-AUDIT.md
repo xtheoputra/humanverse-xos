@@ -38,6 +38,281 @@ Diperbarui: 24 September 2026 · Mencakup **dua puluh empat naskah**:
 
 ---
 
+## 🔍 Tinjauan tiga lensa Sprint 4 (28 Sep 2026) — sebelum PR
+
+Tiga peninjau serentak, masing-masing di worktree dan tumpukan uji sendiri, atas
+`v0/sprint-4-ai` di `588765c`: **keamanan** (6 terbukti: 1 high · 1 medium · 4 low) ·
+**kontrak** (17: 16 dengan uji merah, 1 dengan kutipan) · **penegak buta** (lihat di
+bawah). Tiap temuan dibuktikan dengan uji yang MERAH pada `588765c` — 47 uji baru atau
+berubah, semuanya merah di sana dan hijau sesudahnya — lalu dibetulkan di kode **dan**
+spec yang menyebutnya.
+
+> 🔍 **Penegak buta: 175 kerusakan dirancang tanpa melihat uji, 91 LOLOS seluruh suite**
+> (5 high · 35 medium · 51 low) — lebih banyak daripada Sprint 2 (39) dan Sprint 3 (49).
+> Yang paling mahal lolos di jantung gerbang: `deny` pengguna diabaikan untuk R3 ·
+> `deny` hanya dibaca di scope PERTAMA delegasi · token konfirmasi membawa semua scope
+> tool (satu *izinkan selalu* = izin tulis di lima scope) · `memory.search` coach
+> melebar ke `journal_raw` · api hidup tanpa batas laju tool. Kelimanya **benar di
+> kode** — tidak dijaga uji mana pun. Lima pekerja serentak (worktree & tumpukan
+> sendiri, dikelompokkan menurut berkas uji) menutup semuanya: **tiap kerusakan kini
+> punya uji yang merah padanya dan mutasinya — 94 mutasi, semuanya berbunyi**. Tidak
+> satu pun ternyata cacat kode; dua cacat lain justru ketahuan di sela pekerjaan itu
+> (**E-212**, **E-213**), dan empat uji yang berkedip terbukti salahnya di uji atau di
+> jam: batas laju GCRA yang terisi ulang tiap detik (uji menuntut 61 panggilan dalam
+> 1 dtk), urutan riwayat menurut jam PostgreSQL yang mundur, kemiripan dua ruang vektor
+> acak (±0,35%), dan satu asersi yang **selalu lolos** (UUID dibandingkan dengan teks).
+
+### 🛑 E-197 — satu pesan sah membekukan seluruh proses api 75 detik (keamanan, high)
+
+`_TANDAI` (`.+?` malas diikuti `\s+…?` · `\s*[.!]*\s*$`) menelusur mundur O(n³) atas
+deretan spasi: *“tandai x”* + 3.991 spasi + *“y”* — 4.000 karakter, lolos skema — 75,7
+detik per `kenali()`, dipanggil **sinkron di event loop** tiga kali per pesan. Semua
+pengguna, SSE, dan `/health` berhenti; batas laju 300/menit membiarkannya diulang tanpa
+akhir. ✅ Teks perintah dirapatkan per kata sebelum pola mana pun melihatnya, ekor pola
+hanya kata utuh; uji di proses anak berbatas waktu atas delapan pesan jahat terpanjang.
+
+### 🔴 E-198 — *“mood 3 hari lalu buruk sekali”* tercatat sebagai mood BARU (kontrak)
+
+`_AWALAN_MOOD` membuat kata perintahnya opsional, padahal K-28 dan AGENTS.md menulis
+*deterministic hanya untuk perintah yang DIAWALI kata perintahnya*. ✅ Kata perintah wajib.
+
+### 🔴 E-199 — giliran yang butuh DUA izin tidak bisa diselesaikan (kontrak, high)
+
+*“Tanya aku”* untuk bacaan habit-agent, lalu `habit.complete` R2: token kedua lahir di
+pohon run ULANGAN, yang tidak punya pesan pengguna — jawabannya `422`. Di baliknya dua
+cacat lagi: ulangan hanya membawa persetujuan TERAKHIR (`allow_once` menanyakan hal yang
+sama tanpa akhir), dan `confirmed_by_user` punya dua arti — run ulangan yang memakai
+persetujuan lalu ditahan lagi tercatat "sudah dijawab" sebelum ditanyakan. ✅ Token
+membawa pesan giliran dan persetujuan yang sudah dipegangnya; run `blocked` = NULL
+sampai dijawab. Ikut dibetulkan: `allow_always` kini disimpan di transaksi **jawabannya**
+(`MesinIzin.ubah`) — dulu jawaban di-commit lebih dulu, izinnya menyusul.
+
+### 🔴 E-200 — run ditinggal `running` selamanya dalam operasi biasa (keamanan · kontrak)
+
+Pesan ber-id buatan klien yang dikirim ulang: run akar ditulis, pesan ditolak (PK), klien
+menerima 500, run `running` selamanya — kolom *Yang BELUM* 4.4 hanya menyebut proses
+yang mati. ✅ Id kembar `409 already_exists` (pesan **dan** percakapan — yang kedua juga
+500), diperiksa sebelum run ditulis; run yang terlanjur ditulis ditutup `failed`.
+
+### 🔴 E-201 — anggaran harian bisa dikosongkan dan dilewati (keamanan, medium · low)
+
+(1) Hari LOKAL dibaca dari zona waktu profil, yang bisa diganti kapan saja: pindah ke
+zona yang tengah malamnya baru lewat membuang biaya sejam terakhir — anggaran harian
+menjadi per jam. (2) Periksa-lalu-pakai tanpa pemesanan: tiap giliran hanya melihat
+pohonnya sendiri — empat giliran serentak, empat panggilan besar, anggaran untuk satu.
+✅ **K-32 diubah**: 24 jam bergulir; jatah TERBURUK tiap panggilan dipesan ke `cost_usd`
+run yang berjalan, di bawah kunci per pengguna.
+
+### 🔴 E-202 — permintaan yang ditolak menimpa aliran giliran terakhir (kontrak)
+
+`jawab` memulai giliran baru SEBELUM memeriksa jawabannya, lalu mengirim `error` ke
+giliran kosong itu: klien yang menyambung ulang kehilangan `done` yang sungguh terjadi;
+ketukan ganda saat giliran ulangan berjalan menerima `turn_in_progress`. ✅ Semua yang
+bisa menolak diperiksa lebih dulu; giliran yang batal sebelum apa pun terjadi di-`urungkan`.
+
+### 🔴 E-203 — `error.code` SSE = kode internal berbahasa Indonesia (kontrak)
+
+`terlalu_sering`, `masukan_salah`, `bukan_alat_agent` sampai ke klien apa adanya
+(AGENTS.md §7). ✅ `rate_limited` · `agent_error` · `model_unavailable` · `cancelled` ·
+`internal_error` · kode layanan pemilik data — spec/04.
+
+### 🔴 E-204 — pengguna diminta mengizinkan aksi yang pasti ditolak (kontrak · keamanan)
+
+spec/05 menjanjikan *tidak ada konfirmasi R2 untuk aksi yang pasti gagal*, tetapi batas
+yang tidak bisa ditulis sebagai `enum`/`min`/`max` — `tier_used` untuk `skipped`, isi
+memori kosong, tanggal 0999 — sampai ke gerbang; `NaN` lolos `min`/`max`. ✅ Pemeriksa
+murni milik modul pemilik data dijalankan sebelum gerbang; tanggal & bilangan tak hingga
+ditolak semua tool.
+
+### 🔴 E-205 — tulisan agent tanpa `audit_logs` (kontrak)
+
+Diagram spec/05 *jalankan · catat agent_runs · catat audit_logs*; hanya penolakan dan
+jawaban yang tercatat. ✅ `agent.tool_executed` di TRANSAKSI tulisannya (`platform.
+JejakTulisan`, dijalankan modul pemilik bila sesuatu berubah); `habit.completed` yang
+lahir dari agent bersumber `agent` (spec/03), bukan `app`.
+
+### 🔴 E-206 — skema keluaran tidak menjaga medan bersarang (kontrak)
+
+`items: array` tidak menyatakan isinya: `note` (C-32) di dalam `items[]` atau `checkin{}`
+lolos pemeriksa yang *dijanjikan menjaganya*. ✅ `array`/`object` wajib `items`/`fields`,
+diperiksa sampai ke kedalaman mana pun.
+
+### 🔴 E-207 — validator registry: tiga janji yang tidak ditegakkan (kontrak)
+
+Aturan 8 menyembunyikan pelanggaran lain di tool yang sama; aturan 6 · 9 hanya memeriksa
+`memory.read/write` (pihak ketiga dengan tool ber-scope `journal_raw` diterima);
+`capabilities` tidak snake_case. ✅ Ketiganya.
+
+### 🔴 E-208 — coach diam-diam melewati scope ingatan *“tanya aku”* (kontrak)
+
+✅ Dinyatakan di `rationale`; K-30 dan spec/07 4.7 kini menulisnya dengan benar —
+dinyatakan, bukan ditanyakan (E-193).
+
+### 🔴 E-209 · E-210 — katalog dan indeks yang tidak dibaca siapa pun (kontrak)
+
+`agent_tools.permission` = `execute` untuk semua tool, termasuk bacaan, dan tidak
+dibandingkan; `ai_conversations_user_idx` menyusun kolom yang tidak dipakai kueri daftar.
+✅ Migrasi `0009`; K-29 membandingkan aksinya.
+
+### 🔴 E-196 — dua nama untuk tiga jawaban konfirmasi (kontrak)
+
+spec/05 `izinkan_selalu` · `izinkan_sekali` · `tolak`; spec/04 dan API `allow_always` ·
+`allow_once` · `reject`. ✅ spec/05 memakai nama API. Ikut dirapikan: bentuk `decision`
+run yang ditahan kini ditulis spec/01 (kuncinya `kind`, bukan `jenis`), dan `error` run
+`cancelled` membawa `type` seperti run lain.
+
+#### 🔴 E-211 — uji Sprint 1 yang berkedip ternyata jam, dan batas penyerapnya terlalu kecil
+
+`test_login_gagal_dibatasi_per_akun…` merah 1 dari 3 kali, sendirian: 429 untuk tebakan
+kedua yang sah. Batas *2 gagal per hari* hanya meloloskan tebakan kedua bila jam Redis
+tidak mundur di antara keduanya — dan jam VM Docker Desktop **diukur mundur 3,1 dtk**
+dalam 20 detik (Sprint 2 mengukur 0,76–1,18 dtk, penyerapnya 2 dtk). ✅ Penyerap 5 dtk,
+kasus uji 4 dtk + mutasinya — tetap jauh dari *jam disetel mundur satu jam* yang
+sengaja tidak diserap.
+
+#### 🔴 E-212 · E-213 — dua cacat yang ditemukan pekerja penegak buta, bukan lensanya
+
+**E-212:** giliran yang GAGAL tidak menyimpan balasan, dan `POST …/messages` yang diputar
+ulang (Idempotency-Key) menilai *selesai* hanya dari ada-tidaknya balasan — jawabannya
+`processing` selamanya. ✅ Status dibaca dari balasan **dan** run akarnya; nilai baru
+`failed` (spec/04). **E-213:** uji riwayat yang berkedip ternyata jam PostgreSQL di VM
+Docker yang **mundur ±3 dtk kira-kira tiap 28 dtk** (32 kali dalam 15 menit, 134.350
+sampel) — balasan bercap lebih tua dari pertanyaannya. ✅ Cap waktu pesan monoton per
+percakapan di bawah kunci yang sudah ada: `GREATEST(clock_timestamp(), last_message_at +
+1 µs)`; `last_message_at` = cap pesan terakhir.
+
+#### Juga dari tinjauan: token rusak ber-non-ASCII → 500, bukan 422 (keamanan, low)
+
+`hmac.compare_digest(str, str)` melempar TypeError untuk non-ASCII. ✅ Dibandingkan
+sebagai byte.
+
+#### 🔴 E-214 — gerbang penuh (1 Okt 2026): dua mutasi C-32 ditangkap gerbang keluaran, bukan uji C-32
+
+Putaran mutasi basis data yang **penuh** — tak pernah tuntas di Sesi 34, dihentikan pemilik
+pada mutasi ke-84 dari 415, maka klaim *“0 diam”* saat itu hanya atas 84 — menemukan dua mutasi
+`4.3` **DIAM/SALAH ALASAN**: `checkin.get` dan `mood.recent` yang **membocorkan `note` pengguna**
+(C-32). Keduanya ditulis sebelum gerbang keluaran (**E-206**) ada; sesudahnya, medan `note` yang
+tak dinyatakan ditolak gerbang keluaran LEBIH DULU (`RuntimeError: … mengembalikan medan yang tidak
+dinyatakan … ['note']`), sehingga uji C-32 (`test_alat_baca_coach_tanpa_catatan_bebas_pengguna`,
+`assert "rahasia" not in …`) tak pernah menyentuh isinya — penjaga yang tak bisa merah pada mutasi
+itu (arch/11: *“pemeriksa yang tak pernah merah tak dihitung ada”*). ✅ Mutasinya kini **menyatakan
+`note` di skema keluaran tool juga** (`checkin.get.yaml` · `mood.recent.yaml`), supaya bocornya leleh
+sampai ke uji C-32 — kini merah dengan alasan yang benar (*“catatan bebas pengguna keluar dari tool
+coach (C-32)”*). Dua lapis C-32 kini punya mutasi masing-masing: gerbang keluaran (E-206) untuk medan
+asing, uji C-32 untuk medan yang **dinyatakan**. Putaran penuh: `84 → 415` mutasi db, **415/415
+berbunyi, 0 diam**.
+
+#### Yang TIDAK dibetulkan, dari tinjauan ini
+
+| Temuan | Kenapa | Ke mana |
+|---|---|---|
+| *Prompt injection* tersimpan — tulisan pengguna (judul, isi ingatan) masuk `bahan` model apa adanya | penyedia lokal V0 tidak menalar dan tidak memilih tool; tidak terbukti di V0 | **K-28** (*Harga yang diakui*) — syarat penyedia sungguhan |
+| Satu giliran per percakapan hanya per PROSES api | V0 satu proses api | **K-31** (ditambahkan) |
+| Menurunkan risiko tool di YAML tanpa migrasi tetap membuat api mulai | tool registry adalah kode — lewat PR dan ujinya; katalog hanya mencatat tool milik agent dan aksinya | **K-29** (ditambahkan) |
+| Migrasi `0007` turun gagal sesudah run pertama (FK `agent_runs → agents`) | memang benar gagal: jejak audit tidak dihapus demi migrasi turun | — |
+
+## 🔨 Sprint 4 dikodekan (24 Sep 2026) — apa yang berubah bagi berkas ini
+
+Sprint 4 (`spec/07` 4.1–4.9, *AI*) dikerjakan di branch `v0/sprint-4-ai`, **di
+atas** branch Sprint 3 (PR #166) yang masih menunggu HUMAN REVIEW — satu commit per
+tugas (**K-18**). Keadaan tiap *“Selesai bila”*, tanpa dibulatkan, ada di
+[`../spec/07`](../spec/07-BACKLOG-V0.md) Sprint 4. Lima keputusan didelegasikan
+baru: **K-28** (AI Gateway V0), **K-29** (katalog agent), **K-30** (program agent &
+keyakinan V0), **K-31** (aliran percakapan), **K-32** (anggaran biaya) —
+[`KEPUTUSAN-DIDELEGASIKAN.md`](KEPUTUSAN-DIDELEGASIKAN.md).
+
+> 🔑 **Pola E-42 untuk keenam kalinya — dan kini di sebuah RUTE yang tidak pernah
+> ditulis.** spec/05 *“`ask` → minta izin”* dan spec/07 4.5 *“risk 2 minta izin
+> sekali”* menuntut jawaban pengguna, tetapi spec/04 tidak punya satu rute pun
+> untuk menjawabnya (**E-195**).
+
+### 🔴 E-190 — manifest agent di `tools/`, folder yang kini milik perkakas
+
+spec/05 menulis `agents/<name>/manifest.yaml` dan `tools/<name>.yaml` sebelum repo
+punya `tools/` — kini folder pemeriksa dokumen dan gerbang CI. ✅ **Dibetulkan:**
+registry V0 tinggal di paket api (`agents/manifest/`, `agents/alat/`), dibaca saat
+api dibuat; katalog basis data diisi migrasi (**K-29**).
+
+### 🔴 E-191 — skema tool menuntut `scopes`, tabel tool V0 tidak pernah menyebutnya
+
+Tanpa kolom itu gerbang risiko (4.5) tidak punya scope untuk ditanyakan ke mesin
+izin. ✅ **Dibetulkan** di [`../spec/05`](../spec/05-AGENT-CONTRACTS.md): kolom
+*Scope* tiap tool V0.
+
+### 🔴 E-192 — K-14 + *“risk 2 minta izin”* dibaca harfiah = satu permintaan ditanya dua kali
+
+*“Tandai lari selesai”* → orchestrator memanggil `agent.habit` (R2 — pemanggilan
+agent ADALAH tool, K-14) → habit-agent memanggil `habit.complete` (R2). Diuji
+dengan gerbang sungguhan: pengguna ditanya untuk delegasinya, lalu untuk
+tulisannya. ✅ **Dibetulkan:** pemanggilan `kind: agent` berbawaan `allow` dan
+tanpa konfirmasi R3 — yang berisiko adalah tool di dalamnya, yang ditanyakan di run
+agent itu; R4, `deny`, dan `ask` yang **disetel** pengguna untuk delegasinya tetap
+berlaku.
+
+### 🔴 E-193 — `memory.search` menahan SETIAP jawaban coach pada izin `journal_raw`
+
+Kolom *Scope* `memory.search` (E-191) = semua scope resmi, termasuk `journal_raw`
+yang sensitif — tidak pernah `allow` karena bawaan. Gerbang yang menanyakan tiap
+scope pemanggilan menahan tiap jawaban coach menunggu izin atas scope yang bahkan
+tidak diminta manifest coach. Ditemukan uji program V0 (4.7), bukan tinjauan.
+Padahal pencarian 3.7 sudah menanyai mesin izin **per scope sendiri** (menyisihkan
+yang ditolak atau belum diputuskan, dan melaporkannya). ✅ **Dibetulkan:** tool baca
+yang menyaring izinnya sendiri menyatakannya (`menyaring_izin`), gerbang tidak
+menanyakannya lagi — dan hanya bacaan tanpa efek yang boleh (validator).
+
+### 🔴 E-194 — riwayat percakapan kehilangan alasan balasannya
+
+spec/04 menjanjikan `confidence` + `rationale` di **setiap** balasan AI, tetapi
+`ai_messages` tidak punya kolom untuk keduanya: hanya SSE `done` yang membawanya.
+✅ **Dibetulkan:** migrasi `0008` + spec/01; `GET …/messages` mengembalikannya.
+
+### 🔴 E-195 — izin diminta, tetapi tidak ada rute untuk menjawabnya
+
+✅ **Dibetulkan** di [`../spec/04`](../spec/04-API-CONTRACTS.md): SSE
+`confirmation_required` + `POST /conversations/{id}/confirmations`. Pemanggilan yang
+ditahan **tidak disimpan** — pengguna menerima permintaan bertanda tangan (agent,
+tool, risiko, scope, **sidik** masukan; tanpa masukannya), jawabannya sekali pakai,
+dan giliran yang sama diulang dengan persetujuan itu.
+
+### 🔴 Dan satu balasan yang BOHONG, ditemukan uji sebelum sampai ke siapa pun
+
+*“Lewati X”* sesudah X tercatat selesai: `POST …/completions` mengembalikan baris
+LAMA untuk tanggal yang sudah tercatat (spec/04), tetapi habit agent pertama
+menjawab *“X ditandai dilewati”*. Kini balasannya mengatakan apa yang terjadi —
+juga saat perangkat lain mencatat di antara baca dan tulis — dan tidak meminta izin
+untuk tulisan yang tidak akan terjadi (**K-30**).
+
+#### Yang TIDAK dibetulkan di Sprint 4
+
+| Temuan | Kenapa | Ke mana |
+|---|---|---|
+| Catatan bebas mood sampai ke coach lewat memori episodiknya (`memory.search`, 3.6), walau `mood.recent` tidak mengembalikannya | apakah `mood` sensitif — hukum & privasi | **C-32** (diperluas) |
+| Run yang prosesnya MATI (bukan berhenti) tetap `running` | penyapu lintas pengguna butuh fungsi `SECURITY DEFINER` baru — hapus akun 6.5 lebih dulu | **K-31** |
+| Aliran SSE hanya di proses api yang menjalankan gilirannya | V0 satu proses api | **K-31** |
+| Habit agent tidak bisa MENGUBAH catatan yang sudah ada | tidak ada tool pembatalan di 9 tool V0 | spec/05 — tool baru butuh baris registry |
+| Keyakinan V0 tidak dikalibrasi | butuh data nyata | **#34** |
+| Penyedia model yang menalar | tarif dan ke mana data pengguna boleh dikirim | **A-6/#18** |
+
+### 🔒 Yang dijaga lebih ketat daripada yang diminta
+
+* **Agent menyentuh data hanya lewat tool** — dan tiap tool lewat satu jalan:
+  registry → manifest → masukan ketat → batas laju → gerbang → keluaran = skema.
+* **Jejak audit bukan penalaran**: `decision` hanya skalar pendek, `error` hanya
+  `{code, type}` — pesan galat bisa mengutip tulisan pengguna.
+* **Tulisan pengguna tidak keluar dari tempatnya**: token konfirmasi memuat sidik
+  masukan, bukan masukannya; token percakapan tidak ke Redis.
+* **Aliran yang diputus tetap dibayar**: token yang sudah keluar dicatat, dan
+  dihitung anggaran.
+
+### ⚠️ Yang sengaja TIDAK diputuskan di Sprint 4
+
+* **A-6/#18** — penyedia model sungguhan (tarif, dan ke mana isi percakapan dikirim).
+* **#34** — ambang keyakinan untuk bertindak.
+* Angka anggaran biaya harian yang sebenarnya — uang.
+* **C-32** — `mood` sensitif atau tidak (kini juga: catatan mood lewat memori).
+
+---
+
 ## 🔨 Sprint 3 dikodekan (24 Sep 2026) — apa yang berubah bagi berkas ini
 
 Sprint 3 (`spec/07` 3.1–3.8, *Memory & event*) dikerjakan di branch

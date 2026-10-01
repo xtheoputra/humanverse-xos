@@ -1,0 +1,23 @@
+name: goal.list
+version: 1.0.0
+kind: read
+description: Goal milik pengguna yang belum dihapus (GET /goals)
+scopes: [goals]
+risk_level: 0
+input:
+  status: { type: string, required: false, enum: [active, paused, achieved, dropped] }
+output:
+  items:
+    type: array
+    items:
+      type: object
+      fields:
+        id: uuid
+        title: string
+        status: string
+        domain: string | null
+        target_date: string | null
+  terpotong: boolean       # ada lebih banyak daripada yang dikembalikan
+side_effects: none
+reaches_third_party: false
+rate_limit: 60/min/user

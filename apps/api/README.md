@@ -39,6 +39,10 @@ uv run --locked python -m hvx.pekerja
 | `HVX_QDRANT_API_KEY` | | kosong — kunci API Qdrant (wajib di luar D0 lokal) |
 | `HVX_QDRANT_KOLEKSI` | | `memories` — nama koleksi (uji memakai koleksi sekali pakai) |
 | `HVX_SEMATAN_KEY` | bila Qdrant | ≥ 32 karakter — kunci penyemat lokal (**K-26**), diturunkan per pengguna. Tanpa kunci, vektor di Qdrant bisa **dibalik menjadi kata** isi jurnal; menggantinya = seluruh memori disemat ulang |
+| `HVX_MODEL_SIMPLE` | | `lokal/hvx-ringkas-v1` — model kelas *simple* (**K-28**), `penyedia/nama`. V0 hanya penyedia `lokal`: tanpa jaringan, tanpa biaya, merangkai fakta yang disiapkan agent |
+| `HVX_MODEL_REASONING` | | `lokal/hvx-nalar-v1` — model kelas *reasoning* (**K-28**). Perintah berbentuk tetap (*“catat mood 3”*) tidak memanggil model mana pun |
+| `HVX_AI_ANGGARAN_HARIAN_USD` | | `0.50` — biaya model per pengguna per **24 jam bergulir** (**K-32**, E-201). Melewatinya **menurunkan** kelas model ke *simple*, tidak menolak (4.9); angka sebenarnya milik pemilik |
+| `HVX_MODEL_HARGA` | | `{}` — JSON `{"penyedia/nama": [masuk, keluar]}`, USD per sejuta token. Model di luar penyedia `lokal` **tanpa harga ditolak saat mulai**: biaya yang tak terhitung tak bisa dibatasi (4.9) |
 
 Rute yang ada — kontraknya [`spec/04`](../../spec/04-API-CONTRACTS.md):
 
@@ -55,6 +59,7 @@ Rute yang ada — kontraknya [`spec/04`](../../spec/04-API-CONTRACTS.md):
 | `GET·POST /v1/moods` | tugas 2.6 — tiap mood melahirkan memori episodik (3.6) |
 | `GET·POST /v1/journal` · `GET·PATCH·DELETE /v1/journal/{id}` | tugas 3.4 — daftar **tanpa** `body`; sunting & hapus menjangkau memori jurnal (3.6) |
 | `GET·POST /v1/activities` (`?source=`) | tugas 3.8 — klien hanya mencatat `manual` |
+| `GET·POST /v1/conversations` · `GET·POST /v1/conversations/{id}/messages` · `GET …/stream` (SSE) · `POST …/confirmations` | tugas 4.8 — *“catat mood 3”* tanpa agent & tanpa model; giliran agent di latar; `done` memuat `cost_usd` (**K-31**, **E-194**, **E-195**) |
 
 Tiap tulisan fakta perilaku menerbitkan event `spec/03` **di transaksi yang
 sama** (3.2, peta aturan 6 `spec/06`); proses `hvx.pekerja` menyalurkannya.

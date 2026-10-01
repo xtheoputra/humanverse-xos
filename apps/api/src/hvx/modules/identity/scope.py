@@ -38,7 +38,10 @@ SCOPE_RESMI: Mapping[str, Scope] = MappingProxyType(
         "goals": Scope("goal dan milestone", sensitif=False),
         "checkins": Scope("check-in harian: energi, fokus, jam tidur", sensitif=False),
         "mood": Scope("mood yang dilaporkan, dan memori episodiknya (3.6)", sensitif=False),
-        "coaching_notes": Scope("catatan yang ditulis coach-agent", sensitif=False),
+        "coaching_notes": Scope(
+            "catatan coaching: ditulis coach-agent, atau diminta pengguna untuk diingat",
+            sensitif=False,
+        ),
         "journal_raw": Scope("isi jurnal apa adanya, dan memori episodiknya (3.6)", sensitif=True),
     }
 )

@@ -14,6 +14,7 @@ dibuat wajib — jadi keduanya kini diperlakukan sama.
 from __future__ import annotations
 
 import re
+from decimal import Decimal
 from typing import Literal, Self
 
 from pydantic import Field, SecretStr, field_validator, model_validator
@@ -25,6 +26,9 @@ Lingkungan = Literal["local", "test", "ci", "production"]
 
 # "jumlah/detik" — lihat batas_laju.py
 POLA_BATAS = r"^[1-9][0-9]{0,5}/[1-9][0-9]{0,5}$"
+
+# Id model "penyedia/nama" — `lokal/hvx-nalar-v1` (platform/model.py, K-28).
+POLA_MODEL = r"^[a-z][a-z0-9-]{0,19}/[a-z0-9][a-z0-9._-]{0,79}$"
 
 # Satu asal peramban: skema + host + port opsional — persis yang dikirim `Origin`.
 _POLA_ASAL = r"https?://[a-z0-9]([a-z0-9.-]*[a-z0-9])?(:[0-9]{1,5})?"
@@ -104,8 +108,34 @@ class Settings(BaseSettings):
     # Kunci penyemat lokal (K-26) — WAJIB bila `qdrant_url` diisi: feature hashing
     # tanpa kunci bisa dibalik dengan kamus, jadi vektor di Qdrant membocorkan kata
     # isi jurnal. Mengganti kunci = seluruh memori disemat ulang (sidiknya ikut di
-    # nama penyemat, `memories.model_version`).
+    # nama penyemat, `memories.embedding_model`).
     sematan_key: SecretStr | None = Field(default=None, min_length=32)
+
+    # AI Gateway (spec/07 4.1, K-28): model tiap kelas, "penyedia/nama". V0 hanya
+    # penyedia `lokal` — tanpa jaringan dan tanpa biaya; penyedia berbayar, dan ke
+    # mana data pengguna boleh dikirim, keputusan pemilik (A-6/#18, arch/05 §6).
+    model_simple: str = Field(default="lokal/hvx-ringkas-v1", pattern=POLA_MODEL)
+    model_reasoning: str = Field(default="lokal/hvx-nalar-v1", pattern=POLA_MODEL)
+    # Harga USD per SEJUTA token (masuk, keluar) per model — JSON,
+    # `{"lokal/hvx-nalar-v1": [3, 15]}`. Model di luar penyedia `lokal` tanpa harga
+    # DITOLAK gerbang: biaya yang tak terhitung tak bisa dibatasi (4.9).
+    model_harga: dict[str, tuple[Decimal, Decimal]] = Field(default_factory=dict)
+    # Anggaran biaya model per PENGGUNA per HARI LOKALNYA (spec/07 4.9, K-32). Melewatinya
+    # menurunkan kelas model ke `simple` — bukan menolak. Angka sebenarnya milik pemilik
+    # (uang, A-6/#18); bawaannya longgar, dan penyedia lokal V0 gratis.
+    ai_anggaran_harian_usd: Decimal = Field(default=Decimal("0.50"), ge=0, le=1_000)
+
+    @field_validator("model_harga")
+    @classmethod
+    def _harga_model_sah(
+        cls, nilai: dict[str, tuple[Decimal, Decimal]]
+    ) -> dict[str, tuple[Decimal, Decimal]]:
+        for model, (masuk, keluar) in nilai.items():
+            if not re.fullmatch(POLA_MODEL, model):
+                raise ValueError("HVX_MODEL_HARGA: id model wajib `penyedia/nama`")
+            if masuk < 0 or keluar < 0 or not (masuk.is_finite() and keluar.is_finite()):
+                raise ValueError("HVX_MODEL_HARGA: harga wajib angka ≥ 0")
+        return nilai
 
     @model_validator(mode="after")
     def _vektor_berkunci(self) -> Self:

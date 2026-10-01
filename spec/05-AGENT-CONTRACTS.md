@@ -52,7 +52,21 @@ evaluation:
     cost_usd_per_run: 0.02
 ```
 
-Aturan validasi yang ditegakkan saat registrasi:
+> 🔧 **Letak V0 (E-190, 24 Sep 2026, tugas 4.2).** `agents/<name>/manifest.yaml` dan
+> `tools/<name>.yaml` di atas ditulis sebelum repo punya `tools/` — kini folder
+> perkakas pengembang (pemeriksa dokumen, gerbang CI). Registry V0 tinggal di
+> paket api: `apps/api/src/hvx/modules/agents/manifest/<name>.yaml` dan
+> `…/agents/alat/<name>.yaml`, dibaca saat api dibuat. Katalog basis data
+> (`agents`, `agent_tools`) diisi **migrasi** dengan salinan bekunya — api tidak
+> bisa mendaftarkan agent (spec/01 §10), dan **menolak mulai** bila katalog
+> berbeda dari manifest yang divalidasinya (**K-29**).
+
+Aturan validasi yang ditegakkan saat registrasi — **semua** pelanggaran dilaporkan
+sekaligus, bukan hanya yang pertama (aturan 9 tidak tersembunyi di balik aturan 2).
+Ditegakkan `agents.validasi_registri` (`tests/unit/test_registri_agent.py`: satu
+kasus per aturan), ditambah **A-1** (`risk_level` sebagai properti agent ditolak;
+`autonomy.max_level` wajib `L0`–`L5`) dan **K-14** (entri `agent.<x>` menunjuk agent
+aktif, dengan `risk_level` = `max_risk`-nya):
 
 | # | Aturan |
 |---|---|
@@ -61,10 +75,16 @@ Aturan validasi yang ditegakkan saat registrasi:
 | 3 🔧 | **Setiap tool di `tools:` wajib punya `risk_level <= max_risk`.** Manifest yang mendaftarkan tool lebih berisiko daripada pagunya **ditolak**. (Menggantikan aturan lama *“`risk_level >= 3` wajib punya `requires_confirmation`”* — [#52](../../issues/52) sudah memindahkan `requires_confirmation` ke Policy Engine.) |
 | 4 | `evaluation.gates.safety` **wajib** ada dan `>= 0.95`. |
 | 5 | Satu `name` hanya boleh punya **satu** baris `status: active`. |
-| 6 | `kind: third_party` **tidak boleh** meminta scope `journal`, `journal_raw` 🔧, `finance`, atau `health`. |
+| 6 | `kind: third_party` **tidak boleh** meminta scope `journal`, `journal_raw` 🔧, `finance`, atau `health` — 🔧 lewat `memory.read`/`write` **maupun** lewat `scopes` tool yang didaftarkannya (E-207: dulu hanya yang pertama diperiksa, padahal scope tool-lah yang ditanyakan gerbang). |
 | 7 🔧 | Tool yang akibatnya sampai kepada **orang selain pemegang akun** (`reaches_third_party: true`) **wajib** `risk_level >= 3`. Manifest yang menurunkannya **ditolak**. |
 | 8 🔧 | Tool **tanpa** `risk_level` **ditolak** saat registrasi. **Tidak ada bawaan** — kelalaian berhenti di validator, bukan di produksi. |
 | 9 🔧 | Perluasan aturan 6: `kind: third_party` juga **tidak boleh** meminta scope `spatial`, `location`, `people`, atau `csi`. |
+
+> 🔧 **Tinjauan kontrak Sprint 4 (E-207).** *“Semua pelanggaran sekaligus”* kini juga
+> untuk tool tanpa `risk_level`: aturan 8 dilaporkan dan pemeriksaan tool itu
+> **berlanjut** (dulu berhenti di sana, menyembunyikan pelanggaran lainnya).
+> `capabilities` wajib snake_case (`^[a-z][a-z0-9_]{0,63}$`) — komentar skema di atas
+> sebelumnya tidak ditegakkan siapa pun.
 
 ## 🔧 Daftar scope resmi V0 (aturan 2 · E-180)
 
@@ -80,7 +100,7 @@ Aturan validasi yang ditegakkan saat registrasi:
 | `goals` | goal dan milestone | — | coach · memory |
 | `checkins` | check-in harian: energi, fokus, jam tidur | — | coach · memory |
 | `mood` | mood yang dilaporkan, dan memori episodiknya (3.6) | — | coach · memory |
-| `coaching_notes` | catatan yang ditulis `coach-agent` | — | coach · memory |
+| `coaching_notes` | catatan coaching: ditulis `coach-agent`, atau diminta pengguna untuk diingat (`memory-agent`, 4.7) | — | coach · memory |
 | `journal_raw` | isi jurnal apa adanya, dan memori episodiknya (3.6) | ✅ | **tidak satu pun** |
 
 ⁽¹⁾ **Sensitif = tidak pernah `allow` karena bawaan.** Hanya keputusan `allow`
@@ -201,11 +221,18 @@ scopes:      [ habits ]            # scope memory/data yang disentuh
 risk_level:  0
 input:
   habit_id:  { type: uuid, required: true }
+  # 🔧 4.3: batas nilai opsional — `enum: [..]` (string) · `min`/`max` (integer, number)
 output:                            # 🔧 = GET /habits/{id}/streak (04, E-176)
   current:              integer
   longest:              integer
   completion_rate_30d:  number | null   # null = belum ada periode jatuh tempo
+# 🔧 E-206: `array`/`object` WAJIB menyatakan isinya — `{ type: array, items: <tipe> }`
+#   atau `{ type: object | null, fields: { <medan>: <tipe> } }`, bersarang sedalam perlu.
+#   Pelaksana menolak medan yang tidak dinyatakan DI KEDALAMAN MANA PUN.
 side_effects: none                 # none | writes_user_data | external_call
+menyaring_izin: false              # 🔧 E-193: true = tool BACA yang menanyai mesin izin
+                                   #   per scope sendiri (memory.search) — gerbang tidak
+                                   #   menanyakannya lagi
 reaches_third_party: false         # 🔧 K-1: true bila akibatnya sampai ke orang
                                    #     selain pemegang akun. true ⇒ risk_level >= 3
 rate_limit:   60/min/user
@@ -219,20 +246,81 @@ rate_limit:   60/min/user
 
 Tool V0 — **9 tool + 3 entri `kind: agent`**:
 
-| Tool | Kind | Risk | Dipakai |
-|---|---|---|---|
-| `habit.list` | read | 0 | Coach, Habit |
-| `habit.streak` | read | 0 | Coach, Habit |
-| `habit.complete` | write | 2 | Habit |
-| `goal.list` | read | 0 | Coach |
-| `checkin.get` | read | 0 | Coach |
-| `mood.recent` | read | 0 | Coach |
-| `memory.search` | read | 0 | Coach, Memory |
-| `memory.write` | write | 2 | Memory |
-| `recommendation.create` | write | 1 | Coach |
-| `agent.coach` | **agent** | 1 | Orchestrator |
-| `agent.habit` | **agent** | 2 | Orchestrator |
-| `agent.memory` | **agent** | 2 | Orchestrator |
+| Tool | Kind | Risk | Dipakai | Scope 🔧 | Batas laju 🔧 |
+|---|---|---|---|---|---|
+| `habit.list` | read | 0 | Coach, Habit | habits | 60/min/user |
+| `habit.streak` | read | 0 | Coach, Habit | habits | 60/min/user |
+| `habit.complete` | write | 2 | Habit | habits | 20/min/user |
+| `goal.list` | read | 0 | Coach | goals | 60/min/user |
+| `checkin.get` | read | 0 | Coach | checkins | 60/min/user |
+| `mood.recent` | read | 0 | Coach | mood | 60/min/user |
+| `memory.search` | read | 0 | Coach, Memory | yang diminta manifest pemanggil — semua scope resmi | 60/min/user |
+| `memory.write` | write | 2 | Memory | satu scope yang diizinkan — semua kecuali `journal_raw` | 20/min/user |
+| `recommendation.create` | write | 1 | Coach | coaching_notes | 20/min/user |
+| `agent.coach` | **agent** | 1 | Orchestrator | scope baca & tulis `coach-agent` | 30/min/user |
+| `agent.habit` | **agent** | 2 | Orchestrator | habits | 30/min/user |
+| `agent.memory` | **agent** | 2 | Orchestrator | scope `memory-agent` | 30/min/user |
+
+> 🔧 **Kolom *Batas laju* ditambahkan 28 Sep 2026** (tinjauan penegak buta Sprint 4):
+> `rate_limit` tiap tool — per pengguna, dipakai pelaksana SEBELUM gerbang — hidup di
+> YAML-nya tanpa sumber di berkas ini; satu-satunya contohnya menulis `60/min/user`.
+> Tulisan (`write`) lebih ketat daripada bacaan; delegasi di antaranya. Kini
+> `tests/unit/test_registri_agent.py` membandingkan kolom ini dengan registry.
+
+> 🔧 **Kolom *Scope* ditambahkan 24 Sep 2026 (E-191, tugas 4.2).** Skema tool
+> menuntut `scopes` — *scope memory/data yang disentuh* — tetapi tabel V0 tidak
+> pernah menyebutnya, jadi gerbang risiko (4.5) tidak punya scope untuk ditanyakan
+> ke mesin izin. `checkin.get` dan `mood.recent` sengaja **tanpa catatan bebas**
+> (`note`): coach membaca angka dan label, bukan tulisan pengguna (C-32). ⚠️ Memori
+> episodik mood (3.6) memuat catatannya, dan `memory.search` menyerahkannya di bawah
+> scope `mood` — apakah itu boleh adalah **C-32** yang sama, milik pemilik.
+
+> 🔧 **Pelaksana tool V0 (tugas 4.3, 24 Sep 2026).** Satu jalan untuk tiap
+> pemanggilan — `agents.PelaksanaAlat`, urutannya tetap: **(1)** terdaftar di registry
+> *dan* berimplementasi (keduanya satu lawan satu, diperiksa saat pelaksana dirakit —
+> implementasi tanpa baris registry adalah tool tanpa `risk_level`); **(2)** tercantum
+> di `tools:` manifest pemanggil; **(3)** masukan tepat skema `input` — medan tak
+> dikenal, wajib yang hilang, tipe yang salah, dan nilai di luar `enum`/`min`/`max`-nya
+> **ditolak, tidak dikoersi** (E-170 di sisi agent: `true` bukan `1`, `20260901` bukan
+> tanggal); medan bernama **`scope`** (`memory.write`) wajib ada di `scopes` tool
+> **dan** di pagu manifest pemanggil; **(4)** `rate_limit` per pengguna; **(5)** gerbang
+> risiko (4.5); **(6)** keluaran diperiksa terhadap skema `output` — medan yang tidak
+> dinyatakan adalah **cacat implementasi**, bukan fitur. Yang ditolak di (1)–(3) tidak
+> memakai jatah dan tidak pernah sampai ke gerbang — tidak ada konfirmasi R2 untuk aksi
+> yang pasti gagal. Batas nilai skema **menyalin** modul pemiliknya (status habit dan
+> goal, domain rekomendasi, batas pencarian), dan salinannya diuji sama. 🔧 **E-204
+> (tinjauan kontrak Sprint 4):** batas yang tidak bisa ditulis sebagai
+> `enum`/`min`/`max` — `tier_used` untuk `skipped`, isi memori yang kosong atau lebih
+> dari 4.000 karakter, judul rekomendasi kosong — diperiksa **pemeriksa pemilik datanya**
+> (`agents.Implementasi.periksa`, fungsi murni modul pemilik) di langkah (3) juga;
+> tanggal di luar `1900-01-01` … `2999-12-31` (spec/04) dan bilangan tak hingga
+> (`NaN` lolos `min`/`max`) ditolak semua tool. Dulu ketiganya sampai ke gerbang, dan
+> pengguna diminta mengizinkan aksi yang lalu ditolak pemiliknya. **Keluaran**
+> diperiksa sampai ke medan bersarang (E-206) — `note` di dalam `items[]` dulu lolos.
+>
+> Tiap implementasi memanggil **pintu keluar modul pemilik datanya** — layanan yang
+> sama dengan rute HTTP-nya, di bawah RLS pengguna yang dilayani run itu:
+> `habit.complete` menerbitkan `habit.completed`-nya sendiri, dan kiriman ulangnya
+> tidak melahirkan baris kedua. Yang dicatat ke run (`agent_runs.memory_scopes`,
+> 4.4) adalah scope yang **benar-benar** disentuh — untuk `memory.search`, yang
+> **diizinkan** pengguna, bukan yang diminta manifest.
+>
+> * **`memory.write`** — memori yang pengguna *minta diingat*: `kind='semantic'`,
+>   keyakinan 1.000 dengan alasan K-27 (yang diyakini: *bahwa* pengguna
+>   menyatakannya), `model_version` = `<agent>@<versi>` penulisnya. Ditulis **hanya
+>   bila belum diingat** — isi yang sama (spasi dirapikan) di scope yang sama
+>   mengembalikan baris lama (`baru: false`), dikunci per (pengguna, scope) supaya
+>   dua permintaan serentak tidak melahirkan dua baris. Scope di luar
+>   `memory.write` manifest ditolak **sebelum** gerbang: izin pengguna tidak
+>   melebarkan manifest (aturan 2).
+> * **`recommendation.create`** — `confidence` 0–1 dan `rationale` 1–10 alasan
+>   berisi **wajib**; `domain` ∈ `habit · goal · wellbeing` (contoh kolom spec/01).
+>   `score` sengaja **kosong**: skor adalah keluaran mesin rekomendasi (5.5), bukan
+>   angka yang dikarang agent.
+> * **`mood.recent`** — `hari` 1–30 (bawaan 7), paling banyak 50 baris;
+>   **`goal.list`** — paling banyak 100 goal, `status` hanya dari `spec/04`. Keduanya
+>   menyatakan **`terpotong: true`** bila ada lebih banyak: daftar yang dipotong
+>   diam-diam adalah jawaban yang salah (K-24).
 
 > 🔧 **Tiga baris terakhir ditambahkan 11 September 2026 — menerapkan
 > [K-14](../docs/KEPUTUSAN-DIDELEGASIKAN.md), yang sudah diputuskan
@@ -270,6 +358,33 @@ Tool V0 — **9 tool + 3 entri `kind: agent`**:
 | `coach-agent` | R1 | habit.list, habit.streak, goal.list, checkin.get, mood.recent, memory.search, recommendation.create | habits, goals, checkins, mood, coaching_notes | coaching_notes |
 | `habit-agent` | R2 | habit.list, habit.streak, habit.complete | habits | — |
 | `memory-agent` | R2 | memory.search, memory.write | semua scope **kecuali** `journal_raw` | semua scope **kecuali** `journal_raw` 🔧 |
+
+> 🔧 **Program V0 tiga agent (tugas 4.7, 24 Sep 2026, K-30).** `coach-agent` menjawab
+> dari lima sumber yang dibaca tool — habit & check-in hari ini (zona waktu profil),
+> mood 7 hari, goal aktif, ingatan yang cocok — sebagai kalimat fakta yang juga
+> menjadi `rationale`-nya; sumber yang ditolak pengguna dilewati dan dinyatakan.
+> `habit-agent` menulis hanya bila tepat satu habit aktif cocok dan tanggalnya belum
+> tercatat. `memory-agent` menulis hanya yang belum diingat (arch/08 §2.2: **agent**).
+> Keyakinan V0 = banyaknya bukti, bukan peluang terkalibrasi; ambang bertindaknya #34.
+
+> 🔧 **`orchestrator-agent` V0 (tugas 4.6, 24 Sep 2026).** Memilih agent dari **niat**
+> (aturan, bukan model — `agents.kenali`): *“tandai/centang/lewati …”* → `agent.habit`,
+> *“ingat bahwa …”* dan *“apa yang kamu ingat …”* → `agent.memory`, selainnya →
+> `agent.coach`. Niat yang BERTINDAK hanya dikenali bila pesannya **diawali** kata
+> perintahnya — *“ingatkan aku …”* (pengingat) bukan *“ingat”*. Pemanggilannya tool
+> `kind: agent` (K-14), jadi run agent itu menjadi **anak** run orchestrator
+> (`parent_run_id`, `trigger='agent'`); balasan, keyakinan, dan alasan anaknya
+> diteruskan apa adanya. Perintah `deterministic` (*“catat mood 3”*) tidak pernah
+> sampai ke orchestrator.
+
+> 🔧 **Runtime V0 (tugas 4.4, 24 Sep 2026).** Program tiap agent hanya memegang
+> `KonteksAgent`: `alat(nama, masukan)` lewat pelaksana tool (4.3) dan
+> `model(tugas, pertanyaan, bahan)` lewat AI Gateway (4.1) — keduanya yang mencatat
+> ke run, jadi jejaknya adalah yang TERJADI, bukan yang dilaporkan program. Tiap
+> keputusan wajib membawa **`confidence` 0–1 dan 1–10 `rationale`** (Konstitusi
+> Pasal 3, [`../arch/08`](../arch/08-AGENT-CONTRACTS.md) §4) — keputusan tanpa
+> keduanya menggagalkan run, bukan dikirim tanpa dasar. Isi kolomnya: spec/01
+> `agent_runs`.
 
 ⁽¹⁾ 🔧 **`orchestrator-agent` naik dari `risk_level: 0` ke `max_risk: R2`**, dan
 itu konsekuensi langsung aturan 3 yang baru: ia memanggil `agent.habit`
@@ -324,8 +439,8 @@ jalankan · catat agent_runs · catat audit_logs
 > (E-167, tinjauan Sprint 1). Mesin izin 1.5 semula menjawab `ask` untuk *tanpa
 > baris* dan untuk *`ask` yang disetel pengguna* — gerbang tidak bisa menerapkan
 > risk 0 · 1 → `allow` tanpa menimpa pilihan *“tanya aku”*. Mesin izin kini
-> menerima `MesinIzin.cek(…, bawaan=…)`; gerbang risiko (tugas 4.5, **belum
-> ada**) memanggilnya dengan bawaan per risk. Keputusan tersimpan yang **belum
+> menerima `MesinIzin.cek(…, bawaan=…)`; gerbang risiko (tugas 4.5,
+> `agents.GerbangRisiko`) memanggilnya dengan bawaan per risk. Keputusan tersimpan yang **belum
 > kedaluwarsa** — termasuk `ask` — menang atas bawaan itu. **R ≥ 3 tidak
 > terpengaruh**: konfirmasi manusia diminta sebelum mesin izin ditanya, jadi
 > `allow` yang tersimpan tidak pernah melewatinya.
@@ -333,6 +448,50 @@ jalankan · catat agent_runs · catat audit_logs
 > V0 tidak punya satu pun tool level 3 atau 4. Itu disengaja: janji *"Act
 > selalu di bawah kontrol pengguna"* paling mudah ditepati dengan tidak
 > memberi agent kemampuan yang belum perlu.
+
+> 🔧 **Gerbang V0 (tugas 4.5, 24 Sep 2026) — `agents.GerbangRisiko`, ditanya pelaksana
+> tool untuk tiap pemanggilan.** Urutan yang ditegakkan, dan dua bedanya dari diagram
+> di atas:
+>
+> 1. **R4 → DENY**, tanpa konfirmasi ([`../arch/04`](../arch/04-DEPENDENCY-GRAPH.md) §3,
+>    H-21 — *irreversible*); tercatat.
+> 2. **Mesin izin per scope** yang disentuh pemanggilan itu (scope masukan
+>    `memory.write`, selainnya `scopes` tool), subjek = agent pemanggil, aksi menurut
+>    `kind` (`read` · `write` · `execute`). **`deny` → tolak & catat**
+>    (`audit_logs` `agent.tool_denied`) — 🔧 *sebelum* konfirmasi R3: meminta manusia
+>    mengonfirmasi aksi yang toh akan ditolak hanya membuang perhatiannya.
+> 3. **R3 → konfirmasi setiap kali**, bahkan bila izinnya `allow`.
+> 4. **`ask` → minta izin**. Jawabannya tiga (nama API spec/04 — 🔧 E-196: berkas ini
+>    dulu memakai nama internalnya): `allow_always` (izin `allow` disimpan per scope —
+>    *minta izin sekali*; tidak tersedia untuk R3 — **di transaksi yang sama** dengan
+>    jawabannya), `allow_once` (hanya pemanggilan ini), `reject`.
+> 5. 🔧 **Jalankan · catat `agent_runs` · catat `audit_logs`** (E-205) — diagram di atas
+>    kini ditepati utuh: tulisan agent atas data pengguna (`habit.complete` ·
+>    `memory.write` · `recommendation.create`) meninggalkan `agent.tool_executed`
+>    (agent, tool, risiko, run, disetujui atau tidak — tanpa isinya) **di transaksi
+>    tulisannya**, hanya bila sesuatu berubah; event yang lahir dari tulisan agent
+>    bersumber `agent` (spec/03), bukan `app`.
+>
+> Yang ditahan: run-nya `blocked`, dan pengguna menerima permintaan **bertanda tangan**
+> (HMAC berlabel `HVX_IP_HASH_KEY`, 15 menit) yang memuat agent, tool, risiko, scope,
+> dan **sidik** masukannya — bukan masukannya: tulisan pengguna tidak masuk token,
+> jejak audit, maupun Redis. Jawabannya **sekali pakai** (`agent_runs.confirmed_by_user`
+> run yang ditahan) dan tercatat (`agent.action_approved` · `agent.action_rejected`).
+> Giliran yang disetujui **diulang dari awal** dengan persetujuan itu; gerbang
+> meloloskan pemanggilan yang agent, tool, dan sidik masukannya sama — dan hanya itu.
+> Persetujuan diwarisi run anak (orchestrator → agent). 🔧 **E-199:** satu giliran bisa
+> ditanya lebih dari sekali (*“tanya aku”* untuk bacaan, lalu tulisan R2) — token
+> membawa pesan pengguna yang memulai giliran dan persetujuan yang sudah dipegangnya,
+> jadi ulangan berikutnya membawa **semuanya**; run `blocked` menunggu jawaban
+> (`confirmed_by_user` NULL) walau ia sendiri memakai persetujuan sebelumnya.
+>
+> 🔧 **Delegasi tidak ditanyakan sendiri (E-192).** K-14 membuat pemanggilan agent
+> lain melewati gerbang ini; dibaca harfiah bersama *“risk 2 minta izin”*, satu
+> permintaan (*“tandai lari selesai”*) ditanya **dua kali** — delegasi `agent.habit`
+> (R2), lalu tulisan `habit.complete` (R2). Pemanggilan `kind: agent` karena itu
+> berbawaan `allow` dan tanpa konfirmasi R3 — yang berisiko adalah tool di dalamnya,
+> yang ditanyakan di run agent itu sendiri; R4, `deny`, dan `ask` yang **disetel**
+> pengguna untuk delegasinya tetap berlaku.
 
 > 🔧 **Gerbang di atas adalah bentuk V0 dari rantai kanonik 12 gerbang**
 > [`../arch/04`](../arch/04-DEPENDENCY-GRAPH.md) §3. Yang belum ada di V0 —

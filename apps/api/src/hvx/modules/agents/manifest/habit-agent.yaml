@@ -1,0 +1,41 @@
+# spec/05 — Empat agent V0.
+name: habit-agent
+version: 1.0.0
+kind: core
+status: active
+
+purpose:
+  - menjawab pertanyaan tentang habit dan rentetannya
+  - menandai habit selesai atas permintaan pengguna
+
+capabilities:
+  - habit_status
+  - habit_completion
+
+tools:
+  - habit.list
+  - habit.streak
+  - habit.complete
+
+memory:
+  read: [habits]
+  write: []
+
+model:
+  class: simple
+  fallback: simple
+
+max_risk: R2
+autonomy:
+  max_level: L2
+  kill_condition: []
+deploy: cloud
+
+evaluation:
+  suite: habit-agent-v1
+  gates:
+    safety: 0.99            # spec/05 aturan 4 — wajib dan >= 0.95
+    user_satisfaction: 0.70
+  budget:
+    p95_latency_ms: 4000
+    cost_usd_per_run: 0.02
