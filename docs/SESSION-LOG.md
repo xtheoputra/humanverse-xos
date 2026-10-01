@@ -4,6 +4,34 @@
 
 ---
 
+## Sesi 35 — 1 Oktober 2026
+
+**Pemilik: *“lanjutkan”*** (berkali-kali) — menuntaskan serah-terima Sesi 34: gerbang
+penuh Sprint 4 → PR, lalu **memulai Sprint 5**.
+
+| Hal | Hasil |
+|---|---|
+| Naskah baru | tidak ada |
+| Keputusan pemilik | tidak ada yang baru |
+| Temuan ditutup | 🆕 **E-214** — putaran mutasi basis data yang untuk pertama kali **tuntas** (415 mutasi) menemukan dua mutasi C-32 (`checkin.get` · `mood.recent`) DIAM/SALAH ALASAN: medan `note` yang tak dinyatakan ditolak gerbang keluaran (E-206) lebih dulu, maka uji C-32 tak pernah menyentuh isinya. Serah-terima Sesi 34 *“0 diam”* hanya atas 84 mutasi (gerbang dihentikan di tengah). Dibetulkan: mutasinya kini menyatakan `note` di skema tool juga (`checkin.get.yaml` · `mood.recent.yaml`) |
+| `spec/` diubah | tidak ada |
+| Kode | 🔧 `v0/sprint-4-ai` commit **24fbcc1** — `tools: mutasi C-32 nyatakan note di skema keluaran` (fix E-214) + catatan audit |
+| Gerbang Sprint 4 | gerbang penuh `ci_lokal.py --lapor-github` **hijau** di `24fbcc1` — **20 langkah wajib, 30 mnt 49 dtk**, 623/623 mutasi berbunyi, jalur memori ujung-ke-ujung di smoke. Sempat di-*reap* **reaper tekanan memori** Claude Code sekali di tengah pytest (status `killed`, bukan gagal) — diulang atas izin pemilik |
+| PR dibuka | 🆕 **#167** Sprint 4 AI, base `v0/sprint-3-memory-event` — melengkapi tumpukan **#163→#167**, semuanya menunggu HUMAN REVIEW |
+| Sprint 5 dimulai | branch `v0/sprint-5-intelligence` dari `24fbcc1`, worktree `E:/xtheoputra/hvx-sprint5`. 🔑 **Tanpa migrasi** — 23 tabel (termasuk `human_states`, `recommendations` lengkap dengan `score`·`score_breakdown`·`scoring_version`, `recommendation_feedback`) sudah ada sejak **migrasi 0001**. Sprint 5 = murni logika aplikasi |
+| ⏸️ Berhenti di | rencana Sprint 5 tersimpan (lihat bawah). **Berikutnya: implementasi 5.1** (behavior projector) **gerbang-dulu** (uji wipe-and-replay sebelum fitur, AGENTS.md §2). Urutan 5.1→5.6, satu commit per tugas (K-18); lalu tinjauan tiga lensa → gerbang penuh `--lapor-github` → PR Sprint 5 (base `v0/sprint-4-ai`) → Sprint 6. PR #163–#167 menunggu HUMAN REVIEW |
+
+### Rencana Sprint 5 — keputusan sendiri, **belum final** (difinalkan di `KEPUTUSAN-DIDELEGASIKAN.md` bersama kodenya)
+
+- **K-33** behavior projector (5.1): konsumen atas **semua** event, wajib-sukses, idempoten; proyeksi = `activities(source='inferred')` lewat `activities.catat_disimpulkan`; dibangun ulang dari `events` = sumber kebenaran (spec/02 aturan D); dibuktikan uji *wipe-and-replay* → baris identik.
+- **K-34** pola (5.2): temporal/hari/rentetan ke `memories(kind='behavioral')` (sudah ber-`confidence`+`evidence_count` per baris) lewat pintu keluar modul `memory`; keluaran **asosiatif, bukan kausal** (docs/54 §7, naskah 4 §7). Tanpa tabel baru.
+- **K-35** `human_states` (5.3): `intelligence` menghitung metrik `{value,confidence,evidence_count}`, ditulis lewat pintu keluar **baru** `profile.simpan_human_state` (tabel milik `profile`, spec/06); `model_version` diisi; `for_date` lokal perangkat (bukan UTC, bukan `profiles.timezone`).
+- **K-36** mesin rekomendasi (5.5): mengisi `score` 0–1, `score_breakdown` (bobot sama, docs/87), `scoring_version='v1'`, `rationale`; dipicu konsumen atas `checkin.logged`/`habit.skipped`; agent tetap pemasok `confidence`+`rationale` (skor bukan karangan agent).
+- **K-37** umpan balik (5.6): peta status — `accepted`→`accepted`, `rejected`→`rejected`, `modified`/`snoozed`/`ignored` → **bukan** `rejected`; `recommendation_feedback` append-only, perubahan `recommendations.status` di transaksi yang sama; `POST …/feedback` berjalur `Idempotency-Key`.
+- **#34** ambang Confidence Layer (5.4) tetap milik pemilik — V0 hanya aturan keras `evidence_count = 0 → sistem bertanya, bukan menyatakan`.
+
+---
+
 ## Sesi 34 — 28 September 2026
 
 **Pemilik: *“lanjutkan”*** — meneruskan catatan serah-terima Sesi 33: tinjauan tiga
