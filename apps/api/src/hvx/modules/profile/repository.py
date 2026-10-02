@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Mapping
+from datetime import date
 from typing import Any
 from uuid import UUID
 
@@ -38,6 +39,21 @@ _UBAH = text(
 _BISA_DIUBAH = ("display_name", "timezone", "locale", "preferences")
 
 _ZONA_WAKTU = text("SELECT timezone FROM profiles WHERE user_id = :user_id")
+
+# human_states (§6): satu baris per (pengguna, tanggal lokal, versi model). Behavior
+# Engine (5.3) menghitung ulang → upsert pada kunci unik itu, bukan baris kedua.
+# `model_version` di kunci membiarkan dua versi hidup berdampingan (prasyarat
+# evaluasi/rollback §23).
+_SIMPAN_HUMAN_STATE = text(
+    """
+    INSERT INTO human_states (user_id, for_date, metrics, model_version)
+    VALUES (:user_id, :for_date, CAST(:metrics AS jsonb), :model_version)
+    ON CONFLICT (user_id, for_date, model_version) DO UPDATE SET
+      metrics = EXCLUDED.metrics,
+      computed_at = now()
+    """
+)
+_MEDAN_METRIK = frozenset({"value", "confidence", "evidence_count"})
 
 
 async def ambil_profil(conn: AsyncConnection, user_id: UUID) -> Profil | None:
@@ -74,6 +90,35 @@ async def ubah_profil(
         nilai[k] = json.dumps(v) if k == "preferences" and k in perubahan else v
     baris = (await conn.execute(_UBAH, nilai)).mappings().first()
     return Profil.model_validate(dict(baris)) if baris else None
+
+
+async def simpan_human_state(
+    conn: AsyncConnection,
+    user_id: UUID,
+    *,
+    for_date: date,
+    metrics: Mapping[str, Mapping[str, Any]],
+    model_version: str,
+) -> None:
+    """Simpan/ganti satu `human_state` harian (spec/07 5.3), di transaksi pemanggil.
+
+    Tiap metrik WAJIB `{value, confidence, evidence_count}` (Confidence Layer §19) —
+    dijaga di sini supaya tak ada metrik tanpa keyakinan & bukti yang lolos ke tabel.
+    """
+    if not metrics:
+        raise ValueError("human_state tanpa metrik tidak ditulis")
+    for nama, m in metrics.items():
+        if set(m) != _MEDAN_METRIK:
+            raise ValueError(f"metrik {nama!r} wajib tepat {sorted(_MEDAN_METRIK)}")
+    await conn.execute(
+        _SIMPAN_HUMAN_STATE,
+        {
+            "user_id": user_id,
+            "for_date": for_date,
+            "metrics": json.dumps(dict(metrics), sort_keys=True),
+            "model_version": model_version,
+        },
+    )
 
 
 async def zona_waktu(conn: AsyncConnection, user_id: UUID) -> str | None:

@@ -160,6 +160,19 @@ async def terakhir(conn: AsyncConnection, *, user_id: UUID, batas: int) -> list[
     return [_checkin(b) for b in hasil.mappings()]
 
 
+async def checkin_pada(conn: AsyncConnection, user_id: UUID, for_date: date) -> Checkin | None:
+    """Check-in pengguna pada tanggal LOKAL itu — `None` bila belum ada.
+
+    Pembaca lapisan atas (Behavior Engine 5.3) yang menghitung `human_states` dari
+    keadaan OTORITATIF check-in, bukan dari payload event yang bisa basi saat
+    disalurkan ulang. Berjalan di koneksi & RLS pemanggil.
+    """
+    baris = (
+        (await conn.execute(_PADA, {"user_id": user_id, "for_date": for_date})).mappings().first()
+    )
+    return _checkin(baris) if baris else None
+
+
 async def energi_pada(conn: AsyncConnection, user_id: UUID, for_date: date) -> int | None:
     """Energi check-in pengguna pada tanggal LOKAL itu — dipasang `hvx.main` sebagai
     `pembaca_energi` (K-23): tier habit yang disarankan (spec/07 2.2, naskah 4 §34).

@@ -8,6 +8,7 @@ Sejak spec/07 4.3: `buat_rekomendasi` — jalur tool `recommendation.create`.
 Berkas ini satu-satunya pintu keluar modul (spec/06 aturan 1).
 """
 
+from .keadaan import JENIS_KEADAAN, hitung_human_state, metrik_harian
 from .pola import (
     JENIS_POLA,
     deteksi_pola_habit,
@@ -22,10 +23,13 @@ from .rekomendasi import DOMAIN, buat_rekomendasi, periksa_rekomendasi
 __all__ = [
     "DOMAIN",
     "JENIS_EVENT",
+    "JENIS_KEADAAN",
     "JENIS_POLA",
     "bangun_ulang_proyeksi",
     "buat_rekomendasi",
     "deteksi_pola_habit",
+    "hitung_human_state",
+    "metrik_harian",
     "periksa_rekomendasi",
     "pola_hari",
     "pola_konsistensi",

@@ -76,6 +76,17 @@ def rakit_konsumen(
             jenis=intelligence.JENIS_POLA,
             tangani=intelligence.deteksi_pola_habit,
         ),
+        # Human State (5.3) — konsumen `checkin.logged`: metrik harian {value,
+        # confidence, evidence_count} → human_states. Idempoten (upsert per hari).
+        events.KonsumenStream(
+            engine=engine,
+            redis=redis,
+            awalan=settings.redis_prefix,
+            grup="human-state",
+            nama=f"human-state-{hos}",
+            jenis=intelligence.JENIS_KEADAAN,
+            tangani=intelligence.hitung_human_state,
+        ),
         # Memory extractor (3.6) — `journal.created`, `mood.logged`; boleh gagal & diulang.
         events.KonsumenStream(
             engine=engine,
