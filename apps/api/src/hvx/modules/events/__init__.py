@@ -13,7 +13,7 @@ Berkas ini satu-satunya pintu keluar modul (spec/06 aturan 1).
 
 from .kontrak import REGISTRY, SUMBER, EventTidakSah, Sumber, payload_sah
 from .penerbit import HasilTerbit, terbitkan
-from .proyeksi import cari_penyelesaian, untuk_proyeksi
+from .proyeksi import cari_penyelesaian, riwayat_habit, untuk_proyeksi
 from .relay import LIHAT_BELAKANG_S, Relay, Rujukan, kunci_stream
 from .stream import UMUR_MATI_S, EventMasuk, KonsumenStream, Penangan, kunci_mati, pangkas_mati
 
@@ -35,6 +35,7 @@ __all__ = [
     "kunci_stream",
     "pangkas_mati",
     "payload_sah",
+    "riwayat_habit",
     "terbitkan",
     "untuk_proyeksi",
 ]

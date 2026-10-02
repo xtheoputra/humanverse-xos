@@ -54,6 +54,33 @@ _MENURUT_PENYELESAIAN = text(
 )
 
 
+# Penyelesaian HIDUP sebuah habit: tiap `habit.completed` yang completion_id-nya
+# tidak punya `habit.completion_retracted` — bahan deteksi pola (5.2). `done`/`partial`
+# saja (skipped terbit sebagai jenis lain); urut tiba.
+_RIWAYAT_HABIT = text(
+    f"""
+    SELECT {_KOLOM}
+    FROM events c
+    WHERE c.user_id = :user_id
+      AND c.event_type = 'habit.completed'
+      AND c.subject_id = :habit_id
+      AND NOT EXISTS (
+        SELECT 1 FROM events r
+        WHERE r.user_id = c.user_id
+          AND r.event_type = 'habit.completion_retracted'
+          AND r.payload ->> 'completion_id' = c.payload ->> 'completion_id'
+      )
+    ORDER BY c.recorded_at, c.id
+    """  # noqa: S608 — _KOLOM konstanta modul, bukan masukan
+)
+
+
+async def riwayat_habit(conn: AsyncConnection, user_id: UUID, habit_id: UUID) -> list[EventMasuk]:
+    """`habit.completed` hidup (tak dicabut) sebuah habit — bahan pola hari & waktu (5.2)."""
+    hasil = await conn.execute(_RIWAYAT_HABIT, {"user_id": user_id, "habit_id": habit_id})
+    return [EventMasuk(**baris._asdict()) for baris in hasil]
+
+
 async def untuk_proyeksi(conn: AsyncConnection, user_id: UUID) -> list[EventMasuk]:
     """SEMUA event satu pengguna, urut tiba — bahan membangun ulang proyeksi dari nol."""
     hasil = await conn.execute(_SEMUA, {"user_id": user_id})

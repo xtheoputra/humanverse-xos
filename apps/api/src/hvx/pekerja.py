@@ -64,6 +64,18 @@ def rakit_konsumen(
             jenis=intelligence.JENIS_EVENT,
             tangani=intelligence.proyeksikan_perilaku,
         ),
+        # Pola perilaku (5.2) — konsumen `habit.*` (spec/03 "Habit streak"): hitung
+        # ulang pola hari/waktu/konsistensi habit → memori behavioral. Idempoten
+        # (upsert per pola), jadi diulang aman.
+        events.KonsumenStream(
+            engine=engine,
+            redis=redis,
+            awalan=settings.redis_prefix,
+            grup="pola",
+            nama=f"pola-{hos}",
+            jenis=intelligence.JENIS_POLA,
+            tangani=intelligence.deteksi_pola_habit,
+        ),
         # Memory extractor (3.6) — `journal.created`, `mood.logged`; boleh gagal & diulang.
         events.KonsumenStream(
             engine=engine,

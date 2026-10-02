@@ -2024,8 +2024,8 @@ MUTASI: list[Mutasi] = [
         [
             Sunting(
                 f"{MODUL}/habits/service.py",
-                "        hari_ini = await platform.hari_ini_di(conn, zona)",
-                '        hari_ini = await platform.hari_ini_di(conn, "UTC")',
+                "    hari_ini = await platform.hari_ini_di(conn, zona)",
+                '    hari_ini = await platform.hari_ini_di(conn, "UTC")',
             )
         ],
         _pytest(f"{UJI_RENTETAN}::test_hari_ini_menurut_zona_profil_bukan_utc"),
@@ -3065,8 +3065,8 @@ MUTASI: list[Mutasi] = [
         [
             Sunting(
                 f"{MODUL}/habits/service.py",
-                "        mulai = await repository.mulai_lokal(conn, habit_id, zona) or hari_ini",
-                "        mulai = hari_ini",
+                "    mulai = await repository.mulai_lokal(conn, habit_id, zona) or hari_ini",
+                "    mulai = hari_ini",
             )
         ],
         _pytest(f"{UJI_RENTETAN}::test_tingkat_menghitung_hari_sejak_habit_dibuat"),
