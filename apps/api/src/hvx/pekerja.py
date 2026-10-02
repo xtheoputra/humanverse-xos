@@ -32,7 +32,7 @@ import structlog
 from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncEngine
 
-from hvx.modules import events, memory, platform
+from hvx.modules import events, intelligence, memory, platform
 
 log = structlog.get_logger("hvx.pekerja")
 
@@ -52,6 +52,18 @@ def rakit_konsumen(
     """
     hos = platform.nama_hos()
     return [
+        # Behavior projector (5.1) — SEMUA event, wajib (spec/03). Proyektornya total
+        # & idempoten: kegagalan hanya transien (basis data/Redis), yang diulang
+        # menyelesaikannya — bukan event yang dijatuhkan diam-diam.
+        events.KonsumenStream(
+            engine=engine,
+            redis=redis,
+            awalan=settings.redis_prefix,
+            grup="proyektor",
+            nama=f"proyektor-{hos}",
+            jenis=intelligence.JENIS_EVENT,
+            tangani=intelligence.proyeksikan_perilaku,
+        ),
         # Memory extractor (3.6) — `journal.created`, `mood.logged`; boleh gagal & diulang.
         events.KonsumenStream(
             engine=engine,

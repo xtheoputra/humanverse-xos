@@ -8,6 +8,14 @@ Sejak spec/07 4.3: `buat_rekomendasi` — jalur tool `recommendation.create`.
 Berkas ini satu-satunya pintu keluar modul (spec/06 aturan 1).
 """
 
+from .proyektor import JENIS_EVENT, bangun_ulang_proyeksi, proyeksikan_perilaku
 from .rekomendasi import DOMAIN, buat_rekomendasi, periksa_rekomendasi
 
-__all__ = ["DOMAIN", "buat_rekomendasi", "periksa_rekomendasi"]
+__all__ = [
+    "DOMAIN",
+    "JENIS_EVENT",
+    "bangun_ulang_proyeksi",
+    "buat_rekomendasi",
+    "periksa_rekomendasi",
+    "proyeksikan_perilaku",
+]
