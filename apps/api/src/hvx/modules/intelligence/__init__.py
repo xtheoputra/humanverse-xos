@@ -10,6 +10,7 @@ Berkas ini satu-satunya pintu keluar modul (spec/06 aturan 1).
 
 from .keadaan import JENIS_KEADAAN, hitung_human_state, metrik_harian
 from .keyakinan import BUKTI_MINIMUM, Sikap, cukup_untuk_menyatakan, sikap
+from .mesin import JENIS_REKOMENDASI, SKOR_VERSI, Skor, nilai_rekomendasi, sarankan
 from .pola import (
     JENIS_POLA,
     deteksi_pola_habit,
@@ -27,18 +28,23 @@ __all__ = [
     "JENIS_EVENT",
     "JENIS_KEADAAN",
     "JENIS_POLA",
+    "JENIS_REKOMENDASI",
+    "SKOR_VERSI",
     "Sikap",
+    "Skor",
     "bangun_ulang_proyeksi",
     "buat_rekomendasi",
     "cukup_untuk_menyatakan",
     "deteksi_pola_habit",
     "hitung_human_state",
     "metrik_harian",
+    "nilai_rekomendasi",
     "periksa_rekomendasi",
     "pola_hari",
     "pola_konsistensi",
     "pola_waktu",
     "proyeksikan_perilaku",
+    "sarankan",
     "sikap",
     "tanpa_klaim_kausal",
 ]

@@ -9382,6 +9382,37 @@ MUTASI: list[Mutasi] = [
         harus_memuat="coach tidak bertanya saat nol bukti",
         kelompok="db",
     ),
+    # ── Sprint 5 · 5.5 mesin rekomendasi: skor 0–1 (rata-rata bobot sama), scoring_version, rationale ──
+    Mutasi(
+        "5.5",
+        "skor rekomendasi bukan rata-rata komponen (docs/87)",
+        [
+            Sunting(
+                f"{MODUL}/intelligence/mesin.py",
+                "    rata = sum(komponen.values()) / len(komponen)",
+                "    rata = sum(komponen.values())",
+            )
+        ],
+        _pytest("tests/unit/test_mesin_rekomendasi.py::test_rata_rata_bobot_sama"),
+        harus_memuat="skor bukan rata-rata komponen",
+    ),
+    Mutasi(
+        "5.5",
+        "habit yang dilewati tidak melahirkan rekomendasi berskor",
+        [
+            Sunting(
+                f"{MODUL}/intelligence/mesin.py",
+                "    if skor is None:  # nol bukti → tidak menyarankan (Confidence Layer 5.4)",
+                "    if skor is not None:  # nol bukti → tidak menyarankan (Confidence Layer 5.4)",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_rekomendasi.py::"
+            "test_pekerja_menyekor_rekomendasi_dari_skip_lalu_menyegarkannya_dari_checkin"
+        ),
+        harus_memuat="pekerja tidak menyekor rekomendasi dari habit yang dilewati",
+        kelompok="db",
+    ),
     # ── alat ini sendiri: mutasi yang menggantung dihentikan beserta turunannya ──
     Mutasi(
         "alat",

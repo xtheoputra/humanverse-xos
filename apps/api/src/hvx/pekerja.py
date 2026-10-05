@@ -87,6 +87,18 @@ def rakit_konsumen(
             jenis=intelligence.JENIS_KEADAAN,
             tangani=intelligence.hitung_human_state,
         ),
+        # Recommendation engine (5.5) — `habit.skipped` membuat rekomendasi berskor,
+        # `checkin.logged` menyegarkan konteks energinya (spec/03 Recommendation trigger,
+        # boleh gagal). Idempoten (id per habit+tanggal, ON CONFLICT DO NOTHING).
+        events.KonsumenStream(
+            engine=engine,
+            redis=redis,
+            awalan=settings.redis_prefix,
+            grup="rekomendasi",
+            nama=f"rekomendasi-{hos}",
+            jenis=intelligence.JENIS_REKOMENDASI,
+            tangani=intelligence.sarankan,
+        ),
         # Memory extractor (3.6) — `journal.created`, `mood.logged`; boleh gagal & diulang.
         events.KonsumenStream(
             engine=engine,
