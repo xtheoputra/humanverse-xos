@@ -99,3 +99,19 @@ class JawabanAkun(BaseModel):
 
 class JawabanSegarkan(BaseModel):
     tokens: JawabanToken
+
+
+class PermintaanHapusAkun(BaseModel):
+    """`DELETE /me` — sandi diminta ulang (re-auth) sebelum penghapusan dijadwalkan."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    password: SecretStr = Field(min_length=1, max_length=PANJANG_MAKS)
+
+
+class JawabanHapusDijadwalkan(BaseModel):
+    deletion_scheduled_at: datetime
+
+
+class JawabanRestore(BaseModel):
+    status: str = "active"

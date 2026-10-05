@@ -31,7 +31,7 @@ from .persetujuan import (
     catat_persetujuan,
 )
 from .repository import ambil_pengguna
-from .routes import router
+from .routes import router, router_akun
 from .schemas import PenggunaRingkas
 from .scope import SCOPE_RESMI, Scope
 from .service import PendengarPendaftaran, PenggunaBaru
@@ -71,4 +71,5 @@ __all__ = [
     "pengguna_saat_ini",
     "penyimpan_sesi",
     "router",
+    "router_akun",
 ]

@@ -876,7 +876,7 @@ MUTASI: list[Mutasi] = [
         [
             Sunting(
                 f"{MODUL}/identity/service.py",
-                '        aktif = akun is not None and akun.status == "active"',
+                "        aktif = akun is not None and akun.status in _STATUS_SESI_SAH",
                 "        aktif = True",
             )
         ],
@@ -9490,6 +9490,51 @@ MUTASI: list[Mutasi] = [
         ),
         harus_memuat="tampil tanpa Why",
         cwd=APLIKASI,
+    ),
+    # ── Sprint 6 · 6.5 hapus akun (Stage A): re-auth, cabut semua sesi, login pending_deletion ──
+    Mutasi(
+        "6.5",
+        "hapus akun tanpa verifikasi sandi — sesi dicuri bisa menghapus akun",
+        [
+            Sunting(
+                f"{MODUL}/identity/service.py",
+                "    if not await sandi.cocokkan_async(akun.password_hash, kata_sandi):",
+                "    if False and not await sandi.cocokkan_async(akun.password_hash, kata_sandi):",
+            )
+        ],
+        _pytest("tests/integration/test_hapus_akun.py::test_sandi_salah_tidak_menjadwalkan"),
+        harus_memuat="akun dijadwalkan hapus tanpa sandi benar",
+        kelompok="db",
+    ),
+    Mutasi(
+        "6.5",
+        "hapus akun tidak mencabut sesi — token lama tetap hidup",
+        [
+            Sunting(
+                f"{MODUL}/identity/service.py",
+                "    await sesi.cabut_semua(pengguna.user_id)\n    return dijadwalkan",
+                "    return dijadwalkan",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_hapus_akun.py::test_hapus_menjadwalkan_dan_mencabut_semua_sesi"
+        ),
+        harus_memuat="sesi tidak dicabut seketika saat hapus akun",
+        kelompok="db",
+    ),
+    Mutasi(
+        "6.5",
+        "login pending_deletion diblokir — restore jadi mustahil",
+        [
+            Sunting(
+                f"{MODUL}/identity/service.py",
+                '_STATUS_SESI_SAH = frozenset({"active", "pending_deletion"})',
+                '_STATUS_SESI_SAH = frozenset({"active"})',
+            )
+        ],
+        _pytest("tests/integration/test_hapus_akun.py::test_login_pending_deletion_lalu_restore"),
+        harus_memuat="login pending_deletion ditolak",
+        kelompok="db",
     ),
     # ── alat ini sendiri: mutasi yang menggantung dihentikan beserta turunannya ──
     Mutasi(

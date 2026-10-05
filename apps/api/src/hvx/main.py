@@ -161,6 +161,7 @@ def create_app(settings: platform.Settings | None = None) -> FastAPI:
         )
     app.include_router(platform.router)
     app.include_router(identity.router)
+    app.include_router(identity.router_akun)
     app.include_router(profile.router)
     app.include_router(goals.router)
     app.include_router(habits.router)

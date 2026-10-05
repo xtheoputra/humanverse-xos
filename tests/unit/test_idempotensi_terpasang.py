@@ -25,6 +25,7 @@ TANPA_IDEMPOTENSI: dict[tuple[str, str], str] = {
     ("POST", "/v1/recommendations/{rekomendasi_id}/shown"): (
         "idempoten dengan sendirinya — menandai `shown` dua kali tetap `shown` (6.1)"
     ),
+    ("POST", "/v1/me/restore"): "idempoten dengan sendirinya — restore dua kali tetap active (6.5)",
 }
 # K-21: jawaban /auth/* memuat token; memutar ulangnya = menyimpan token mentah.
 AWALAN_AUTH = "/v1/auth/"

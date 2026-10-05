@@ -13,6 +13,7 @@ from __future__ import annotations
 import json
 from collections.abc import Mapping
 from dataclasses import dataclass
+from datetime import datetime
 from uuid import UUID
 
 from sqlalchemy import text
@@ -224,3 +225,54 @@ async def catat_masuk(conn: AsyncConnection, user_id: UUID) -> None:
     await conn.execute(
         text("UPDATE users SET last_login_at = now() WHERE id = :id"), {"id": user_id}
     )
+
+
+# ── Alur hapus akun (6.5) — tahap 1 & pembatalan, di RLS pemiliknya ──
+
+
+@dataclass(frozen=True)
+class AkunUntukHapus:
+    password_hash: str
+    status: str
+    deletion_scheduled_at: datetime | None
+
+
+_AKUN_HAPUS = text("SELECT password_hash, status, deletion_scheduled_at FROM users WHERE id = :id")
+# Tahap 1: hanya dari `active` (RETURNING kosong kalau sudah pending/suspended).
+_JADWALKAN_HAPUS = text(
+    """
+    UPDATE users
+    SET status = 'pending_deletion',
+        deletion_scheduled_at = now() + make_interval(days => :hari)
+    WHERE id = :id AND status = 'active'
+    RETURNING deletion_scheduled_at
+    """
+)
+_BATALKAN_HAPUS = text(
+    """
+    UPDATE users SET status = 'active', deletion_scheduled_at = NULL
+    WHERE id = :id AND status = 'pending_deletion'
+    RETURNING id
+    """
+)
+
+
+async def akun_untuk_hapus(conn: AsyncConnection, user_id: UUID) -> AkunUntukHapus | None:
+    """Sandi + status + jadwal akun sendiri — untuk verifikasi `DELETE /me` (RLS own-row)."""
+    b = (await conn.execute(_AKUN_HAPUS, {"id": user_id})).mappings().first()
+    return (
+        AkunUntukHapus(b["password_hash"], b["status"], b["deletion_scheduled_at"]) if b else None
+    )
+
+
+async def jadwalkan_hapus(conn: AsyncConnection, user_id: UUID, hari: int) -> datetime | None:
+    """Tandai `pending_deletion` + jadwal; `None` bila bukan dari `active` (idempoten)."""
+    b = (await conn.execute(_JADWALKAN_HAPUS, {"id": user_id, "hari": hari})).first()
+    hasil: datetime | None = b.deletion_scheduled_at if b else None
+    return hasil
+
+
+async def batalkan_hapus(conn: AsyncConnection, user_id: UUID) -> bool:
+    """`True` bila akun yang `pending_deletion` dikembalikan `active`; `False` kalau bukan."""
+    b = (await conn.execute(_BATALKAN_HAPUS, {"id": user_id})).first()
+    return b is not None

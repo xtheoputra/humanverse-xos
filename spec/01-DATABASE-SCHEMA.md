@@ -110,7 +110,8 @@ CREATE TABLE users (
   last_login_at   timestamptz,
   created_at      timestamptz NOT NULL DEFAULT now(),
   updated_at      timestamptz NOT NULL DEFAULT now(),
-  deleted_at      timestamptz
+  deleted_at      timestamptz,
+  deletion_scheduled_at timestamptz                  -- 🔧 0010 (6.5): now()+30h saat tahap 1; NULL = tidak dijadwalkan
 );
 CREATE INDEX users_status_idx ON users (status) WHERE deleted_at IS NULL;
 
@@ -1252,8 +1253,8 @@ Menutup janji *Delete* di Privacy Center (naskah 5 §26) tanpa merusak audit:
 
 | Tahap | Tindakan |
 |---|---|
-| 1 | `users.status = 'pending_deletion'`, sesi dicabut, agent berhenti melayani |
-| 2 | Tenggang **30 hari** — pengguna masih bisa membatalkan |
+| 1 | `users.status = 'pending_deletion'`, `deletion_scheduled_at = now()+30h`, **semua sesi dicabut** (`cabut_semua`), agent berhenti melayani |
+| 2 | Tenggang **30 hari** — pengguna masih bisa membatalkan (`POST /me/restore`) |
 | 3 | `DELETE FROM users` → cascade menghapus profil, goal, habit, jurnal, mood, memori, percakapan, rekomendasi, event, human_states |
 | 4 | Titik embedding di Qdrant dihapus berdasarkan `memories.embedding_id` yang dikumpulkan **sebelum** tahap 3 — atau per saringan `user_id` payload (`platform.KlienVektor.hapus_milik`, 3.5), yang juga membuang titik yatim |
 | 5 | `audit_logs` **tetap**, dengan `user_id` diacak jadi id semu satu arah; isinya sudah metadata saja |
@@ -1262,6 +1263,14 @@ Menutup janji *Delete* di Privacy Center (naskah 5 §26) tanpa merusak audit:
 > ⚠️ Tahap 4 adalah jebakan paling mudah terlewat: **Qdrant tidak ikut
 > cascade.** Kumpulkan `embedding_id` lebih dulu, atau titik memori pengguna
 > akan tertinggal di sana selamanya.
+>
+> 🔧 **Autentikasi restore (5 Okt 2026, 6.5, keputusan pemilik).** Tahap 1
+> mencabut semua sesi, jadi pengguna tak punya sesi untuk `POST /me/restore`.
+> `masuk` karena itu **mengizinkan login akun `pending_deletion`** (`suspended`
+> tetap `403`): sesi barunya untuk membatalkan penghapusan (dan baca), agent
+> tidak melayani sampai akun `active` lagi. Restore mengembalikan `status='active'`
+> dan `deletion_scheduled_at=NULL`. Tahap 3–6 dijalankan **peran pemeliharaan**
+> (bukan api) atas akun yang `deletion_scheduled_at <= now()`.
 
 ---
 

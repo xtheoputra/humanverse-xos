@@ -14,6 +14,7 @@ from __future__ import annotations
 
 from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass
+from datetime import datetime
 from uuid import UUID, uuid4
 
 from sqlalchemy.exc import IntegrityError
@@ -44,6 +45,14 @@ PendengarPendaftaran = Callable[[AsyncConnection, PenggunaBaru], Awaitable[None]
 
 def _galat(status: int, kode: str, pesan: str) -> platform.GalatApi:
     return platform.GalatApi(status, kode, pesan)
+
+
+# Status yang masih boleh memegang sesi (masuk & penyegaran). `pending_deletion`
+# IKUT: setelah DELETE /me mencabut semua sesi, pengguna harus bisa login lagi
+# untuk membatalkan dalam 30 hari (6.5, keputusan pemilik). `suspended` tidak.
+_STATUS_SESI_SAH = frozenset({"active", "pending_deletion"})
+# Tenggang alur hapus akun (spec/01 "Prosedur hapus akun", tahap 2).
+TENGGANG_HAPUS_HARI = 30
 
 
 async def daftar(
@@ -136,7 +145,7 @@ async def masuk(
     if akun is None or not cocok:
         await _catat_gagal(engine, akun.id if akun else None, "kredensial", ip_hash)
         raise _galat(401, "invalid_credentials", "Email atau sandi salah.")
-    if akun.status != "active":
+    if akun.status not in _STATUS_SESI_SAH:
         await _catat_gagal(engine, akun.id, akun.status, ip_hash)
         raise _galat(403, "account_not_active", "Akun tidak aktif.")
 
@@ -232,7 +241,7 @@ async def _masih_aktif(engine: AsyncEngine, pemilik: SesiAktif, *, ip_hash: str 
     """Akun pemilik sesi masih `active` — kalau tidak, pencabutan sesinya dicatat di sini."""
     async with platform.transaksi_pengguna(engine, pemilik.user_id) as conn:
         akun = await repository.ambil_pengguna(conn, pemilik.user_id)
-        aktif = akun is not None and akun.status == "active"
+        aktif = akun is not None and akun.status in _STATUS_SESI_SAH
         if not aktif:
             await audit(
                 conn,
@@ -263,3 +272,71 @@ async def keluar(
             subjek_id=str(pengguna.sesi_id),
             ip_hash=ip_hash,
         )
+
+
+async def jadwalkan_penghapusan(
+    engine: AsyncEngine,
+    sesi: PenyimpanSesi,
+    pengguna: PenggunaMasuk,
+    kata_sandi: str,
+    *,
+    ip_hash: str | None,
+) -> datetime:
+    """Tahap 1 hapus akun (spec/01): `pending_deletion` + jadwal 30 hari, SEMUA sesi dicabut.
+
+    Sandi diminta ulang — penghapusan tidak boleh berangkat dari sesi yang dicuri.
+    Perubahan status & jejaknya satu transaksi; pencabutan sesi (Redis) sesudah commit.
+    Idempoten: DELETE /me saat sudah `pending_deletion` mengembalikan jadwal yang ada,
+    tanpa menyetel ulang jam tenggang."""
+    async with platform.transaksi_pengguna(engine, pengguna.user_id) as conn:
+        akun = await repository.akun_untuk_hapus(conn, pengguna.user_id)
+    if akun is None:  # pragma: no cover - pemegang sesi sah selalu ada
+        raise _galat(404, "user_not_found", "Akun tidak ditemukan.")
+    if not await sandi.cocokkan_async(akun.password_hash, kata_sandi):
+        async with platform.transaksi_pengguna(engine, pengguna.user_id) as conn:
+            await audit(
+                conn,
+                aksi="account.deletion_rejected",
+                aktor_tipe="user",
+                aktor_id=str(pengguna.user_id),
+                user_id=pengguna.user_id,
+                ip_hash=ip_hash,
+                metadata={"alasan": "sandi_salah"},
+            )
+        raise _galat(403, "invalid_credentials", "Sandi salah.")
+
+    async with platform.transaksi_pengguna(engine, pengguna.user_id) as conn:
+        dijadwalkan = await repository.jadwalkan_hapus(conn, pengguna.user_id, TENGGANG_HAPUS_HARI)
+        if dijadwalkan is not None:  # baru dijadwalkan (dari `active`) — catat
+            await audit(
+                conn,
+                aksi="account.deletion_scheduled",
+                aktor_tipe="user",
+                aktor_id=str(pengguna.user_id),
+                user_id=pengguna.user_id,
+                ip_hash=ip_hash,
+                metadata={"tenggang_hari": TENGGANG_HAPUS_HARI},
+            )
+    if dijadwalkan is None:  # sudah `pending_deletion` sebelumnya — kembalikan jadwalnya
+        dijadwalkan = akun.deletion_scheduled_at
+        if dijadwalkan is None:  # status tak bisa dihapus (mis. `suspended`)
+            raise _galat(409, "deletion_not_possible", "Akun tidak bisa dijadwalkan hapus.")
+    # Semua sesi dicabut SEKETIKA — termasuk yang sedang dipakai memanggil ini.
+    await sesi.cabut_semua(pengguna.user_id)
+    return dijadwalkan
+
+
+async def batalkan_penghapusan(engine: AsyncEngine, user_id: UUID, *, ip_hash: str | None) -> None:
+    """`POST /me/restore` — kembalikan `active`, batalkan jadwal. Idempoten: akun yang
+    sudah `active` tetap `200`, tanpa jejak kedua."""
+    async with platform.transaksi_pengguna(engine, user_id) as conn:
+        dibatalkan = await repository.batalkan_hapus(conn, user_id)
+        if dibatalkan:
+            await audit(
+                conn,
+                aksi="account.deletion_cancelled",
+                aktor_tipe="user",
+                aktor_id=str(user_id),
+                user_id=user_id,
+                ip_hash=ip_hash,
+            )
