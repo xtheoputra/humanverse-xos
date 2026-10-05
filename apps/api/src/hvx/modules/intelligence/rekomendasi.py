@@ -18,12 +18,14 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 from hvx.modules import platform
 
 from . import repository
+from .schemas import RekomendasiRingkas
 
 # spec/01 `recommendations.domain` — contoh kolomnya: 'habit','goal','wellbeing'.
 DOMAIN = frozenset({"habit", "goal", "wellbeing"})
 JUDUL_MAKS = 200
 ISI_MAKS = 2_000
 ALASAN_MAKS = 10
+DAFTAR_MAKS = 50  # GET /recommendations: daftar terbatas, terbaru dulu (bukan berkursor)
 _BERISI = re.compile(r"\S")
 
 
@@ -82,3 +84,26 @@ async def buat_rekomendasi(
         if jejak is not None:
             await jejak(conn)
     return rid
+
+
+async def daftar_rekomendasi(
+    engine: AsyncEngine,
+    user_id: UUID,
+    *,
+    status: str | None = None,
+    domain: str | None = None,
+    limit: int = DAFTAR_MAKS,
+) -> list[RekomendasiRingkas]:
+    """`GET /recommendations` — terbaru dulu, disaring opsional per status/domain."""
+    async with platform.transaksi_pengguna(engine, user_id) as conn:
+        return await repository.daftar_rekomendasi(
+            conn, user_id, status=status, domain=domain, limit=limit
+        )
+
+
+async def tandai_terlihat(engine: AsyncEngine, user_id: UUID, rekomendasi_id: UUID) -> None:
+    """`POST /recommendations/{id}/shown` — tandai `shown` bila pending; 404 bila tak ada."""
+    async with platform.transaksi_pengguna(engine, user_id) as conn:
+        if await repository.status_rekomendasi(conn, rekomendasi_id) is None:
+            raise platform.GalatApi(404, "recommendation_not_found", "rekomendasi tidak ditemukan")
+        await repository.tandai_terlihat(conn, rekomendasi_id, user_id)

@@ -11,7 +11,7 @@ from uuid import UUID
 from sqlalchemy import Row, text
 from sqlalchemy.ext.asyncio import AsyncConnection
 
-from .schemas import UmpanBalik
+from .schemas import RekomendasiRingkas, UmpanBalik
 
 _SISIP = text(
     """
@@ -240,5 +240,69 @@ def _umpan_balik(baris: Row[Any]) -> UmpanBalik:
         action=baris.action,
         reason=baris.reason,
         outcome=baris.outcome,
+        created_at=baris.created_at,
+    )
+
+
+# ── Daftar rekomendasi & tandai terlihat (6.1 Dashboard, spec/04 Rekomendasi) ──
+
+_DAFTAR_REKOMENDASI = text(
+    """
+    SELECT id, domain, subject_type, subject_id, title, body, score, scoring_version,
+           score_breakdown, confidence, rationale, status, created_at
+    FROM recommendations
+    WHERE user_id = :user_id
+      AND (CAST(:status AS text) IS NULL OR status = :status)
+      AND (CAST(:domain AS text) IS NULL OR domain = :domain)
+    ORDER BY created_at DESC, id DESC
+    LIMIT :limit
+    """
+)
+
+# pending → shown (sekali): rekomendasi yang sudah diubah pengguna tak ditarik mundur.
+_TANDAI_TERLIHAT = text(
+    """
+    UPDATE recommendations SET status = 'shown', shown_at = now()
+    WHERE id = :id AND user_id = :user_id AND status = 'pending'
+    """
+)
+
+
+async def daftar_rekomendasi(
+    conn: AsyncConnection,
+    user_id: UUID,
+    *,
+    status: str | None,
+    domain: str | None,
+    limit: int,
+) -> list[RekomendasiRingkas]:
+    baris = (
+        await conn.execute(
+            _DAFTAR_REKOMENDASI,
+            {"user_id": user_id, "status": status, "domain": domain, "limit": limit},
+        )
+    ).all()
+    return [_rekomendasi_ringkas(b) for b in baris]
+
+
+async def tandai_terlihat(conn: AsyncConnection, id_: UUID, user_id: UUID) -> None:
+    """Tandai sebuah rekomendasi `shown` bila masih `pending` — no-op bila bukan."""
+    await conn.execute(_TANDAI_TERLIHAT, {"id": id_, "user_id": user_id})
+
+
+def _rekomendasi_ringkas(baris: Row[Any]) -> RekomendasiRingkas:
+    return RekomendasiRingkas(
+        id=baris.id,
+        domain=baris.domain,
+        subject_type=baris.subject_type,
+        subject_id=baris.subject_id,
+        title=baris.title,
+        body=baris.body,
+        score=float(baris.score) if baris.score is not None else None,
+        scoring_version=baris.scoring_version,
+        score_breakdown=baris.score_breakdown,
+        confidence=float(baris.confidence) if baris.confidence is not None else None,
+        rationale=baris.rationale,
+        status=baris.status,
         created_at=baris.created_at,
     )

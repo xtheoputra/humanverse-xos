@@ -9443,6 +9443,37 @@ MUTASI: list[Mutasi] = [
         harus_memuat="status akhir mengikuti umpan balik terakhir",
         kelompok="db",
     ),
+    # ── Sprint 6 · 6.1 Dashboard: beberapa dimensi, tiap skor punya Why (naskah 4 §28) ──
+    Mutasi(
+        "6.1",
+        "skor dashboard tanpa Why (Explainable AI §29)",
+        [
+            Sunting(
+                f"{MODUL}/intelligence/dasbor.py",
+                '    return f"{label} yang kamu laporkan sendiri di check-in {for_date.isoformat()}."',
+                '    return ""',
+            )
+        ],
+        _pytest("tests/unit/test_dasbor_murni.py::test_tiap_dimensi_punya_why"),
+        harus_memuat="ada dimensi tanpa Why",
+    ),
+    Mutasi(
+        "6.1",
+        "dashboard tidak membaca human_state (selalu kosong)",
+        [
+            Sunting(
+                f"{MODUL}/intelligence/dasbor.py",
+                '    if terkini is None:  # belum ada check-in — cold start, bukan "satu angka 0"',
+                '    if terkini is not None:  # belum ada check-in — cold start, bukan "satu angka 0"',
+            )
+        ],
+        _pytest(
+            "tests/integration/test_dashboard.py::"
+            "test_dashboard_menyajikan_dimensi_berwhy_dari_checkin"
+        ),
+        harus_memuat="pekerja tidak menghasilkan dimensi dashboard dari check-in",
+        kelompok="db",
+    ),
     # ── alat ini sendiri: mutasi yang menggantung dihentikan beserta turunannya ──
     Mutasi(
         "alat",

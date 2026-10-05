@@ -1,22 +1,61 @@
-"""Rute `intelligence` — spec/04 *Rekomendasi*. V0: umpan balik rekomendasi (5.6).
+"""Rute `intelligence` — spec/04 *Rekomendasi* & Dashboard (6.1).
 
-`GET /recommendations` dan `POST …/shown` menyusul bersama Dashboard (Sprint 6).
+`GET /dashboard` (§28), `GET /recommendations` + `POST …/shown` (spec/04), dan umpan
+balik (5.6). `POST …/shown` idempoten dengan sendirinya — menandai `shown` dua kali
+tetap `shown` — jadi tanpa `Idempotency-Key` (test_idempotensi_terpasang TANPA_IDEMPOTENSI).
 """
 
 from __future__ import annotations
 
 from functools import partial
+from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Query, Request, Response
 from fastapi.responses import JSONResponse
 
 from hvx.modules import identity, platform
 
-from . import umpan_balik
-from .schemas import CatatUmpanBalik, UmpanBalik
+from . import rekomendasi, umpan_balik
+from .dasbor import dasbor as bangun_dasbor
+from .schemas import CatatUmpanBalik, DaftarRekomendasi, Dasbor, UmpanBalik
 
 router = APIRouter(prefix="/v1", tags=["recommendations"])
+
+# spec/01 `recommendations.status` yang boleh disaring klien.
+_STATUS = frozenset({"pending", "shown", "accepted", "rejected", "expired"})
+Status = Annotated[str | None, Query(max_length=20)]
+Domain = Annotated[str | None, Query(max_length=40)]
+
+
+@router.get("/dashboard", response_model=Dasbor)
+async def dashboard(request: Request, pengguna: identity.PenggunaDiperlukan) -> Dasbor:
+    return await bangun_dasbor(platform.engine_dari(request), pengguna.user_id)
+
+
+@router.get("/recommendations", response_model=DaftarRekomendasi)
+async def daftar_rekomendasi(
+    request: Request,
+    pengguna: identity.PenggunaDiperlukan,
+    status: Status = None,
+    domain: Domain = None,
+) -> DaftarRekomendasi:
+    if status is not None and status not in _STATUS:
+        raise platform.GalatApi(400, "invalid_status", "status rekomendasi tak dikenal")
+    items = await rekomendasi.daftar_rekomendasi(
+        platform.engine_dari(request), pengguna.user_id, status=status, domain=domain
+    )
+    return DaftarRekomendasi(items=items)
+
+
+@router.post("/recommendations/{rekomendasi_id}/shown", status_code=204)
+async def tandai_terlihat(
+    request: Request, rekomendasi_id: UUID, pengguna: identity.PenggunaDiperlukan
+) -> Response:
+    await rekomendasi.tandai_terlihat(
+        platform.engine_dari(request), pengguna.user_id, rekomendasi_id
+    )
+    return Response(status_code=204)
 
 
 @router.post(

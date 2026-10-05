@@ -55,6 +55,17 @@ _SIMPAN_HUMAN_STATE = text(
 )
 _MEDAN_METRIK = frozenset({"value", "confidence", "evidence_count"})
 
+# Human state terkini (Dashboard 6.1): baris paling baru per pengguna. `for_date`
+# lebih dulu (keadaan HARI mana), lalu `computed_at` sebagai pemecah seri.
+_HUMAN_STATE_TERKINI = text(
+    """
+    SELECT for_date, metrics, model_version
+    FROM human_states WHERE user_id = :user_id
+    ORDER BY for_date DESC, computed_at DESC
+    LIMIT 1
+    """
+)
+
 
 async def ambil_profil(conn: AsyncConnection, user_id: UUID) -> Profil | None:
     baris = (await conn.execute(_AMBIL, {"user_id": user_id})).mappings().first()
@@ -119,6 +130,15 @@ async def simpan_human_state(
             "model_version": model_version,
         },
     )
+
+
+async def human_state_terkini(conn: AsyncConnection, user_id: UUID) -> Mapping[str, Any] | None:
+    """Human state paling baru pengguna — `{for_date, metrics, model_version}` atau `None`.
+
+    Dibaca Dashboard (6.1) lewat pintu keluar `profile` karena `human_states` milik
+    `profile` (spec/06 aturan 5). Berjalan di koneksi & RLS pemanggil."""
+    baris = (await conn.execute(_HUMAN_STATE_TERKINI, {"user_id": user_id})).mappings().first()
+    return dict(baris) if baris else None
 
 
 async def zona_waktu(conn: AsyncConnection, user_id: UUID) -> str | None:

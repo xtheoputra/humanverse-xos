@@ -347,13 +347,24 @@ Peristiwa SSE `done`:
 
 ---
 
-## Rekomendasi
+## Rekomendasi & Dashboard
 
 ```
-GET    /recommendations              ?status=pending&domain=
+GET    /dashboard                     → { as_of, dimensions:[{key,value,confidence,evidence_count,why}] }  🔧 6.1
+GET    /recommendations              ?status=&domain=      → { items }
 POST   /recommendations/{id}/feedback { action, reason?, outcome? }   → 201
 POST   /recommendations/{id}/shown                                    → 204
 ```
+
+> 🔧 **`GET /dashboard` ditambahkan 5 Okt 2026 (6.1).** naskah 4 §28 menolak satu
+> angka Life Score dan meminta **beberapa dimensi, tiap skor ber-Why**. V0
+> menampilkan hanya dimensi yang **diukur** — metrik `human_states` (energi, fokus)
+> yang dilaporkan pengguna. Sumbu lain §28 (Finance/Social/Career/…) belum punya
+> ukuran disepakati (**A-19**/**B-38**, [`../docs/99`](../docs/99-CATATAN-AUDIT.md)):
+> menampilkannya sebagai angka = mengambil posisi dalam model yang belum diputuskan
+> pemilik, jadi tidak ditampilkan sampai keputusan itu ada. `dimensions` kosong =
+> cold start (belum ada check-in). `GET /recommendations` daftar terbatas terbaru
+> dulu (bukan berkursor); `?status=` divalidasi terhadap `recommendations.status`.
 
 ---
 

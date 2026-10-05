@@ -9,7 +9,7 @@ status yang menegakkannya ada di [`umpan_balik`].
 from __future__ import annotations
 
 import json
-from datetime import datetime
+from datetime import date, datetime
 from typing import Annotated, Any, Literal
 from uuid import UUID
 
@@ -51,3 +51,54 @@ class UmpanBalik(BaseModel):
     reason: str | None
     outcome: dict[str, Any]
     created_at: datetime
+
+
+# ── Dashboard (6.1) & daftar rekomendasi (spec/04 Rekomendasi) ──
+
+
+class Dimensi(BaseModel):
+    """Satu dimensi dashboard (naskah 4 §28) — skor PLUS Why-nya. Bukan satu angka hidup."""
+
+    model_config = ConfigDict(frozen=True)
+
+    key: str
+    value: float
+    confidence: float
+    evidence_count: int
+    why: str
+
+
+class Dasbor(BaseModel):
+    """Beberapa dimensi, tiap skor punya Why (§28) — **hanya yang V0 ukur**.
+
+    Sumbu yang belum punya ukuran disepakati (Finance/Social/Career/…, A-19/B-38)
+    sengaja TIDAK ditampilkan: menyajikannya sebagai angka berarti mengambil posisi
+    dalam model yang belum diputuskan pemilik. `dimensions` kosong = belum ada
+    check-in (cold start)."""
+
+    model_config = ConfigDict(frozen=True)
+
+    as_of: date | None
+    dimensions: list[Dimensi]
+
+
+class RekomendasiRingkas(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    id: UUID
+    domain: str
+    subject_type: str | None
+    subject_id: UUID | None
+    title: str
+    body: str | None
+    score: float | None
+    scoring_version: str
+    score_breakdown: dict[str, Any]
+    confidence: float | None
+    rationale: list[str]
+    status: str
+    created_at: datetime
+
+
+class DaftarRekomendasi(BaseModel):
+    items: list[RekomendasiRingkas]
