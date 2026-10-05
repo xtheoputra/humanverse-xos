@@ -19,6 +19,8 @@ from collections.abc import Mapping, Sequence
 from decimal import Decimal
 from typing import Any
 
+from hvx.modules import intelligence
+
 from .niat import kenali
 from .orkestrator import orkestrator
 from .pelaksana_alat import AlatDitolak
@@ -46,6 +48,13 @@ _TUGAS_COACH = (
     "Jangan menambah fakta; bila faktanya tidak cukup, katakan begitu."
 )
 _TUGAS_INGATAN = "Sebutkan kembali ingatan berikut apa adanya; jangan menambah apa pun."
+# Confidence Layer, nol bukti (5.4, #34): bukan kesimpulan kosong — sebuah PERTANYAAN
+# yang meminta bukti pertama (cold start B-1). Menyebut jalan masuk data V0, tanpa
+# mengarang satu fakta pun tentang pengguna (Pasal 8).
+TANYA_TANPA_DATA = (
+    "Aku belum punya datamu untuk menjawab itu. Mau mulai dari mana — "
+    "catat satu habit, isi check-in energi hari ini, atau tulis jurnal singkat?"
+)
 
 
 def _baca_ditolak(galat: AlatDitolak) -> bool:
@@ -142,12 +151,6 @@ async def coach(k: KonteksAgent, pesan: str) -> Keputusan:
         fakta += [f"Pernah tercatat: {x['content']}" for x in ingatan["items"]]
         sumber += 1
 
-    jawaban = await k.model(
-        tugas=_TUGAS_COACH,
-        pertanyaan=pesan,
-        bahan=fakta,
-        kelas="reasoning" if niat.rute == "reasoning" else "simple",
-    )
     # ≤ 8 fakta + 2 kalimat sumber — `rationale` paling banyak 10 (runtime.ALASAN_MAKS).
     alasan = [f[:300] for f in fakta][:8] or [
         "Belum ada habit, check-in, mood, goal, atau ingatan yang tercatat."
@@ -159,16 +162,25 @@ async def coach(k: KonteksAgent, pesan: str) -> Keputusan:
         alasan.append(
             f"Ingatan yang belum kamu izinkan kubaca: {', '.join(perlu_izin)} — tidak dipakai."
         )
+    jejak = {"sumber": sumber, "dilewati": len(dilewati), "perlu_izin": len(perlu_izin)}
+
+    # Confidence Layer (5.4, #34): nol sumber berisi → BERTANYA, bukan menyatakan
+    # kesimpulan kosong. Jawabannya tetap dan deterministik — tanpa model (tidak ada
+    # bahan untuk dirangkai) — dan alasannya tetap menyebut sumber yang ditolak/menunggu
+    # izin, supaya pengguna tahu kenapa belum ada yang dibaca.
+    if not intelligence.cukup_untuk_menyatakan(sumber):
+        return Keputusan(
+            TANYA_TANPA_DATA, KEYAKINAN_SUMBER[sumber], tuple(alasan), {"action": "ask", **jejak}
+        )
+
+    jawaban = await k.model(
+        tugas=_TUGAS_COACH,
+        pertanyaan=pesan,
+        bahan=fakta,
+        kelas="reasoning" if niat.rute == "reasoning" else "simple",
+    )
     return Keputusan(
-        jawaban.teks,
-        KEYAKINAN_SUMBER[sumber],
-        tuple(alasan),
-        {
-            "action": "reply",
-            "sumber": sumber,
-            "dilewati": len(dilewati),
-            "perlu_izin": len(perlu_izin),
-        },
+        jawaban.teks, KEYAKINAN_SUMBER[sumber], tuple(alasan), {"action": "reply", **jejak}
     )
 
 

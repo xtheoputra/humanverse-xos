@@ -6461,8 +6461,8 @@ MUTASI: list[Mutasi] = [
         [
             Sunting(
                 f"{MODUL}/agents/program_v0.py",
-                "        KEYAKINAN_SUMBER[sumber],",
-                "        KEYAKINAN_SUMBER[5],",
+                '        jawaban.teks, KEYAKINAN_SUMBER[sumber], tuple(alasan), {"action": "reply", **jejak}',
+                '        jawaban.teks, KEYAKINAN_SUMBER[5], tuple(alasan), {"action": "reply", **jejak}',
             )
         ],
         _pytest(f"{UJI_AGENT_V0}::test_coach_menjawab_dari_data_pengguna_tanpa_catatan_bebasnya"),
@@ -9354,6 +9354,34 @@ MUTASI: list[Mutasi] = [
         kelompok="db",
     ),
     # ── akhir penegak buta G4-program ──
+    # ── Sprint 5 · 5.4 Confidence Layer (#34): nol bukti → BERTANYA, bukan menyatakan ──
+    Mutasi(
+        "5.4",
+        "ambang #34 runtuh: nol bukti dinyatakan, bukan ditanyakan",
+        [
+            Sunting(
+                f"{MODUL}/intelligence/keyakinan.py",
+                "    return Sikap.MENYATAKAN if evidence_count >= BUKTI_MINIMUM else Sikap.BERTANYA",
+                "    return Sikap.MENYATAKAN if evidence_count >= 0 else Sikap.BERTANYA",
+            )
+        ],
+        _pytest("tests/unit/test_keyakinan.py::test_nol_bukti_bertanya"),
+        harus_memuat="nol bukti harus BERTANYA",
+    ),
+    Mutasi(
+        "5.4",
+        "coach menyatakan kesimpulan kosong alih-alih bertanya saat nol sumber",
+        [
+            Sunting(
+                f"{MODUL}/agents/program_v0.py",
+                "    if not intelligence.cukup_untuk_menyatakan(sumber):",
+                "    if intelligence.cukup_untuk_menyatakan(sumber):",
+            )
+        ],
+        _pytest(f"{UJI_AGENT_V0}::test_coach_tanpa_data_bertanya_bukan_menyatakan"),
+        harus_memuat="coach tidak bertanya saat nol bukti",
+        kelompok="db",
+    ),
     # ── alat ini sendiri: mutasi yang menggantung dihentikan beserta turunannya ──
     Mutasi(
         "alat",
