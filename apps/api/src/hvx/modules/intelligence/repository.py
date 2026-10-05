@@ -11,6 +11,8 @@ from uuid import UUID
 from sqlalchemy import Row, text
 from sqlalchemy.ext.asyncio import AsyncConnection
 
+from .schemas import UmpanBalik
+
 _SISIP = text(
     """
     INSERT INTO recommendations (user_id, agent_id, agent_run_id, domain, title, body,
@@ -163,4 +165,80 @@ async def perbarui_skor(
             "score_breakdown": json.dumps(score_breakdown, ensure_ascii=False),
             "context_snapshot": json.dumps(context_snapshot, ensure_ascii=False),
         },
+    )
+
+
+# ── Umpan balik (5.6): recommendation_feedback append-only + status rekomendasi ──
+
+_STATUS_REKOMENDASI = text("SELECT status FROM recommendations WHERE id = :id")
+
+_SISIP_UMPAN_BALIK = text(
+    """
+    INSERT INTO recommendation_feedback (recommendation_id, user_id, action, reason, outcome)
+    VALUES (:recommendation_id, :user_id, :action, :reason, CAST(:outcome AS jsonb))
+    RETURNING id, recommendation_id, action, reason, outcome, created_at
+    """
+)
+
+_SET_STATUS = text(
+    "UPDATE recommendations SET status = :status WHERE id = :id AND user_id = :user_id"
+)
+
+_UMPAN_BALIK_ID = text(
+    """
+    SELECT id, recommendation_id, action, reason, outcome, created_at
+    FROM recommendation_feedback WHERE id = :id
+    """
+)
+
+
+async def status_rekomendasi(conn: AsyncConnection, id_: UUID) -> str | None:
+    """Status rekomendasi — `None` bila tak ada / bukan milik pengguna (RLS)."""
+    baris = (await conn.execute(_STATUS_REKOMENDASI, {"id": id_})).first()
+    return baris.status if baris else None
+
+
+async def sisip_umpan_balik(
+    conn: AsyncConnection,
+    *,
+    rekomendasi_id: UUID,
+    user_id: UUID,
+    action: str,
+    reason: str | None,
+    outcome: Mapping[str, Any],
+) -> UmpanBalik:
+    baris = (
+        await conn.execute(
+            _SISIP_UMPAN_BALIK,
+            {
+                "recommendation_id": rekomendasi_id,
+                "user_id": user_id,
+                "action": action,
+                "reason": reason,
+                "outcome": json.dumps(outcome, ensure_ascii=False),
+            },
+        )
+    ).one()
+    return _umpan_balik(baris)
+
+
+async def set_status_rekomendasi(
+    conn: AsyncConnection, id_: UUID, user_id: UUID, status: str
+) -> None:
+    await conn.execute(_SET_STATUS, {"id": id_, "user_id": user_id, "status": status})
+
+
+async def umpan_balik_id(conn: AsyncConnection, id_: UUID) -> UmpanBalik | None:
+    baris = (await conn.execute(_UMPAN_BALIK_ID, {"id": id_})).first()
+    return _umpan_balik(baris) if baris else None
+
+
+def _umpan_balik(baris: Row[Any]) -> UmpanBalik:
+    return UmpanBalik(
+        id=baris.id,
+        recommendation_id=baris.recommendation_id,
+        action=baris.action,
+        reason=baris.reason,
+        outcome=baris.outcome,
+        created_at=baris.created_at,
     )

@@ -9413,6 +9413,36 @@ MUTASI: list[Mutasi] = [
         harus_memuat="pekerja tidak menyekor rekomendasi dari habit yang dilewati",
         kelompok="db",
     ),
+    # ── Sprint 5 · 5.6 umpan balik: modified/snoozed/ignored bukan penolakan ──
+    Mutasi(
+        "5.6",
+        "modified/snoozed/ignored dihitung sebagai penolakan",
+        [
+            Sunting(
+                f"{MODUL}/intelligence/umpan_balik.py",
+                '_STATUS_BARU: dict[str, str] = {"accepted": "accepted", "rejected": "rejected"}',
+                '_STATUS_BARU: dict[str, str] = {"accepted": "accepted", "rejected": "rejected", "modified": "rejected"}',
+            )
+        ],
+        _pytest(
+            "tests/unit/test_umpan_balik_murni.py::test_modified_snoozed_ignored_bukan_penolakan"
+        ),
+        harus_memuat="diperlakukan sebagai penolakan",
+    ),
+    Mutasi(
+        "5.6",
+        "status rekomendasi tidak mengikuti umpan balik (perubahan tak ditulis)",
+        [
+            Sunting(
+                f"{MODUL}/intelligence/umpan_balik.py",
+                "        if baru != status_kini:",
+                "        if baru == status_kini:",
+            )
+        ],
+        _pytest("tests/integration/test_umpan_balik.py::test_umpan_balik_append_only_banyak_baris"),
+        harus_memuat="status akhir mengikuti umpan balik terakhir",
+        kelompok="db",
+    ),
     # ── alat ini sendiri: mutasi yang menggantung dihentikan beserta turunannya ──
     Mutasi(
         "alat",
