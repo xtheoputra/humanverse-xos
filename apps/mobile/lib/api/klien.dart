@@ -62,6 +62,8 @@ abstract interface class LayananHabit {
   Future<Checkin?> checkinPada(String tanggal);
 
   Future<Checkin> simpanEnergi(String tanggal, int energi, {Checkin? lama});
+
+  Future<Dasbor> dasbor();
 }
 
 /// Klien HTTP untuk API V0 (`/v1`, spec/04).
@@ -348,5 +350,11 @@ class KlienApi implements LayananHabit {
     final badan = lama?.keJsonDenganEnergi(energi) ?? {'energy': energi};
     final jawaban = await _kirim('PUT', '/v1/checkins/$tanggal', badan: badan);
     return Checkin.dariJson(_json(jawaban) as Map<String, dynamic>);
+  }
+
+  @override
+  Future<Dasbor> dasbor() async {
+    final jawaban = await _kirim('GET', '/v1/dashboard');
+    return Dasbor.dariJson(_json(jawaban) as Map<String, dynamic>);
   }
 }

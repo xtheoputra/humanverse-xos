@@ -7,6 +7,7 @@ class LayananPalsu implements LayananHabit {
 
   List<Habit> habit;
   Checkin? checkin;
+  Dasbor dasborData = const Dasbor(asOf: null, dimensi: []);
   bool masukDipanggil = false;
   Map<String, Object?>? daftarDengan;
   final List<String> panggilan = [];
@@ -160,5 +161,12 @@ class LayananPalsu implements LayananHabit {
     lamaEnergi = lama;
     checkin = Checkin(forDate: tanggal, energi: energi);
     return checkin!;
+  }
+
+  @override
+  Future<Dasbor> dasbor() async {
+    panggilan.add('dasbor');
+    _mungkinGagal();
+    return dasborData;
   }
 }

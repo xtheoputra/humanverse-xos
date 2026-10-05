@@ -144,6 +144,48 @@ class Habit {
   bool get dilewatiHariItu => hari?.penyelesaian?.status == 'skipped';
 }
 
+/// Satu dimensi dashboard (naskah 4 §28) — skor PLUS Why-nya.
+class Dimensi {
+  const Dimensi({
+    required this.key,
+    required this.nilai,
+    required this.keyakinan,
+    required this.bukti,
+    required this.why,
+  });
+
+  factory Dimensi.dariJson(Map<String, dynamic> json) => Dimensi(
+    key: json['key'] as String,
+    nilai: (json['value'] as num).toDouble(),
+    keyakinan: (json['confidence'] as num).toDouble(),
+    bukti: json['evidence_count'] as int,
+    why: json['why'] as String,
+  );
+
+  final String key; // 'energy' · 'focus'
+  final double nilai; // 0–1
+  final double keyakinan; // 0–1
+  final int bukti;
+  final String why;
+}
+
+/// `GET /v1/dashboard` — beberapa dimensi, tiap skor ber-Why (§28). `asOf` null =
+/// belum ada check-in (cold start), `dimensi` kosong.
+class Dasbor {
+  const Dasbor({required this.asOf, required this.dimensi});
+
+  factory Dasbor.dariJson(Map<String, dynamic> json) => Dasbor(
+    asOf: json['as_of'] as String?,
+    dimensi: [
+      for (final d in json['dimensions'] as List<dynamic>)
+        Dimensi.dariJson(d as Map<String, dynamic>),
+    ],
+  );
+
+  final String? asOf;
+  final List<Dimensi> dimensi;
+}
+
 class Checkin {
   const Checkin({
     required this.forDate,

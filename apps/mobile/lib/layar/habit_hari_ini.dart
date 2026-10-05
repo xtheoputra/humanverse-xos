@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../api/klien.dart';
 import '../api/model.dart';
+import 'dasbor.dart';
 
 /// Layar V0 pertama — spec/07 2.7: daftar habit + tandai selesai.
 ///
@@ -200,6 +201,16 @@ class _LayarHabitHariIniState extends State<LayarHabitHariIni> {
           child: Text(_tanggal, key: const Key('tanggal')),
         ),
         actions: [
+          IconButton(
+            key: const Key('buka-dasbor'),
+            tooltip: 'Dashboard',
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => LayarDasbor(layanan: widget.layanan),
+              ),
+            ),
+            icon: const Icon(Icons.insights),
+          ),
           IconButton(
             tooltip: 'Muat ulang',
             onPressed: _memuat ? null : _muat,

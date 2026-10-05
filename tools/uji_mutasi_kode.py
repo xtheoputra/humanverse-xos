@@ -9474,6 +9474,23 @@ MUTASI: list[Mutasi] = [
         harus_memuat="pekerja tidak menghasilkan dimensi dashboard dari check-in",
         kelompok="db",
     ),
+    Mutasi(
+        "6.1",
+        "layar dashboard menampilkan skor tanpa Why",
+        [
+            Sunting(
+                f"{APLIKASI}/lib/layar/dasbor.dart",
+                "                  d.why,",
+                "                  '',",
+            )
+        ],
+        _flutter_uji(
+            "test/layar/dasbor_test.dart",
+            "tiap dimensi yang tampil membawa Why",
+        ),
+        harus_memuat="tampil tanpa Why",
+        cwd=APLIKASI,
+    ),
     # ── alat ini sendiri: mutasi yang menggantung dihentikan beserta turunannya ──
     Mutasi(
         "alat",
