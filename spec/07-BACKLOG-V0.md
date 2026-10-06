@@ -284,6 +284,20 @@ Tidak ada tugas yang boleh masuk `main` tanpa baris **HUMAN REVIEW**.
 | 6.5 | Alur hapus akun (6 tahap [`01`](01-DATABASE-SCHEMA.md)) + `DELETE /me` · `POST /me/restore` | uji: titik Qdrant ikut terhapus; **semua sesi pengguna dicabut seketika** (`cabut_semua` — status hanya dibaca saat masuk & penyegaran) |
 | 6.6 | Rapikan UX + luring dasar | catat habit tanpa jaringan → sinkron tanpa duplikat |
 
+> 🔨 **Sprint 6 dikodekan sebagian — keadaan 6 Okt 2026** (branch
+> `v0/sprint-5-intelligence`, belum ber-PR):
+>
+> | # | Keadaan |
+> |---|---|
+> | 6.1 | ✅ backend `f1f76bf` + layar Flutter `261d788`: beberapa dimensi ber-Why, hanya yang V0 ukur (sumbu tanpa data **tidak** ditampilkan) |
+> | 6.5 | ✅ **kode lengkap.** Stage A `8d4bd84`: `DELETE /me` (sandi diminta lagi → `pending_deletion` + jadwal 30 hari + semua sesi dicabut), `POST /me/restore`, login `pending_deletion` diizinkan (keputusan pemilik 5 Okt), migrasi 0010. Stage B: **sapuan tahap 3–6** oleh proses pekerja — migrasi 0011, tiga fungsi `hvx_pekerja`, titik Qdrant dibuang selagi akun terkunci, jejak audit dianonimkan di semua kolom, sesi dan jejak idempotensi Redis dibersihkan (**K-39**, **E-215…E-218**, [`01`](01-DATABASE-SCHEMA.md) *Prosedur hapus akun*). Bukti: `tests/integration/test_sapuan_hapus_akun.py` (13 uji) + `test_id_semu.py`, 20 mutasi `6.5b` |
+> | 6.2 · 6.3 · 6.4 · 6.6 | ⏳ belum. 6.2 butuh inferensi jawaban dan sumbu yang V0 tak punya; 6.3 V0 reaktif tanpa pengiriman (A-28); 6.4 menyentuh arti *“hapus”* dan retensi (**C-34**, butir C — pemilik); 6.6 pekerjaan Flutter (antrean luring + `Idempotency-Key` yang sudah ada) |
+>
+> **Yang 6.5 sengaja belum menutup:** rujukan stream (id · pemilik · jenis) milik akun
+> yang dihapus tidak dibuang per akun — dipangkas menurut kursor relay dan, untuk stream
+> mati, 7 hari ([`../SECURITY.md`](../SECURITY.md)). `ip_hash` baris audit yang
+> dipertahankan tidak diubah (**C-34**).
+
 ---
 
 ## Yang TIDAK ada di backlog ini

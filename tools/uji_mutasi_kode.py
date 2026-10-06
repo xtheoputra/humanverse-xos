@@ -3813,8 +3813,8 @@ MUTASI: list[Mutasi] = [
         [
             Sunting(
                 f"{MODUL}/platform/vektor.py",
-                """raise GalatVektor(f"qdrant {metode} {jalur.split('?')[0]} → {r.status_code}")""",
-                """raise GalatVektor(f"qdrant {metode} {jalur.split('?')[0]} → {r.status_code} {r.text}")""",
+                """f"qdrant {metode} {jalur.split('?')[0]} → {r.status_code}", r.status_code""",
+                """f"qdrant {metode} {jalur.split('?')[0]} → {r.status_code} {r.text}", r.status_code""",
             )
         ],
         _pytest(f"{UJI_VEKTOR}::test_galat_qdrant_tidak_memantulkan_isi_permintaan"),
@@ -4141,15 +4141,16 @@ MUTASI: list[Mutasi] = [
         "3.5",
         "memori penyemat lain tidak disemat ulang (spec/01 DAN migrasi)",
         [
+            # Bentuk yang berlaku ada di 0011 (CREATE OR REPLACE) — 0006 tertimpa olehnya.
             Sunting(
                 "spec/01-DATABASE-SCHEMA.md",
-                "    WHERE m.deleted_at IS NOT NULL OR m.embedding_model IS DISTINCT FROM p_model",
-                "    WHERE m.deleted_at IS NOT NULL OR m.model_version IS NULL",
+                "      AND (m.deleted_at IS NOT NULL OR m.embedding_model IS DISTINCT FROM p_model)",
+                "      AND (m.deleted_at IS NOT NULL OR m.model_version IS NULL)",
             ),
             Sunting(
-                f"{MIGRASI}/0006_penyelaras_memori.up.sql",
-                "    WHERE m.deleted_at IS NOT NULL OR m.embedding_model IS DISTINCT FROM p_model",
-                "    WHERE m.deleted_at IS NOT NULL OR m.model_version IS NULL",
+                f"{MIGRASI}/0011_sapuan_hapus_akun.up.sql",
+                "      AND (m.deleted_at IS NOT NULL OR m.embedding_model IS DISTINCT FROM p_model)",
+                "      AND (m.deleted_at IS NOT NULL OR m.model_version IS NULL)",
             ),
         ],
         _pytest(f"{UJI_MEMORI}::test_penyemat_lain_disemat_ulang_bukan_dicampur"),
@@ -9534,6 +9535,361 @@ MUTASI: list[Mutasi] = [
         ],
         _pytest("tests/integration/test_hapus_akun.py::test_login_pending_deletion_lalu_restore"),
         harus_memuat="login pending_deletion ditolak",
+        kelompok="db",
+    ),
+    # ── Sprint 6 · 6.5 hapus akun (Stage B): sapuan tahap 3–6 oleh proses pekerja ──
+    Mutasi(
+        "6.5b",
+        "sapuan menghapus akun tanpa membuang titik Qdrant (tahap 4 dilewati)",
+        [
+            Sunting(
+                f"{MODUL}/identity/penghapusan.py",
+                "                if buang_titik is not None:\n"
+                "                    await buang_titik(akun.user_id)\n",
+                "                if buang_titik is not None:\n                    pass\n",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_sapuan_hapus_akun.py::"
+            "test_sapuan_menghapus_semua_jejak_akun_dan_hanya_akun_itu"
+        ),
+        harus_memuat="titik Qdrant tertinggal",
+        kelompok="db",
+    ),
+    Mutasi(
+        "6.5b",
+        "galat tahap 4 (Qdrant mati) ditelan — akun tetap dihapus, titiknya jadi yatim",
+        [
+            Sunting(
+                f"{MODUL}/identity/penghapusan.py",
+                "                if buang_titik is not None:\n"
+                "                    await buang_titik(akun.user_id)\n",
+                "                if buang_titik is not None:\n"
+                "                    try:\n"
+                "                        await buang_titik(akun.user_id)\n"
+                "                    except Exception:\n"
+                "                        pass\n",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_sapuan_hapus_akun.py::"
+            "test_qdrant_gagal_tidak_mengubah_apa_pun_dan_putaran_berikutnya_menyelesaikan"
+        ),
+        harus_memuat="akun terhapus padahal tahap 4 gagal",
+        kelompok="db",
+    ),
+    Mutasi(
+        "6.5b",
+        "tanpa Qdrant akun bertitik tetap dihapus — titiknya tertinggal selamanya",
+        [
+            Sunting(
+                f"{MODUL}/identity/penghapusan.py",
+                "        if akun.punya_titik and buang_titik is None:",
+                "        if False and akun.punya_titik and buang_titik is None:",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_sapuan_hapus_akun.py::"
+            "test_tanpa_qdrant_akun_bertitik_ditunda_dan_yang_tak_bertitik_dihapus"
+        ),
+        harus_memuat="akun bertitik dihapus tanpa membuang titiknya",
+        kelompok="db",
+    ),
+    Mutasi(
+        "6.5b",
+        "sapuan tidak mengunci akun sebelum membuang titik — yang dipulihkan kehilangan vektornya",
+        [
+            Sunting(
+                f"{MODUL}/identity/penghapusan.py",
+                "                if not await repository.kunci_akun_jatuh_tempo(conn, akun.user_id):",
+                "                if False and not await repository.kunci_akun_jatuh_tempo(\n"
+                "                    conn, akun.user_id\n"
+                "                ):",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_sapuan_hapus_akun.py::"
+            "test_akun_dipulihkan_di_antara_daftar_dan_kunci_tidak_menyentuh_qdrant"
+        ),
+        harus_memuat="titik Qdrant dibuang untuk akun yang sudah dipulihkan",
+        kelompok="db",
+    ),
+    Mutasi(
+        "6.5b",
+        "sesi yang lahir selama tenggang tidak dicabut sesudah akun dihapus",
+        [
+            Sunting(
+                f"{MODUL}/identity/penghapusan.py",
+                "        for bersihkan in (sesi.cabut_semua, *sesudah):",
+                "        for bersihkan in sesudah:",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_sapuan_hapus_akun.py::"
+            "test_sapuan_menghapus_semua_jejak_akun_dan_hanya_akun_itu"
+        ),
+        harus_memuat="sesi yang lahir selama tenggang tidak dicabut",
+        kelompok="db",
+    ),
+    Mutasi(
+        "6.5b",
+        "id semu = sha256 polos id akun (bisa dicocokkan siapa pun yang pernah melihat id itu)",
+        [
+            Sunting(
+                f"{MODUL}/identity/penghapusan.py",
+                '    return UUID(platform.sidik(settings, "akun-terhapus", str(user_id))[:32])',
+                '    return UUID(__import__("hashlib").sha256(str(user_id).encode()).hexdigest()[:32])',
+            )
+        ],
+        _pytest("tests/unit/test_id_semu.py::test_id_semu_berkunci_bukan_hash_polos"),
+        harus_memuat="id semu = sha256 polos",
+    ),
+    Mutasi(
+        "6.5b",
+        "anonimisasi audit melewatkan actor_id — id asli tetap terbaca di jejak",
+        [
+            Sunting(
+                f"{MIGRASI}/0011_sapuan_hapus_akun.up.sql",
+                "          actor_id = replace(a.actor_id, p_user_id::text, p_semu::text),\n",
+                "",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_sapuan_hapus_akun.py::"
+            "test_sapuan_menghapus_semua_jejak_akun_dan_hanya_akun_itu"
+        ),
+        harus_memuat="id asli akun yang dihapus masih terbaca di audit_logs",
+        kelompok="db",
+    ),
+    Mutasi(
+        "6.5b",
+        "fungsi hapus tidak memeriksa jatuh tempo — pekerja yang dibajak menghapus akun aktif",
+        [
+            Sunting(
+                f"{MIGRASI}/0011_sapuan_hapus_akun.up.sql",
+                "      WHERE u.id = p_user_id\n"
+                "        AND u.status = 'pending_deletion' AND u.deletion_scheduled_at <= now()\n"
+                "      FOR UPDATE;",
+                "      WHERE u.id = p_user_id\n      FOR UPDATE;",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_sapuan_hapus_akun.py::"
+            "test_fungsi_basis_data_menolak_akun_yang_belum_jatuh_tempo"
+        ),
+        harus_memuat="fungsi hapus menghapus akun yang belum jatuh tempo",
+        kelompok="db",
+    ),
+    Mutasi(
+        "6.5b",
+        "fungsi kunci tidak memeriksa jatuh tempo — akun aktif ikut terkunci dan 'siap dihapus'",
+        [
+            Sunting(
+                f"{MIGRASI}/0011_sapuan_hapus_akun.up.sql",
+                "        AND u.status = 'pending_deletion' AND u.deletion_scheduled_at <= now()\n"
+                "      FOR NO KEY UPDATE;",
+                "      FOR NO KEY UPDATE;",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_sapuan_hapus_akun.py::"
+            "test_fungsi_basis_data_menolak_akun_yang_belum_jatuh_tempo"
+        ),
+        harus_memuat="fungsi kunci menahan akun yang belum jatuh tempo",
+        kelompok="db",
+    ),
+    Mutasi(
+        "6.5b",
+        "kunci sapuan FOR UPDATE, bukan FOR NO KEY UPDATE — penulis anak ikut tertahan",
+        [
+            Sunting(
+                f"{MIGRASI}/0011_sapuan_hapus_akun.up.sql",
+                "      FOR NO KEY UPDATE;",
+                "      FOR UPDATE;",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_sapuan_hapus_akun.py::"
+            "test_kunci_sapuan_menahan_restore_tetapi_tidak_penulis_anak"
+        ),
+        harus_memuat="kunci sapuan menahan penulis anak",
+        kelompok="db",
+    ),
+    Mutasi(
+        "6.5b",
+        "penyelaras vektor tidak melewati akun yang menunggu dihapus — titik yatim di antara tahap 4 dan 3",
+        [
+            Sunting(
+                f"{MIGRASI}/0011_sapuan_hapus_akun.up.sql",
+                "    WHERE u.status <> 'pending_deletion'\n"
+                "      AND (m.deleted_at IS NOT NULL OR m.embedding_model IS DISTINCT FROM p_model)\n",
+                "    WHERE (m.deleted_at IS NOT NULL OR m.embedding_model IS DISTINCT FROM p_model)\n",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_sapuan_hapus_akun.py::"
+            "test_penyelaras_vektor_melewati_akun_yang_menunggu_dihapus"
+        ),
+        harus_memuat="akun yang menunggu dihapus masih diselaraskan ke Qdrant",
+        kelompok="db",
+    ),
+    Mutasi(
+        "6.5b",
+        "restore diizinkan sesudah tenggang habis — akun hidup kembali tanpa vektornya",
+        [
+            Sunting(
+                f"{MODUL}/identity/repository.py",
+                "    WHERE id = :id AND status = 'pending_deletion' AND deletion_scheduled_at > now()",
+                "    WHERE id = :id AND status = 'pending_deletion'",
+            )
+        ],
+        _pytest("tests/integration/test_sapuan_hapus_akun.py::test_restore_hanya_selama_tenggang"),
+        harus_memuat="restore sesudah tenggang diizinkan",
+        kelompok="db",
+    ),
+    Mutasi(
+        "6.5b",
+        "agent melayani akun pending_deletion lewat kirim pesan",
+        [
+            Sunting(
+                f"{MODUL}/agents/percakapan.py",
+                "    async def kirim(self, user_id: UUID, percakapan_id: UUID, badan: KirimPesan)"
+                " -> TerimaPesan:\n"
+                "        await self._pastikan_melayani(user_id)\n",
+                "    async def kirim(self, user_id: UUID, percakapan_id: UUID, badan: KirimPesan)"
+                " -> TerimaPesan:\n",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_sapuan_hapus_akun.py::"
+            "test_agent_berhenti_melayani_akun_yang_menunggu_dihapus"
+        ),
+        harus_memuat="agent melayani akun yang menunggu dihapus",
+        kelompok="db",
+    ),
+    Mutasi(
+        "6.5b",
+        "agent menerima jawaban konfirmasi dari akun pending_deletion",
+        [
+            Sunting(
+                f"{MODUL}/agents/percakapan.py",
+                "        await self._pastikan_melayani(user_id)\n"
+                "        await self._pastikan_ada(user_id, percakapan_id)\n"
+                "        try:",
+                "        await self._pastikan_ada(user_id, percakapan_id)\n        try:",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_sapuan_hapus_akun.py::"
+            "test_agent_berhenti_melayani_akun_yang_menunggu_dihapus"
+        ),
+        harus_memuat="agent menerima jawaban konfirmasi dari akun itu",
+        kelompok="db",
+    ),
+    Mutasi(
+        "6.5b",
+        "pekerja tidak menyalakan sapuan hapus akun — hanya fungsinya yang ada",
+        [
+            Sunting(
+                "apps/api/src/hvx/pekerja.py",
+                '"sapuan-hapus-akun", sapu_hapus_akun, JEDA_SAPUAN_HAPUS_S, berhenti',
+                '"sapuan-hapus-akun", lambda: asyncio.sleep(0), JEDA_SAPUAN_HAPUS_S, berhenti',
+            )
+        ],
+        _pytest(
+            "tests/integration/test_sapuan_hapus_akun.py::"
+            "test_proses_pekerja_menjalankan_sapuan_sendiri_lalu_berhenti_bersih"
+        ),
+        harus_memuat="pekerja tidak menjalankan sapuan hapus akun",
+        kelompok="db",
+    ),
+    Mutasi(
+        "6.5b",
+        "tabel milik pengguna tanpa ON DELETE CASCADE — datanya tertinggal sesudah akun dihapus",
+        [
+            Sunting(
+                f"{MIGRASI}/0001_v0_skema.up.sql",
+                "CREATE TABLE journal_entries (\n"
+                "  id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),\n"
+                "  user_id     uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,",
+                "CREATE TABLE journal_entries (\n"
+                "  id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),\n"
+                "  user_id     uuid NOT NULL REFERENCES users(id),",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_sapuan_hapus_akun.py::"
+            "test_tiap_tabel_milik_pengguna_ikut_terhapus_bersama_akunnya"
+        ),
+        harus_memuat="tanpa FK ke users(id) ON DELETE CASCADE",
+        kelompok="db",
+    ),
+    Mutasi(
+        "6.5b",
+        "pembersih sesudah commit tidak dijalankan — jejak idempotensi akun yang dihapus tertinggal",
+        [
+            Sunting(
+                f"{MODUL}/identity/penghapusan.py",
+                "        for bersihkan in (sesi.cabut_semua, *sesudah):",
+                "        for bersihkan in (sesi.cabut_semua,):",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_sapuan_hapus_akun.py::"
+            "test_sapuan_menghapus_semua_jejak_akun_dan_hanya_akun_itu"
+        ),
+        harus_memuat="jejak idempotensi akun yang dihapus tertinggal",
+        kelompok="db",
+    ),
+    Mutasi(
+        "6.5b",
+        "pembersihan idempotensi melewatkan jatah kuota akun yang dihapus",
+        [
+            Sunting(
+                f"{MODUL}/platform/idempotensi.py",
+                '    return terhapus + int(await redis.delete(f"{awalan}:idem-kuota:{user_id}"))',
+                "    return terhapus",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_sapuan_hapus_akun.py::"
+            "test_sapuan_menghapus_semua_jejak_akun_dan_hanya_akun_itu"
+        ),
+        harus_memuat="jejak idempotensi akun yang dihapus tertinggal",
+        kelompok="db",
+    ),
+    Mutasi(
+        "6.5b",
+        "pembersihan idempotensi menyapu kunci SEMUA pengguna, bukan hanya akun yang dihapus",
+        [
+            Sunting(
+                f"{MODUL}/platform/idempotensi.py",
+                '    async for kunci in redis.scan_iter(match=f"{awalan}:idem:{user_id}:*", count=500):',
+                '    async for kunci in redis.scan_iter(match=f"{awalan}:idem:*", count=500):',
+            )
+        ],
+        _pytest(
+            "tests/integration/test_sapuan_hapus_akun.py::"
+            "test_sapuan_menghapus_semua_jejak_akun_dan_hanya_akun_itu"
+        ),
+        harus_memuat="jejak idempotensi orang lain ikut terbuang",
+        kelompok="db",
+    ),
+    Mutasi(
+        "6.5b",
+        "pekerja tidak memasang pembersih idempotensi — fungsinya ada, tak pernah dipanggil",
+        [
+            Sunting(
+                "apps/api/src/hvx/pekerja.py",
+                "                sesudah=(partial(platform.lupakan_idempotensi, redis, settings.redis_prefix),),",
+                "                sesudah=(),",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_sapuan_hapus_akun.py::"
+            "test_proses_pekerja_menjalankan_sapuan_sendiri_lalu_berhenti_bersih"
+        ),
+        harus_memuat="pekerja tidak membersihkan jejak idempotensi",
         kelompok="db",
     ),
     # ── alat ini sendiri: mutasi yang menggantung dihentikan beserta turunannya ──

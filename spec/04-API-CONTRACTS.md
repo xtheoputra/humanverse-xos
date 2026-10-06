@@ -42,16 +42,31 @@ POST   /auth/refresh         { refresh_token }                            → 20
 POST   /auth/logout                                                       → 204
 GET    /me                                                                → 200 { user, profile }
 PATCH  /me/profile           { display_name?, timezone?, locale?, preferences? }
-DELETE /me                   { password }        → 202 { deletion_scheduled_at }   ⏳ 6.5
-POST   /me/restore                               → 200   (batal hapus, dalam 30 hari)   ⏳ 6.5
+DELETE /me                   { password }        → 202 { deletion_scheduled_at }   ✅ 6.5
+POST   /me/restore                               → 200   (batal hapus, selama tenggang 30 hari)   ✅ 6.5
+                                                 → 409 deletion_grace_expired  (tenggang habis)
 ```
 
-> ⏳ **`DELETE /me` dan `POST /me/restore` bukan bagian Sprint 1** — keduanya
-> pintu masuk alur hapus akun enam tahap, tugas [`07`](07-BACKLOG-V0.md) 6.5.
-> Semula tidak ditandai, jadi kontrak ini tampak menjanjikan rute yang tidak
-> ada (tinjauan Sprint 1). Alur itu wajib mencabut semua sesi pengguna
-> (`PenyimpanSesi.cabut_semua`): status akun hanya dibaca saat masuk dan saat
-> penyegaran, jadi token akses yang sudah terbit hidup sampai kedaluwarsanya.
+> ✅ **`DELETE /me` dan `POST /me/restore` — 6.5, dikodekan 5–6 Okt 2026.** Keduanya
+> pintu masuk alur hapus akun enam tahap, tugas [`07`](07-BACKLOG-V0.md) 6.5
+> (semula ditandai ⏳ karena bukan bagian Sprint 1 — tinjauan Sprint 1). Alur itu
+> mencabut semua sesi pengguna (`PenyimpanSesi.cabut_semua`): status akun hanya
+> dibaca saat masuk dan saat penyegaran, jadi token akses yang sudah terbit hidup
+> sampai kedaluwarsanya.
+>
+> * `DELETE /me` meminta sandi lagi (`403 invalid_credentials` bila salah) dan
+>   idempoten: saat sudah `pending_deletion` ia mengembalikan jadwal yang ada, tanpa
+>   menyetel ulang jam tenggang.
+> * Akun `pending_deletion` **boleh login** (`suspended` tidak) — satu-satunya jalan
+>   membatalkan, karena `DELETE /me` mencabut semua sesinya. Selama tenggang asisten
+>   **tidak melayani**: `POST /conversations/{id}/messages` dan `…/confirmations` →
+>   `403 account_pending_deletion`; membaca tetap boleh.
+> * `POST /me/restore` idempoten pada akun `active` (`200`, tanpa jejak kedua), tetapi
+>   **hanya selama `deletion_scheduled_at` belum lewat**: sesudahnya
+>   `409 deletion_grace_expired` — sapuan boleh membuang titik Qdrant-nya kapan saja
+>   (E-216).
+> * Penghapusannya sendiri (tahap 3–6) dikerjakan proses pekerja, bukan rute —
+>   [`01`](01-DATABASE-SCHEMA.md) *Prosedur hapus akun*.
 
 > 🔧 **`consents` ditambahkan 17 Sep 2026 (E-164), saat tugas 1.1 ditulis.**
 > [`07`](07-BACKLOG-V0.md) 1.4 menuntut persetujuan dicatat **saat daftar** —

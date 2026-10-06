@@ -23,7 +23,14 @@ from .config import Settings
 
 
 class GalatVektor(RuntimeError):
-    """Qdrant menjawab galat atau tidak terjangkau — isinya tidak memuat vektor atau payload."""
+    """Qdrant menjawab galat atau tidak terjangkau — isinya tidak memuat vektor atau payload.
+
+    `status` = kode HTTP jawabannya; `None` bila tidak terjangkau sama sekali.
+    """
+
+    def __init__(self, pesan: str, status: int | None = None) -> None:
+        super().__init__(pesan)
+        self.status = status
 
 
 @dataclass(frozen=True)
@@ -55,7 +62,9 @@ class KlienVektor:
             raise GalatVektor(f"qdrant tidak terjangkau: {type(galat).__name__}") from None
         if r.status_code >= 400:
             # Hanya kode status — badan galat Qdrant bisa memantulkan isi permintaan.
-            raise GalatVektor(f"qdrant {metode} {jalur.split('?')[0]} → {r.status_code}")
+            raise GalatVektor(
+                f"qdrant {metode} {jalur.split('?')[0]} → {r.status_code}", r.status_code
+            )
         # `/readyz` menjawab teks polos; sisanya JSON.
         if r.content and r.headers.get("content-type", "").startswith("application/json"):
             return r.json()
@@ -152,12 +161,21 @@ class KlienVektor:
 
     async def hapus_milik(self, nama: str, user_id: UUID) -> None:
         """Semua titik satu pengguna — hapus akun tahap 4 (spec/01): menurut SARINGAN,
-        bukan daftar id, supaya titik yatim (memori yang gagal commit) ikut terhapus."""
-        await self._minta(
-            "POST",
-            f"/collections/{nama}/points/delete?wait=true",
-            {"filter": {"must": [{"key": "user_id", "match": {"value": str(user_id)}}]}},
-        )
+        bukan daftar id, supaya titik yatim (memori yang gagal commit) ikut terhapus.
+
+        Koleksi yang belum ada = tidak ada titik untuk dibuang: sukses, bukan galat —
+        pekerja yang baru dinyalakan belum sempat membuatnya (penyelaras membuatnya
+        pada putarannya yang pertama), dan akun yang tak pernah punya memori tak boleh
+        tertahan menunggunya."""
+        try:
+            await self._minta(
+                "POST",
+                f"/collections/{nama}/points/delete?wait=true",
+                {"filter": {"must": [{"key": "user_id", "match": {"value": str(user_id)}}]}},
+            )
+        except GalatVektor as galat:
+            if galat.status != 404:
+                raise
 
 
 def klien_vektor_dari(settings: Settings) -> KlienVektor | None:

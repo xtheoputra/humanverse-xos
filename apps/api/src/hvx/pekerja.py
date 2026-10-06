@@ -1,4 +1,5 @@
-"""Proses pekerja — relay event, konsumen stream, penyelaras vektor (spec/07 3.3 · 3.5 · 3.6).
+"""Proses pekerja — relay event, konsumen stream, penyelaras vektor, sapuan hapus akun
+(spec/07 3.3 · 3.5 · 3.6 · 6.5).
 
     python -m hvx.pekerja
 
@@ -8,14 +9,18 @@ api mereka bersaing dengan permintaan HTTP, dan tiap replika api akan
 menjalankan relay-nya sendiri. Klien Redis-nya sendiri, dengan batas waktu
 soket lebih panjang dari BLOCK (`platform/redis_store.py`).
 
-Tiga jenis tugas, masing-masing berulang sendiri — satu yang gagal tidak
+Empat jenis tugas, masing-masing berulang sendiri — satu yang gagal tidak
 menghentikan yang lain:
 
 * **relay** — kotak keluar `events` → stream Redis (3.3);
 * **konsumen** — satu per grup spec/03 *Consumer V0* (`rakit_konsumen`);
 * **penyelaras vektor** — `memories` → Qdrant (3.5), HANYA bila `HVX_QDRANT_URL`
   diisi. Tanpanya memori tetap diekstrak ke PostgreSQL dan disemat begitu
-  Qdrant diisi; tidak ada yang hilang.
+  Qdrant diisi; tidak ada yang hilang;
+* **sapuan hapus akun** — akun yang tenggang 30 harinya habis: titik Qdrant dibuang,
+  jejak audit dianonimkan, akunnya dihapus (6.5, tahap 3–6). Pekerja yang menjalankannya
+  karena hanya peran ini yang memegang fungsi sapuan (`hvx_pekerja`, spec/01 §12) —
+  `hvx_app` sengaja tidak punya `DELETE` atas `users`.
 
 Seperti `hvx.main`, berkas ini berada di luar `hvx.modules` dan hanya menyambung
 modul lewat pintu keluarnya.
@@ -27,18 +32,22 @@ import asyncio
 import contextlib
 import signal
 from collections.abc import Awaitable, Callable
+from functools import partial
 
 import structlog
 from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncEngine
 
-from hvx.modules import events, intelligence, memory, platform
+from hvx.modules import events, identity, intelligence, memory, platform
 
 log = structlog.get_logger("hvx.pekerja")
 
 JEDA_RELAY_S = 1.0
 JEDA_SELARAS_S = 2.0
 PANGKAS_TIAP = 60  # putaran relay — ±1 menit
+# Tenggang hapus akun 30 hari (spec/01): lima menit telatnya tidak terasa siapa pun, dan
+# sapuan yang sepi hanya satu kueri berbatas.
+JEDA_SAPUAN_HAPUS_S = 300.0
 _SOKET_S = 10.0  # > BLOCK konsumen (2 dtk), lihat platform/redis_store.py
 
 
@@ -152,6 +161,26 @@ async def jalankan(settings: platform.Settings, berhenti: asyncio.Event) -> None
             if vektor
             else None
         )
+        # Sesi yang lahir selama tenggang (login untuk membatalkan) dicabut sesudah akunnya
+        # terhapus; titik Qdrant dibuang hanya bila Qdrant dipasang di proses ini.
+        sesi = identity.PenyimpanSesi(
+            redis, settings.redis_prefix, settings.access_token_ttl_s, settings.refresh_token_ttl_s
+        )
+        buang_titik = (
+            partial(memory.buang_titik_pengguna, vektor, settings.qdrant_koleksi)
+            if vektor
+            else None
+        )
+
+        async def sapu_hapus_akun() -> int:
+            return await identity.sapu_akun_jatuh_tempo(
+                engine,
+                settings,
+                sesi=sesi,
+                buang_titik=buang_titik,
+                sesudah=(partial(platform.lupakan_idempotensi, redis, settings.redis_prefix),),
+            )
+
         putaran = 0
 
         async def relay_sekali() -> None:
@@ -167,6 +196,11 @@ async def jalankan(settings: platform.Settings, berhenti: asyncio.Event) -> None
             asyncio.create_task(_ulang(f"konsumen:{k.grup}", k.putaran, 0.0, berhenti))
             for k in konsumen
         ]
+        tugas.append(
+            asyncio.create_task(
+                _ulang("sapuan-hapus-akun", sapu_hapus_akun, JEDA_SAPUAN_HAPUS_S, berhenti)
+            )
+        )
         if penyelaras:
             tugas.append(
                 asyncio.create_task(
@@ -176,7 +210,10 @@ async def jalankan(settings: platform.Settings, berhenti: asyncio.Event) -> None
         else:
             log.warning("pekerja.tanpa_vektor", alasan="HVX_QDRANT_URL kosong — memori tak disemat")
         log.info(
-            "pekerja.mulai", konsumen=[k.grup for k in konsumen], vektor=penyelaras is not None
+            "pekerja.mulai",
+            konsumen=[k.grup for k in konsumen],
+            vektor=penyelaras is not None,
+            sapuan_hapus_akun=True,
         )
         await berhenti.wait()
         for t in tugas:

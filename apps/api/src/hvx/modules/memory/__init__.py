@@ -26,7 +26,7 @@ from .ekstraksi import (
 )
 from .ingatan import ISI_MAKS, HasilIngat, ingat, periksa_ingatan
 from .pencarian import MAKS_HASIL, PencariMemori
-from .penyelaras import INDEKS_PAYLOAD, MAKS_TEKS_SEMAT, PenyelarasVektor
+from .penyelaras import INDEKS_PAYLOAD, MAKS_TEKS_SEMAT, PenyelarasVektor, buang_titik_pengguna
 from .perilaku import catat_pola, luruhkan_pola
 from .schemas import HasilCariMemori, Memori, MemoriDitemukan
 
@@ -45,6 +45,7 @@ __all__ = [
     "MemoriDitemukan",
     "PencariMemori",
     "PenyelarasVektor",
+    "buang_titik_pengguna",
     "catat_pola",
     "ekstrak",
     "id_memori",

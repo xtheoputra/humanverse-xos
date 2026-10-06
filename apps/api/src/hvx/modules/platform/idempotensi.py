@@ -283,3 +283,16 @@ async def idempotensi(
 
 # Yang dinyatakan rute tulis domain di tanda tangannya: `idem: platform.Idempoten`.
 Idempoten = Annotated[Idempotensi, Depends(idempotensi)]
+
+
+async def lupakan_idempotensi(redis: Redis, awalan: str, user_id: UUID) -> int:
+    """Semua jejak idempotensi satu pengguna — rujukan jawaban dan jatah kuotanya.
+
+    Hapus akun (spec/07 6.5, SECURITY.md): rujukannya tanpa isi tulisan (sidik · status · id),
+    tetapi hidup 24 jam dan menunjuk pemiliknya — akun yang sudah tiada tidak boleh
+    meninggalkannya. Jumlah kunci yang dibuang.
+    """
+    terhapus = 0
+    async for kunci in redis.scan_iter(match=f"{awalan}:idem:{user_id}:*", count=500):
+        terhapus += int(await redis.delete(kunci))
+    return terhapus + int(await redis.delete(f"{awalan}:idem-kuota:{user_id}"))

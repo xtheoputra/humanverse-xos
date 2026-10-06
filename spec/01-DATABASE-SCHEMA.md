@@ -111,7 +111,7 @@ CREATE TABLE users (
   created_at      timestamptz NOT NULL DEFAULT now(),
   updated_at      timestamptz NOT NULL DEFAULT now(),
   deleted_at      timestamptz,
-  deletion_scheduled_at timestamptz                  -- 🔧 0010 (6.5): now()+30h saat tahap 1; NULL = tidak dijadwalkan
+  deletion_scheduled_at timestamptz                  -- 🔧 0010 (6.5): now()+30 hari saat tahap 1 (E-218); NULL = tidak dijadwalkan
 );
 CREATE INDEX users_status_idx ON users (status) WHERE deleted_at IS NULL;
 
@@ -1037,7 +1037,8 @@ GRANT SELECT ON agents, agent_tools TO hvx_app;
 > di atas dijaga `tests/integration/test_kepemilikan_data.py`.
 >
 > ⚠️ **Yang sengaja tidak diberikan:** `DELETE` pada `users` (tahap 3 prosedur
-> hapus akun dijalankan peran pemeliharaan, bukan aplikasi — tugas 6.5) dan
+> hapus akun dijalankan proses pekerja lewat fungsi `hvx_pekerja` §12, bukan
+> aplikasi — tugas 6.5, K-39) dan
 > `UPDATE`/`DELETE` pada tabel hanya-tambah. Hapus kategori `events` di Privacy
 > Center (6.4) butuh jalur tersendiri; ia tidak boleh dibuka dengan melebarkan
 > `GRANT` di sini.
@@ -1188,13 +1189,94 @@ CREATE FUNCTION memori_perlu_diselaraskan(p_model text, p_batas integer)
   AS $$
     SELECT m.user_id
     FROM public.memories m
-    WHERE m.deleted_at IS NOT NULL OR m.embedding_model IS DISTINCT FROM p_model
+    JOIN public.users u ON u.id = m.user_id
+    WHERE u.status <> 'pending_deletion'
+      AND (m.deleted_at IS NOT NULL OR m.embedding_model IS DISTINCT FROM p_model)
     GROUP BY m.user_id
     ORDER BY min(m.updated_at), m.user_id
     LIMIT least(greatest(p_batas, 1), 1000)
   $$;
 REVOKE ALL ON FUNCTION memori_perlu_diselaraskan(text, integer) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION memori_perlu_diselaraskan(text, integer) TO hvx_pekerja;
+
+-- Sapuan hapus akun, tahap 3–6 (spec/07 6.5, K-39): tiga fungsi, satu per
+-- langkah, dan MASING-MASING menolak akun yang belum `pending_deletion` lewat
+-- `deletion_scheduled_at`. Pekerja yang dibajak hanya bisa mempercepat yang
+-- memang sudah waktunya. Hanya untuk `hvx_pekerja`.
+--
+-- 1. SIAPA yang waktunya — hanya baca, paling banyak 100 akun; `punya_titik`:
+--    ada memori yang pernah disemat ke Qdrant (tahap 4 wajib sanggup berjalan).
+CREATE FUNCTION akun_jatuh_tempo(p_batas integer)
+  RETURNS TABLE (user_id uuid, punya_titik boolean)
+  LANGUAGE sql STABLE SECURITY DEFINER
+  SET search_path = pg_catalog, public, pg_temp
+  AS $$
+    SELECT u.id,
+           EXISTS (SELECT 1 FROM public.memories m
+                   WHERE m.user_id = u.id AND m.embedding_id IS NOT NULL)
+    FROM public.users u
+    WHERE u.status = 'pending_deletion' AND u.deletion_scheduled_at <= now()
+    ORDER BY u.deletion_scheduled_at, u.id
+    LIMIT least(greatest(p_batas, 1), 100)
+  $$;
+REVOKE ALL ON FUNCTION akun_jatuh_tempo(integer) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION akun_jatuh_tempo(integer) TO hvx_pekerja;
+
+-- 2. KUNCI barisnya (`FOR NO KEY UPDATE`: menyerialkan `POST /me/restore` tanpa
+--    menahan penulis anak) dan periksa ulang waktunya. Kunci ditahan sampai
+--    transaksi pekerja selesai — tahap 4 (Qdrant) dikerjakan selagi terkunci.
+CREATE FUNCTION kunci_akun_jatuh_tempo(p_user_id uuid)
+  RETURNS boolean
+  LANGUAGE plpgsql VOLATILE SECURITY DEFINER
+  SET search_path = pg_catalog, public, pg_temp
+  AS $$
+  BEGIN
+    PERFORM 1 FROM public.users u
+      WHERE u.id = p_user_id
+        AND u.status = 'pending_deletion' AND u.deletion_scheduled_at <= now()
+      FOR NO KEY UPDATE;
+    RETURN FOUND;
+  END
+  $$;
+REVOKE ALL ON FUNCTION kunci_akun_jatuh_tempo(uuid) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION kunci_akun_jatuh_tempo(uuid) TO hvx_pekerja;
+
+-- 3. Tahap 5 · 3 · 6 dalam SATU transaksi: jejak audit akun dialihkan ke id semu
+--    (`p_semu`, HMAC berkunci dari pekerja — user_id, actor_id, subject_id, dan
+--    metadata yang memuat id lama), akunnya dihapus (CASCADE), lalu satu baris
+--    `account.deleted`. Gagal di tengah = tidak satu pun berubah.
+CREATE FUNCTION hapus_akun_jatuh_tempo(p_user_id uuid, p_semu uuid)
+  RETURNS boolean
+  LANGUAGE plpgsql VOLATILE SECURITY DEFINER
+  SET search_path = pg_catalog, public, pg_temp
+  AS $$
+  BEGIN
+    IF p_semu IS NULL OR p_semu = p_user_id THEN
+      RAISE EXCEPTION 'id semu wajib ada dan berbeda dari id akun';
+    END IF;
+    PERFORM 1 FROM public.users u
+      WHERE u.id = p_user_id
+        AND u.status = 'pending_deletion' AND u.deletion_scheduled_at <= now()
+      FOR UPDATE;
+    IF NOT FOUND THEN
+      RETURN false;
+    END IF;
+    UPDATE public.audit_logs a
+      SET user_id = p_semu,
+          actor_id = replace(a.actor_id, p_user_id::text, p_semu::text),
+          subject_id = replace(a.subject_id, p_user_id::text, p_semu::text),
+          metadata = replace(a.metadata::text, p_user_id::text, p_semu::text)::jsonb
+      WHERE a.user_id = p_user_id;
+    DELETE FROM public.users WHERE id = p_user_id;
+    INSERT INTO public.audit_logs (data_subject, actor_type, actor_id, user_id, action,
+                                   subject_type, subject_id)
+      VALUES ('user', 'system', 'sapuan-hapus-akun', p_semu, 'account.deleted',
+              'user', p_semu::text);
+    RETURN true;
+  END
+  $$;
+REVOKE ALL ON FUNCTION hapus_akun_jatuh_tempo(uuid, uuid) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION hapus_akun_jatuh_tempo(uuid, uuid) TO hvx_pekerja;
 ```
 
 > 🔑 **Kenapa fungsi, bukan kebijakan RLS yang lebih longgar** (17 Sep 2026,
@@ -1269,8 +1351,41 @@ Menutup janji *Delete* di Privacy Center (naskah 5 §26) tanpa merusak audit:
 > `masuk` karena itu **mengizinkan login akun `pending_deletion`** (`suspended`
 > tetap `403`): sesi barunya untuk membatalkan penghapusan (dan baca), agent
 > tidak melayani sampai akun `active` lagi. Restore mengembalikan `status='active'`
-> dan `deletion_scheduled_at=NULL`. Tahap 3–6 dijalankan **peran pemeliharaan**
-> (bukan api) atas akun yang `deletion_scheduled_at <= now()`.
+> dan `deletion_scheduled_at=NULL`.
+>
+> 🔧 **Tahap 3–6 — dikodekan 6 Okt 2026 (6.5 Stage B, K-39).** Dijalankan proses
+> **pekerja** (`hvx.pekerja`, anggota `hvx_pekerja`) tiap lima menit, atas akun
+> `status='pending_deletion'` yang `deletion_scheduled_at <= now()`, lewat **tiga fungsi
+> §12** — bukan peran login ketiga, dan bukan `DELETE` untuk `hvx_app`:
+>
+> `akun_jatuh_tempo` (siapa) → `kunci_akun_jatuh_tempo` (kunci baris,
+> `FOR NO KEY UPDATE`, periksa ulang) → **tahap 4** (Qdrant, di luar SQL, selagi baris
+> terkunci) → `hapus_akun_jatuh_tempo` (tahap 5 · 3 · 6 satu transaksi) → sesi dicabut.
+>
+> * **Qdrant lebih dulu.** Urutan terbalik meninggalkan titik tanpa pemilik yang tak
+>   bisa lagi dicari (`user_id`-nya sudah tiada). Pembuangannya menurut saringan
+>   `user_id` payload (`hapus_milik`), jadi diulang aman; koleksi yang belum ada = tidak
+>   ada titik = sukses. Gagal di tengah membatalkan transaksi — akunnya utuh dan dicoba
+>   lagi putaran berikutnya.
+> * **Tanpa Qdrant terpasang di pekerja**, akun yang pernah punya titik (`embedding_id`
+>   terisi) **ditunda**, bukan dihapus — menghapus barisnya meninggalkan titiknya selamanya.
+> * **Tahap 5: id semu mengganti id akun di SEMUA kolom yang bisa memuatnya** —
+>   `user_id`, `actor_id`, `subject_id`, dan teks `metadata` (**E-215**: `audit()` menulis
+>   `str(user_id)` ke `actor_id` pada tiap aksi pengguna; menganonimkan `user_id` saja
+>   meninggalkan id asli di sana). Id semu = HMAC-SHA256 berkunci (`HVX_IP_HASH_KEY`, label
+>   `akun-terhapus`) dipotong 128 bit: baris audit satu akun tetap bisa dipertemukan,
+>   tetapi tak bisa dibalik tanpa kunci. `ip_hash` **tidak** diubah — pertanyaan pemilik
+>   (**C-34**).
+> * **Restore hanya selama tenggang (E-216).** `POST /me/restore` sesudah
+>   `deletion_scheduled_at` → `409 deletion_grace_expired`: sapuan boleh membuang titik
+>   Qdrant-nya kapan saja, dan akun yang dipulihkan di antaranya hidup kembali tanpa
+>   vektor memorinya.
+> * **Penyelaras vektor melewati akun `pending_deletion` (E-217)** — penyematan ulang
+>   bisa menulis titik baru di antara tahap 4 dan commit tahap 3. Restore
+>   mengembalikannya.
+> * **Agent berhenti melayani** akun `pending_deletion` di pintu giliran (`kirim`,
+>   `jawab` → `403 account_pending_deletion`); membaca dan membatalkan tetap boleh.
+> * Sesi yang lahir selama tenggang (login untuk membatalkan) dicabut sesudah commit.
 
 ---
 

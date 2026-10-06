@@ -21,6 +21,13 @@ from .izin import (
     UbahanIzin,
     mesin_izin,
 )
+from .penghapusan import (
+    BATAS_SAPUAN,
+    PembersihSesudah,
+    PenghapusTitik,
+    id_semu,
+    sapu_akun_jatuh_tempo,
+)
 from .persetujuan import (
     TUJUAN_LAYANAN,
     TUJUAN_PELATIHAN_MODEL,
@@ -34,10 +41,11 @@ from .repository import ambil_pengguna
 from .routes import router, router_akun
 from .schemas import PenggunaRingkas
 from .scope import SCOPE_RESMI, Scope
-from .service import PendengarPendaftaran, PenggunaBaru
+from .service import PendengarPendaftaran, PenggunaBaru, pastikan_akun_melayani
 from .sesi import HasilPenyegaran, PenyimpanSesi, SesiAktif, Token
 
 __all__ = [
+    "BATAS_SAPUAN",
     "SCOPE_RESMI",
     "TUJUAN_LAYANAN",
     "TUJUAN_PELATIHAN_MODEL",
@@ -48,11 +56,13 @@ __all__ = [
     "IzinTidakSah",
     "Keputusan",
     "MesinIzin",
+    "PembersihSesudah",
     "PendengarPendaftaran",
     "PenggunaBaru",
     "PenggunaDiperlukan",
     "PenggunaMasuk",
     "PenggunaRingkas",
+    "PenghapusTitik",
     "PenyimpanSesi",
     "Persetujuan",
     "PersetujuanTidakSah",
@@ -67,9 +77,12 @@ __all__ = [
     "boleh_dipakai_untuk",
     "cabut_persetujuan",
     "catat_persetujuan",
+    "id_semu",
     "mesin_izin",
+    "pastikan_akun_melayani",
     "pengguna_saat_ini",
     "penyimpan_sesi",
     "router",
     "router_akun",
+    "sapu_akun_jatuh_tempo",
 ]

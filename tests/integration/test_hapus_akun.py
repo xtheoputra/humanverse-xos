@@ -36,9 +36,7 @@ def _akun(api: ApiUji, uid: str) -> tuple[Any, ...]:
 async def test_hapus_menjadwalkan_dan_mencabut_semua_sesi(api_uji: ApiUji) -> None:
     email, uid, token1 = await _daftar(api_uji)
     # Sesi KEDUA: login lagi → dua token hidup, keduanya harus mati sesudah DELETE.
-    masuk = await api_uji.klien.post(
-        "/v1/auth/login", json={"email": email, "password": SANDI}
-    )
+    masuk = await api_uji.klien.post("/v1/auth/login", json={"email": email, "password": SANDI})
     token2 = masuk.json()["tokens"]["access_token"]
 
     r = await api_uji.klien.request(
@@ -64,7 +62,7 @@ async def test_sandi_salah_tidak_menjadwalkan(api_uji: ApiUji) -> None:
         "DELETE", "/v1/me", json={"password": "sandi-salah-sekali-2026"}, headers=auth(token)
     )
 
-    assert r.status_code == 403, r.text
+    assert r.status_code == 403, f"akun dijadwalkan hapus tanpa sandi benar: {r.text}"
     assert r.json()["error"]["code"] == "invalid_credentials"
     assert _akun(api_uji, uid)[0] == "active", "akun dijadwalkan hapus tanpa sandi benar"
 
@@ -75,9 +73,7 @@ async def test_login_pending_deletion_lalu_restore(api_uji: ApiUji) -> None:
     assert _akun(api_uji, uid)[0] == "pending_deletion"
 
     # Login DIIZINKAN untuk pending_deletion — satu-satunya jalan membatalkan.
-    masuk = await api_uji.klien.post(
-        "/v1/auth/login", json={"email": email, "password": SANDI}
-    )
+    masuk = await api_uji.klien.post("/v1/auth/login", json={"email": email, "password": SANDI})
     assert masuk.status_code == 200, "login pending_deletion ditolak — restore jadi mustahil"
     token_baru = masuk.json()["tokens"]["access_token"]
 

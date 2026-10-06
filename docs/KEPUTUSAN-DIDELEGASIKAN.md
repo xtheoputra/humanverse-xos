@@ -648,6 +648,28 @@ sesudahnya.
 
 ---
 
+## K-39 · Sapuan hapus akun: proses pekerja lewat tiga fungsi sempit, Qdrant dibuang selagi akun terkunci
+
+> Diputuskan 6 Oktober 2026, saat 6.5 Stage B ditulis. (K-33 … K-38 — Sprint 5 — dirujuk kode
+> dan [`SESSION-LOG.md`](SESSION-LOG.md) Sesi 35, tetapi **belum ditulis di berkas ini**; nomor
+> berikutnya sengaja tidak menimpanya.)
+>
+> Yang dipertanyakan: spec/01 *Prosedur hapus akun* menyebut tahap 3–6 dijalankan *“peran
+> pemeliharaan (bukan api)”* tanpa bentuk — peran login baru? alat `tools/` dengan kredensial
+> pemilik skema? proses yang sudah ada? Dan `hvx_app` sengaja tidak punya `DELETE` atas `users`
+> (spec/01 §10). **Bukan** yang dipertanyakan: tenggang 30 hari, enam tahap, dan bahwa jejak audit
+> dipertahankan — itu spec dan keputusan pemilik.
+
+| | |
+|---|---|
+| **Keputusan** | **(1)** Tahap 3–6 dikerjakan **proses pekerja** (`hvx.pekerja`, anggota `hvx_pekerja`), tiap lima menit, lewat **tiga fungsi `SECURITY DEFINER`** (spec/01 §12): `akun_jatuh_tempo` (siapa) · `kunci_akun_jatuh_tempo` (kunci baris, periksa ulang) · `hapus_akun_jatuh_tempo` (tahap 5 · 3 · 6 satu transaksi). **Masing-masing menolak akun yang bukan `pending_deletion` dengan tenggang habis** — penegakannya di basis data, bukan di kode sapuan. **(2)** Urutan: kunci (`FOR NO KEY UPDATE`) → **tahap 4**, titik Qdrant dibuang menurut saringan `user_id` **selagi terkunci** → fungsi hapus → sesi dan jejak idempotensi Redis dibuang sesudah commit. Gagal sebelum commit membatalkan semuanya; akunnya masih jatuh tempo dan diulang. **(3)** Jejak audit dialihkan ke **id semu = HMAC-SHA256 berkunci** (`HVX_IP_HASH_KEY`, label `akun-terhapus`, 128 bit) di `user_id`, `actor_id`, `subject_id`, dan teks `metadata`; satu baris `account.deleted` menutupnya. **(4)** `POST /me/restore` hanya selama `deletion_scheduled_at > now()`; sesudahnya `409 deletion_grace_expired`. **(5)** Penyelaras vektor melewati akun `pending_deletion`. **(6)** Tanpa Qdrant terpasang di pekerja, akun yang pernah punya titik **ditunda**, bukan dihapus. **(7)** Asisten berhenti melayani akun `pending_deletion` di pintu giliran (`kirim`, `jawab` → `403 account_pending_deletion`). |
+| **Bukti** | spec/01: *“Tahap 4 adalah jebakan paling mudah terlewat: Qdrant tidak ikut cascade”* dan *“kumpulkan `embedding_id` lebih dulu, atau titik memori pengguna akan tertinggal selamanya”*; spec/01 §10: *`DELETE` pada `users` … dijalankan peran pemeliharaan, bukan aplikasi*; pemilik 5 Okt 2026 (Stage A): login `pending_deletion` diizinkan, kolom jadwal tersendiri. `audit()` menulis `str(user_id)` ke `actor_id` pada tiap aksi pengguna — menganonimkan `user_id` saja (bunyi tahap 5) meninggalkan id asli di sana (**E-215**). |
+| **Bacaan yang DITOLAK** | **(a)** *“Alat `tools/` memakai kredensial pemilik skema”* — ditolak: kredensial yang melewati RLS dan semua hak hidup panjang di proses terjadwal; tiga fungsi yang menolak akun belum jatuh tempo memberi batas sekecil itu tanpa kredensial baru. **(b)** *“Peran login ketiga (`hvx_pemeliharaan`)”* — ditolak: permukaan baru (compose, `peran-lokal.sql`, `pastikan_peran_aplikasi`) untuk kerja yang sudah punya rumah di pekerja. **(c)** *“Hapus baris dulu, Qdrant sesudah commit”* — ditolak: gagal di antaranya meninggalkan titik tanpa pemilik yang tak bisa lagi dicari (`user_id`-nya sudah tiada; menyimpan daftarnya butuh tabel ke-24). **(d)** *“Kunci `FOR UPDATE`”* — ditolak: foreign key tulisan anak mengambil `FOR KEY SHARE`, jadi penulis anak ikut menunggu Qdrant. **(e)** *“Hash polos id akun sebagai id semu”* — ditolak: id yang pernah terlihat (cadangan, log lama) langsung cocok lagi. **(f)** *“Restore tanpa batas”* (Stage A) — ditolak: akun yang dipulihkan sesudah titiknya dibuang hidup kembali tanpa vektor memorinya, diam-diam (**E-216**). |
+| **Harga yang diakui** | ⚠️ Baris akun terkunci selama panggilan Qdrant (batas waktu 5 dtk): login atau restore pada akun yang sedang disapu menunggu sebanyak itu. Akun jatuh tempo dihapus ≤ 5 menit sesudah waktunya. Sapuan tanpa Qdrant menunda akun bertitik **tanpa batas** (peringatan di log) — dipilih daripada titik tanpa pemilik. Satu akun yang terus gagal tidak menahan yang lain, tetapi mengulang galatnya tiap lima menit. Pembersihan Redis sesudah commit boleh gagal tanpa bisa diulang (akunnya sudah tiada; jejaknya mati sendiri dalam 24 jam). Rujukan stream tidak dibuang per akun. `ip_hash` baris audit tidak diubah (**C-34**). |
+| **Cara membalikkan** | `identity/penghapusan.py` · migrasi 0011 · `pekerja.JEDA_SAPUAN_HAPUS_S`; `tests/integration/test_sapuan_hapus_akun.py` dan 20 mutasi `6.5b` diubah bersamanya. |
+
+---
+
 ## Yang sengaja **tidak** saya putuskan
 
 | Butir | Kenapa |

@@ -227,6 +227,16 @@ class LayananPercakapan:
         return TerimaKonfirmasi(agent_run_id=run_id, status=status)
 
     # ── giliran ─────────────────────────────────────────────────────────────
+    async def _pastikan_melayani(self, user_id: UUID) -> None:
+        """Agent berhenti melayani akun yang menunggu dihapus (spec/01 tahap 1, 6.5).
+
+        Di PINTU giliran (`kirim`, `jawab`), bukan tiap permintaan: akun itu masih boleh
+        masuk untuk membatalkan atau membaca, tetapi asisten tidak lagi menulis atau
+        menalar atas data yang akan dibuang.
+        """
+        async with platform.transaksi_pengguna(self._engine, user_id) as conn:
+            await identity.pastikan_akun_melayani(conn, user_id)
+
     async def _pastikan_ada(self, user_id: UUID, percakapan_id: UUID) -> None:
         if await self.baca(user_id, percakapan_id) is None:
             raise _tidak_ditemukan()
@@ -240,6 +250,7 @@ class LayananPercakapan:
             ) from None
 
     async def kirim(self, user_id: UUID, percakapan_id: UUID, badan: KirimPesan) -> TerimaPesan:
+        await self._pastikan_melayani(user_id)
         await self._pastikan_ada(user_id, percakapan_id)
         pesan_id = badan.id or uuid4()
         async with platform.transaksi_pengguna(self._engine, user_id) as conn:
@@ -412,6 +423,7 @@ class LayananPercakapan:
         `turn_in_progress`. Yang baru ketahuan saat jawabannya dicatat (`allow_always`
         untuk R3, balapan dua jawaban) meng-`urungkan` giliran yang belum terjadi.
         """
+        await self._pastikan_melayani(user_id)
         await self._pastikan_ada(user_id, percakapan_id)
         try:
             permintaan = self._tanda.baca(badan.token, user_id)

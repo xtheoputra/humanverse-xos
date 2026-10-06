@@ -328,7 +328,12 @@ async def jadwalkan_penghapusan(
 
 async def batalkan_penghapusan(engine: AsyncEngine, user_id: UUID, *, ip_hash: str | None) -> None:
     """`POST /me/restore` — kembalikan `active`, batalkan jadwal. Idempoten: akun yang
-    sudah `active` tetap `200`, tanpa jejak kedua."""
+    sudah `active` tetap `200`, tanpa jejak kedua.
+
+    Hanya SELAMA tenggang (K-39): sesudah `deletion_scheduled_at` sapuan boleh membuang titik
+    Qdrant-nya kapan saja, dan akun yang dipulihkan sesudah itu kehilangan memori
+    vektornya diam-diam — jadi `409 deletion_grace_expired`, bukan `200`.
+    """
     async with platform.transaksi_pengguna(engine, user_id) as conn:
         dibatalkan = await repository.batalkan_hapus(conn, user_id)
         if dibatalkan:
@@ -340,3 +345,28 @@ async def batalkan_penghapusan(engine: AsyncEngine, user_id: UUID, *, ip_hash: s
                 user_id=user_id,
                 ip_hash=ip_hash,
             )
+            return
+        if await repository.status_akun(conn, user_id) == "pending_deletion":
+            raise _galat(
+                409,
+                "deletion_grace_expired",
+                "Masa tenggang penghapusan sudah berakhir; akun tidak bisa dipulihkan.",
+            )
+
+
+async def pastikan_akun_melayani(conn: AsyncConnection, user_id: UUID) -> None:
+    """Agent berhenti melayani akun yang menunggu dihapus (spec/01 tahap 1).
+
+    Dibaca di PINTU GILIRAN agent, bukan tiap permintaan: `pending_deletion` boleh masuk
+    (membatalkan, membaca), tetapi tidak boleh membuat asisten menulis atau menalar
+    atas datanya lagi — datanya akan dibuang. `conn` = transaksi pengguna itu (RLS).
+    """
+    status = await repository.status_akun(conn, user_id)
+    if status == "pending_deletion":
+        raise _galat(
+            403,
+            "account_pending_deletion",
+            "Akun sedang dijadwalkan dihapus. Batalkan penghapusan untuk memakai asisten.",
+        )
+    if status != "active":
+        raise _galat(403, "account_not_active", "Akun tidak aktif.")

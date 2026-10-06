@@ -4,6 +4,29 @@
 
 ---
 
+## Sesi 36 — 6 Oktober 2026
+
+**Pemilik: *“sudah berapa % proyek jadi?”*, lalu *“lanjutkan progress”*** — dihitung dari
+`spec/07` dan branch terbaru (`v0/sprint-5-intelligence`, **bukan** `v0/sprint-2-human-core` yang
+sedang di-checkout di folder utama): **46 dari 51 tugas V0 selesai dikodekan (±90 %)**, nol yang
+digabung (PR #163–#167 menunggu HUMAN REVIEW; Sprint 5–6 belum ber-PR). Lalu 6.5 **Stage B**.
+
+| Hal | Hasil |
+|---|---|
+| Naskah baru | tidak ada |
+| Keputusan pemilik | tidak ada yang baru |
+| Keputusan didelegasikan | 🆕 **K-39** — sapuan hapus akun: proses pekerja lewat tiga fungsi `hvx_pekerja`, Qdrant dibuang selagi akun terkunci |
+| Temuan | 🆕 **E-215** (anonimisasi `user_id` meninggalkan id asli di `actor_id`/`subject_id`/`metadata`) · **E-216** (restore tanpa batas tenggang) · **E-217** (penyelaras menulis titik yatim di antara tahap 4 dan 3) · **E-218** (typo `30h`) · **E-219** (mutasi Stage A salah alasan) · pertanyaan baru **C-34** (`ip_hash` di audit yang dipertahankan) |
+| `spec/` diubah | `01` (§12 tiga fungsi + penyelaras, *Prosedur hapus akun*, typo), `04` (`DELETE /me`/restore ✅, `409 deletion_grace_expired`, `403 account_pending_deletion`), `07` (keadaan Sprint 6) |
+| Kode | migrasi **0011** (tiga fungsi + penyelaras melewati `pending_deletion`) · `identity/penghapusan.py` · `memory.buang_titik_pengguna` · `platform.lupakan_idempotensi` · `GalatVektor.status` (koleksi belum ada = sukses) · tugas `sapuan-hapus-akun` di `hvx.pekerja` · restore hanya selama tenggang · asisten berhenti melayani `pending_deletion` |
+| Bukti | `test_sapuan_hapus_akun.py` (13) · `test_id_semu.py` (3) · **20 mutasi `6.5b`** berbunyi · 2 jangkar mutasi 3.5 yang bergeser dibetulkan dan 3 mutasi 3.5 dibuktikan masih berbunyi · **78 mutasi lama** pada berkas yang disentuh dijalankan ulang: 77 berbunyi, 1 (`6.5` *“tanpa verifikasi sandi”*) **salah alasan sejak Stage A** (**E-219**) — dibetulkan, kini berbunyi · suite penuh `pytest --cov`: 1.212 hijau + 1 merah (`test_jangkar_mutasi`, dibetulkan sesudahnya), cakupan **92 %** · `mypy` bersih · `import-linter` 15/15 · `ruff` bersih · 14 pemeriksa dokumen wajib hijau |
+| ⚠️ Belum dijalankan | **gerbang penuh `ci_lokal.py`** (±30 mnt) — langkah pemilik sebelum PR; Flutter tidak disentuh |
+| ⚠️ Belum di-commit | semua perubahan sesi ini ada di working tree `hvx-sprint5` — **tidak ada commit** (belum diminta) |
+| Utang yang ketemu | **K-33 … K-38** dirujuk kode Sprint 5 dan Sesi 35 tetapi **belum ditulis** di `KEPUTUSAN-DIDELEGASIKAN.md` · `R-1` (urutan gerbang roadmap) merah sejak sebelum sesi ini — bukan pemeriksa wajib · tes `test_hapus_akun.py` Stage A belum diformat `ruff` (kini sudah) |
+| ⏸️ Berhenti di | 6.5 **selesai kode**. Sisa V0: **6.2** weekly review · **6.3** notifikasi · **6.4** Privacy Center (butir C, pemilik) · **6.6** UX + luring (Flutter). Berikutnya yang paling berdampak: commit per tugas + gerbang penuh + PR Sprint 5, lalu K-33…K-38 di dokumen |
+
+---
+
 ## Sesi 35 — 1 Oktober 2026
 
 **Pemilik: *“lanjutkan”*** (berkali-kali) — menuntaskan serah-terima Sesi 34: gerbang
