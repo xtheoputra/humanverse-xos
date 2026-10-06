@@ -41,8 +41,9 @@ Diperbarui: 24 September 2026 · Mencakup **dua puluh empat naskah**:
 ## 🔨 Sprint 6 · 6.6 luring dasar (6 Okt 2026) — apa yang berubah bagi berkas ini
 
 Antrean luring Flutter dikerjakan di branch `v0/sprint-5-intelligence`. Bentuknya **K-40**
-([`KEPUTUSAN-DIDELEGASIKAN.md`](KEPUTUSAN-DIDELEGASIKAN.md)). Dua temuan, keduanya dibetulkan
-di commit yang sama, dan satu pertanyaan baru untuk pemilik (**C-35**).
+([`KEPUTUSAN-DIDELEGASIKAN.md`](KEPUTUSAN-DIDELEGASIKAN.md)). Tiga temuan (E-220 · E-221 dari
+6.6 sendiri, E-222 dari gerbang penuh pertama atas Sprint 5–6), semuanya dibetulkan, dan satu
+pertanyaan baru untuk pemilik (**C-35**).
 
 #### E-220 — klien tanpa batas waktu, dan galat jaringan tak punya jenis
 
@@ -68,6 +69,24 @@ ujinya hijau pada kode asli **dan** pada mutan; (b) pemeriksaan *“catatan masi
 sebelum menghitung penolakan — tanpa uji yang menjangkaunya. Tombol *Sinkronkan* juga tak lagi
 memanggil `sinkron()` sendiri (`habitPada` sudah mengirim antrean; panggilan kedua tak
 terbukti perlu).
+
+#### E-222 — gerbang penuh pertama atas Sprint 5–6: tiga mutasi alat yang merah, semuanya cacat alat
+
+Gerbang penuh `ci_lokal.py` belum pernah dijalankan atas Sprint 5 (handover Sesi 35/36 menulis
+*“belum dijalankan”*) — dan putaran mutasi basis data pertamanya berhenti merah: 441 dijalankan,
+438 berbunyi, **3 diam**. Ketiganya cacat **alat**, bukan produk, dan dua dari tiga berasal dari
+sebelum sesi ini:
+
+| Mutasi | Penyebab | Perbaikan |
+|---|---|---|
+| 4.7 *“memory.search tidak menyatakan menyaring izinnya sendiri”* | menunjuk `test_coach_tanpa_data_mengatakannya` — **diganti namanya oleh 5.4** (`b6dd75e`, nol bukti → *bertanya*). `pytest` menjawab *“not found”* (kode 4), yang bagi alat berarti “diam” | diarahkan ke uji yang memegang pesannya (`…_scope_ingatan_yang_belum_diputuskan`, sama dengan mutasi 4.7 pertama) |
+| 4.7 *“coach mengarang bahan saat tidak ada data (Pasal 8)”* | nama uji yang sama — **dan** mutan **setara** sejak 5.4: `fakta` tak pernah kosong di baris yang dimutasi (nol sumber memotong lebih awal), jadi tak ada uji yang bisa membuatnya berbunyi | dihapus; Pasal 8 pada nol data dijaga mutasi 5.4 dan `test_coach_tanpa_data_bertanya_bukan_menyatakan` |
+| 6.1 *“dashboard tidak membaca human_state”* | membalik kondisi (`is None` → `is not None`) membuat dashboard **crash 500** pada akun tanpa data, jadi uji merah di asersi status — bukan di asersi *“pekerja tidak menghasilkan dimensi”* yang dituntut. Pola **E-214** · **E-219** untuk ketiga kalinya | `if True:` — dashboard selalu kosong, tanpa crash |
+
+✅ Penjaga baru yang menutup kelas cacatnya: `test_tiap_mutasi_pytest_menunjuk_uji_yang_ada`
+(`tests/unit/test_jangkar_mutasi.py`) memeriksa dalam detik bahwa tiap `_pytest(...)` menunjuk uji
+yang ada — `test_jangkar_mutasi` lama hanya memeriksa jangkar penyuntingan, bukan nama uji. Dibuktikan
+sanggup gagal oleh mutasi `alat` *“mutasi menunjuk uji yang sudah tidak ada”*.
 
 #### C-35 — data pengguna di penyimpanan perangkat: antrean luring dan token
 

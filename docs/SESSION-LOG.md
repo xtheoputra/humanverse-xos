@@ -15,12 +15,13 @@ mengerjakan satu-satunya sisa V0 yang mekanis dan bukan milik pemilik: **6.6 lur
 | Naskah baru | tidak ada |
 | Keputusan pemilik | tidak ada yang baru |
 | Keputusan didelegasikan | 🆕 **K-40** — luring dasar: antrean penyelesaian habit di memori; hanya tandai selesai/batalkan yang diantre; dikirim ulang bila jawaban hilang (server idempoten) |
-| Temuan | 🆕 **E-220** (klien tanpa batas waktu; galat jaringan tak punya jenis) · **E-221** (mutasi 6.6 pertama salah alasan; dua penjaga tak terbukti dibuang) · pertanyaan baru **C-35** (antrean & token di penyimpanan perangkat) |
+| Temuan | 🆕 **E-220** (klien tanpa batas waktu; galat jaringan tak punya jenis) · **E-221** (mutasi 6.6 pertama salah alasan; dua penjaga tak terbukti dibuang) · **E-222** (gerbang penuh pertama atas Sprint 5–6 merah di mutasi basis data: 2 mutasi 4.7 menunjuk uji yang diganti namanya oleh 5.4 — satu juga mutan setara — dan 1 mutasi 6.1 membuat dashboard crash; dibetulkan + uji penjaga nama uji) · pertanyaan baru **C-35** (antrean & token di penyimpanan perangkat) |
 | `spec/` diubah | `07` (6.6 ✅ + batas yang diakui) |
 | Kode | `apps/mobile/lib/api/luring.dart` (`LayananLuring` · `Catatan` · `StatusAntrean` · `StatusLuring`) · `klien.dart` (`JaringanPutus`, `batasWaktu` 15 dtk) · `model.dart` (`Habit.denganPenyelesaian`) · `habit_hari_ini.dart` (spanduk, konfirmasi keluar, pesan jaringan) · `main.dart` |
 | Bukti | `luring_test.dart` (17) · `luring_layar_test.dart` (6) · 3 uji klien · `test/ujung/luring_nyata_test.dart` **lawan api sungguhan** (jawaban hilang → kirim ulang → satu penyelesaian) · **31 mutasi `6.6`** · `flutter analyze --fatal-infos` bersih · `flutter test` 68 hijau |
 | Yang ketemu saat menjalankan yang SUNGGUHAN | alat `dart run tool/ujung_ke_ujung.dart` **tak bisa mengompilasi** kode yang memakai `package:flutter/foundation.dart` — skenario luring-nyata dipindah ke `test/ujung/` (`flutter test`). Dan `docker compose up --build` membangun tag citra yang sama dari dua layanan (`migrate`, `api`) → *“already exists”* — gerbang memakai `--no-build` dari citra yang sudah ada |
-| ⚠️ Belum dijalankan | **gerbang penuh `ci_lokal.py`** (±30 mnt) · belum ada PR untuk `v0/sprint-5-intelligence` |
+| Gerbang penuh | putaran 1 (13:08, 6 Okt): `lint` · `typecheck` · `pytest` (1213, cakupan 92 %) hijau; **merah di mutasi basis data** (E-222). `flutter test` · build · smoke · scan **belum tercapai** — diulang dari awal sesudah perbaikan |
+| ⚠️ Belum dijalankan | belum ada PR untuk `v0/sprint-5-intelligence`; belum di-push |
 | ⏸️ Berhenti di | 47 → **48 dari 51 tugas** (±94 %). Sisa V0: **6.2** weekly review · **6.3** notifikasi · **6.4** Privacy Center (butir C, pemilik). Berikutnya yang paling berdampak: gerbang penuh + PR Sprint 5, K-33…K-38 di dokumen, jawaban pemilik atas **C-34** · **C-35** |
 
 ---

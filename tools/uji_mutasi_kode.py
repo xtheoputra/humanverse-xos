@@ -6397,7 +6397,7 @@ MUTASI: list[Mutasi] = [
         "4.7",
         "memory.search tidak menyatakan menyaring izinnya sendiri",
         [Sunting(f"{MODUL}/agents/alat/memory.search.yaml", "menyaring_izin: true\n", "")],
-        _pytest(f"{UJI_AGENT_V0}::test_coach_tanpa_data_mengatakannya"),
+        _pytest(f"{UJI_AGENT_V0}::test_coach_tidak_tertahan_scope_ingatan_yang_belum_diputuskan"),
         harus_memuat="memory.search menunggu izin pengguna",
         kelompok="db",
     ),
@@ -6484,20 +6484,10 @@ MUTASI: list[Mutasi] = [
         harus_memuat="alasan bukan fakta yang dipakai",
         kelompok="db",
     ),
-    Mutasi(
-        "4.7",
-        "coach mengarang bahan saat tidak ada data (Pasal 8)",
-        [
-            Sunting(
-                f"{MODUL}/agents/program_v0.py",
-                "        bahan=fakta,\n",
-                '        bahan=fakta or ["Kamu baik-baik saja."],\n',
-            )
-        ],
-        _pytest(f"{UJI_AGENT_V0}::test_coach_tanpa_data_mengatakannya"),
-        harus_memuat="coach mengarang jawaban tanpa data (Pasal 8)",
-        kelompok="db",
-    ),
+    # (E-222) "coach mengarang bahan saat tidak ada data (Pasal 8)" dihapus: sejak 5.4 nol sumber
+    # memotong lebih awal (`cukup_untuk_menyatakan` → BERTANYA), jadi `fakta or [...]` tak pernah
+    # tercapai dengan `fakta` kosong — mutan setara, tak mungkin berbunyi. Pasal 8 pada nol data
+    # dijaga mutasi 5.4 di bawah dan `test_coach_tanpa_data_bertanya_bukan_menyatakan`.
     Mutasi(
         "4.7",
         "habit agent menebak di antara beberapa yang cocok",
@@ -9465,7 +9455,7 @@ MUTASI: list[Mutasi] = [
             Sunting(
                 f"{MODUL}/intelligence/dasbor.py",
                 '    if terkini is None:  # belum ada check-in — cold start, bukan "satu angka 0"',
-                '    if terkini is not None:  # belum ada check-in — cold start, bukan "satu angka 0"',
+                '    if True:  # belum ada check-in — cold start, bukan "satu angka 0"',
             )
         ],
         _pytest(
@@ -10336,6 +10326,21 @@ MUTASI: list[Mutasi] = [
         _flutter_uji("test/layar/luring_layar_test.dart", "habit baru tanpa jaringan"),
         harus_memuat="dialog habit baru harus menjelaskan bahwa jaringan dibutuhkan",
         cwd=APLIKASI,
+    ),
+    # ── alat ini sendiri: mutasi yang menunjuk uji yang sudah diganti namanya (E-222) ──
+    Mutasi(
+        "alat",
+        "mutasi menunjuk uji yang sudah tidak ada — pytest keluar 4, terbaca diam",
+        [
+            Sunting(
+                "tools/uji_mutasi_kode.py",
+                # dipecah: jangkar yang utuh akan cocok dengan literalnya sendiri (2×)
+                "::test_habit_agent_tidak_" + 'menebak"),',
+                "::test_habit_agent_tidak_" + 'menebak_nama_lama"),',
+            )
+        ],
+        _pytest("tests/unit/test_jangkar_mutasi.py::test_tiap_mutasi_pytest_menunjuk_uji_yang_ada"),
+        harus_memuat="tidak punya uji `test_habit_agent_tidak_menebak_nama_lama`",
     ),
     # ── alat ini sendiri: mutasi yang menggantung dihentikan beserta turunannya ──
     Mutasi(
