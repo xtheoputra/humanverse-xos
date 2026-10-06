@@ -20,21 +20,22 @@ from sqlalchemy.ext.asyncio import AsyncConnection
 
 from .stream import EventMasuk
 
-_KOLOM = (
-    "id, user_id, event_type, schema_version, occurred_at, recorded_at, source, "
-    "subject_type, subject_id, payload"
-)
+# Kolom ditulis LITERAL di tiap kueri, sama dengan field `EventMasuk` — bukan disisipkan
+# lewat f-string: bandit (B608, gerbang `scan`) menandai SQL hasil rakitan string walau
+# sumbernya konstanta, dan repo ini tidak memakai `nosec`. Selisih kolom dengan
+# `EventMasuk` langsung terlihat sebagai TypeError di uji proyektor.
 
 # Urutan `recorded_at` (jam saat event MASUK sistem) — sama dengan urutan relay
 # menyalurkannya ke konsumen (`relay.py`), jadi membangun ulang menapaki jalur
 # yang sama dengan aliran langsung. `id` sebagai pemecah seri yang tentu.
 _SEMUA = text(
-    f"""
-    SELECT {_KOLOM}
+    """
+    SELECT id, user_id, event_type, schema_version, occurred_at, recorded_at, source,
+           subject_type, subject_id, payload
     FROM events
     WHERE user_id = :user_id
     ORDER BY recorded_at, id
-    """  # noqa: S608 — _KOLOM konstanta modul, bukan masukan
+    """
 )
 
 # Satu event menurut (jenis, completion_id di payload). Behavior projector
@@ -42,15 +43,16 @@ _SEMUA = text(
 # "pernah selesai?" dan "pernah dicabut?" — alih-alih menebak dari urutan tiba,
 # yang bisa terbalik oleh pengiriman ulang stream.
 _MENURUT_PENYELESAIAN = text(
-    f"""
-    SELECT {_KOLOM}
+    """
+    SELECT id, user_id, event_type, schema_version, occurred_at, recorded_at, source,
+           subject_type, subject_id, payload
     FROM events
     WHERE user_id = :user_id
       AND event_type = :event_type
       AND payload ->> 'completion_id' = :completion_id
     ORDER BY recorded_at, id
     LIMIT 1
-    """  # noqa: S608 — _KOLOM konstanta modul, bukan masukan
+    """
 )
 
 
@@ -58,8 +60,9 @@ _MENURUT_PENYELESAIAN = text(
 # tidak punya `habit.completion_retracted` — bahan deteksi pola (5.2). `done`/`partial`
 # saja (skipped terbit sebagai jenis lain); urut tiba.
 _RIWAYAT_HABIT = text(
-    f"""
-    SELECT {_KOLOM}
+    """
+    SELECT c.id, c.user_id, c.event_type, c.schema_version, c.occurred_at, c.recorded_at,
+           c.source, c.subject_type, c.subject_id, c.payload
     FROM events c
     WHERE c.user_id = :user_id
       AND c.event_type = 'habit.completed'
@@ -71,7 +74,7 @@ _RIWAYAT_HABIT = text(
           AND r.payload ->> 'completion_id' = c.payload ->> 'completion_id'
       )
     ORDER BY c.recorded_at, c.id
-    """  # noqa: S608 — _KOLOM konstanta modul, bukan masukan
+    """
 )
 
 

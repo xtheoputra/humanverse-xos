@@ -41,9 +41,9 @@ Diperbarui: 24 September 2026 · Mencakup **dua puluh empat naskah**:
 ## 🔨 Sprint 6 · 6.6 luring dasar (6 Okt 2026) — apa yang berubah bagi berkas ini
 
 Antrean luring Flutter dikerjakan di branch `v0/sprint-5-intelligence`. Bentuknya **K-40**
-([`KEPUTUSAN-DIDELEGASIKAN.md`](KEPUTUSAN-DIDELEGASIKAN.md)). Empat temuan (E-220 · E-221 dari
-6.6 sendiri; E-222 · E-223 dari gerbang penuh pertama atas Sprint 5–6 — yang kedua cacat produk
-nyata dari Sprint 2), semuanya dibetulkan, dan satu pertanyaan baru untuk pemilik (**C-35**).
+([`KEPUTUSAN-DIDELEGASIKAN.md`](KEPUTUSAN-DIDELEGASIKAN.md)). Enam temuan (E-220 · E-221 dari
+6.6 sendiri; E-222…E-225 dari gerbang penuh pertama atas Sprint 5–6 — E-223 cacat produk
+nyata dari Sprint 2, E-224 dari Sprint 5, E-225 artefak cache gerbang), semuanya dibetulkan, dan satu pertanyaan baru untuk pemilik (**C-35**).
 
 #### E-220 — klien tanpa batas waktu, dan galat jaringan tak punya jenis
 
@@ -113,6 +113,25 @@ di luar badan fungsi karena uji kesetaraan membandingkan `pg_get_functiondef`. B
 menunggu balapan terjadi) + 3 mutasi `E-223` berbunyi. Cacat ini lolos Sprint 2 dan semua
 gerbang sebelumnya karena balapannya bergantung pada waktu; hanya beban memori putaran 3 yang
 memunculkannya.
+
+#### E-224 — `bandit` merah: tiga SQL f-string di `events/proyeksi.py` (Sprint 5, 5.1/5.2)
+
+Tahap `scan` belum pernah dijalankan atas Sprint 5. `bandit` (B608, *hardcoded SQL expressions*, Medium)
+menandai tiga kueri yang menyisipkan `_KOLOM` lewat f-string. Sumbernya konstanta modul, jadi bukan
+injeksi — tetapi `# noqa: S608` hanya dipahami `ruff`, dan repo ini tidak memakai `nosec` di mana pun.
+✅ Kolom ditulis **literal** di tiap kueri (kebiasaan repo: SQL statis), `_KOLOM` dan `noqa`-nya dibuang;
+`_RIWAYAT_HABIT` sekalian memakai kolom ber-alias `c.` karena ada subkueri `events r`. Uji proyektor
+dan penerbitan event (23) hijau; tak ada mutasi yang menjangkar berkas ini.
+
+#### E-225 — `trivy` merah palsu: lapisan `apt-get upgrade` dipakai dari cache yang basi
+
+`trivy` citra: 8 CVE (HIGH 5 · CRITICAL 3) di `perl-base` dan `libpcre2-8-0`, versi perbaikannya
+(`5.36.0-7+deb12u4`, `10.42-1+deb12u2`) sudah terbit. Dockerfile **sudah** menjalankan
+`apt-get upgrade` — tetapi gerbang membangun dalam 13 dtk, artinya lapisan itu dipakai dari **cache**
+yang dibuat sebelum perbaikan terbit. `scan` lalu memindai citra yang bukan yang akan dibangun CI atau
+produksi (komentar Dockerfile sendiri mengakui build bisa berbeda antar-waktu). Dibuktikan: bangun
+`--no-cache-filter jalan` → paket terpasang di versi perbaikan dan `trivy` hijau. ✅ `tools/ci_lokal.py`
+membangun tahap akhir dengan `--no-cache-filter jalan` (lapisan dependensi tetap ber-cache; ±25 dtk).
 
 #### C-35 — data pengguna di penyimpanan perangkat: antrean luring dan token
 

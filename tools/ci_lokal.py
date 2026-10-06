@@ -335,11 +335,18 @@ TAHAP: dict[str, list[Langkah]] = {
     "build": [
         (
             "docker build (citra CI)",
-            # --pull: patokan digest diperiksa ulang ke registry
+            # --pull: patokan digest diperiksa ulang ke registry.
+            # --no-cache-filter jalan (E-224): lapisan `apt-get upgrade` tahap akhir
+            # TIDAK boleh dipakai dari cache — ia membeku pada paket Debian saat pertama
+            # dibangun, sehingga `scan` memindai citra yang bukan lagi yang akan dibangun
+            # CI/produksi dan merah oleh CVE yang perbaikannya sudah terpasang di build
+            # segar (6 Okt 2026: perl-base, libpcre2). Lapisan dependensi tetap ber-cache.
             [
                 "docker",
                 "build",
                 "--pull",
+                "--no-cache-filter",
+                "jalan",
                 "-f",
                 "infrastructure/docker/api.Dockerfile",
                 "-t",
