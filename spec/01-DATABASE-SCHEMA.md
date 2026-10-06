@@ -58,9 +58,13 @@ di fase berikutnya.
 CREATE EXTENSION IF NOT EXISTS citext;
 
 -- dipakai semua tabel yang punya updated_at
+-- 🔧 E-223 (migrasi 0012): naik KETAT per baris. `now()` = awal TRANSAKSI, jadi dua versi
+-- baris berbeda bisa berbagi `updated_at` yang sama (dua UPDATE dalam satu transaksi, atau
+-- dua transaksi serentak) — padahal kunci event `checkin.logged` memakainya sebagai
+-- identitas versi baris. Tiap UPDATE menaikkannya ≥ 1 µs di atas nilai lamanya.
 CREATE OR REPLACE FUNCTION set_updated_at() RETURNS trigger AS $$
 BEGIN
-  NEW.updated_at = now();
+  NEW.updated_at = GREATEST(now(), OLD.updated_at + interval '1 microsecond');
   RETURN NEW;
 END $$ LANGUAGE plpgsql;
 

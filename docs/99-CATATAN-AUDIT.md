@@ -41,9 +41,9 @@ Diperbarui: 24 September 2026 · Mencakup **dua puluh empat naskah**:
 ## 🔨 Sprint 6 · 6.6 luring dasar (6 Okt 2026) — apa yang berubah bagi berkas ini
 
 Antrean luring Flutter dikerjakan di branch `v0/sprint-5-intelligence`. Bentuknya **K-40**
-([`KEPUTUSAN-DIDELEGASIKAN.md`](KEPUTUSAN-DIDELEGASIKAN.md)). Tiga temuan (E-220 · E-221 dari
-6.6 sendiri, E-222 dari gerbang penuh pertama atas Sprint 5–6), semuanya dibetulkan, dan satu
-pertanyaan baru untuk pemilik (**C-35**).
+([`KEPUTUSAN-DIDELEGASIKAN.md`](KEPUTUSAN-DIDELEGASIKAN.md)). Empat temuan (E-220 · E-221 dari
+6.6 sendiri; E-222 · E-223 dari gerbang penuh pertama atas Sprint 5–6 — yang kedua cacat produk
+nyata dari Sprint 2), semuanya dibetulkan, dan satu pertanyaan baru untuk pemilik (**C-35**).
 
 #### E-220 — klien tanpa batas waktu, dan galat jaringan tak punya jenis
 
@@ -87,6 +87,32 @@ sebelum sesi ini:
 (`tests/unit/test_jangkar_mutasi.py`) memeriksa dalam detik bahwa tiap `_pytest(...)` menunjuk uji
 yang ada — `test_jangkar_mutasi` lama hanya memeriksa jangkar penyuntingan, bukan nama uji. Dibuktikan
 sanggup gagal oleh mutasi `alat` *“mutasi menunjuk uji yang sudah tidak ada”*.
+
+#### 🔴 E-223 — `updated_at` bukan identitas versi baris: `PUT /checkins` serentak menjawab 500
+
+Gerbang penuh putaran 3 (6 Okt 2026) merah di **satu** uji dari 1.214:
+`test_put_serentak_tanggal_sama_satu_baris` → `[200, 200, 200, 201, 500]`, galat server
+`EventTidakSah: idempotency_key yang sama untuk kejadian yang berbeda`. Uji itu lulus di putaran 1
+dan 25 kali berturut-turut pada sistem tenang — **bukan flake lingkungan**: kunci event
+`checkin:<tanggal>:<updated_at>` memakai `updated_at` sebagai identitas **versi baris**, tetapi
+pemicu `set_updated_at()` mengisinya dengan `now()` = awal **transaksi**, dan dua versi berbeda
+bisa berbagi nilainya. Diukur di tumpukan lokal: lima transaksi serentak, **175 dari 400
+percobaan** punya sedikitnya dua `now()` kembar (selisih terdekat median 1 µs). Dua versi baris
+berisi energi berbeda dengan kunci yang sama → `EventTidakSah` → 500 bagi pengguna yang
+menyimpan check-in dari dua perangkat serentak. Bentuk lain dari akar yang sama: transaksi yang
+**mulai lebih awal tetapi menulis belakangan** memundurkan `updated_at` (dan `occurred_at` event
+check-in-nya) di bawah versi yang lebih lama.
+
+✅ Dibetulkan di sumbernya, bukan di kuncinya: migrasi **0012** membuat `set_updated_at()` naik
+**ketat per baris** — `GREATEST(now(), OLD.updated_at + 1 µs)`. Pembaruan satu baris selalu
+berurutan (kunci baris), jadi nilainya tak pernah kembar dan tak pernah mundur; tanpa kolom baru,
+berlaku bagi semua tabel ber-`updated_at`. `spec/01` (Awalan) diselaraskan; komentar penjelas
+di luar badan fungsi karena uji kesetaraan membandingkan `pg_get_functiondef`. Bukti:
+`test_updated_at_naik_ketat_walau_dua_update_dalam_satu_transaksi` dan
+`test_updated_at_tak_mundur_walau_transaksinya_mulai_lebih_awal` (deterministik — tanpa
+menunggu balapan terjadi) + 3 mutasi `E-223` berbunyi. Cacat ini lolos Sprint 2 dan semua
+gerbang sebelumnya karena balapannya bergantung pada waktu; hanya beban memori putaran 3 yang
+memunculkannya.
 
 #### C-35 — data pengguna di penyimpanan perangkat: antrean luring dan token
 

@@ -10327,6 +10327,58 @@ MUTASI: list[Mutasi] = [
         harus_memuat="dialog habit baru harus menjelaskan bahwa jaringan dibutuhkan",
         cwd=APLIKASI,
     ),
+    # ── E-223 set_updated_at() naik ketat per baris: kunci event = identitas versi baris ──
+    Mutasi(
+        "E-223",
+        "set_updated_at memakai now() polos — dua versi baris dalam satu transaksi berbagi updated_at",
+        [
+            Sunting(
+                f"{MIGRASI}/0012_updated_at_monoton.up.sql",
+                "NEW.updated_at = GREATEST(now(), OLD.updated_at + interval '1 microsecond');",
+                "NEW.updated_at = now();",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_migrasi.py::"
+            "test_updated_at_naik_ketat_walau_dua_update_dalam_satu_transaksi"
+        ),
+        harus_memuat="updated_at tidak naik di antara dua versi baris",
+        kelompok="db",
+    ),
+    Mutasi(
+        "E-223",
+        "set_updated_at tanpa +1 µs — transaksi yang mulai lebih awal menyamai updated_at yang baru ditulis",
+        [
+            Sunting(
+                f"{MIGRASI}/0012_updated_at_monoton.up.sql",
+                "NEW.updated_at = GREATEST(now(), OLD.updated_at + interval '1 microsecond');",
+                "NEW.updated_at = GREATEST(now(), OLD.updated_at);",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_migrasi.py::"
+            "test_updated_at_tak_mundur_walau_transaksinya_mulai_lebih_awal"
+        ),
+        harus_memuat="versi baris yang lebih baru mendapat updated_at yang lebih lama",
+        kelompok="db",
+    ),
+    Mutasi(
+        "E-223",
+        "set_updated_at memundurkan updated_at — now() polos, transaksi lambat menulis nilai lebih lama",
+        [
+            Sunting(
+                f"{MIGRASI}/0012_updated_at_monoton.up.sql",
+                "NEW.updated_at = GREATEST(now(), OLD.updated_at + interval '1 microsecond');",
+                "NEW.updated_at = now();",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_migrasi.py::"
+            "test_updated_at_tak_mundur_walau_transaksinya_mulai_lebih_awal"
+        ),
+        harus_memuat="versi baris yang lebih baru mendapat updated_at yang lebih lama",
+        kelompok="db",
+    ),
     # ── alat ini sendiri: mutasi yang menunjuk uji yang sudah diganti namanya (E-222) ──
     Mutasi(
         "alat",
