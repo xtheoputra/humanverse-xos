@@ -670,6 +670,27 @@ sesudahnya.
 
 ---
 
+## K-40 · Luring dasar: antrean penyelesaian habit di memori, hanya tindakan yang aman diulang
+
+> Diputuskan 6 Oktober 2026, saat 6.6 ditulis.
+>
+> Yang dipertanyakan: `spec/07` 6.6 — *“catat habit tanpa jaringan → sinkron tanpa duplikat”* —
+> tidak menyebut **apa** yang boleh menunggu, **di mana** antreannya disimpan, atau **apa yang
+> terjadi** saat server menolak catatan yang menunggu. **Bukan** yang dipertanyakan: kontrak
+> `spec/04` (`POST …/completions` → 200 dengan baris lama · `DELETE …/completions/{tanggal}` → 204 ·
+> `id` buatan klien) dan `UNIQUE (habit_id, for_date)` `spec/01` — itulah yang sudah membuat
+> pencatatan luring aman diulang.
+
+| | |
+|---|---|
+| **Keputusan** | **(1)** Yang diantre **hanya tandai selesai dan batalkan** — tindakan harian, dan satu-satunya yang aman diulang. Check-in energi dan habit baru **tidak**: keduanya gagal sebagai `JaringanPutus` dengan pesan jaringan. **(2)** Catatan dibuang dari antrean **sesudah** server menjawab (*at-least-once*): jawaban yang hilang di jalan berarti dikirim **lagi**, dan server menjawab 200 dengan baris lama. **(3)** Urutan terjaga — catatan baru selalu di belakang; satu perkecualian: `batal` membuang catatan lama pada `(habit, tanggal)` yang sama (`DELETE` menghapus apa pun yang ada, akhirnya sama). `selesai` sesudah `batal` **tidak** dipadatkan: baris lama di server (mis. `skipped` dari perangkat lain) harus dihapus dulu. **(4)** `5xx` · `429` · `408` menahan **seluruh** antrean (dicoba lagi); `4xx` lain tak akan pernah berhasil, jadi catatan itu dibuang, **dihitung**, dan ditampilkan sampai pengguna mengakuinya. Galat jaringan (putus, atau tak dijawab **15 dtk**) adalah `JaringanPutus` — bukan penolakan, dan **tidak** melupakan token. **(5)** Antrean hidup di **memori** dan milik **satu akun**: masuk sebagai akun lain atau keluar membuangnya; *keluar* dengan catatan menunggu mencoba mengirim dulu, lalu bertanya. **(6)** Layar luring = jawaban server terakhir + catatan antrean ditumpangkan (yang terakhir menang); tanpa jawaban sebelumnya, galatnya diteruskan — bukan daftar kosong. **(7)** Pemicu kirim: tiap tindakan, muat ulang, dan tombol *Sinkronkan* — **tanpa** pewaktu. |
+| **Bukti** | `spec/01`: *“`UNIQUE (habit_id, for_date)` mencegah pencatatan ganda saat aplikasi luring”* · `spec/04`: *“pencatatan habit dari perangkat luring harus selalu aman diulang”* · `spec/03`: *“ini yang membuat aplikasi luring aman menyinkron ulang”* · `apps/mobile/lib/api/klien.dart` (sebelum 6.6): penyimpanan lokal menunggu *“penyimpanan yang aman per platform”* — belum diputuskan siapa pun. Dibuktikan lawan api **sungguhan** (`test/ujung/luring_nyata_test.dart`): jaringan diputus → catatan menunggu → jawaban `POST` dihilangkan di tengah jalan → dikirim ulang → server tetap memegang **satu** penyelesaian bertier sama. |
+| **Bacaan yang DITOLAK** | **(a)** *“Simpan antrean di penyimpanan lokal (`shared_preferences` · localStorage)”* — ditolak: tempat menyimpan data pengguna di perangkat (dan, bersamanya, token) adalah keputusan privasi yang salahnya ditanggung pengguna (**C-35**), localStorage web terbaca skrip mana pun di asal yang sama, dan paket pub baru menambah rantai pasok tanpa keputusan. **(b)** *“Antre juga check-in energi”* — ditolak: `PUT` mengganti seluruh baris, jadi salinan lama di layar yang dikirim belakangan menimpa perubahan dari perangkat lain. **(c)** *“Antre pembuatan habit”* — ditolak: `id` buatan klien memang aman diulang, tetapi catatan selesai di belakangnya bergantung pada habit yang belum ada di server; menuntut tampilan habit sementara dan urutan ketergantungan — di luar *“dasar”*. **(d)** *“Pemadatan penuh: selesai lalu batal = tak ada”* — ditolak: server bisa sudah memegang barisnya (perangkat lain), `DELETE` tetap harus dikirim. **(e)** *“Pewaktu berkala”* — ditolak: uji widget yang berpewaktu abadi tak pernah tenang (`pumpAndSettle`), dan pemicu dari tindakan pengguna sudah cukup untuk *dasar*. **(f)** *“Membuang catatan 4xx diam-diam”* — ditolak: catatan pengguna yang hilang tanpa jejak lebih buruk daripada spanduk yang mengganggu. |
+| **Harga yang diakui** | ⚠️ **Antrean mati bersama proses**: aplikasi yang ditutup atau dimatikan sistem selagi luring kehilangan catatan yang belum terkirim — *keluar* bertanya dulu, proses yang dimatikan tidak. ⚠️ **Aplikasi yang dibuka tanpa jaringan tak bisa dipakai** (tak ada sesi: token juga hanya di memori — `klien.dart`); luring dasar = jaringan putus **selagi aplikasi berjalan**. Catatan luring menang atas perubahan perangkat lain yang lebih baru (dikirim apa adanya — server tak punya versi). `4xx` yang dibuang bisa jadi catatan yang sah bagi pengguna (habit dihapus di perangkat lain) — hanya dihitung dan diberitahukan. Tanpa pewaktu, antrean menunggu tindakan berikutnya. Waktu tunggu 15 dtk per permintaan menahan layar selama itu pada jaringan yang diam (bukan putus). |
+| **Cara membalikkan** | `apps/mobile/lib/api/luring.dart` (satu berkas) · `LayarHabitHariIni.luring` · `main.dart`; penyimpanan lokal kelak = membaca/menulis `_antrean` lewat satu antarmuka — tambahan, bukan penulisan ulang. `test/api/luring_test.dart` · `test/layar/luring_layar_test.dart` · `test/ujung/luring_nyata_test.dart` dan 31 mutasi `6.6` diubah bersamanya. |
+
+---
+
 ## Yang sengaja **tidak** saya putuskan
 
 | Butir | Kenapa |

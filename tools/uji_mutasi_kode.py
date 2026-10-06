@@ -9892,6 +9892,451 @@ MUTASI: list[Mutasi] = [
         harus_memuat="pekerja tidak membersihkan jejak idempotensi",
         kelompok="db",
     ),
+    # ── Sprint 6 · 6.6 luring dasar: antrean penyelesaian habit (Flutter, K-40) ──
+    Mutasi(
+        "6.6",
+        "catatan dibuang SEBELUM server menjawab — jawaban hilang berarti catatan hilang",
+        [
+            Sunting(
+                f"{APLIKASI}/lib/api/luring.dart",
+                "      final catatan = _antrean.first;\n",
+                "      final catatan = _antrean.removeAt(0);\n",
+            )
+        ],
+        _flutter_uji("test/api/luring_test.dart", "jawaban yang hilang di jalan"),
+        harus_memuat="catatan yang jawabannya hilang harus tetap menunggu",
+        cwd=APLIKASI,
+    ),
+    Mutasi(
+        "6.6",
+        "galat jaringan membuang catatan alih-alih menahannya",
+        [
+            Sunting(
+                f"{APLIKASI}/lib/api/luring.dart",
+                "        _setLuring(true);\n        return;\n      } on GalatApi catch (g) {",
+                "        _setLuring(true);\n      } on GalatApi catch (g) {",
+            )
+        ],
+        _flutter_uji(
+            "test/api/luring_test.dart", "tanpa jaringan: tandai selesai menunggu di antrean"
+        ),
+        harus_memuat="catatan harus menunggu saat jaringan putus",
+        cwd=APLIKASI,
+    ),
+    Mutasi(
+        "6.6",
+        "antrean dikirim dari belakang — urutan terbalik",
+        [
+            Sunting(
+                f"{APLIKASI}/lib/api/luring.dart",
+                "      final catatan = _antrean.first;\n",
+                "      final catatan = _antrean.last;\n",
+            )
+        ],
+        _flutter_uji("test/api/luring_test.dart", "urutan dijaga"),
+        harus_memuat="urutan antrean harus dijaga",
+        cwd=APLIKASI,
+    ),
+    Mutasi(
+        "6.6",
+        "catatan baru masuk di DEPAN antrean",
+        [
+            Sunting(
+                f"{APLIKASI}/lib/api/luring.dart",
+                "    _antrean.add(catatan);\n    _umumkan();",
+                "    _antrean.insert(0, catatan);\n    _umumkan();",
+            )
+        ],
+        _flutter_uji("test/api/luring_test.dart", "urutan dijaga"),
+        harus_memuat="yang terakhir menang di tampilan luring",
+        cwd=APLIKASI,
+    ),
+    Mutasi(
+        "6.6",
+        "batal tidak membuang catatan selesai yang belum terkirim",
+        [
+            Sunting(
+                f"{APLIKASI}/lib/api/luring.dart",
+                "      _antrean.removeWhere(catatan.serumpun);\n",
+                "",
+            )
+        ],
+        _flutter_uji("test/api/luring_test.dart", "batal membuang catatan selesai"),
+        harus_memuat="batal harus membuang selesai yang belum terkirim",
+        cwd=APLIKASI,
+    ),
+    Mutasi(
+        "6.6",
+        "batal membuang SEMUA catatan tanggal itu, bukan hanya habitnya",
+        [
+            Sunting(
+                f"{APLIKASI}/lib/api/luring.dart",
+                "      _antrean.removeWhere(catatan.serumpun);\n",
+                "      _antrean.removeWhere((c) => c.tanggal == catatan.tanggal);\n",
+            )
+        ],
+        _flutter_uji("test/api/luring_test.dart", "batal hanya membuang catatan"),
+        harus_memuat="batal hanya boleh membuang catatan (habit, tanggal) yang sama",
+        cwd=APLIKASI,
+    ),
+    Mutasi(
+        "6.6",
+        "galat 4xx dianggap sementara — satu catatan yang ditolak menahan seluruh antrean",
+        [
+            Sunting(
+                f"{APLIKASI}/lib/api/luring.dart",
+                "      g.status >= 500 || g.status == 429 || g.status == 408;",
+                "      true;",
+            )
+        ],
+        _flutter_uji("test/api/luring_test.dart", "ditolak 4xx"),
+        harus_memuat="catatan yang ditolak tidak boleh menahan yang di belakangnya",
+        cwd=APLIKASI,
+    ),
+    Mutasi(
+        "6.6",
+        "galat 5xx dianggap penolakan — catatan dibuang saat server sakit",
+        [
+            Sunting(
+                f"{APLIKASI}/lib/api/luring.dart",
+                "      g.status >= 500 || g.status == 429 || g.status == 408;",
+                "      false;",
+            )
+        ],
+        _flutter_uji("test/api/luring_test.dart", "server sakit (5xx)"),
+        harus_memuat="server sakit harus menahan antrean, bukan membuangnya",
+        cwd=APLIKASI,
+    ),
+    Mutasi(
+        "6.6",
+        "penolakan server tidak dihitung — catatan hilang tanpa jejak",
+        [
+            Sunting(
+                f"{APLIKASI}/lib/api/luring.dart",
+                "        _ditolak++;\n",
+                "",
+            )
+        ],
+        _flutter_uji("test/api/luring_test.dart", "ditolak 4xx"),
+        harus_memuat="penolakan harus terlihat di status",
+        cwd=APLIKASI,
+    ),
+    Mutasi(
+        "6.6",
+        "status tak membedakan jumlah penolakan — mengakui penolakan tak mengubah apa pun",
+        [
+            Sunting(
+                f"{APLIKASI}/lib/api/luring.dart",
+                "      other.ditolak == ditolak &&\n",
+                "",
+            )
+        ],
+        _flutter_uji("test/api/luring_test.dart", "ditolak 4xx"),
+        harus_memuat="pengakuan harus mengosongkan penolakan di status",
+        cwd=APLIKASI,
+    ),
+    Mutasi(
+        "6.6",
+        "masuk sebagai akun LAIN mewarisi antrean akun sebelumnya",
+        [
+            Sunting(
+                f"{APLIKASI}/lib/api/luring.dart",
+                "    if (_pemilik != pengguna.id) _buang();",
+                "    if (_pemilik != pengguna.id && _pemilik == null) _buang();",
+            )
+        ],
+        _flutter_uji("test/api/luring_test.dart", "masuk sebagai akun LAIN"),
+        harus_memuat="catatan akun lain tidak boleh diwarisi",
+        cwd=APLIKASI,
+    ),
+    Mutasi(
+        "6.6",
+        "masuk lagi sebagai akun yang SAMA membuang antreannya",
+        [
+            Sunting(
+                f"{APLIKASI}/lib/api/luring.dart",
+                "    if (_pemilik != pengguna.id) _buang();",
+                "    _buang();",
+            )
+        ],
+        _flutter_uji("test/api/luring_test.dart", "masuk sebagai akun LAIN"),
+        harus_memuat="akun yang sama harus mempertahankan antreannya",
+        cwd=APLIKASI,
+    ),
+    Mutasi(
+        "6.6",
+        "keluar tidak membuang antrean — akun berikutnya mewarisinya",
+        [
+            Sunting(
+                f"{APLIKASI}/lib/api/luring.dart",
+                "      _pemilik = null;\n      _buang();\n",
+                "      _pemilik = null;\n",
+            )
+        ],
+        _flutter_uji("test/api/luring_test.dart", "keluar membuang antrean"),
+        harus_memuat="keluar harus membuang antrean",
+        cwd=APLIKASI,
+    ),
+    Mutasi(
+        "6.6",
+        "sinkron serentak tidak berbagi satu putaran — catatan terbang berkali-kali",
+        [
+            Sunting(
+                f"{APLIKASI}/lib/api/luring.dart",
+                "      _jalan ??= _kuras().whenComplete(() => _jalan = null);",
+                "      _kuras();",
+            )
+        ],
+        _flutter_uji("test/api/luring_test.dart", "sinkron serentak"),
+        harus_memuat="satu catatan terbang sekali walau sinkron dipanggil serentak",
+        cwd=APLIKASI,
+    ),
+    Mutasi(
+        "6.6",
+        "putaran kirim hanya memegang salinan antrean — catatan yang masuk di tengah tertinggal",
+        [
+            Sunting(
+                f"{APLIKASI}/lib/api/luring.dart",
+                "    while (_antrean.isNotEmpty) {\n      final catatan = _antrean.first;\n",
+                "    for (final catatan in List<Catatan>.of(_antrean)) {\n",
+            )
+        ],
+        _flutter_uji("test/api/luring_test.dart", "catatan yang masuk selagi putaran"),
+        harus_memuat="catatan yang masuk di tengah putaran harus ikut terkirim",
+        cwd=APLIKASI,
+    ),
+    Mutasi(
+        "6.6",
+        "daftar luring tanpa catatan yang menunggu — habit yang baru ditandai tampak belum",
+        [
+            Sunting(
+                f"{APLIKASI}/lib/api/luring.dart",
+                "    if (untukHariIni.isEmpty) return daftar;",
+                "    return daftar;",
+            )
+        ],
+        _flutter_uji(
+            "test/api/luring_test.dart", "tanpa jaringan: tandai selesai menunggu di antrean"
+        ),
+        harus_memuat="daftar luring harus menampilkan catatan yang menunggu",
+        cwd=APLIKASI,
+    ),
+    Mutasi(
+        "6.6",
+        "tampilan luring memakai catatan PERTAMA, bukan terakhir",
+        [
+            Sunting(
+                f"{APLIKASI}/lib/api/luring.dart",
+                "      if (c.habitId == h.id) terakhir = c;",
+                "      if (c.habitId == h.id) terakhir ??= c;",
+            )
+        ],
+        _flutter_uji("test/api/luring_test.dart", "urutan dijaga"),
+        harus_memuat="yang terakhir menang di tampilan luring",
+        cwd=APLIKASI,
+    ),
+    Mutasi(
+        "6.6",
+        "daftar luring tanpa jawaban sebelumnya jadi KOSONG, bukan gagal jujur",
+        [
+            Sunting(
+                f"{APLIKASI}/lib/api/luring.dart",
+                "      if (simpanan == null) rethrow; // tak ada yang bisa ditampilkan jujur",
+                "      if (simpanan == null) return const [];",
+            )
+        ],
+        _flutter_uji("test/api/luring_test.dart", "tanpa jawaban server sebelumnya"),
+        harus_memuat="emitted",
+        cwd=APLIKASI,
+    ),
+    Mutasi(
+        "6.6",
+        "daftar luring menunggu server sekali lagi sesudah sinkron gagal karena jaringan",
+        [
+            Sunting(
+                f"{APLIKASI}/lib/api/luring.dart",
+                "    if (_luring && _tertahan && simpanan != null) {",
+                "    if (false && simpanan != null) {",
+            )
+        ],
+        _flutter_uji("test/api/luring_test.dart", "sinkron baru saja gagal"),
+        harus_memuat="jangan menunggu server sekali lagi sesudah sinkron gagal karena jaringan",
+        cwd=APLIKASI,
+    ),
+    Mutasi(
+        "6.6",
+        "check-in luring gagal alih-alih memakai jawaban terakhir server",
+        [
+            Sunting(
+                f"{APLIKASI}/lib/api/luring.dart",
+                "      if (!_checkinTerakhir.containsKey(tanggal)) rethrow;",
+                "      rethrow;",
+            )
+        ],
+        _flutter_uji(
+            "test/api/luring_test.dart", "check-in luring: jawaban terakhir server dipakai"
+        ),
+        harus_memuat="JaringanPutus",
+        cwd=APLIKASI,
+    ),
+    Mutasi(
+        "6.6",
+        "panggilan yang butuh jaringan tidak menandai keadaan luring",
+        [
+            Sunting(
+                f"{APLIKASI}/lib/api/luring.dart",
+                "      _setLuring(true);\n      rethrow;\n",
+                "      rethrow;\n",
+            )
+        ],
+        _flutter_uji("test/api/luring_test.dart", "habit baru dan energi TIDAK diantre"),
+        harus_memuat="galat jaringan harus menandai keadaan luring",
+        cwd=APLIKASI,
+    ),
+    Mutasi(
+        "6.6",
+        "SesiBerakhir ditelan putaran kirim — layar tak pernah diminta masuk lagi",
+        [
+            Sunting(
+                f"{APLIKASI}/lib/api/luring.dart",
+                "      } on GalatApi catch (g) {\n        if (_sementara(g)) {",
+                "      } on SesiBerakhir {\n        _tertahan = true;\n        return;\n      } on GalatApi catch (g) {\n        if (_sementara(g)) {",
+            )
+        ],
+        _flutter_uji("test/api/luring_test.dart", "sesi berakhir saat mengirim"),
+        harus_memuat="emitted",
+        cwd=APLIKASI,
+    ),
+    Mutasi(
+        "6.6",
+        "klien: ClientException bocor sebagai galat umum, bukan JaringanPutus",
+        [
+            Sunting(
+                f"{APLIKASI}/lib/api/klien.dart",
+                "    } on http.ClientException {\n      throw const JaringanPutus();\n    } on TimeoutException {",
+                "    } on TimeoutException {",
+            )
+        ],
+        _flutter_uji("test/api/klien_test.dart", "BUKAN penolakan"),
+        harus_memuat="ClientException: tak tersambung",
+        cwd=APLIKASI,
+    ),
+    Mutasi(
+        "6.6",
+        "klien: jaringan putus melupakan token — dikira sesi berakhir",
+        [
+            Sunting(
+                f"{APLIKASI}/lib/api/klien.dart",
+                "    } on http.ClientException {\n      throw const JaringanPutus();\n",
+                "    } on http.ClientException {\n      _lupakan();\n      throw const JaringanPutus();\n",
+            )
+        ],
+        _flutter_uji("test/api/klien_test.dart", "BUKAN penolakan"),
+        harus_memuat="jaringan putus bukan sesi berakhir",
+        cwd=APLIKASI,
+    ),
+    Mutasi(
+        "6.6",
+        "klien: tanpa batas waktu — jaringan yang diam menggantung tanpa akhir",
+        [
+            Sunting(
+                f"{APLIKASI}/lib/api/klien.dart",
+                "      return await kerja().timeout(batasWaktu);",
+                "      return await kerja();",
+            )
+        ],
+        _flutter_uji("test/api/klien_test.dart", "tak dijawab dalam batas waktu"),
+        harus_memuat="timed out",
+        cwd=APLIKASI,
+    ),
+    Mutasi(
+        "6.6",
+        "layar: keluar membuang catatan menunggu tanpa bertanya",
+        [
+            Sunting(
+                f"{APLIKASI}/lib/layar/habit_hari_ini.dart",
+                "    if (menunggu == 0 || !mounted) return menunggu == 0;",
+                "    if (menunggu >= 0) return true;",
+            )
+        ],
+        _flutter_uji(
+            "test/layar/luring_layar_test.dart", "keluar dengan catatan yang tak bisa terkirim"
+        ),
+        harus_memuat="keluar harus bertanya dulu bila ada catatan yang tak terkirim",
+        cwd=APLIKASI,
+    ),
+    Mutasi(
+        "6.6",
+        "layar: keluar tidak mencoba mengirim catatan dulu",
+        [
+            Sunting(
+                f"{APLIKASI}/lib/layar/habit_hari_ini.dart",
+                "      await luring.sinkron();\n",
+                "",
+            )
+        ],
+        _flutter_uji(
+            "test/layar/luring_layar_test.dart", "keluar dengan catatan yang BISA terkirim"
+        ),
+        harus_memuat="catatan yang bisa terkirim harus dikirim dulu, tanpa bertanya",
+        cwd=APLIKASI,
+    ),
+    Mutasi(
+        "6.6",
+        "layar: catatan yang ditolak server tak terlihat",
+        [
+            Sunting(
+                f"{APLIKASI}/lib/layar/habit_hari_ini.dart",
+                "            if (s.ditolak > 0)",
+                "            if (s.ditolak > 99)",
+            )
+        ],
+        _flutter_uji("test/layar/luring_layar_test.dart", "catatan yang DITOLAK server"),
+        harus_memuat="catatan yang ditolak harus terlihat",
+        cwd=APLIKASI,
+    ),
+    Mutasi(
+        "6.6",
+        "layar: catatan yang menunggu tak disebut",
+        [
+            Sunting(
+                f"{APLIKASI}/lib/layar/habit_hari_ini.dart",
+                "            if (s.menunggu > 0)",
+                "            if (s.menunggu > 99)",
+            )
+        ],
+        _flutter_uji("test/layar/luring_layar_test.dart", "tanpa jaringan: habit tercentang"),
+        harus_memuat="spanduk harus menyebut catatan yang menunggu",
+        cwd=APLIKASI,
+    ),
+    Mutasi(
+        "6.6",
+        "layar: galat jaringan dilaporkan sebagai server tak terjangkau",
+        [
+            Sunting(
+                f"{APLIKASI}/lib/layar/habit_hari_ini.dart",
+                "      JaringanPutus() => 'Tidak ada jaringan. Coba lagi saat tersambung.',\n",
+                "",
+            )
+        ],
+        _flutter_uji("test/layar/luring_layar_test.dart", "energi tanpa jaringan"),
+        harus_memuat="galat jaringan harus dijelaskan sebagai jaringan",
+        cwd=APLIKASI,
+    ),
+    Mutasi(
+        "6.6",
+        "layar: dialog habit baru tak menjelaskan bahwa jaringan dibutuhkan",
+        [
+            Sunting(
+                f"{APLIKASI}/lib/layar/habit_hari_ini.dart",
+                "    } on JaringanPutus {\n      // Habit baru",
+                "    } on FormatException {\n      // Habit baru",
+            )
+        ],
+        _flutter_uji("test/layar/luring_layar_test.dart", "habit baru tanpa jaringan"),
+        harus_memuat="dialog habit baru harus menjelaskan bahwa jaringan dibutuhkan",
+        cwd=APLIKASI,
+    ),
     # ── alat ini sendiri: mutasi yang menggantung dihentikan beserta turunannya ──
     Mutasi(
         "alat",

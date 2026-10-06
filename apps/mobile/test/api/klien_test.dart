@@ -1,5 +1,6 @@
 // KlienApi lawan kontrak spec/04 — tanpa server: `MockClient` membaca tiap
 // permintaan yang dikirim dan menjawab seperti api V0.
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -427,6 +428,96 @@ void main() {
       'granted': true,
       'data_scopes': ['habits', 'checkins'],
     });
+  });
+
+  test(
+    'jaringan putus → JaringanPutus, BUKAN penolakan — token tidak dilupakan',
+    () async {
+      var putus = false;
+      final klien = KlienApi(
+        dasar: dasar,
+        klien: MockClient((r) async {
+          if (r.url.path == '/v1/auth/login') return _json(_akun('1'));
+          if (putus) throw http.ClientException('tak tersambung');
+          return _json({'items': <Object?>[]});
+        }),
+      );
+      await klien.masuk(email: 'a@uji.id', sandi: 'x');
+      putus = true;
+
+      await expectLater(
+        klien.habitPada('2026-09-24'),
+        throwsA(isA<JaringanPutus>()),
+      );
+
+      expect(
+        klien.sudahMasuk,
+        isTrue,
+        reason: 'jaringan putus bukan sesi berakhir',
+      );
+      putus = false;
+      expect(await klien.habitPada('2026-09-24'), isEmpty);
+    },
+  );
+
+  test(
+    'tak dijawab dalam batas waktu → JaringanPutus, bukan menggantung',
+    () async {
+      final klien = KlienApi(
+        dasar: dasar,
+        batasWaktu: const Duration(milliseconds: 50),
+        klien: MockClient((r) async {
+          if (r.url.path == '/v1/auth/login') return _json(_akun('1'));
+          return Completer<http.Response>().future; // jaringan yang diam
+        }),
+      );
+      await klien.masuk(email: 'a@uji.id', sandi: 'x');
+
+      await expectLater(
+        klien.habitPada('2026-09-24'),
+        throwsA(isA<JaringanPutus>()),
+      );
+      expect(klien.sudahMasuk, isTrue);
+    },
+  );
+
+  test('jaringan putus SAAT menyegarkan token → JaringanPutus; token segar tetap dipegang', () async {
+    var putus = false;
+    var segar = 0;
+    final klien = KlienApi(
+      dasar: dasar,
+      klien: MockClient((r) async {
+        if (r.url.path == '/v1/auth/login') return _json(_akun('1'));
+        if (r.url.path == '/v1/auth/refresh') {
+          if (putus) throw http.ClientException('tak tersambung');
+          segar++;
+          return _json({'tokens': _token('2')});
+        }
+        // Token akses lama kedaluwarsa; hanya yang BARU diterima.
+        if (r.headers['Authorization'] != 'Bearer hvxa_akses2') {
+          return _json({
+            'error': {'code': 'unauthenticated', 'message': 'x'},
+          }, 401);
+        }
+        return _json({'items': <Object?>[]});
+      }),
+    );
+    await klien.masuk(email: 'a@uji.id', sandi: 'x');
+    putus = true;
+
+    await expectLater(
+      klien.habitPada('2026-09-24'),
+      throwsA(isA<JaringanPutus>()),
+    );
+    expect(klien.sudahMasuk, isTrue);
+
+    putus = false;
+    expect(await klien.habitPada('2026-09-24'), isEmpty);
+    expect(
+      segar,
+      1,
+      reason: 'token segar yang SAMA dipakai sesudah jaringan pulih',
+    );
   });
 
   // `tanggalLokal` hanya bisa dibedakan dari tanggal UTC di mesin yang TIDAK

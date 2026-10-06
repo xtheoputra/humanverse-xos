@@ -15,9 +15,16 @@ class LayananPalsu implements LayananHabit {
   // Check-in lama yang layar kirim bersama energi baru — PUT = ganti (spec/04).
   Checkin? lamaEnergi;
   Exception? galatBerikutnya;
+  // Jaringan putus: tiap panggilan data melempar `JaringanPutus` dan TIDAK tercatat
+  // di server palsu — seperti permintaan yang tak pernah sampai.
+  bool putus = false;
 
   @override
   bool sudahMasuk = false;
+
+  void _sambung() {
+    if (putus) throw const JaringanPutus();
+  }
 
   void _mungkinGagal() {
     final g = galatBerikutnya;
@@ -64,6 +71,7 @@ class LayananPalsu implements LayananHabit {
 
   @override
   Future<List<Habit>> habitPada(String tanggal) async {
+    _sambung();
     panggilan.add('habit $tanggal');
     _mungkinGagal();
     return habit;
@@ -77,6 +85,7 @@ class LayananPalsu implements LayananHabit {
     required int target,
     List<Tier> tier = const [],
   }) async {
+    _sambung();
     panggilan.add(
       'buat $judul $periode $target ${tier.map((t) => t.label).join('|')}',
     );
@@ -99,6 +108,7 @@ class LayananPalsu implements LayananHabit {
     String tanggal, {
     int? tier,
   }) async {
+    _sambung();
     panggilan.add('selesai $habitId $tanggal ${tier ?? '-'}');
     _mungkinGagal();
     final p = Penyelesaian(forDate: tanggal, status: 'done', tierDipakai: tier);
@@ -125,6 +135,7 @@ class LayananPalsu implements LayananHabit {
 
   @override
   Future<void> batalkanSelesai(String habitId, String tanggal) async {
+    _sambung();
     panggilan.add('batal $habitId $tanggal');
     habit = [
       for (final h in habit)
@@ -147,6 +158,7 @@ class LayananPalsu implements LayananHabit {
 
   @override
   Future<Checkin?> checkinPada(String tanggal) async {
+    _sambung();
     panggilan.add('checkin $tanggal');
     return checkin;
   }
@@ -157,6 +169,7 @@ class LayananPalsu implements LayananHabit {
     int energi, {
     Checkin? lama,
   }) async {
+    _sambung();
     panggilan.add('energi $tanggal $energi');
     lamaEnergi = lama;
     checkin = Checkin(forDate: tanggal, energi: energi);
@@ -165,6 +178,7 @@ class LayananPalsu implements LayananHabit {
 
   @override
   Future<Dasbor> dasbor() async {
+    _sambung();
     panggilan.add('dasbor');
     _mungkinGagal();
     return dasborData;

@@ -30,11 +30,50 @@ Diperbarui: 24 September 2026 · Mencakup **dua puluh empat naskah**:
 | [H](#h-sudah-diputuskan--ditutup) | **Sudah diputuskan / ditutup** | 27 |
 | [A](#a-perlu-jawaban-pemilik) | Pertanyaan yang memblokir | 26 |
 | [B](#b-risiko-teknis) | Risiko teknis | 42 |
-| [C](#c-risiko-hukum--kepatuhan) | Risiko hukum & kepatuhan | 34 |
+| [C](#c-risiko-hukum--kepatuhan) | Risiko hukum & kepatuhan | 35 |
 | [D](#d-celah-yang-belum-tertutup) | Celah yang belum tertutup | 5 |
 | [E](#e-ketidakcocokan-antar-naskah) | **Ketidakcocokan antar-naskah** | 162 |
 | [F](#f-yang-sudah-saya-periksa-dan-ternyata-benar) | Sudah diperiksa, ternyata benar | 136 |
 | [G](#g-lubang-di-dalam-naskah-sendiri) | Lubang di dalam naskah sendiri | 21 |
+
+---
+
+## 🔨 Sprint 6 · 6.6 luring dasar (6 Okt 2026) — apa yang berubah bagi berkas ini
+
+Antrean luring Flutter dikerjakan di branch `v0/sprint-5-intelligence`. Bentuknya **K-40**
+([`KEPUTUSAN-DIDELEGASIKAN.md`](KEPUTUSAN-DIDELEGASIKAN.md)). Dua temuan, keduanya dibetulkan
+di commit yang sama, dan satu pertanyaan baru untuk pemilik (**C-35**).
+
+#### E-220 — klien tanpa batas waktu, dan galat jaringan tak punya jenis
+
+`KlienApi` tidak punya batas waktu: jaringan yang **diam** (bukan putus) menggantung layar
+tanpa akhir. Dan semua kegagalan jaringan keluar sebagai `ClientException` mentah, yang layar
+baca sebagai *“Server tidak terjangkau”* — sama dengan galat tak terduga apa pun, jadi tak ada
+yang bisa memutuskan *“catatan ini boleh menunggu”* (hanya galat jaringan yang boleh;
+galat server tidak). ✅ `batasWaktu` 15 dtk dan `JaringanPutus` (`klien.dart`), termasuk saat
+**menyegarkan token** — jaringan putus di sana bukan penolakan, jadi token segar tetap dipegang
+(`SesiBerakhir` hanya untuk penolakan sungguhan). Uji: `klien_test.dart` (3), mutasi *“ClientException
+bocor”* · *“jaringan putus melupakan token”* · *“tanpa batas waktu”*.
+
+#### E-221 — mutasi 6.6 pertama yang salah alasan, dan dua penjaga yang tak terbukti
+
+Putaran pertama 31 mutasi `6.6`: 30 berbunyi dengan alasan yang dimaksud; satu (*“status
+tak membedakan jumlah penolakan”*) merah di asersi **lain** (`ditolak == 0` sesudah
+pengakuan, tanpa pesan) — persis pola **E-214** · **E-219**. ✅ Asersinya diberi pesan, dan
+mutasinya dipecah dua: *“penolakan tak dihitung”* dan *“status abai penolakan”*, masing-masing menunjuk
+asersinya sendiri. Dua penjaga yang **tak bisa dibuktikan sanggup gagal** dibuang alih-alih
+dibiarkan: (a) `while (true)` ulang di `sinkron()` untuk *“jendela satu mikrotugas”* — di VM Dart
+penyelesaian putaran merambat sinkron ke semua penunggunya, jadi jendelanya tidak ada dan
+ujinya hijau pada kode asli **dan** pada mutan; (b) pemeriksaan *“catatan masih di antrean”*
+sebelum menghitung penolakan — tanpa uji yang menjangkaunya. Tombol *Sinkronkan* juga tak lagi
+memanggil `sinkron()` sendiri (`habitPada` sudah mengirim antrean; panggilan kedua tak
+terbukti perlu).
+
+#### C-35 — data pengguna di penyimpanan perangkat: antrean luring dan token
+
+6.6 sengaja **tidak** menyimpan apa pun di perangkat: antrean luring dan token hanya di memori
+(K-40), jadi *“luring dasar”* hanya berlaku selagi aplikasi berjalan. Pertanyaannya ada di
+bagian **C** di bawah (**C-35**) — milik pemilik, tidak diputuskan di kode.
 
 ---
 
@@ -1631,6 +1670,7 @@ Diurutkan dari yang paling menghambat.
 
 | # | Catatan |
 |---|---|
+| C-35 | 🆕 **Data pengguna di penyimpanan perangkat: antrean luring dan token** (luring dasar 6.6, 6 Okt 2026). Antrean luring (habit · tanggal · tier) dan token segar hanya di **memori** (**K-40**) — catatan yang belum terkirim hilang bersama prosesnya, dan aplikasi yang dibuka tanpa jaringan tak punya sesi. Menyimpannya berarti menaruh catatan kebiasaan (dekat dengan data kesehatan) dan token di perangkat yang bisa hilang, dipinjam, atau — di web — dibaca skrip mana pun di asal yang sama. Yang perlu dijawab pemilik: **(a)** apakah antrean boleh bertahan di perangkat, dan di penyimpanan apa (aman per platform, bukan localStorage); **(b)** apakah token segar boleh disimpan (Keychain/Keystore) — tanpanya luring sesudah aplikasi ditutup mustahil; **(c)** kapan semuanya dibuang: saat keluar, saat hapus akun (6.5), atau sesudah waktu tertentu. Tidak diputuskan di kode: privasi, ditanggung pengguna yang perangkatnya dipakai orang lain. Bertaut **C-34**. |
 | C-34 | 🆕 **Jejak audit yang dipertahankan sesudah akun dihapus masih membawa `ip_hash`** (sapuan hapus akun 6.5, 6 Okt 2026). `spec/01` tahap 5: `audit_logs` tetap, `user_id` diganti id semu (K-39 melakukannya juga di `actor_id` · `subject_id` · `metadata`, E-215). `ip_hash` — HMAC-SHA256 berkunci atas alamat klien (IPv6 per /64), kolom *“hash, bukan IP mentah”* — **tidak diubah**, karena `spec/01` tidak memerintahkannya dan menghapusnya adalah keputusan tentang arti *“hapus”* dan retensi audit. Akibatnya: baris-baris audit akun yang sudah dihapus **masih bisa dikaitkan satu sama lain dan dengan akun lain lewat jaringan yang sama**, dan siapa pun yang memegang `HVX_IP_HASH_KEY` dapat mencocokkan alamat yang ditebak (IPv4: 2³² kemungkinan). Yang perlu dijawab pemilik: **(a)** apakah `ip_hash` dikosongkan (`NULL`) saat akunnya dihapus — kehilangan korelasi forensik antar-akun — atau dipertahankan dengan alasan keamanan (*legitimate interest*) yang dicatat; **(b)** berapa lama baris audit akun yang dihapus disimpan (`@retention: forever` di `spec/01` §8 — termasuk untuk akun yang sudah menuntut hapus?). Tidak diputuskan di kode: hukum & privasi, ditanggung orang yang sudah pergi dan tak ikut memilih. |
 | C-33 | 🆕 **Teks bebas di payload event tidak bisa dicabut pemiliknya** (tinjauan keamanan Sprint 3, dibuktikan). `spec/03` memasukkan teks bebas ke payload: `note` penyelesaian habit, `reason` habit dilewati, `title` habit & goal, `label` mood. Tabel `events` **hanya-tambah** (aturan C `spec/02`, `hvx_app` tanpa `UPDATE`/`DELETE`), jadi teks itu tinggal di sana sampai akunnya dihapus — juga sesudah pemiliknya **membatalkan** penyelesaiannya (`DELETE …/completions`, E-178) atau mengganti judulnya. Diuji: alasan lewat *“kambuh, dirawat di RS jiwa”* bertahan di `events` sesudah penyelesaiannya dicabut. Alasan yang membuat isi jurnal **tidak pernah** masuk event (`spec/03`: event mengalir ke banyak konsumen) berlaku juga di sini, dan `spec/03` sendiri tidak menerapkannya. Yang perlu dijawab pemilik: **(a)** apakah payload event boleh membawa teks bebas sama sekali, atau cukup rujukan (`completion_id`) dan konsumen membaca teksnya di bawah RLS seperti isi jurnal; **(b)** kalau boleh, berapa lama teks yang sudah dicabut pemiliknya disimpan. Tidak diputuskan di kode: bentuk payload adalah kontrak `spec/03` yang diturunkan dari naskah 5 §7. |
 | C-32 | 🆕 **`mood` tidak sensitif — dan aturan 6 `spec/05` tidak melarang pihak ketiga memintanya.** Daftar scope resmi V0 (**E-180**) menandai hanya `journal_raw` sensitif, karena `spec/05` memberi `coach-agent` bacaan `mood` **tanpa** izin eksplisit (tool `mood.recent` risk 0 → `allow`). Tetapi mood yang dilaporkan — valensi, label *“cemas”*, catatan bebas — dekat dengan **data kesehatan jiwa**, dan aturan 6 hanya melarang `journal` · `journal_raw` · `finance` · `health`. Yang perlu dijawab pemilik: **(a)** apakah `mood` termasuk `health` bagi aturan 6 (agent pihak ketiga dilarang memintanya), dan **(b)** apakah ia sensitif (coach pun butuh `allow` yang disimpan pengguna). Tidak diputuskan di Sprint 3 — pihak ketiga belum ada di V0, jadi tidak ada yang bocor hari ini. ⚠️ Diperberat tinjauan keamanan Sprint 3: memori mood memuat **catatan bebas** (`note`) mood itu — agent mana pun yang manifest-nya menyebut `mood` membacanya dengan bawaan risk 0 (`allow`). Bertaut **C-3** ([#21](../../issues/21)) dan **C-25**. |

@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 
 import '../api/klien.dart';
+import '../api/luring.dart';
 import '../api/model.dart';
 import 'dasbor.dart';
 
@@ -11,16 +12,21 @@ import 'dasbor.dart';
 /// "Hari ini" adalah tanggal LOKAL perangkat (spec/01 `for_date`): habit yang
 /// ditandai Senin pagi di Jakarta tercatat Senin. Tier yang disarankan datang
 /// dari server bersama alasannya — energi check-in (naskah 4 §34, K-23).
+///
+/// `luring` (opsional, 6.6): bila ada, layar menampilkan catatan yang menunggu
+/// sinkron dan tidak membuangnya diam-diam saat keluar.
 class LayarHabitHariIni extends StatefulWidget {
   const LayarHabitHariIni({
     super.key,
     required this.layanan,
     required this.sesudahKeluar,
+    this.luring,
     this.jam = DateTime.now,
   });
 
   final LayananHabit layanan;
   final VoidCallback sesudahKeluar;
+  final StatusLuring? luring;
   final DateTime Function() jam;
 
   @override
@@ -71,12 +77,104 @@ class _LayarHabitHariIniState extends State<LayarHabitHariIni> {
       widget.sesudahKeluar();
       return;
     }
-    final pesan = e is GalatApi
-        ? e.pesan
-        : 'Server tidak terjangkau. Coba lagi.';
+    final pesan = switch (e) {
+      GalatApi() => e.pesan,
+      JaringanPutus() => 'Tidak ada jaringan. Coba lagi saat tersambung.',
+      _ => 'Server tidak terjangkau. Coba lagi.',
+    };
     setState(() => _galat = pesan);
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(pesan)));
   }
+
+  /// Catatan antrean yang masih menunggu menghalangi keluar diam-diam: kirim
+  /// dulu; yang tetap tak terkirim hanya dibuang atas persetujuan pengguna.
+  Future<bool> _bolehKeluar() async {
+    final luring = widget.luring;
+    if (luring == null || luring.status.value.menunggu == 0) return true;
+    try {
+      await luring.sinkron();
+    } on Exception {
+      // Sesi berakhir pun tak membatalkan niat keluar — yang tersisa ditanyakan di bawah.
+    }
+    final menunggu = luring.status.value.menunggu;
+    if (menunggu == 0 || !mounted) return menunggu == 0;
+    final buang = await showDialog<bool>(
+      context: context,
+      builder: (dialog) => AlertDialog(
+        title: const Text('Keluar sekarang?'),
+        content: Text(
+          '$menunggu catatan belum terkirim dan akan DIBUANG kalau kamu keluar. '
+          'Tunggu sampai tersambung supaya terkirim dulu.',
+        ),
+        actions: [
+          TextButton(
+            key: const Key('tetap-masuk'),
+            onPressed: () => Navigator.of(dialog).pop(false),
+            child: const Text('Tetap di sini'),
+          ),
+          FilledButton(
+            key: const Key('keluar-buang'),
+            onPressed: () => Navigator.of(dialog).pop(true),
+            child: const Text('Keluar dan buang'),
+          ),
+        ],
+      ),
+    );
+    return buang ?? false;
+  }
+
+  Widget _spanduk(StatusLuring luring) => ValueListenableBuilder<StatusAntrean>(
+    valueListenable: luring.status,
+    builder: (context, s, _) {
+      if (!s.luring && s.menunggu == 0 && s.ditolak == 0) {
+        return const SizedBox.shrink();
+      }
+      return Card(
+        margin: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+        child: Column(
+          children: [
+            if (s.luring)
+              const ListTile(
+                key: Key('spanduk-luring'),
+                leading: Icon(Icons.cloud_off),
+                title: Text('Tanpa jaringan'),
+                subtitle: Text(
+                  'Habit yang kamu tandai disimpan di perangkat ini dan '
+                  'dikirim begitu tersambung.',
+                ),
+              ),
+            if (s.menunggu > 0)
+              ListTile(
+                key: const Key('spanduk-menunggu'),
+                leading: const Icon(Icons.sync),
+                title: Text('${s.menunggu} catatan menunggu sinkron'),
+                trailing: TextButton(
+                  key: const Key('sinkron'),
+                  // Memuat ulang = mengirim antrean dulu (`habitPada`), lalu
+                  // menampilkan daftar yang sudah bersih dari catatan terkirim.
+                  onPressed: _muat,
+                  child: const Text('Sinkronkan'),
+                ),
+              ),
+            if (s.ditolak > 0)
+              ListTile(
+                key: const Key('spanduk-ditolak'),
+                leading: const Icon(Icons.error_outline),
+                title: Text('${s.ditolak} catatan ditolak server'),
+                subtitle: const Text(
+                  'Mis. habitnya sudah dihapus atau tier-nya berubah sejak kamu mencatat.',
+                ),
+                trailing: TextButton(
+                  key: const Key('akui-ditolak'),
+                  onPressed: luring.akuiDitolak,
+                  child: const Text('Mengerti'),
+                ),
+              ),
+          ],
+        ),
+      );
+    },
+  );
 
   Future<void> _ubah(String habitId, Future<void> Function() kerja) async {
     setState(() => _sedangDiubah.add(habitId));
@@ -157,6 +255,7 @@ class _LayarHabitHariIniState extends State<LayarHabitHariIni> {
   }
 
   Future<void> _keluar() async {
+    if (!await _bolehKeluar()) return;
     await widget.layanan.keluar();
     widget.sesudahKeluar();
   }
@@ -235,6 +334,7 @@ class _LayarHabitHariIniState extends State<LayarHabitHariIni> {
         child: ListView(
           padding: const EdgeInsets.only(bottom: 88),
           children: [
+            if (widget.luring case final luring?) _spanduk(luring),
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
               child: Text(
@@ -363,6 +463,14 @@ class _DialogTambahHabitState extends State<_DialogTambahHabit> {
         return;
       }
       setState(() => _galat = g.pesan);
+    } on JaringanPutus {
+      // Habit baru butuh jaringan (K-40): `id` yang sama dipakai lagi saat
+      // "Simpan" diketuk ulang dengan isian yang sama, jadi aman dicoba lagi.
+      setState(
+        () => _galat =
+            'Tidak ada jaringan. Habit baru butuh jaringan — coba '
+            'lagi saat tersambung.',
+      );
     } on Exception {
       setState(() => _galat = 'Server tidak terjangkau. Coba lagi.');
     } finally {

@@ -4,6 +4,27 @@
 
 ---
 
+## Sesi 37 — 6 Oktober 2026
+
+**Pemilik: *“lanjutkan progress”*** — menutup serah-terima Sesi 36 (6.5 Stage B di-commit), lalu
+mengerjakan satu-satunya sisa V0 yang mekanis dan bukan milik pemilik: **6.6 luring dasar**
+(6.2 butuh inferensi · 6.3 spekulatif · 6.4 butir C — dibiarkan).
+
+| Hal | Hasil |
+|---|---|
+| Naskah baru | tidak ada |
+| Keputusan pemilik | tidak ada yang baru |
+| Keputusan didelegasikan | 🆕 **K-40** — luring dasar: antrean penyelesaian habit di memori; hanya tandai selesai/batalkan yang diantre; dikirim ulang bila jawaban hilang (server idempoten) |
+| Temuan | 🆕 **E-220** (klien tanpa batas waktu; galat jaringan tak punya jenis) · **E-221** (mutasi 6.6 pertama salah alasan; dua penjaga tak terbukti dibuang) · pertanyaan baru **C-35** (antrean & token di penyimpanan perangkat) |
+| `spec/` diubah | `07` (6.6 ✅ + batas yang diakui) |
+| Kode | `apps/mobile/lib/api/luring.dart` (`LayananLuring` · `Catatan` · `StatusAntrean` · `StatusLuring`) · `klien.dart` (`JaringanPutus`, `batasWaktu` 15 dtk) · `model.dart` (`Habit.denganPenyelesaian`) · `habit_hari_ini.dart` (spanduk, konfirmasi keluar, pesan jaringan) · `main.dart` |
+| Bukti | `luring_test.dart` (17) · `luring_layar_test.dart` (6) · 3 uji klien · `test/ujung/luring_nyata_test.dart` **lawan api sungguhan** (jawaban hilang → kirim ulang → satu penyelesaian) · **31 mutasi `6.6`** · `flutter analyze --fatal-infos` bersih · `flutter test` 68 hijau |
+| Yang ketemu saat menjalankan yang SUNGGUHAN | alat `dart run tool/ujung_ke_ujung.dart` **tak bisa mengompilasi** kode yang memakai `package:flutter/foundation.dart` — skenario luring-nyata dipindah ke `test/ujung/` (`flutter test`). Dan `docker compose up --build` membangun tag citra yang sama dari dua layanan (`migrate`, `api`) → *“already exists”* — gerbang memakai `--no-build` dari citra yang sudah ada |
+| ⚠️ Belum dijalankan | **gerbang penuh `ci_lokal.py`** (±30 mnt) · belum ada PR untuk `v0/sprint-5-intelligence` |
+| ⏸️ Berhenti di | 47 → **48 dari 51 tugas** (±94 %). Sisa V0: **6.2** weekly review · **6.3** notifikasi · **6.4** Privacy Center (butir C, pemilik). Berikutnya yang paling berdampak: gerbang penuh + PR Sprint 5, K-33…K-38 di dokumen, jawaban pemilik atas **C-34** · **C-35** |
+
+---
+
 ## Sesi 36 — 6 Oktober 2026
 
 **Pemilik: *“sudah berapa % proyek jadi?”*, lalu *“lanjutkan progress”*** — dihitung dari
@@ -21,7 +42,7 @@ digabung (PR #163–#167 menunggu HUMAN REVIEW; Sprint 5–6 belum ber-PR). Lalu
 | Kode | migrasi **0011** (tiga fungsi + penyelaras melewati `pending_deletion`) · `identity/penghapusan.py` · `memory.buang_titik_pengguna` · `platform.lupakan_idempotensi` · `GalatVektor.status` (koleksi belum ada = sukses) · tugas `sapuan-hapus-akun` di `hvx.pekerja` · restore hanya selama tenggang · asisten berhenti melayani `pending_deletion` |
 | Bukti | `test_sapuan_hapus_akun.py` (13) · `test_id_semu.py` (3) · **20 mutasi `6.5b`** berbunyi · 2 jangkar mutasi 3.5 yang bergeser dibetulkan dan 3 mutasi 3.5 dibuktikan masih berbunyi · **78 mutasi lama** pada berkas yang disentuh dijalankan ulang: 77 berbunyi, 1 (`6.5` *“tanpa verifikasi sandi”*) **salah alasan sejak Stage A** (**E-219**) — dibetulkan, kini berbunyi · suite penuh `pytest --cov`: 1.212 hijau + 1 merah (`test_jangkar_mutasi`, dibetulkan sesudahnya), cakupan **92 %** · `mypy` bersih · `import-linter` 15/15 · `ruff` bersih · 14 pemeriksa dokumen wajib hijau |
 | ⚠️ Belum dijalankan | **gerbang penuh `ci_lokal.py`** (±30 mnt) — langkah pemilik sebelum PR; Flutter tidak disentuh |
-| ⚠️ Belum di-commit | semua perubahan sesi ini ada di working tree `hvx-sprint5` — **tidak ada commit** (belum diminta) |
+| ✅ Di-commit | semula tertinggal di working tree `hvx-sprint5`; di-commit di awal Sesi 37 (`a44e030`, lokal) sesudah `pytest` penuh 1.213 hijau |
 | Utang yang ketemu | **K-33 … K-38** dirujuk kode Sprint 5 dan Sesi 35 tetapi **belum ditulis** di `KEPUTUSAN-DIDELEGASIKAN.md` · `R-1` (urutan gerbang roadmap) merah sejak sebelum sesi ini — bukan pemeriksa wajib · tes `test_hapus_akun.py` Stage A belum diformat `ruff` (kini sudah) |
 | ⏸️ Berhenti di | 6.5 **selesai kode**. Sisa V0: **6.2** weekly review · **6.3** notifikasi · **6.4** Privacy Center (butir C, pemilik) · **6.6** UX + luring (Flutter). Berikutnya yang paling berdampak: commit per tugas + gerbang penuh + PR Sprint 5, lalu K-33…K-38 di dokumen |
 

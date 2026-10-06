@@ -142,6 +142,22 @@ class Habit {
   bool get tercatatHariItu => hari?.penyelesaian != null;
 
   bool get dilewatiHariItu => hari?.penyelesaian?.status == 'skipped';
+
+  /// Salinan dengan catatan [tanggal] diganti `p` (`null` = tidak tercatat);
+  /// energi dan tier yang disarankan dibiarkan — itu dari server, bukan dari catatan.
+  Habit denganPenyelesaian(String tanggal, Penyelesaian? p) => Habit(
+    id: id,
+    judul: judul,
+    periode: periode,
+    target: target,
+    tier: tier,
+    hari: HariHabit(
+      forDate: hari?.forDate ?? tanggal,
+      penyelesaian: p,
+      energi: hari?.energi,
+      tierDisarankan: hari?.tierDisarankan,
+    ),
+  );
 }
 
 /// Satu dimensi dashboard (naskah 4 §28) — skor PLUS Why-nya.

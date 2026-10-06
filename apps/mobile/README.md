@@ -39,7 +39,7 @@ flutter run -d chrome --web-port 5000 --dart-define=HVX_API=http://127.0.0.1:800
 flutter analyze --fatal-infos     # gerbang lint
 flutter test                      # uji klien (MockClient) + uji widget (layanan palsu)
 dart run tool/ujung_ke_ujung.dart http://127.0.0.1:8000   # klien asli lawan api hidup
-flutter test test/ujung --dart-define=HVX_API_UJI=http://127.0.0.1:8000   # LAYAR diketuk lawan api hidup
+flutter test test/ujung --dart-define=HVX_API_UJI=http://127.0.0.1:8000   # LAYAR diketuk + luring (jawaban hilang → kirim ulang) lawan api hidup
 ```
 
 Semuanya dijalankan gerbang [`tools/ci_lokal.py`](../../tools/ci_lokal.py) —
@@ -52,6 +52,17 @@ test` biasa melaporkannya sebagai `~1`.
 
 | | Kenapa | Kapan |
 |---|---|---|
-| token disimpan di perangkat | token segar di penyimpanan web terbaca skrip mana pun di asal yang sama; halaman yang dimuat ulang meminta masuk lagi | bersama mode luring — `spec/07` 6.6 |
+| token disimpan di perangkat | token segar di penyimpanan web terbaca skrip mana pun di asal yang sama; halaman yang dimuat ulang meminta masuk lagi | pemilik — **C-35** (tempat menyimpan data pengguna di perangkat) |
 | teks syarat & kebijakan privasi | milik pemilik (#59 butir 2, C-11) — persetujuan dicatat untuk `draf-v0` | pemilik |
-| mode luring | antrean lokal + sinkron tanpa duplikat | `spec/07` 6.6 |
+| antrean luring yang bertahan sesudah aplikasi ditutup | antrean ada di **memori** (K-40): catatan yang belum terkirim hilang bersama prosesnya, dan aplikasi yang dibuka luring tak punya sesi (token juga di memori) | pemilik — **C-35** |
+| check-in energi & habit baru tanpa jaringan | `PUT` mengganti seluruh baris (salinan lama di layar bisa menimpa perangkat lain); habit baru butuh urutan ketergantungan — keduanya gagal jujur sebagai *“Tidak ada jaringan”* | belum dijadwalkan |
+
+## Luring dasar (`spec/07` 6.6, **K-40**)
+
+Selagi aplikasi berjalan dan jaringan putus, **tandai selesai / batalkan** habit tetap bisa:
+catatannya menunggu di antrean ([`lib/api/luring.dart`](lib/api/luring.dart)), layar
+menampilkannya seolah sudah tercatat, dan spanduk menyebut berapa yang menunggu. Begitu
+tersambung — lewat ketukan berikutnya, tarik-segarkan, atau tombol *Sinkronkan* — antrean
+dikirim **berurutan**; tanpa duplikat karena `POST …/completions` dan `DELETE …/completions/{tanggal}`
+aman diulang (`spec/04`). Server menolak (4xx)? Catatan dibuang **dan dihitung** di spanduk
+sampai pengguna mengakuinya. *Keluar* dengan catatan yang tak bisa terkirim bertanya dulu.
