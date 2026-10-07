@@ -12,7 +12,7 @@ Berkas ini satu-satunya pintu keluar modul (spec/06 aturan 1).
 """
 
 from .privasi import BAGIAN_PRIVASI, PENGHAPUS_PRIVASI
-from .repository import checkin_pada, energi_pada
+from .repository import checkin_pada, checkin_rentang, energi_pada, mood_rentang
 from .routes import router
 from .schemas import CatatMood, Checkin, Mood
 from .service import catat_mood, daftar_mood, mood_untuk_ekstraksi
@@ -26,9 +26,11 @@ __all__ = [
     "Mood",
     "catat_mood",
     "checkin_pada",
+    "checkin_rentang",
     "daftar_checkin",
     "daftar_mood",
     "energi_pada",
+    "mood_rentang",
     "mood_untuk_ekstraksi",
     "router",
 ]

@@ -102,3 +102,46 @@ class RekomendasiRingkas(BaseModel):
 
 class DaftarRekomendasi(BaseModel):
     items: list[RekomendasiRingkas]
+
+
+# ── spec/07 6.2 — tinjauan mingguan (naskah 4 §31, K-45) ─────────────────────
+
+
+class SumbuTinjauan(BaseModel):
+    key: str
+    label: str
+    value: float
+    previous: float | None  # minggu sebelumnya; None = tak ada data pembanding
+    unit: Literal["0-1", "1-5", "jam"]
+    evidence_count: int
+    why: str
+
+
+class ButirTinjauan(BaseModel):
+    text: str
+    evidence_count: int
+
+
+class PertanyaanTinjauan(BaseModel):
+    key: Literal["went_well", "changed", "failed", "why", "change_next_week"]
+    question: str
+    stance: Literal["state", "ask"]  # Confidence Layer 5.4 — tanpa butir, sistem bertanya
+    items: list[ButirTinjauan]
+    prompt: str
+
+
+class TakDiukur(BaseModel):
+    key: str
+    label: str
+
+
+class TinjauanMingguan(BaseModel):
+    week: str
+    start: date
+    end: date
+    complete: bool
+    timezone: str
+    axes: list[SumbuTinjauan]
+    not_measured: list[TakDiukur]
+    questions: list[PertanyaanTinjauan]
+    review_version: str

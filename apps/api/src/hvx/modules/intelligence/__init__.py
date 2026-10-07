@@ -38,6 +38,8 @@ from .schemas import (
     RekomendasiRingkas,
     UmpanBalik,
 )
+from .tinjauan import VERSI as VERSI_TINJAUAN
+from .tinjauan import awal_minggu, nilai_habit, susun_tinjauan, tinjauan_mingguan
 from .umpan_balik import baca_umpan_balik, catat_umpan_balik, status_sesudah
 
 __all__ = [
@@ -50,6 +52,7 @@ __all__ = [
     "JENIS_REKOMENDASI",
     "PENGHAPUS_PRIVASI",
     "SKOR_VERSI",
+    "VERSI_TINJAUAN",
     "CatatUmpanBalik",
     "DaftarRekomendasi",
     "Dasbor",
@@ -58,6 +61,7 @@ __all__ = [
     "Sikap",
     "Skor",
     "UmpanBalik",
+    "awal_minggu",
     "baca_umpan_balik",
     "bangun_ulang_proyeksi",
     "buat_rekomendasi",
@@ -69,6 +73,7 @@ __all__ = [
     "dimensi_dari_metrik",
     "hitung_human_state",
     "metrik_harian",
+    "nilai_habit",
     "nilai_rekomendasi",
     "periksa_rekomendasi",
     "pola_hari",
@@ -79,6 +84,8 @@ __all__ = [
     "sarankan",
     "sikap",
     "status_sesudah",
+    "susun_tinjauan",
     "tandai_terlihat",
     "tanpa_klaim_kausal",
+    "tinjauan_mingguan",
 ]

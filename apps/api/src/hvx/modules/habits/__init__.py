@@ -13,6 +13,7 @@ Berkas ini satu-satunya pintu keluar modul (spec/06 aturan 1).
 
 from .privasi import BAGIAN_PRIVASI, PENGHAPUS_PRIVASI
 from .rentetan import Rentetan, hitung_rentetan
+from .repository import HabitDalamRentang, habit_rentang
 from .routes import router
 from .schemas import CatatPenyelesaian, Habit
 from .service import (
@@ -35,6 +36,7 @@ __all__ = [
     "PENGHAPUS_PRIVASI",
     "CatatPenyelesaian",
     "Habit",
+    "HabitDalamRentang",
     "PembacaEnergi",
     "PembacaGoalHidup",
     "PembacaZonaWaktu",
@@ -42,6 +44,7 @@ __all__ = [
     "catat_penyelesaian",
     "daftar_habit",
     "habit_pada",
+    "habit_rentang",
     "hitung_rentetan",
     "lepas_goal",
     "rentetan_habit",

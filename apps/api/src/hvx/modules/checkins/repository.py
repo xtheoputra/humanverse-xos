@@ -289,3 +289,35 @@ async def batas_waktu_mood(conn: AsyncConnection, longgar_s: int) -> datetime:
     if not isinstance(nilai, datetime):  # pragma: no cover - bentuk dari PostgreSQL
         raise TypeError(type(nilai).__name__)
     return nilai
+
+
+# ── spec/07 6.2 — tinjauan mingguan (dibaca `intelligence`, di transaksi pemanggil) ──
+
+# Valensi per tanggal LOKAL pengguna — tanggal mood dari `occurred_at` di zona profil,
+# sama dengan cara tanggal check-in dicatat (spec/01: tanggal lokal, bukan UTC).
+_MOOD_RENTANG = text(
+    """
+    SELECT (occurred_at AT TIME ZONE :zona)::date AS tanggal, valence
+    FROM mood_entries
+    WHERE user_id = :user_id AND deleted_at IS NULL
+      AND (occurred_at AT TIME ZONE :zona)::date BETWEEN :dari AND :sampai
+    ORDER BY occurred_at, id
+    """
+)
+
+
+async def mood_rentang(
+    conn: AsyncConnection, user_id: UUID, dari: date, sampai: date, zona: str
+) -> list[tuple[date, int]]:
+    """(tanggal lokal, valensi) tiap mood yang dilaporkan di rentang itu, inklusif."""
+    hasil = await conn.execute(
+        _MOOD_RENTANG, {"user_id": user_id, "dari": dari, "sampai": sampai, "zona": zona}
+    )
+    return [(b.tanggal, int(b.valence)) for b in hasil]
+
+
+async def checkin_rentang(
+    conn: AsyncConnection, user_id: UUID, dari: date, sampai: date
+) -> list[Checkin]:
+    """Check-in di rentang tanggal LOKAL itu, inklusif — terbaru dulu."""
+    return await rentang(conn, user_id=user_id, dari=dari, sampai=sampai)

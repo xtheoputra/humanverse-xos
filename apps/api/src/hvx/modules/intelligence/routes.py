@@ -8,7 +8,7 @@ tetap `shown` — jadi tanpa `Idempotency-Key` (test_idempotensi_terpasang TANPA
 from __future__ import annotations
 
 from functools import partial
-from typing import Annotated
+from typing import Annotated, Any
 from uuid import UUID
 
 from fastapi import APIRouter, Query, Request, Response
@@ -16,9 +16,9 @@ from fastapi.responses import JSONResponse
 
 from hvx.modules import identity, platform
 
-from . import rekomendasi, umpan_balik
+from . import rekomendasi, tinjauan, umpan_balik
 from .dasbor import dasbor as bangun_dasbor
-from .schemas import CatatUmpanBalik, DaftarRekomendasi, Dasbor, UmpanBalik
+from .schemas import CatatUmpanBalik, DaftarRekomendasi, Dasbor, TinjauanMingguan, UmpanBalik
 
 router = APIRouter(prefix="/v1", tags=["recommendations"])
 
@@ -26,11 +26,20 @@ router = APIRouter(prefix="/v1", tags=["recommendations"])
 _STATUS = frozenset({"pending", "shown", "accepted", "rejected", "expired"})
 Status = Annotated[str | None, Query(max_length=20)]
 Domain = Annotated[str | None, Query(max_length=40)]
+Minggu = Annotated[str | None, Query(pattern=tinjauan.POLA_MINGGU)]
 
 
 @router.get("/dashboard", response_model=Dasbor)
 async def dashboard(request: Request, pengguna: identity.PenggunaDiperlukan) -> Dasbor:
     return await bangun_dasbor(platform.engine_dari(request), pengguna.user_id)
+
+
+@router.get("/reviews/weekly", response_model=TinjauanMingguan)
+async def tinjauan_mingguan(
+    request: Request, pengguna: identity.PenggunaDiperlukan, week: Minggu = None
+) -> dict[str, Any]:
+    """spec/07 6.2 — lima pertanyaan naskah 4 §31; dihitung saat dibaca, tidak disimpan."""
+    return await tinjauan.tinjauan_mingguan(platform.engine_dari(request), pengguna.user_id, week)
 
 
 @router.get("/recommendations", response_model=DaftarRekomendasi)

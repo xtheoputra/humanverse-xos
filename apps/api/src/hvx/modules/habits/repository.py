@@ -371,3 +371,66 @@ async def selesai_tanggal(
     """{habit_id: penyelesaian} semua habit pengguna pada tanggal itu — SATU kueri."""
     hasil = await conn.execute(_SELESAI_TANGGAL, {"user_id": user_id, "for_date": for_date})
     return {p.habit_id: p for p in (_penyelesaian(b) for b in hasil.mappings())}
+
+
+# ── spec/07 6.2 — tinjauan mingguan (dibaca `intelligence`, di transaksi pemanggil) ──
+
+
+@dataclass(frozen=True)
+class HabitDalamRentang:
+    """Satu habit hidup dan catatannya di sebuah rentang tanggal LOKAL."""
+
+    id: UUID
+    title: str
+    period: str
+    target_count: int
+    weekdays: tuple[int, ...] | None  # `schedule.weekdays` — None = tiap hari
+    status: str
+    mulai: date  # tanggal lokal habit dibuat (zona profil SAAT INI)
+    adaptive_tiers: tuple[str, ...]  # label tier, berat → ringan
+    # {for_date: (status, catatan pengguna)} — catatan `skipped` adalah alasan dari pemiliknya
+    catatan: Mapping[date, tuple[str, str | None]]
+
+
+_HABIT_RENTANG = text(
+    """
+    SELECT h.id, h.title, h.period, h.target_count, h.schedule, h.adaptive_tiers, h.status,
+           (h.created_at AT TIME ZONE :zona)::date AS mulai,
+           c.for_date, c.status AS status_catatan, c.note
+    FROM habits h
+    LEFT JOIN habit_completions c
+      ON c.habit_id = h.id AND c.for_date BETWEEN :dari AND :sampai
+    WHERE h.user_id = :user_id AND h.deleted_at IS NULL
+    ORDER BY h.created_at, h.id, c.for_date
+    """
+)
+
+
+async def habit_rentang(
+    conn: AsyncConnection, user_id: UUID, dari: date, sampai: date, zona: str
+) -> list[HabitDalamRentang]:
+    """Habit hidup pengguna beserta catatannya di [dari, sampai] — SATU kueri."""
+    hasil = await conn.execute(
+        _HABIT_RENTANG, {"user_id": user_id, "dari": dari, "sampai": sampai, "zona": zona}
+    )
+    urut: dict[UUID, dict[str, Any]] = {}
+    for b in hasil.mappings():
+        h = urut.setdefault(
+            b["id"],
+            {
+                "id": b["id"],
+                "title": b["title"],
+                "period": b["period"],
+                "target_count": int(b["target_count"]),
+                "weekdays": tuple(b["schedule"].get("weekdays") or ()) or None,
+                "status": b["status"],
+                "mulai": b["mulai"],
+                "adaptive_tiers": tuple(
+                    str(t.get("label", "")) for t in (b["adaptive_tiers"] or [])
+                ),
+                "catatan": {},
+            },
+        )
+        if b["for_date"] is not None:
+            h["catatan"][b["for_date"]] = (str(b["status_catatan"]), b["note"])
+    return [HabitDalamRentang(**h) for h in urut.values()]
