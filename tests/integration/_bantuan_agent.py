@@ -97,3 +97,17 @@ def run(api: ApiUji, run_id: UUID) -> dict[str, Any]:
         baris = kursor.fetchone()
     assert baris is not None, f"run {run_id} tidak tersimpan"
     return dict(zip(kolom, baris, strict=True))
+
+
+async def izinkan_mood(api: ApiUji, user_id: UUID) -> None:
+    """C-32 (K-46): `mood` sensitif — coach & memory-agent membacanya hanya sesudah pengguna
+    menyimpan `allow`. Uji yang menguji hal LAIN dari jawaban yang memuat mood memulai dari
+    pengguna yang sudah mengizinkannya; yang menguji izinnya sendiri tidak memanggil ini."""
+    from hvx.modules import identity
+
+    s = api.app.state.settings
+    izin = identity.MesinIzin(
+        api.app.state.engine, api.app.state.redis, s.redis_prefix, s.permission_cache_ttl_s
+    )
+    for agent in ("coach-agent", "memory-agent"):
+        await izin.tetapkan(user_id, identity.Subjek("agent", agent), "mood", "read", "allow")

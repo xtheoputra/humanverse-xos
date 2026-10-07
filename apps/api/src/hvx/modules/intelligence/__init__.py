@@ -20,6 +20,7 @@ from .pola import (
     pola_waktu,
     tanpa_klaim_kausal,
 )
+from .privasi import BAGIAN_PRIVASI, PENGHAPUS_PRIVASI
 from .proyektor import JENIS_EVENT, bangun_ulang_proyeksi, proyeksikan_perilaku
 from .rekomendasi import (
     DOMAIN,
@@ -40,12 +41,14 @@ from .schemas import (
 from .umpan_balik import baca_umpan_balik, catat_umpan_balik, status_sesudah
 
 __all__ = [
+    "BAGIAN_PRIVASI",
     "BUKTI_MINIMUM",
     "DOMAIN",
     "JENIS_EVENT",
     "JENIS_KEADAAN",
     "JENIS_POLA",
     "JENIS_REKOMENDASI",
+    "PENGHAPUS_PRIVASI",
     "SKOR_VERSI",
     "CatatUmpanBalik",
     "DaftarRekomendasi",

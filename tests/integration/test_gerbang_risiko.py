@@ -652,3 +652,46 @@ async def test_token_konfirmasi_berumur_15_menit(api_bersama: ApiUji) -> None:
     sisa = dirakit.kedaluwarsa - time.time()
 
     assert 14 * 60 < sisa <= 15 * 60, f"token konfirmasi berumur {sisa:.0f} dtk, bukan 15 menit"
+
+
+# ── C-32 (K-46) · E-227: `mood` sensitif — yang MEMBACA ditanya, delegasinya tidak ──
+
+
+async def _baca_mood(k: agents.KonteksAgent, pesan: str) -> agents.Keputusan:
+    """coach-agent tiruan yang hanya membaca mood (`mood.recent`, R0)."""
+    await k.alat("mood.recent", {"hari": 7})
+    return agents.Keputusan("mood dibaca", Decimal("0.5"), ("mood",), {"action": "reply"})
+
+
+async def test_coach_ditanya_sebelum_membaca_mood_walau_risk_0(api_bersama: ApiUji) -> None:
+    """C-32: mood = data kesehatan jiwa (GDPR Art. 9, UU PDP Pasal 4(2)) — R0 tidak lagi
+    membukanya karena bawaan; hanya `allow` yang disimpan pengguna."""
+    uid, _token = await api_bersama.pengguna_baru()
+    runtime = _runtime(api_bersama, {"coach-agent": _baca_mood})
+
+    belum = await _coba(runtime, uid, "coach-agent", "?")
+    assert _ringkas(belum) == ("perlu_izin", "mood.recent", True), (
+        f"coach membaca mood tanpa izin tersimpan (C-32): {_ringkas(belum)}"
+    )
+    assert _permintaan(belum).scopes == ("mood",)
+
+    await _izin(api_bersama).tetapkan(uid, COACH, "mood", "read", "allow")
+    assert _ringkas(await _coba(runtime, uid, "coach-agent", "?")) == "dijalankan"
+
+
+async def test_delegasi_ke_coach_tidak_ditanya_untuk_mood(api_bersama: ApiUji) -> None:
+    """E-227: delegasi tidak membaca mood — memaksanya `ask` membuat tiap giliran orkestrator
+    ditahan, lalu tool coach di dalamnya ditanya LAGI. Keputusan yang DISIMPAN pengguna atas
+    delegasinya tetap menang."""
+    uid, _token = await api_bersama.pengguna_baru()
+
+    hasil = await _coba(_delegasi(api_bersama), uid, "orchestrator-agent", "bagaimana hariku?")
+    assert _ringkas(hasil) == "dijalankan", (
+        f"delegasi ke coach ditahan untuk scope sensitif yang tidak dibacanya: {_ringkas(hasil)}"
+    )
+
+    await _izin(api_bersama).tetapkan(uid, ORKESTRATOR, "mood", "execute", "ask")
+    ditahan = await _coba(_delegasi(api_bersama), uid, "orchestrator-agent", "bagaimana hariku?")
+    assert _ringkas(ditahan) == ("perlu_izin", "agent.coach", True), (
+        "“tanya aku” yang disimpan pengguna atas delegasi diabaikan"
+    )

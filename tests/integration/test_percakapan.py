@@ -19,7 +19,7 @@ from typing import Any
 
 import httpx
 import pytest
-from _bantuan_agent import REGISTRI, run, sql
+from _bantuan_agent import REGISTRI, izinkan_mood, run, sql
 from _bantuan_db import ApiUji, BasisDataV0, auth
 from asgi_lifespan import LifespanManager
 from test_gerbang_risiko import _registri_dengan_risiko
@@ -134,6 +134,7 @@ async def test_percakapan_dibuat_dan_didaftar(api: ApiUji) -> None:
 
 async def test_token_mengalir_lalu_done_membawa_biaya_keyakinan_dan_alasan(api: ApiUji) -> None:
     uid, token = await api.pengguna_baru()
+    await izinkan_mood(api, uid)
     await buat_habit(api, token, title="Lari pagi")
     cid = await _percakapan(api, token)
 
@@ -184,7 +185,8 @@ async def test_token_mengalir_lalu_done_membawa_biaya_keyakinan_dan_alasan(api: 
 
 async def test_klien_yang_tersambung_belakangan_menerima_seluruh_aliran(api: ApiUji) -> None:
     """Jaringan seluler: SSE tersambung SESUDAH gilirannya selesai — tetap dari token pertama."""
-    _uid, token = await api.pengguna_baru()
+    uid, token = await api.pengguna_baru()
+    await izinkan_mood(api, uid)
     await buat_habit(api, token, title="Lari pagi")
     cid = await _percakapan(api, token)
 
@@ -810,7 +812,8 @@ async def test_pesan_yang_diputar_ulang_selagi_gilirannya_berjalan_processing(
     """Idempotency-Key yang diulang SELAGI giliran berjalan membaca keadaannya saat itu:
     `processing`. `completed` menyuruh klien membaca riwayat yang belum memuat balasannya
     alih-alih menyambung ke aliran."""
-    _uid, token = await api.pengguna_baru()
+    uid, token = await api.pengguna_baru()
+    await izinkan_mood(api, uid)
     await buat_habit(api, token, title="Lari pagi")  # satu sumber → giliran sampai ke model (5.4)
     cid = await _percakapan(api, token)
     mulai, lepas = _tahan_model(monkeypatch)
@@ -839,7 +842,8 @@ async def test_api_berhenti_membatalkan_giliran_yang_masih_berjalan(
     """K-31: `tutup()` MEMBATALKAN giliran latar — run-nya ditutup `cancelled`, alirannya
     berakhir `error cancelled`. Menunggunya selesai menahan api yang berhenti selama model
     menjawab — tanpa batas bila penyedianya menggantung."""
-    _uid, token = await api.pengguna_baru()
+    uid, token = await api.pengguna_baru()
+    await izinkan_mood(api, uid)
     await buat_habit(api, token, title="Lari pagi")  # satu sumber → giliran sampai ke model (5.4)
     cid = await _percakapan(api, token)
     mulai, lepas = _tahan_model(monkeypatch)
@@ -875,7 +879,8 @@ async def test_lifespan_yang_berhenti_menutup_giliran_yang_berjalan(
             sendiri = ApiUji(
                 app=app, klien=klien, db=v0_bersama, awalan_redis=awalan, engine_pekerja=None
             )
-            _uid, token = await sendiri.pengguna_baru()
+            uid, token = await sendiri.pengguna_baru()
+            await izinkan_mood(sendiri, uid)
             await buat_habit(sendiri, token, title="Lari pagi")  # satu sumber → model (5.4)
             cid = await _percakapan(sendiri, token)
             terima = await _kirim(sendiri, token, cid, "halo")

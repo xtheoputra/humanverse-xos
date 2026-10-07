@@ -110,11 +110,15 @@ class GerbangRisiko:
         )
         subjek = identity.Subjek("agent", jalannya.agent.name)
         aksi = AKSI_IZIN[alat.kind]
+        # 🔧 E-227 (C-32): bawaan `allow` delegasi tidak dipaksa `ask` di scope sensitif —
+        # delegasi tidak membaca apa pun; yang membaca ditanya di run-nya (`MesinIzin.cek`).
         keputusan = (
             []  # tool menanyai mesin izin sendiri, per scope (memory.search, E-193)
             if alat.menyaring_izin
             else [
-                await self._izin.cek(jalannya.user_id, subjek, s, aksi, bawaan=bawaan)
+                await self._izin.cek(
+                    jalannya.user_id, subjek, s, aksi, bawaan=bawaan, delegasi=delegasi
+                )
                 for s in scopes
             ]
         )

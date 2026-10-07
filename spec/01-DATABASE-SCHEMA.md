@@ -1269,7 +1269,8 @@ CREATE FUNCTION hapus_akun_jatuh_tempo(p_user_id uuid, p_semu uuid)
       SET user_id = p_semu,
           actor_id = replace(a.actor_id, p_user_id::text, p_semu::text),
           subject_id = replace(a.subject_id, p_user_id::text, p_semu::text),
-          metadata = replace(a.metadata::text, p_user_id::text, p_semu::text)::jsonb
+          metadata = replace(a.metadata::text, p_user_id::text, p_semu::text)::jsonb,
+          ip_hash = NULL
       WHERE a.user_id = p_user_id;
     DELETE FROM public.users WHERE id = p_user_id;
     INSERT INTO public.audit_logs (data_subject, actor_type, actor_id, user_id, action,
@@ -1281,6 +1282,39 @@ CREATE FUNCTION hapus_akun_jatuh_tempo(p_user_id uuid, p_semu uuid)
   $$;
 REVOKE ALL ON FUNCTION hapus_akun_jatuh_tempo(uuid, uuid) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION hapus_akun_jatuh_tempo(uuid, uuid) TO hvx_pekerja;
+
+-- Privacy Center (spec/07 6.4, K-42): hapus per kategori ikut membuang riwayat event
+-- pengguna itu (naskah 11 §7.25). `events` tetap hanya-tambah bagi `hvx_app` (§10) — yang
+-- dibuka hanya PENGHAPUSAN, hanya event milik pengguna yang SEDANG DILAYANI transaksi
+-- (`app_current_user_id()`), hanya jenis yang disebut, dan bila diminta satu subjek.
+-- Tanpa pengguna yang dilayani: galat, bukan nol baris. Untuk `hvx_app`.
+CREATE FUNCTION hapus_event_pengguna(p_jenis text[], p_subjek_tipe text, p_subjek_id uuid)
+  RETURNS integer
+  LANGUAGE plpgsql VOLATILE SECURITY DEFINER
+  SET search_path = pg_catalog, public, pg_temp
+  AS $$
+  DECLARE
+    v_pengguna uuid := public.app_current_user_id();
+    v_jumlah integer;
+  BEGIN
+    IF v_pengguna IS NULL THEN
+      RAISE EXCEPTION 'hapus_event_pengguna: tidak ada pengguna yang dilayani transaksi ini'
+        USING ERRCODE = 'insufficient_privilege';
+    END IF;
+    IF (p_subjek_tipe IS NULL) <> (p_subjek_id IS NULL) THEN
+      RAISE EXCEPTION 'hapus_event_pengguna: subjek wajib tipe DAN id, atau keduanya kosong';
+    END IF;
+    DELETE FROM public.events e
+      WHERE e.user_id = v_pengguna
+        AND e.event_type = ANY(p_jenis)
+        AND (p_subjek_id IS NULL
+             OR (e.subject_type = p_subjek_tipe AND e.subject_id = p_subjek_id));
+    GET DIAGNOSTICS v_jumlah = ROW_COUNT;
+    RETURN v_jumlah;
+  END
+  $$;
+REVOKE ALL ON FUNCTION hapus_event_pengguna(text[], text, uuid) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION hapus_event_pengguna(text[], text, uuid) TO hvx_app;
 ```
 
 > 🔑 **Kenapa fungsi, bukan kebijakan RLS yang lebih longgar** (17 Sep 2026,

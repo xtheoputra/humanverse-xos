@@ -274,12 +274,52 @@ async def keluar(
         )
 
 
+async def verifikasi_sandi_ulang(
+    engine: AsyncEngine,
+    user_id: UUID,
+    kata_sandi: str,
+    *,
+    penjaga: PenjagaGagalMasuk,
+    aksi_ditolak: str,
+    ip_hash: str | None,
+) -> repository.AkunUntukHapus:
+    """Re-autentikasi sebelum tindakan yang tak bisa dibatalkan (OWASP ASVS 4.0.3 V3.7.1):
+    hapus akun, ekspor dan hapus data Privacy Center.
+
+    🔴 Versi pertama (`DELETE /me`, 6.5) mencocokkan sandi tanpa batas apa pun selain batas
+    per pengguna (300/menit): token akses yang dicuri cukup untuk menebak sandi ratusan kali
+    per menit lewat pintu ini, sementara pintu login dijaga per akun (E-226). Kini tebakan
+    di sini memakai jatah YANG SAMA dengan login gagal akun itu — kuncinya email sebagaimana
+    `citext` mengenalinya — dipakai SEBELUM argon2, dan dikosongkan bila cocok.
+    Penolakan dicatat `aksi_ditolak` di jejak audit pemiliknya."""
+    async with platform.transaksi_pengguna(engine, user_id) as conn:
+        akun = await repository.akun_untuk_hapus(conn, user_id)
+    if akun is None:  # pragma: no cover - pemegang sesi sah selalu ada
+        raise _galat(404, "user_not_found", "Akun tidak ditemukan.")
+    await penjaga.pakai(akun.kunci)
+    if not await sandi.cocokkan_async(akun.password_hash, kata_sandi):
+        async with platform.transaksi_pengguna(engine, user_id) as conn:
+            await audit(
+                conn,
+                aksi=aksi_ditolak,
+                aktor_tipe="user",
+                aktor_id=str(user_id),
+                user_id=user_id,
+                ip_hash=ip_hash,
+                metadata={"alasan": "sandi_salah"},
+            )
+        raise _galat(403, "invalid_credentials", "Sandi salah.")
+    await penjaga.berhasil(akun.kunci)
+    return akun
+
+
 async def jadwalkan_penghapusan(
     engine: AsyncEngine,
     sesi: PenyimpanSesi,
     pengguna: PenggunaMasuk,
     kata_sandi: str,
     *,
+    penjaga: PenjagaGagalMasuk,
     ip_hash: str | None,
 ) -> datetime:
     """Tahap 1 hapus akun (spec/01): `pending_deletion` + jadwal 30 hari, SEMUA sesi dicabut.
@@ -288,22 +328,14 @@ async def jadwalkan_penghapusan(
     Perubahan status & jejaknya satu transaksi; pencabutan sesi (Redis) sesudah commit.
     Idempoten: DELETE /me saat sudah `pending_deletion` mengembalikan jadwal yang ada,
     tanpa menyetel ulang jam tenggang."""
-    async with platform.transaksi_pengguna(engine, pengguna.user_id) as conn:
-        akun = await repository.akun_untuk_hapus(conn, pengguna.user_id)
-    if akun is None:  # pragma: no cover - pemegang sesi sah selalu ada
-        raise _galat(404, "user_not_found", "Akun tidak ditemukan.")
-    if not await sandi.cocokkan_async(akun.password_hash, kata_sandi):
-        async with platform.transaksi_pengguna(engine, pengguna.user_id) as conn:
-            await audit(
-                conn,
-                aksi="account.deletion_rejected",
-                aktor_tipe="user",
-                aktor_id=str(pengguna.user_id),
-                user_id=pengguna.user_id,
-                ip_hash=ip_hash,
-                metadata={"alasan": "sandi_salah"},
-            )
-        raise _galat(403, "invalid_credentials", "Sandi salah.")
+    akun = await verifikasi_sandi_ulang(
+        engine,
+        pengguna.user_id,
+        kata_sandi,
+        penjaga=penjaga,
+        aksi_ditolak="account.deletion_rejected",
+        ip_hash=ip_hash,
+    )
 
     async with platform.transaksi_pengguna(engine, pengguna.user_id) as conn:
         dijadwalkan = await repository.jadwalkan_hapus(conn, pengguna.user_id, TENGGANG_HAPUS_HARI)

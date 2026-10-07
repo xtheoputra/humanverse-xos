@@ -52,7 +52,8 @@ TipeMedan = Literal["uuid", "date", "integer", "number", "string", "boolean", "a
 
 # spec/05 aturan 6 · 9 — larangan scope bagi `kind: third_party`, BERLAKU walau scope-nya
 # belum ada di daftar resmi V0: kelak ditambahkan, larangannya sudah menunggu.
-SCOPE_TERLARANG_PIHAK_KETIGA_6 = frozenset({"journal", "journal_raw", "finance", "health"})
+# `mood` ditambahkan 7 Okt 2026 (C-32, K-46): data kesehatan jiwa — bagian `health`.
+SCOPE_TERLARANG_PIHAK_KETIGA_6 = frozenset({"journal", "journal_raw", "mood", "finance", "health"})
 SCOPE_TERLARANG_PIHAK_KETIGA_9 = frozenset({"spatial", "location", "people", "csi"})
 AMBANG_KESELAMATAN = 0.95  # spec/05 aturan 4
 

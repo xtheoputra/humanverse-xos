@@ -555,6 +555,8 @@ async def _siapkan_pengguna(
 ) -> tuple[UUID, dict[str, UUID]]:
     """Satu mood dan satu jurnal yang sama-sama menyebut "rapat", sudah tersemat."""
     uid, token = await api.pengguna_baru()
+    # C-32: mood sensitif — coach membacanya hanya dengan `allow` yang disimpan pengguna.
+    await _izin(api).tetapkan(uid, COACH, "mood", "read", "allow")
     await _post(api, token, "/v1/moods", {"valence": 2, "note": "capek sesudah rapat"})
     await _post(api, token, "/v1/journal", {"body": "rapat itu membuatku ingin berhenti"})
     await _ekstrak_semua(api, _awalan())
@@ -592,7 +594,9 @@ async def test_agent_tanpa_izin_scope_tidak_menerima_barisnya(
     assert ids["journal_raw"] not in [h.memori.id for h in tanpa.items], (
         "journal_raw terbuka tanpa izin"
     )
-    assert tanpa.perlu_izin == ["journal_raw"]
+    assert tanpa.perlu_izin == ["journal_raw", "mood"], (
+        "scope sensitif (journal_raw · mood — C-32) terbuka tanpa allow tersimpan"
+    )
 
     # 2 · pengguna MENOLAK scope yang ada di manifest coach
     await izin.tetapkan(uid, COACH, "mood", "read", "deny")
@@ -734,6 +738,7 @@ async def test_hasil_dibatasi_dan_terurut_dari_yang_paling_mirip(
     api_bersama: ApiUji, koleksi: tuple[platform.KlienVektor, str]
 ) -> None:
     uid, token = await api_bersama.pengguna_baru()
+    await _izin(api_bersama).tetapkan(uid, COACH, "mood", "read", "allow")  # C-32: mood sensitif
     for catatan in ("rapat pagi", "rapat siang panjang sekali", "rapat"):
         await _post(api_bersama, token, "/v1/moods", {"valence": 3, "note": catatan})
     await _ekstrak_semua(api_bersama, _awalan())
@@ -774,6 +779,7 @@ async def test_qdrant_hanya_ditanya_titik_penyemat_ini_di_scope_yang_diizinkan(
     K-26) yang menunggu disemat ulang tidak memakan halaman kandidat, dan scope yang
     belum diizinkan tidak ditanyakan sama sekali (tinjauan penegak buta Sprint 3)."""
     uid, _token = await api_bersama.pengguna_baru()
+    await _izin(api_bersama).tetapkan(uid, COACH, "mood", "read", "allow")  # C-32: mood sensitif
     rekam = _QdrantPerekam()
     cari = memory.PencariMemori(
         api_bersama.app.state.engine,
@@ -810,6 +816,7 @@ class _QdrantSkorNol:
 async def test_kueri_tanpa_kata_tidak_menanyai_qdrant(api_bersama: ApiUji) -> None:
     """Vektor nol "berjarak" 0 ke SEMUA titik, dan Qdrant mengembalikan semuanya."""
     uid, _token = await api_bersama.pengguna_baru()
+    await _izin(api_bersama).tetapkan(uid, COACH, "mood", "read", "allow")
     cari = memory.PencariMemori(
         api_bersama.app.state.engine,
         _izin(api_bersama),

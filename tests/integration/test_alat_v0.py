@@ -542,6 +542,7 @@ async def test_memory_search_tanpa_batas_lima_hasil(
     """Tanpa `batas`, `memory.search` menyerahkan lima yang paling mirip — tiap hasil menjadi
     satu fakta di bahan agent; bukan seluruh yang cocok sampai `memory.MAKS_HASIL`."""
     uid, token = await api_bersama.pengguna_baru()
+    await _izin(api_bersama).tetapkan(uid, COACH, "mood", "read", "allow")  # C-32: mood sensitif
     for i in range(7):
         await _post(api_bersama, token, "/v1/moods", {"valence": 3, "note": f"rapat ke-{i}"})
     await _ekstrak_semua(api_bersama, _awalan())

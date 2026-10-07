@@ -72,9 +72,14 @@ _UBAH = text(
     """
 )
 
+# 🔧 C-31 (K-46, 7 Okt 2026): hapus = hapus KERAS. Versi pertama hapus-lunak (`deleted_at`)
+# — tulisan paling pribadi pengguna (Level 3, naskah 133) yang DIHAPUS pemiliknya tetap
+# tersimpan sampai akunnya dihapus, bisa bertahun-tahun, tanpa jalan pulang apa pun
+# (tak ada rute pemulihan). GDPR Art. 17 · UU PDP Pasal 8 · minimisasi Art. 5(1)(e).
+# Baris yang terkunci ekstraksi (`FOR SHARE`, K-27) ditunggu, sama dengan `PATCH`.
 _HAPUS = text(
     """
-    UPDATE journal_entries SET deleted_at = now()
+    DELETE FROM journal_entries
     WHERE id = :id AND deleted_at IS NULL
     RETURNING id
     """

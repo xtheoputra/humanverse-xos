@@ -12,11 +12,14 @@ menyelaraskan memorinya saat jurnal diubah atau dihapus lewat
 Berkas ini satu-satunya pintu keluar modul (spec/06 aturan 1).
 """
 
+from .privasi import BAGIAN_PRIVASI, PENGHAPUS_PRIVASI
 from .routes import router
 from .schemas import Jurnal, RingkasanJurnal
 from .service import PendengarJurnalBerubah, isi_untuk_ekstraksi
 
 __all__ = [
+    "BAGIAN_PRIVASI",
+    "PENGHAPUS_PRIVASI",
     "Jurnal",
     "PendengarJurnalBerubah",
     "RingkasanJurnal",

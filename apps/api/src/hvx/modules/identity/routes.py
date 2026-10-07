@@ -99,6 +99,7 @@ async def hapus_akun(
         sesi,
         pengguna,
         badan.password.get_secret_value(),
+        penjaga=penjaga_gagal_masuk(request),
         ip_hash=platform.sidik_ip(request),
     )
     return JawabanHapusDijadwalkan(deletion_scheduled_at=dijadwalkan)

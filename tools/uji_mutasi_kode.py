@@ -267,7 +267,17 @@ _CORS_BLOK = (
     + NL
     + '            allow_headers=["Authorization", "Content-Type", "Idempotency-Key", "X-Request-ID"],'
     + NL
-    + '            expose_headers=["Retry-After", "X-Request-ID", "Idempotent-Replayed"],'
+    + "            expose_headers=["
+    + NL
+    + '                "Retry-After",'
+    + NL
+    + '                "X-Request-ID",'
+    + NL
+    + '                "Idempotent-Replayed",'
+    + NL
+    + '                "Content-Disposition",  # nama berkas ekspor Privacy Center (6.4)'
+    + NL
+    + "            ],"
     + NL
     + "            allow_credentials=False,"
     + NL
@@ -4296,7 +4306,7 @@ MUTASI: list[Mutasi] = [
         [
             Sunting(
                 f"{MODUL}/identity/izin.py",
-                '        if bawaan == "allow" and SCOPE_RESMI[scope].sensitif:',
+                '        if bawaan == "allow" and SCOPE_RESMI[scope].sensitif and not delegasi:',
                 "        if False:",
             )
         ],
@@ -5072,12 +5082,11 @@ MUTASI: list[Mutasi] = [
         [
             Sunting(
                 f"{MODUL}/journal/repository.py",
-                # Tanpa kata kunci UPDATE di jangkar — S608 membaca potongan SQL sebagai kueri.
-                "journal_entries SET deleted_at = now()"
-                + NL
-                + "    WHERE id = :id AND deleted_at IS NULL"
+                # 🔧 C-31 (K-46): hapus kini KERAS — baris kedua tidak ada lagi, jadi mutasinya
+                # pindah ke jawaban repository: "terhapus" walau tak ada yang terhapus.
+                '    return (await conn.execute(_HAPUS, {"id": jurnal_id})).first() is not None'
                 + NL,
-                "journal_entries SET deleted_at = now()" + NL + "    WHERE id = :id" + NL,
+                '    await conn.execute(_HAPUS, {"id": jurnal_id})' + NL + "    return True" + NL,
             )
         ],
         _pytest(f"{UJI_JURNAL}::test_jurnal_yang_dihapus_tidak_bisa_diubah_atau_dihapus_lagi"),

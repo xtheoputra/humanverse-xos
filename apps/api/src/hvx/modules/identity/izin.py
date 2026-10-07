@@ -222,16 +222,24 @@ class MesinIzin:
         aksi: Aksi,
         *,
         bawaan: Keputusan = "ask",
+        delegasi: bool = False,
     ) -> Keputusan:
         """`allow` · `deny` · `ask` untuk `subjek` yang ingin `aksi` atas `scope` milik pengguna.
 
         `bawaan` hanya untuk yang tanpa keputusan tersimpan (atau kedaluwarsa) —
         keputusan pengguna, termasuk `ask` eksplisit, selalu menang.
+
+        `delegasi=True` — pemanggilan agent lain (gerbang risiko, K-14): bawaan `allow`
+        TIDAK dipaksa `ask` untuk scope sensitif, sebab delegasi tidak membaca data apa pun;
+        agent yang membacanya ditanya di run-nya sendiri. Tanpa ini, begitu `mood` sensitif
+        (C-32), tiap delegasi orkestrator → coach ditanya izin `mood`, lalu tool coach di
+        dalamnya ditanya LAGI (**E-227**, pola E-192). Keputusan yang DISIMPAN pengguna
+        untuk delegasinya — `deny`, `ask` — tetap menang.
         """
         _periksa(user_id, scope, aksi)
         if bawaan not in _KEPUTUSAN:
             raise IzinTidakSah(f"bawaan tak dikenal: {bawaan!r}")
-        if bawaan == "allow" and SCOPE_RESMI[scope].sensitif:
+        if bawaan == "allow" and SCOPE_RESMI[scope].sensitif and not delegasi:
             bawaan = "ask"  # hanya `allow` yang DISIMPAN pengguna membuka scope sensitif
         generasi = await self._generasi(user_id)
         kunci = self._k_keputusan(user_id, generasi, subjek, scope, aksi)

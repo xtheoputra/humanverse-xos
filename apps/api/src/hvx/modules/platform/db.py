@@ -163,17 +163,32 @@ JejakTulisan = Callable[[AsyncConnection], Awaitable[None]]
 
 
 @asynccontextmanager
-async def transaksi_pengguna(engine: AsyncEngine, user_id: UUID) -> AsyncIterator[AsyncConnection]:
+async def transaksi_pengguna(
+    engine: AsyncEngine, user_id: UUID, *, satu_potret: bool = False
+) -> AsyncIterator[AsyncConnection]:
     """Satu transaksi atas nama SATU pengguna — RLS spec/01 §11 membatasi tiap kueri di dalamnya.
 
     `set_config(..., true)` hanya berlaku sampai transaksi selesai: koneksi yang
     kembali ke pool tidak membawa pengguna ini ke permintaan berikutnya. Kueri
     di luar transaksi ini tidak melihat satu baris pun milik pengguna mana pun.
+
+    `satu_potret=True` → `REPEATABLE READ`: tiap kueri di dalamnya membaca potret yang
+    SAMA. Untuk bacaan berlapis yang harus saling cocok — ekspor Privacy Center (6.4)
+    membaca belasan tabel, dan pada `READ COMMITTED` tulisan yang commit di tengahnya
+    menghasilkan salinan yang tidak pernah ada sebagai satu keadaan (penyelesaian
+    tanpa habitnya). Tingkat isolasinya dipulihkan pool saat koneksi kembali.
     """
     if not isinstance(user_id, UUID):
         # str "semua" atau "" di sini akan menjadi galat cast di basis data —
         # ditolak lebih awal, dengan nama yang jelas.
         raise TypeError(f"user_id wajib uuid.UUID, bukan {type(user_id).__name__}")
+    if satu_potret:
+        async with engine.connect() as koneksi:
+            await koneksi.execution_options(isolation_level="REPEATABLE READ")
+            async with koneksi.begin():
+                await koneksi.execute(_SETEL_PENGGUNA, {"user_id": str(user_id)})
+                yield koneksi
+        return
     async with engine.begin() as conn:
         await conn.execute(_SETEL_PENGGUNA, {"user_id": str(user_id)})
         yield conn

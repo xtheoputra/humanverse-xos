@@ -96,8 +96,8 @@ async def test_bawaan_pemanggil_hanya_untuk_yang_tanpa_keputusan_tersimpan(izin:
     )
 
     lewat = izin.jam_basis_data() - timedelta(seconds=1)
-    await izin.mesin.tetapkan(uid, COACH, "mood", "read", "deny", expires_at=lewat)
-    assert await izin.mesin.cek(uid, COACH, "mood", "read", bawaan="allow") == "allow"
+    await izin.mesin.tetapkan(uid, COACH, "checkins", "read", "deny", expires_at=lewat)
+    assert await izin.mesin.cek(uid, COACH, "checkins", "read", bawaan="allow") == "allow"
 
 
 async def test_scope_sensitif_tidak_pernah_allow_karena_bawaan(izin: Izin) -> None:
@@ -109,7 +109,20 @@ async def test_scope_sensitif_tidak_pernah_allow_karena_bawaan(izin: Izin) -> No
         assert await izin.mesin.cek(uid, COACH, "journal_raw", "read", bawaan="allow") == "ask", (
             "journal_raw terbuka karena bawaan"
         )
-    assert await izin.mesin.cek(uid, COACH, "mood", "read", bawaan="allow") == "allow"
+    # C-32 (K-46): mood = data kesehatan jiwa — sensitif seperti jurnal mentah.
+    assert await izin.mesin.cek(uid, COACH, "mood", "read", bawaan="allow") == "ask", (
+        "mood terbuka karena bawaan (C-32)"
+    )
+    assert await izin.mesin.cek(uid, COACH, "checkins", "read", bawaan="allow") == "allow"
+    # E-227: DELEGASI tidak membaca apa pun — bawaannya tidak dipaksa `ask`…
+    assert await izin.mesin.cek(uid, COACH, "mood", "execute", bawaan="allow", delegasi=True) == (
+        "allow"
+    ), "delegasi ditanya untuk scope sensitif yang tidak dibacanya (E-227)"
+    # …tetapi keputusan yang DISIMPAN pengguna tetap menang.
+    await izin.mesin.tetapkan(uid, COACH, "mood", "execute", "deny")
+    assert (
+        await izin.mesin.cek(uid, COACH, "mood", "execute", bawaan="allow", delegasi=True) == "deny"
+    )
 
     await izin.mesin.tetapkan(uid, COACH, "journal_raw", "read", "allow")
     assert await izin.mesin.cek(uid, COACH, "journal_raw", "read", bawaan="allow") == "allow"

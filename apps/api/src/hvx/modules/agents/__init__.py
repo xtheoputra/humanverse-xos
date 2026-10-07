@@ -41,6 +41,7 @@ from .pelaksana_alat import (
     scope_panggilan,
 )
 from .percakapan import LayananPercakapan
+from .privasi import BAGIAN_PRIVASI, PENGHAPUS_PRIVASI, izin_diminta
 from .program_v0 import (
     KEYAKINAN_INGATAN,
     KEYAKINAN_JUDUL_PERSIS,
@@ -80,6 +81,7 @@ from .runtime import (
 __all__ = [
     "AGENT_UNTUK",
     "AKSI_IZIN",
+    "BAGIAN_PRIVASI",
     "CARA_MENGISI_MOOD",
     "IMPLEMENTASI",
     "KEYAKINAN_INGATAN",
@@ -88,6 +90,7 @@ __all__ = [
     "KEYAKINAN_PASTI",
     "KEYAKINAN_SUMBER",
     "KODE_GERBANG",
+    "PENGHAPUS_PRIVASI",
     "PROGRAM_V0",
     "RUANG_ID_AGENT",
     "TANYA_TANPA_DATA",
@@ -129,6 +132,7 @@ __all__ = [
     "RegistriTidakSah",
     "RuntimeAgent",
     "TokenKonfirmasi",
+    "izin_diminta",
     "jalankan_deterministik",
     "jawab_konfirmasi",
     "kenali",

@@ -28,9 +28,11 @@ from .ingatan import ISI_MAKS, HasilIngat, ingat, periksa_ingatan
 from .pencarian import MAKS_HASIL, PencariMemori
 from .penyelaras import INDEKS_PAYLOAD, MAKS_TEKS_SEMAT, PenyelarasVektor, buang_titik_pengguna
 from .perilaku import catat_pola, luruhkan_pola
+from .privasi import BAGIAN_PRIVASI, PENGHAPUS_PRIVASI, SCOPE_SUMBER
 from .schemas import HasilCariMemori, Memori, MemoriDitemukan
 
 __all__ = [
+    "BAGIAN_PRIVASI",
     "BUKTI_SATU_KEJADIAN",
     "INDEKS_PAYLOAD",
     "ISI_MAKS",
@@ -38,6 +40,8 @@ __all__ = [
     "KEYAKINAN_LAPORAN_SENDIRI",
     "MAKS_HASIL",
     "MAKS_TEKS_SEMAT",
+    "PENGHAPUS_PRIVASI",
+    "SCOPE_SUMBER",
     "VERSI_EKSTRAKSI",
     "HasilCariMemori",
     "HasilIngat",
