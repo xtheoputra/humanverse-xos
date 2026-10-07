@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 import 'model.dart';
+import 'privasi.dart';
 
 /// Galat beramplop spec/04: `{"error": {"code", "message", "details"?}}`.
 class GalatApi implements Exception {
@@ -105,7 +106,7 @@ abstract interface class LayananHabit {
 ///   tidak melindungi apa pun (tinjauan kontrak Sprint 2, F19).
 /// * Penyelesaian tidak butuh kunci: `(habit, tanggal)` unik di server, dan
 ///   kirim ulang tanggal yang sama menjawab `200` dengan baris lama (spec/04).
-class KlienApi implements LayananHabit {
+class KlienApi implements LayananHabit, LayananPrivasi {
   KlienApi({
     required this.dasar,
     http.Client? klien,
@@ -399,4 +400,117 @@ class KlienApi implements LayananHabit {
     final jawaban = await _kirim('GET', '/v1/dashboard');
     return Dasbor.dariJson(_json(jawaban) as Map<String, dynamic>);
   }
+
+  // ── Privacy Center (spec/07 6.4) · notifikasi (6.3) · tinjauan mingguan (6.2) ──
+
+  Map<String, dynamic> _objek(http.Response jawaban) =>
+      _json(jawaban) as Map<String, dynamic>;
+
+  @override
+  Future<RingkasanPrivasi> ringkasanPrivasi() async =>
+      RingkasanPrivasi.dariJson(
+        _objek(await _kirim('GET', '/v1/privacy/summary')),
+      );
+
+  @override
+  Future<List<IzinAgent>> izinAgent() async {
+    final isi = _objek(await _kirim('GET', '/v1/privacy/permissions'));
+    return [
+      for (final a in isi['agents'] as List<dynamic>)
+        IzinAgent.dariJson(a as Map<String, dynamic>),
+    ];
+  }
+
+  @override
+  Future<IzinBerlaku> tetapkanIzin(
+    String agent,
+    String scope,
+    String aksi,
+    String keputusan,
+  ) async => IzinBerlaku.dariJson(
+    _objek(
+      await _kirim(
+        'PUT',
+        '/v1/privacy/permissions/agent/${Uri.encodeComponent(agent)}/'
+            '${Uri.encodeComponent(scope)}',
+        badan: {'action': aksi, 'decision': keputusan},
+      ),
+    ),
+  );
+
+  /// Sandi diminta ULANG (OWASP ASVS V3.7.1) — token yang dicuri tidak cukup untuk menyalin
+  /// seluruh data. Tidak diulang otomatis: tiap percobaan memakai jatah tebakan sandi.
+  @override
+  Future<Ekspor> mintaEkspor(String sandi) async => Ekspor.dariJson(
+    _objek(
+      await _kirim('POST', '/v1/privacy/export', badan: {'password': sandi}),
+    ),
+  );
+
+  /// Unduhan butuh sesi pemiliknya — tautan tidak membawa rahasia (ASVS V8.3.1).
+  @override
+  Future<List<int>> unduhEkspor(String id) async =>
+      (await _kirim('GET', '/v1/privacy/export/$id/download')).bodyBytes;
+
+  @override
+  Future<Map<String, int>> hapusData(String kategori, String sandi) async {
+    final isi = _objek(
+      await _kirim(
+        'DELETE',
+        '/v1/privacy/data/${Uri.encodeComponent(kategori)}',
+        badan: {'password': sandi},
+      ),
+    );
+    return {
+      for (final e in (isi['deleted'] as Map<String, dynamic>).entries)
+        e.key: e.value as int,
+    };
+  }
+
+  @override
+  Future<String> hapusAkun(String sandi) async {
+    final isi = _objek(
+      await _kirim('DELETE', '/v1/me', badan: {'password': sandi}),
+    );
+    _lupakan(); // server mencabut SEMUA sesi (6.5) — token ini sudah mati
+    return isi['deletion_scheduled_at'] as String;
+  }
+
+  @override
+  Future<PreferensiNotifikasi> notifikasi() async =>
+      PreferensiNotifikasi.dariJson(
+        _objek(await _kirim('GET', '/v1/me/notifications')),
+      );
+
+  @override
+  Future<PreferensiNotifikasi> ubahNotifikasi({
+    Map<String, bool>? jenis,
+    JamTenang? jamTenang,
+    bool hapusJamTenang = false,
+  }) async => PreferensiNotifikasi.dariJson(
+    _objek(
+      await _kirim(
+        'PATCH',
+        '/v1/me/notifications',
+        badan: {
+          'types': ?jenis,
+          if (hapusJamTenang) 'quiet_hours': null,
+          if (!hapusJamTenang && jamTenang != null)
+            'quiet_hours': jamTenang.keJson(),
+        },
+      ),
+    ),
+  );
+
+  @override
+  Future<TinjauanMingguan> tinjauanMingguan({String? minggu}) async =>
+      TinjauanMingguan.dariJson(
+        _objek(
+          await _kirim(
+            'GET',
+            '/v1/reviews/weekly',
+            kueri: minggu == null ? null : {'week': minggu},
+          ),
+        ),
+      );
 }
