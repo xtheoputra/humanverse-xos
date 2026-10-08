@@ -11905,6 +11905,117 @@ MUTASI: list[Mutasi] = [
         ),
         harus_memuat="pola ber-scope tak resmi sampai ke basis data",
     ),
+    # ── 5.3 human state ──
+    Mutasi(
+        "5.3",
+        "human_state ditulis tanpa memeriksa bentuk {value, confidence, evidence_count}",
+        [
+            Sunting(
+                f"{MODUL}/profile/repository.py",
+                "    for nama, m in metrics.items():\n"
+                "        if set(m) != _MEDAN_METRIK:\n"
+                '            raise ValueError(f"metrik {nama!r} wajib tepat {sorted(_MEDAN_METRIK)}")\n',
+                "",
+            )
+        ],
+        _pytest(
+            "tests/unit/test_human_state_murni.py::"
+            "test_simpan_human_state_menolak_metrik_tanpa_bentuk_lengkap"
+        ),
+        harus_memuat="metrik tanpa {value,confidence,evidence_count} ditulis",
+    ),
+    Mutasi(
+        "5.3",
+        "human_state tanpa satu pun metrik tidak ditolak",
+        [
+            Sunting(
+                f"{MODUL}/profile/repository.py",
+                "    if not metrics:\n"
+                '        raise ValueError("human_state tanpa metrik tidak ditulis")\n',
+                "",
+            )
+        ],
+        _pytest(
+            "tests/unit/test_human_state_murni.py::test_simpan_human_state_menolak_tanpa_metrik"
+        ),
+        harus_memuat="human_state tanpa metrik ditulis",
+    ),
+    Mutasi(
+        "5.3",
+        "check-in hanya-tidur menggagalkan penangan (konsumen mengulang tanpa henti)",
+        [Sunting(f"{MODUL}/intelligence/keadaan.py", "    if not metrik:\n", "    if False:\n")],
+        _pytest(
+            "tests/integration/test_human_state.py::"
+            "test_checkin_tanpa_energi_dan_fokus_tidak_menyatakan_keadaan"
+        ),
+        harus_memuat="human_state tanpa metrik tidak ditulis",
+        kelompok="db",
+    ),
+    Mutasi(
+        "5.3",
+        "human_state dihitung dari payload event (bisa basi), bukan check-in otoritatif",
+        [
+            Sunting(
+                f"{MODUL}/intelligence/keadaan.py",
+                "    metrik = metrik_harian(energy=checkin.energy, focus=checkin.focus)",
+                '    metrik = metrik_harian(energy=event.payload.get("energy"), '
+                'focus=event.payload.get("focus"))',
+            )
+        ],
+        _pytest(
+            "tests/integration/test_human_state.py::test_event_basi_tidak_memundurkan_human_state"
+        ),
+        harus_memuat="human_state dihitung dari payload event basi",
+        kelompok="db",
+    ),
+    Mutasi(
+        "5.3",
+        "hitung ulang human_state tidak memperbarui computed_at (pemecah seri terkini)",
+        [
+            Sunting(
+                f"{MODUL}/profile/repository.py",
+                "      metrics = EXCLUDED.metrics,\n      computed_at = now()\n",
+                "      metrics = EXCLUDED.metrics\n",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_human_state.py::test_event_basi_tidak_memundurkan_human_state"
+        ),
+        harus_memuat="tidak memperbarui computed_at",
+        kelompok="db",
+    ),
+    Mutasi(
+        "5.3",
+        "B2: check-in dikoreksi jadi tanpa metrik — human_state lama bertahan basi",
+        [
+            Sunting(
+                f"{MODUL}/intelligence/keadaan.py",
+                "        await profile.hapus_human_state("
+                "conn, event.user_id, for_date=for_date, model_version=MODEL)\n",
+                "",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_human_state.py::"
+            "test_koreksi_checkin_tanpa_metrik_tidak_meninggalkan_keadaan_basi"
+        ),
+        harus_memuat="human_state basi bertahan sesudah check-in dikoreksi",
+        kelompok="db",
+    ),
+    Mutasi(
+        "6.1",
+        "dashboard menyajikan human_state TERLAMA (urut for_date naik)",
+        [
+            Sunting(
+                f"{MODUL}/profile/repository.py",
+                "    ORDER BY for_date DESC, computed_at DESC\n",
+                "    ORDER BY for_date ASC, computed_at DESC\n",
+            )
+        ],
+        _pytest("tests/integration/test_human_state.py::test_dashboard_menyajikan_hari_terbaru"),
+        harus_memuat="dashboard tidak menyajikan hari terbaru",
+        kelompok="db",
+    ),
 ]
 
 
