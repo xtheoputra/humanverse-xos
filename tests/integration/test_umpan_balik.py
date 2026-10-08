@@ -14,6 +14,7 @@ from typing import Any
 import psycopg
 import pytest
 from _bantuan_db import ApiUji, auth, psycopg_dsn
+from psycopg import sql
 
 pytestmark = pytest.mark.integration
 
@@ -141,3 +142,67 @@ async def test_tak_bisa_umpan_balik_rekomendasi_pengguna_lain(api_bersama: ApiUj
     assert r.status_code == 404, r.text
     assert _umpan_balik(api_bersama, rid_a) == []
     assert _status(api_bersama, rid_a) == "shown"
+
+
+# ── Tinjauan penegak buta S5–6 ──────────────────────────────────────────────────
+
+
+async def test_outcome_umpan_balik_tersimpan(api_bersama: ApiUji) -> None:
+    """`modified` membawa APA yang dipilih sebagai gantinya — bukti itu yang membuat
+    'memilih B setelah disarankan A' bukan penolakan; ia wajib tersimpan."""
+    uid, token = await api_bersama.pengguna_baru()
+    rid = _buat_rekomendasi(api_bersama, uid)
+    hasil = {"dipilih": "jalan kaki 10 menit"}
+
+    r = await api_bersama.klien.post(
+        f"/v1/recommendations/{rid}/feedback",
+        json={"action": "modified", "outcome": hasil},
+        headers=_kunci(token),
+    )
+
+    assert r.status_code == 201, r.text
+    with psycopg.connect(psycopg_dsn(api_bersama.db.dsn_pemilik)) as k:
+        (tersimpan,) = k.execute(
+            "SELECT outcome FROM recommendation_feedback WHERE recommendation_id = %s", (rid,)
+        ).fetchone() or (None,)
+    assert tersimpan == hasil, f"outcome umpan balik tidak disimpan: {tersimpan}"
+    assert r.json()["outcome"] == hasil
+
+
+async def test_umpan_balik_dan_status_satu_transaksi(api_bersama: ApiUji) -> None:
+    """K-37: baris umpan balik dan perubahan status commit BERSAMA atau batal bersama.
+    Perubahan status yang gagal (pemicu uji menolaknya) tidak meninggalkan umpan balik."""
+    uid, token = await api_bersama.pengguna_baru()
+    rid = _buat_rekomendasi(api_bersama, uid)
+    nama = f"uji_tolak_status_{uuid.uuid4().hex[:10]}"
+    with psycopg.connect(psycopg_dsn(api_bersama.db.dsn_pemilik)) as k:
+        k.execute(
+            sql.SQL(
+                "CREATE FUNCTION {}() RETURNS trigger LANGUAGE plpgsql AS "
+                "$$ BEGIN RAISE EXCEPTION 'status ditolak pemicu uji'; END $$"
+            ).format(sql.Identifier(nama))
+        )
+        k.execute(
+            sql.SQL(
+                "CREATE TRIGGER {} BEFORE UPDATE OF status ON recommendations FOR EACH ROW "
+                "WHEN (OLD.id = {}) EXECUTE FUNCTION {}()"
+            ).format(sql.Identifier(nama), sql.Literal(rid), sql.Identifier(nama))
+        )
+        k.commit()
+    try:
+        r = await api_bersama.klien.post(
+            f"/v1/recommendations/{rid}/feedback",
+            json={"action": "accepted"},
+            headers=_kunci(token),
+        )
+    finally:
+        with psycopg.connect(psycopg_dsn(api_bersama.db.dsn_pemilik)) as k:
+            k.execute(sql.SQL("DROP TRIGGER {} ON recommendations").format(sql.Identifier(nama)))
+            k.execute(sql.SQL("DROP FUNCTION {}()").format(sql.Identifier(nama)))
+            k.commit()
+
+    assert r.status_code == 500, r.text
+    assert _umpan_balik(api_bersama, rid) == [], (
+        "umpan balik tercatat walau status gagal diubah — bukan satu transaksi (K-37)"
+    )
+    assert _status(api_bersama, rid) == "shown"

@@ -12166,6 +12166,44 @@ MUTASI: list[Mutasi] = [
         harus_memuat="penyegaran check-in membuang komponen history",
         kelompok="db",
     ),
+    # ── 5.6 umpan balik ──
+    Mutasi(
+        "5.6",
+        "outcome umpan balik (apa yang dipilih sebagai ganti) tidak disimpan",
+        [
+            Sunting(
+                f"{MODUL}/intelligence/umpan_balik.py",
+                "            outcome=badan.outcome,\n",
+                "            outcome={},\n",
+            )
+        ],
+        _pytest("tests/integration/test_umpan_balik.py::test_outcome_umpan_balik_tersimpan"),
+        harus_memuat="outcome umpan balik tidak disimpan",
+        kelompok="db",
+    ),
+    Mutasi(
+        "5.6",
+        "status diubah di transaksi KEDUA — umpan balik tertinggal saat status gagal (K-37)",
+        [
+            Sunting(
+                f"{MODUL}/intelligence/umpan_balik.py",
+                "        baru = status_sesudah(status_kini, badan.action)\n"
+                "        if baru != status_kini:\n"
+                "            await repository.set_status_rekomendasi(conn, rekomendasi_id, user_id, baru)\n"
+                "        return hasil\n",
+                "    baru = status_sesudah(status_kini, badan.action)\n"
+                "    if baru != status_kini:\n"
+                "        async with platform.transaksi_pengguna(engine, user_id) as conn2:\n"
+                "            await repository.set_status_rekomendasi(conn2, rekomendasi_id, user_id, baru)\n"
+                "    return hasil\n",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_umpan_balik.py::test_umpan_balik_dan_status_satu_transaksi"
+        ),
+        harus_memuat="bukan satu transaksi (K-37)",
+        kelompok="db",
+    ),
 ]
 
 
