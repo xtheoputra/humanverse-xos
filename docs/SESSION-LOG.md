@@ -20,7 +20,12 @@ ditulis**, **0 dari 51 di `master`** (PR #163–#167 menunggu HUMAN REVIEW; Spri
 | `arch/` diubah | `09` §2.1 **web gratis** — tiga baris yang mengikat, komponen lawan hosting gratis, yang bertabrakan, bentuk W-a / W-b · `10` §6 tabel kemajuan (*“22 dari 51”* → 51) |
 | `spec/` diubah | `04` (Privacy Center sebagaimana dikodekan · `/me/notifications` · `/reviews/weekly` · E-226 · E-229) · `07` (6.2 · 6.3 · 6.4 ✅, C-34) |
 | Diukur | `flutter build web --release` **berhasil** (45 dtk, 41 MB statis) — aplikasinya siap web; yang belum gratis-siap adalah pekerja (proses hidup terus) dan basis data |
-| ⏸️ Berhenti di | lihat baris gerbang & PR di bawah |
+| 🔍 AI Review S5–6 | **tiga lensa serentak** — pertama kali untuk Sprint 5–6 (worktree `hvx-s56-tinjau-1/2/3`, tumpukan sendiri). Keamanan: **4** (E-232…E-235). Kontrak: **10** (E-236…E-244; K4 = E-232). Penegak buta: **50 dari 86 kerusakan lolos seluruh suite**, 49 kini merah; B1 = **E-246**, B2 = E-236. Plus **E-245** (restore mengaku memulihkan akun suspended) — dicurigai dua lensa, dibuktikan pengintegrasi. Butir pemilik baru: **C-37** · **C-38**; risiko **B-43** |
+| Yang ketemu saat MENGGABUNGKAN | tiap lensa hijau sendirian; di satu pohon dua uji lensa buta **merah tanpa mutasi** (memicu event check-in buatan, padahal E-237 membaca check-in otoritatif), empat jangkar mutasi menyasar kode yang diubah lensa lain, satu mutasi menjadi ekuivalen. Ditangkap dengan menjalankan ulang **setiap** mutasi ketiga lensa di pohon gabungan |
+| Dokumen yang menyusul | `SECURITY.md` (tiga baris basi + enam baris dijaga) · AGENTS.md §5 (tiga aturan baru) · `spec/01` · `spec/03` · `spec/04` · `spec/07` (blok status Sprint 5) · K-33 · K-34 · K-35 · K-36 · K-39 · K-42 |
+| Angka | mutasi kode **815** (lint 276 · db 538 · docker 1; ujung Sprint 4: 623) · pytest **1.319 → 1.390** uji · Flutter 94 |
+| Branch | `v0/sprint-6-product` di-push (cadangan) 8 Okt; PR dibuka sesudah gerbang penuh — status `ci-lokal` menempel di commit ujungnya |
+| ⏸️ Berhenti di | gerbang penuh `ci_lokal.py --lapor-github` di ujung `v0/sprint-6-product` → PR Sprint 5 (base `v0/sprint-4-ai`) + PR Sprint 6 (base `v0/sprint-5-intelligence`); keduanya digabung **berurutan** — perbaikan tinjauan atas kode Sprint 5 ada di PR Sprint 6. Folder `hvx-s56-tinjau-*` dan tumpukannya **tidak dihapus** |
 
 ---
 
