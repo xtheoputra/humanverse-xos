@@ -198,15 +198,19 @@ def test_galat_bentuk_tidak_memantulkan_isi_manifest() -> None:
 
 
 def _pihak_ketiga_lewat_tool(a: Mentah, m: Mentah) -> None:
-    """Scope yang diminta LEWAT tool — bukan lewat `memory.read` manifest."""
+    """Scope yang diminta LEWAT tool — bukan lewat `memory.read` manifest.
+
+    `habit-agent`, bukan `coach-agent` (E-247): sejak C-32 coach membaca `mood` di manifestnya,
+    jadi sebagai pihak ketiga ia sudah ditolak lewat `memory.read` — pemeriksaan scope TOOL
+    tidak pernah tersentuh dan kedua mutasinya diam."""
     a["jurnal.baca"] = {
         **copy.deepcopy(a["goal.list"]),
         "name": "jurnal.baca",
         "scopes": ["journal_raw"],
         "input": {},
     }
-    m["coach-agent"]["kind"] = "third_party"
-    m["coach-agent"]["tools"].append("jurnal.baca")
+    m["habit-agent"]["kind"] = "third_party"
+    m["habit-agent"]["tools"].append("jurnal.baca")
 
 
 KASUS_TINJAUAN: list[tuple[str, str, Callable[[Mentah, Mentah], None]]] = [

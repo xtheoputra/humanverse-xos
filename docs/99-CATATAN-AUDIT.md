@@ -250,6 +250,20 @@ dengan `evidence_count` **0** — persis yang Confidence Layer 5.4 larang di sis
 `test_habit_tanpa_penyelesaian_tidak_menyatakan_konsistensi` ·
 `test_konsistensi_tanpa_penyelesaian_tidak_dinyatakan`.
 
+#### E-247 — dua mutasi aturan 6 *“lewat tool”* diam sejak C-32 — ditemukan gerbang resmi, bukan tinjauan
+
+Gerbang `ci_lokal --lapor-github` pertama atas ujung Sprint 6 (`b94e9e8`) **merah**: dua mutasi
+4.2 (E-207 · B8 — aturan 6 memeriksa scope yang diminta **lewat tool**) diam. Helper ujinya
+menjadikan **coach-agent** pihak ketiga; sejak C-32 (7 Okt) coach membaca `mood` di manifestnya,
+jadi ia sudah ditolak lewat `memory.read` dan pemeriksaan scope tool tak pernah tersentuh. Pola yang
+sama dengan **E-231** di helper tetangganya — E-231 hanya membetulkan satu dari dua helper. Lolos
+karena tiap agen hari itu menjalankan **mutasinya sendiri**, bukan seluruh kelompok lint. ✅ Helper
+memakai **habit-agent**; kedua mutasi berbunyi.
+
+> 🔴 **Pelajaran yang sama untuk ketiga kalinya hari ini:** keputusan yang menyempitkan izin (C-32)
+> mengubah apa yang diuji oleh uji-uji LAMA — yang tidak menyebut `mood` sama sekali. Hanya putaran
+> **penuh** yang menangkapnya.
+
 > **B2 lensa buta = E-236 lensa kontrak** (check-in yang diganti tanpa metrik meninggalkan human
 > state lama): kode E-236 dipakai, uji dan mutasi B2 disimpan.
 
