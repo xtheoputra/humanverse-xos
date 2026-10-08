@@ -140,6 +140,73 @@ async def test_tandai_shown_rekomendasi_tak_dikenal_404(api_bersama: ApiUji) -> 
     assert r.json()["error"]["code"] == "recommendation_not_found"
 
 
+# ── Tinjauan penegak buta S5–6 ──────────────────────────────────────────────────
+
+
+def _rekomendasi_bertanggal(
+    api: ApiUji, uid: Any, jumlah: int, *, domain: str = "habit"
+) -> list[str]:
+    """`jumlah` rekomendasi, yang ke-i dibuat i menit lalu — id urut TERBARU dulu."""
+    ids = [str(uuid.uuid4()) for _ in range(jumlah)]
+    with psycopg.connect(psycopg_dsn(api.db.dsn_pemilik)) as k:
+        for i, rid in enumerate(ids):
+            k.execute(
+                "INSERT INTO recommendations (id, user_id, domain, title, created_at) "
+                "VALUES (%s, %s, %s, 'Lari pagi', now() - make_interval(mins => %s))",
+                (rid, uid, domain, i),
+            )
+        k.commit()
+    return ids
+
+
+async def test_daftar_rekomendasi_terbaru_dulu_dan_terbatas(api_bersama: ApiUji) -> None:
+    """spec/04: terbaru dulu, paling banyak 50 — daftar terbatas, bukan seluruh riwayat."""
+    uid, token = await api_bersama.pengguna_baru()
+    ids = _rekomendasi_bertanggal(api_bersama, uid, 51)
+
+    items = (await api_bersama.klien.get("/v1/recommendations", headers=auth(token))).json()[
+        "items"
+    ]
+
+    assert [r["id"] for r in items[:3]] == ids[:3], "daftar rekomendasi bukan terbaru dulu"
+    assert len(items) == 50, f"daftar rekomendasi tidak dibatasi 50: {len(items)}"
+    assert ids[-1] not in {r["id"] for r in items}
+
+
+async def test_daftar_rekomendasi_menyaring_domain(api_bersama: ApiUji) -> None:
+    uid, token = await api_bersama.pengguna_baru()
+    _rekomendasi_bertanggal(api_bersama, uid, 2, domain="habit")
+    (goal,) = _rekomendasi_bertanggal(api_bersama, uid, 1, domain="goal")
+
+    r = await api_bersama.klien.get("/v1/recommendations?domain=goal", headers=auth(token))
+
+    assert r.status_code == 200, r.text
+    assert [x["id"] for x in r.json()["items"]] == [goal], "saring domain diabaikan"
+
+
+async def test_tandai_shown_tidak_menarik_mundur_keputusan_dan_mengisi_shown_at(
+    api_bersama: ApiUji,
+) -> None:
+    """pending → shown SEKALI (dengan `shown_at`); rekomendasi yang sudah diterima/ditolak
+    tidak ditarik mundur menjadi `shown` hanya karena tampil lagi."""
+    uid, token = await api_bersama.pengguna_baru()
+    diterima = _buat_rekomendasi(api_bersama, uid, status="accepted")
+    baru = _buat_rekomendasi(api_bersama, uid, status="pending")
+
+    for rid in (diterima, baru):
+        r = await api_bersama.klien.post(f"/v1/recommendations/{rid}/shown", headers=auth(token))
+        assert r.status_code == 204, r.text
+
+    assert _status(api_bersama, diterima) == "accepted", (
+        "tandai shown menarik mundur rekomendasi yang sudah diterima"
+    )
+    with psycopg.connect(psycopg_dsn(api_bersama.db.dsn_pemilik)) as k:
+        (shown_at,) = k.execute(
+            "SELECT shown_at FROM recommendations WHERE id = %s", (baru,)
+        ).fetchone() or (None,)
+    assert shown_at is not None, "tandai shown tidak mengisi shown_at"
+
+
 # ── Tinjauan kontrak Sprint 5–6 (8 Okt 2026) ─────────────────────────────────
 
 

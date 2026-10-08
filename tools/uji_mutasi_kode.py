@@ -12204,6 +12204,102 @@ MUTASI: list[Mutasi] = [
         harus_memuat="bukan satu transaksi (K-37)",
         kelompok="db",
     ),
+    # ── 6.1 dashboard & daftar rekomendasi ──
+    Mutasi(
+        "6.1",
+        "daftar rekomendasi urut terlama dulu (spec/04: terbaru dulu)",
+        [
+            Sunting(
+                f"{MODUL}/intelligence/repository.py",
+                "    ORDER BY created_at DESC, id DESC\n    LIMIT :limit\n",
+                "    ORDER BY created_at ASC, id ASC\n    LIMIT :limit\n",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_dashboard.py::test_daftar_rekomendasi_terbaru_dulu_dan_terbatas"
+        ),
+        harus_memuat="daftar rekomendasi bukan terbaru dulu",
+        kelompok="db",
+    ),
+    Mutasi(
+        "6.1",
+        "daftar rekomendasi tanpa batas",
+        [
+            Sunting(
+                f"{MODUL}/intelligence/repository.py",
+                "    ORDER BY created_at DESC, id DESC\n    LIMIT :limit\n",
+                "    ORDER BY created_at DESC, id DESC\n    LIMIT ALL\n",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_dashboard.py::test_daftar_rekomendasi_terbaru_dulu_dan_terbatas"
+        ),
+        harus_memuat="daftar rekomendasi tidak dibatasi 50",
+        kelompok="db",
+    ),
+    Mutasi(
+        "6.1",
+        "saring ?domain= diabaikan",
+        [
+            Sunting(
+                f"{MODUL}/intelligence/repository.py",
+                "      AND (CAST(:domain AS text) IS NULL OR domain = :domain)\n",
+                "",
+            )
+        ],
+        _pytest("tests/integration/test_dashboard.py::test_daftar_rekomendasi_menyaring_domain"),
+        harus_memuat="saring domain diabaikan",
+        kelompok="db",
+    ),
+    Mutasi(
+        "6.1",
+        "tandai shown menarik mundur rekomendasi yang sudah diterima",
+        [
+            Sunting(
+                f"{MODUL}/intelligence/repository.py",
+                "    UPDATE recommendations SET status = 'shown', shown_at = now()\n"
+                "    WHERE id = :id AND user_id = :user_id AND status = 'pending'\n",
+                "    UPDATE recommendations SET status = 'shown', shown_at = now()\n"
+                "    WHERE id = :id AND user_id = :user_id\n",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_dashboard.py::"
+            "test_tandai_shown_tidak_menarik_mundur_keputusan_dan_mengisi_shown_at"
+        ),
+        harus_memuat="tandai shown menarik mundur rekomendasi yang sudah diterima",
+        kelompok="db",
+    ),
+    Mutasi(
+        "6.1",
+        "tandai shown tidak mengisi shown_at",
+        [
+            Sunting(
+                f"{MODUL}/intelligence/repository.py",
+                "    UPDATE recommendations SET status = 'shown', shown_at = now()\n",
+                "    UPDATE recommendations SET status = 'shown'\n",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_dashboard.py::"
+            "test_tandai_shown_tidak_menarik_mundur_keputusan_dan_mengisi_shown_at"
+        ),
+        harus_memuat="tandai shown tidak mengisi shown_at",
+        kelompok="db",
+    ),
+    Mutasi(
+        "6.1",
+        "Why dimensi memakai key mentah, bukan label manusiawi",
+        [
+            Sunting(
+                f"{MODUL}/intelligence/dasbor.py",
+                '_LABEL: dict[str, str] = {"energy": "Energi", "focus": "Fokus"}',
+                "_LABEL: dict[str, str] = {}",
+            )
+        ],
+        _pytest("tests/unit/test_dasbor_murni.py::test_why_memakai_label_manusiawi"),
+        harus_memuat="Why memakai key mentah",
+    ),
 ]
 
 

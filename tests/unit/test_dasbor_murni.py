@@ -31,3 +31,10 @@ def test_beberapa_dimensi_bukan_satu_angka() -> None:
 
 def test_tanpa_metrik_tanpa_dimensi() -> None:
     assert intelligence.dimensi_dari_metrik({}, date(2026, 9, 20)) == []
+
+
+def test_why_memakai_label_manusiawi() -> None:
+    dims = intelligence.dimensi_dari_metrik(_METRIK, date(2026, 9, 20))
+    assert [d.why.split()[0] for d in dims] == ["Energi", "Fokus"], (
+        "Why memakai key mentah, bukan label manusiawi"
+    )
