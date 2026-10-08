@@ -271,6 +271,24 @@ Tidak ada tugas yang boleh masuk `main` tanpa baris **HUMAN REVIEW**.
 | 5.5 | Recommendation engine + `score_breakdown` | skor 0–1, `scoring_version`, `rationale` terisi |
 | 5.6 | Umpan balik rekomendasi | `modified` dan `snoozed` tidak dihitung sebagai penolakan |
 
+> 🔨 **Sprint 5 dikodekan 1–6 Okt 2026** — branch `v0/sprint-5-intelligence` (di atas
+> `v0/sprint-4-ai`), satu commit per tugas (**K-18**), **tanpa migrasi** (23 tabel sejak 0001),
+> **menunggu HUMAN REVIEW**. Blok ini ditulis 8 Okt — Sprint 5 satu-satunya sprint yang
+> dikodekan tanpa blok keadaan. Keadaan tiap "Selesai bila", tanpa dibulatkan:
+>
+> | | Dibuktikan | Yang BELUM |
+> |---|---|---|
+> | 5.1 | `ea89c68` (**K-33**): projector = konsumen wajib atas semua event; `habit.completed` → `activities` `inferred` ber-`id` `uuid5`, **konvergen** dari `events` (bukan menurut urutan tiba); dibangun ulang per pengguna dalam satu transaksi → baris **identik** (`test_proyektor.py::test_bangun_ulang_dari_nol_identik_dan_tanpa_duplikat`) | hanya siklus penyelesaian habit yang diproyeksikan |
+> | 5.2 | `0e8d623` (**K-34**): hari · bagian hari dicatat · konsistensi 30 hari → `memories(kind='behavioral')`; kalimat **asosiatif** (*“paling sering … pada …”*), kata sebab ditolak `tanpa_klaim_kausal`; pola yang kehilangan dasarnya **diluruhkan** (`valid_until`) | bagian hari = waktu **catat**, bukan waktu laku |
+> | 5.3 | `9cf78ef` (**K-35**): `energy` · `focus` per hari, tiap metrik tepat `{value, confidence, evidence_count}` — pintu `profile.simpan_human_state` **menolak** bentuk lain | keyakinan 1,0 = laporan sendiri, bukan taksiran terkalibrasi |
+> | 5.4 | `b6dd75e` (#34): `evidence_count = 0` → coach **bertanya**, tidak menyatakan (`intelligence.keyakinan`) | ambang High/Medium/Low di atas nol — **milik pemilik** (#34) |
+> | 5.5 | `4ec7114` (**K-36** · **K-38**): skor 0–1 = rata-rata bobot sama `history` + `context`, `score_breakdown`, `scoring_version='v1'`, `rationale` terisi; idempoten per (habit, tanggal); nol komponen → **tidak ada** rekomendasi | lima komponen docs/87 lain tak punya data di V0 |
+> | 5.6 | `d025832` (**K-37**): umpan balik hanya-tambah; `modified` · `snoozed` · `ignored` **tidak** mengubah status — hanya `accepted`/`rejected`; `Idempotency-Key`; milik orang lain → 404 | — |
+>
+> ⚠️ **Bukti mesin yang tipis:** mutasi kode 5.1 · 5.2 · 5.3 = **nol**, 5.4–5.6 = dua per tugas
+> (Sprint 4: 277). Tinjauan *penegak buta* Sprint 5 belum pernah dijalankan — langkah AI Review
+> sebelum PR (AGENTS.md §3).
+
 ---
 
 ## Sprint 6 — Product
@@ -284,20 +302,23 @@ Tidak ada tugas yang boleh masuk `main` tanpa baris **HUMAN REVIEW**.
 | 6.5 | Alur hapus akun (6 tahap [`01`](01-DATABASE-SCHEMA.md)) + `DELETE /me` · `POST /me/restore` | uji: titik Qdrant ikut terhapus; **semua sesi pengguna dicabut seketika** (`cabut_semua` — status hanya dibaca saat masuk & penyegaran) |
 | 6.6 | Rapikan UX + luring dasar | catat habit tanpa jaringan → sinkron tanpa duplikat |
 
-> 🔨 **Sprint 6 dikodekan sebagian — keadaan 6 Okt 2026** (branch
-> `v0/sprint-5-intelligence`, belum ber-PR):
+> 🔨 **Sprint 6 dikodekan seluruhnya — keadaan 8 Okt 2026** (6.1 · 6.5 · 6.6 di branch
+> `v0/sprint-5-intelligence`; 6.2 · 6.3 · 6.4 di `v0/sprint-6-product` di atasnya — belum ber-PR):
 >
 > | # | Keadaan |
 > |---|---|
 > | 6.1 | ✅ backend `f1f76bf` + layar Flutter `261d788`: beberapa dimensi ber-Why, hanya yang V0 ukur (sumbu tanpa data **tidak** ditampilkan) |
 > | 6.5 | ✅ **kode lengkap.** Stage A `8d4bd84`: `DELETE /me` (sandi diminta lagi → `pending_deletion` + jadwal 30 hari + semua sesi dicabut), `POST /me/restore`, login `pending_deletion` diizinkan (keputusan pemilik 5 Okt), migrasi 0010. Stage B: **sapuan tahap 3–6** oleh proses pekerja — migrasi 0011, tiga fungsi `hvx_pekerja`, titik Qdrant dibuang selagi akun terkunci, jejak audit dianonimkan di semua kolom, sesi dan jejak idempotensi Redis dibersihkan (**K-39**, **E-215…E-218**, [`01`](01-DATABASE-SCHEMA.md) *Prosedur hapus akun*). Bukti: `tests/integration/test_sapuan_hapus_akun.py` (13 uji) + `test_id_semu.py`, 20 mutasi `6.5b` |
 > | 6.6 | ✅ **luring dasar** (**K-40**, **E-220** · **E-221**): `LayananLuring` (`apps/mobile/lib/api/luring.dart`) menahan **tandai selesai / batalkan** di antrean selagi jaringan putus, mengirimnya berurutan sesudahnya, dan layar menampilkannya (spanduk · konfirmasi keluar). *Tanpa duplikat* datang dari kontrak server (`UNIQUE (habit, tanggal)`; `POST` ulang → 200, `DELETE` ulang → 204) — dibuktikan lawan api sungguhan: jawaban hilang di jalan → dikirim ulang → **satu** penyelesaian (`test/ujung/luring_nyata_test.dart`). Bukti lain: `test/api/luring_test.dart` (17) · `luring_layar_test.dart` (6) · 3 uji klien baru · **31 mutasi `6.6`**. ⚠️ **Batas yang diakui:** antrean di **memori** (hilang bersama prosesnya) dan aplikasi yang dibuka luring tak punya sesi — penyimpanan lokal menunggu pemilik (**C-35**); check-in energi dan habit baru tidak diantre. *“Rapikan UX”* hanya dikerjakan sejauh menyangkut luring (pesan jaringan, spanduk, konfirmasi) — polesan umum tak punya ukuran di kolom *Selesai bila* |
-> | 6.2 · 6.3 · 6.4 | ⏳ belum. 6.2 butuh inferensi jawaban dan sumbu yang V0 tak punya; 6.3 V0 reaktif tanpa pengiriman (A-28); 6.4 menyentuh arti *“hapus”* dan retensi (**C-34**, butir C — pemilik) |
+> | 6.2 | ✅ `a354a70` + layar `17d0959` (**K-45**): `GET /v1/reviews/weekly?week=YYYY-Www` — lima pertanyaan naskah 4 §31 dihitung **saat dibaca** dari habit, check-in, dan mood (tidak disimpan); tiap butir ber-`evidence_count`; tanpa butir → `ask` (5.4). *“Kenapa?”* **selalu bertanya** — hanya alasan yang pengguna catat sendiri dan hal yang terjadi bersamaan, tanpa klaim sebab (naskah 4 §7); sumbu yang V0 tak ukur = `not_measured`. Bukti: `tests/unit/test_tinjauan_murni.py` · `tests/integration/test_notifikasi_dan_tinjauan.py` · `apps/mobile/test/layar/tinjauan_test.dart`. 🔧 8 Okt: minggu di luar 1900–2999 → `400` (dulu `0001-W01` → **500**, **E-228**) |
+> | 6.3 | ✅ `887170d` + layar `17d0959` (**K-44**): `GET/PATCH /v1/me/notifications` — empat jenis V0, tiap jenis bisa dimatikan **kecuali** `account_security`; jam tenang (bawaan 22:00–07:00) dan pagu harian (10); satu gerbang murni `profile.keputusan_kirim` → `now`/`later`/`silent` yang wajib dilewati pengirim mana pun kelak. ⚠️ **V0 tidak mengirim apa pun** (A-28) — jawabannya menyatakan `delivery: "none"`, layarnya mengatakannya |
+> | 6.4 | ✅ `3db89f8` + layar `17d0959` (**K-41 · K-42 · K-43**; butir C atas delegasi pemilik **H-28** → **K-46**): `summary` (jumlah per kategori, bukan isi — satu potret `REPEATABLE READ`) · izin per agent (`PUT` hanya untuk izin yang sungguh diminta agent) · ekspor (sandi ulang, dibangun saat diunduh, sekali pakai, tanpa rahasia di URL) · hapus per kategori (keras, beserta turunannya; sandi ulang), migrasi **0013**. Penegak baru `tests/unit/test_cakupan_privasi.py` — tiap tabel ber-`user_id` [`01`](01-DATABASE-SCHEMA.md) masuk tepat satu kategori. Bukti: `tests/integration/test_privacy_center.py` · uji layar Flutter + `test/ujung/privasi_nyata_test.dart` lawan api hidup. Temuan **E-226** · **E-227** · **E-229** |
+> | mutasi 6.2–6.4 | 🔧 **E-230** — ketiganya dikodekan **tanpa satu mutasi pun**; ditambahkan 8 Okt 2026: **46 mutasi, 46/46 berbunyi** (`6.4` 21 · `6.3` 8 · `6.2` 9 · `E-226` 1 · `E-227` 2 · `K-46` 4), termasuk tujuh mutasi layar Flutter; kasus aturan 6 yang buta sejak C-32 dibetulkan (**E-231**) |
 >
 > **Yang 6.5 sengaja belum menutup:** rujukan stream (id · pemilik · jenis) milik akun
 > yang dihapus tidak dibuang per akun — dipangkas menurut kursor relay dan, untuk stream
 > mati, 7 hari ([`../SECURITY.md`](../SECURITY.md)). `ip_hash` baris audit yang
-> dipertahankan tidak diubah (**C-34**).
+> dipertahankan kini dikosongkan saat sapuan (**C-34** → **K-46**, migrasi 0013).
 
 ---
 

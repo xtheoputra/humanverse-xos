@@ -4,6 +4,42 @@
 
 ---
 
+## Sesi 39 — 8 Oktober 2026
+
+**Pemilik: *“sudah berapa % proyek ini?”*, lalu *“kedepannya, aplikasi ini dapat dijalankan juga
+di web gratis ya, vercel atau apapun itu, simpan ke catatan. lalu jika sudah kita lanjutkan
+progress proyek”*** — dihitung dari `spec/07` dan branch terbaru: **51 dari 51 tugas V0
+ditulis**, **0 dari 51 di `master`** (PR #163–#167 menunggu HUMAN REVIEW; Sprint 5–6 belum ber-PR).
+
+| Hal | Hasil |
+|---|---|
+| Naskah baru | tidak ada |
+| Keputusan pemilik | 🆕 **H-29** web gratis (8 Okt) · 🆕 **H-28** dicatat terlambat: delegasi butir C 7 Okt (*“keputusan di anda berikan pertimbangan internasional dari para pakar”*) — diterapkan pada C-31 · C-32 · C-34 saja |
+| Keputusan didelegasikan | ✍️ **K-33 … K-38** dan **K-41 … K-46** ditulis — dirujuk kode sejak Sprint 5 dan 7 Okt tanpa entri |
+| Temuan | 🆕 **E-228** (`?week=0001-W01` → 500) · **E-229** (POST ekspor tanpa `download_url`) · **E-230** (6.2–6.4 tanpa satu mutasi pun → **46 mutasi, 46/46 berbunyi**) · **E-231** (kasus aturan 6 per scope buta sejak C-32) · pertanyaan baru **C-36** (data pengguna di penyedia hosting gratis) · rujukan **K-47** yang tak pernah ada (→ C-35) |
+| `arch/` diubah | `09` §2.1 **web gratis** — tiga baris yang mengikat, komponen lawan hosting gratis, yang bertabrakan, bentuk W-a / W-b · `10` §6 tabel kemajuan (*“22 dari 51”* → 51) |
+| `spec/` diubah | `04` (Privacy Center sebagaimana dikodekan · `/me/notifications` · `/reviews/weekly` · E-226 · E-229) · `07` (6.2 · 6.3 · 6.4 ✅, C-34) |
+| Diukur | `flutter build web --release` **berhasil** (45 dtk, 41 MB statis) — aplikasinya siap web; yang belum gratis-siap adalah pekerja (proses hidup terus) dan basis data |
+| ⏸️ Berhenti di | lihat baris gerbang & PR di bawah |
+
+---
+
+## Sesi 38 — 7 Oktober 2026 *(direkonstruksi 8 Okt dari commit — sesi ini tidak menulis catatannya)*
+
+**Pemilik, ditanya soal butir C yang menghalangi 6.4: *“keputusan di anda berikan pertimbangan
+internasional dari para pakar”*** (**H-28**). Sisa V0 dikodekan: 6.4 Privacy Center (`3db89f8`),
+6.3 notifikasi (`887170d`), 6.2 tinjauan mingguan (`a354a70`), layar Flutter ketiganya
+(`17d0959`) — branch baru `v0/sprint-6-product` di atas `v0/sprint-5-intelligence`.
+
+| Hal | Hasil |
+|---|---|
+| Keputusan | **K-41 … K-46** (bentuknya ditulis Sesi 39) — **K-46** = C-31 hapus jurnal keras · C-32 `mood` sensitif + terlarang bagi pihak ketiga · C-34 `ip_hash` dikosongkan |
+| Temuan | **E-226** (sandi ulang tanpa jatah tebakan) · **E-227** (delegasi ditanya untuk scope sensitif yang tak dibacanya) |
+| Kode | migrasi **0013** · rute `/v1/privacy/*` · `/v1/me/notifications` · `/v1/reviews/weekly` · penegak `test_cakupan_privasi.py` · tiga layar Flutter + `test/ujung/privasi_nyata_test.dart` |
+| ⚠️ Yang tertinggal | catatan sesi · `spec/07` · `spec/04` · K-entri · **mutasi** (E-230) · asersi C-34 di `test_sapuan_hapus_akun.py` belum di-commit · branch belum di-push — diserap Sesi 39 |
+
+---
+
 ## Sesi 37 — 6 Oktober 2026
 
 **Pemilik: *“lanjutkan progress”*** — menutup serah-terima Sesi 36 (6.5 Stage B di-commit), lalu

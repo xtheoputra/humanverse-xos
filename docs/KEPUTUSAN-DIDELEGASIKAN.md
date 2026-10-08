@@ -24,8 +24,9 @@ Yang **tetap milik pemilik**, dan tidak saya sentuh:
 | cakupan produk | [#4](../../issues/4) Mental Wellness dibuang atau ditunda | pemilik yang menanggung akibatnya |
 | urutan kerja pemilik | ~~[#139](../../issues/139)~~ — ✅ diperintahkan 10 Sep 2026 | ~~soal waktu pemilik sendiri~~ |
 
-⇒ **Nol butir C saya putuskan.** Semuanya menyangkut orang yang tidak ikut
-memilih.
+⇒ **Nol butir C saya putuskan sendiri.** Semuanya menyangkut orang yang tidak ikut
+memilih. 🔧 **Satu pengecualian, atas delegasi pemilik 7 Okt 2026 (H-28):** C-31 · C-32 ·
+C-34 — **K-46**. Delegasi itu tidak meluas ke butir C lain.
 
 ---
 
@@ -648,11 +649,100 @@ sesudahnya.
 
 ---
 
+## K-33 · Behavior projector: konvergen dari `events`, id deterministik, dibangun ulang per pengguna
+
+> Direncanakan 1 Oktober 2026 ([`SESSION-LOG.md`](SESSION-LOG.md) Sesi 35), dikodekan 2 Oktober
+> 2026 saat Sprint 5 tugas 5.1 ditulis (`ea89c68`). Ditulis di berkas ini 8 Oktober 2026 dari
+> kodenya — yang tercatat di sini bentuk yang **dikodekan**, bukan rencananya.
+
+| | |
+|---|---|
+| **Keputusan** | **(1)** Projector adalah konsumen **wajib** atas **semua** jenis event (spec/03 *Consumer V0*) di `hvx.pekerja`. V0 baru memproyeksikan siklus penyelesaian habit: `habit.completed` → satu baris `activities` ber-`source='inferred'`; jenis lain ditelan tanpa efek, jadi proyeksi baru kelak tidak mengubah perkabelan pekerja. **(2)** `id` baris proyeksi **deterministik** — `uuid5` dari penyelesaian sumbernya — dan tulisannya `ON CONFLICT DO NOTHING`, hanya atas baris `inferred` (`activities.catat_proyeksi` · `hapus_proyeksi` · `kosongkan_proyeksi`). **(3)** **Konvergen, bukan sisip/hapus menurut urutan tiba:** tiap event habit menghitung keadaan AKHIR penyelesaian itu dari `events` — ada `habit.completed` dan tak ada `habit.completion_retracted` → barisnya ada; selain itu → tidak ada. **(4)** `bangun_ulang_proyeksi(engine, user_id)` mengosongkan proyeksi seorang pengguna lalu memutar ulang seluruh event-nya dalam **satu transaksi** — tidak ada jendela saat proyeksinya kosong. **(5)** `intelligence` memanggil pintu keluar `events` (`untuk_proyeksi` · `cari_penyelesaian`, di bawah RLS pemiliknya, tanpa `SECURITY DEFINER`) dan `activities` langsung — lapisannya di atas keduanya (M-1). |
+| **Bukti** | spec/07 5.1: *“proyeksi bisa dibangun ulang dari nol dan hasilnya sama”*; spec/02 aturan D: `events` adalah sumber kebenaran; naskah 4 §5 *Behavior Engine*. Uji: `test_proyektor.py` — `test_bangun_ulang_dari_nol_identik_dan_tanpa_duplikat` · `test_cabut_sesudah_proyeksi_menghapusnya_dan_putar_ulang_tak_menghidupkannya` · `test_pekerja_memproyeksikan_habit_selesai_menjadi_aktivitas_inferred`. |
+| **Bacaan yang DITOLAK** | **(a)** *“Sisip saat `completed`, hapus saat `retracted`”* — ditolak: `completed` yang disalurkan ulang SESUDAH `retracted` (celah ACK stream, K-25) menghidupkan kembali penyelesaian yang sudah dicabut. **(b)** *“Id acak per baris proyeksi”* — ditolak: penyaluran ulang stream dan pemutaran ulang akan melahirkan baris kedua. |
+| **Harga yang diakui** | Tiap event habit membaca riwayat penyelesaian itu dari `events` — lebih mahal daripada sisip buta, sengaja. Pemutaran ulang memegang seluruh riwayat seorang pengguna dalam satu transaksi. V0 hanya punya satu lajur `inferred` (penyelesaian habit). |
+| **Cara membalikkan** | `intelligence/proyektor.py` + pintu keluar `activities` · `events`; `tests/integration/test_proyektor.py` diubah bersamanya. |
+
+---
+
+## K-34 · Pola perilaku V0: tiga pola habit sebagai memori `behavioral`, asosiatif, diluruhkan bukan dihapus
+
+> Direncanakan 1 Oktober 2026 (Sesi 35), dikodekan 2 Oktober 2026 saat Sprint 5 tugas 5.2
+> ditulis (`0e8d623`).
+
+| | |
+|---|---|
+| **Keputusan** | **(1)** Tiga pola per habit, dihitung dari penyelesaian yang HIDUP (tidak dicabut): **hari-dalam-minggu** (dari `for_date`), **bagian hari** penyelesaian itu **dicatat** (jam `occurred_at` di zona profil: pagi 05–11 · siang 11–15 · sore 15–19 · malam) — waktu catat, bukan waktu laku — dan **konsistensi 30 hari + rentetan** (`habits.rentetan_pada`, satu sumber logika rentetan bagi tool dan pola). **(2)** Ditulis sebagai `memories(kind='behavioral', scope='habits')` lewat `memory.catat_pola` — tanpa tabel baru. **(3)** `confidence` = keterpusatan pola (bagian penyelesaian pada nilai terbanyak; untuk konsistensi = `completion_rate_30d`), `evidence_count` = banyaknya penyelesaian; keduanya disimpan apa adanya. **(4)** Kalimatnya **asosiatif** — *“paling sering … pada …”* — dan `tanpa_klaim_kausal` menolak kata sebab (*menyebabkan · penyebab · sebab · karena · akibat · mengakibatkan · memicu · membuat*). **(5)** Id memori deterministik per (pengguna, habit, jenis pola): menghitung ulang **menguatkan** baris yang sama (upsert). Nol penyelesaian, atau habitnya dihapus → pola **diluruhkan** (`valid_until = now()`, `memory.luruhkan_pola`), bukan dihapus. **(6)** Pemicu: grup konsumen `pola` atas `habit.completed` · `habit.skipped` · `habit.completion_retracted`. |
+| **Bukti** | spec/07 5.2: *“keluarannya asosiatif, bukan kausal”* (naskah 4 §7, docs/54); naskah 4 §6 *Behavioral Pattern Mining*; Confidence Layer §19. Uji: `test_pola.py::test_pekerja_menulis_pola_lalu_meluruhkannya` · `test_pola_murni.py`. |
+| **Bacaan yang DITOLAK** | **(a)** *“Pola sebagai tabel sendiri”* — ditolak: `memories` sudah membawa `confidence` + `evidence_count` per baris dan sudah disaring scope di pencarian (3.7). **(b)** *“Menghapus pola yang kehilangan dasarnya”* — ditolak: *“dulu begini”* tetap sejarah; meluruhkan menyimpan kapan pola berhenti berlaku. **(c)** *“Pola hanya dinyatakan di atas ambang keyakinan”* — ditolak di sini: ambang di atas nol milik pemilik ([#34](../../issues/34)); yang ditegakkan hanya aturan keras nol bukti (5.4, `intelligence.keyakinan`). |
+| **Harga yang diakui** | *Bagian hari* memakai waktu **catat**, bukan waktu kebiasaan itu dilakukan — penyelesaian yang dicatat belakangan menggeser polanya. Pemeriksa kata sebab berbasis daftar kata — penjaga kalimat sistem sendiri, bukan pemahaman bahasa. |
+| **Cara membalikkan** | `intelligence/pola.py` · `memory/perilaku.py`; `tests/integration/test_pola.py` · `tests/unit/test_pola_murni.py` diubah bersamanya. |
+
+---
+
+## K-35 · `human_states` harian dari check-in: laporan sendiri, satu bukti per hari, tanggal check-in
+
+> Direncanakan 1 Oktober 2026 (Sesi 35), dikodekan 2 Oktober 2026 saat Sprint 5 tugas 5.3
+> ditulis (`9cf78ef`).
+
+| | |
+|---|---|
+| **Keputusan** | **(1)** Konsumen `checkin.logged` menghitung metrik dari check-in **otoritatif** (`checkins.checkin_pada`), bukan dari payload event. **(2)** Metrik V0: `energy` dan `focus` — masing-masing `{value, confidence, evidence_count}`: `value` = skala 1–5 dinormalkan ke 0–1 (`(x−1)/4`), `confidence` = **1,0** (laporan pengguna sendiri, bukan taksiran — sejalan `memory.KEYAKINAN_LAPORAN_SENDIRI`), `evidence_count` = **1** (satu check-in = satu bukti untuk hari itu). Jam tidur tidak menjadi metrik. **(3)** `for_date` = **tanggal check-in itu** — tanggal lokal yang dilaporkan perangkat — bukan tanggal menurut zona profil, bukan UTC. **(4)** Ditulis lewat pintu keluar baru `profile.simpan_human_state` (tabel milik `profile`, spec/06), yang **menolak** metrik tanpa tepat tiga medan itu; upsert per (pengguna, `for_date`, `model_version='human-state@v1'`) — dua versi model boleh hidup berdampingan (§23). **(5)** Check-in tanpa energi dan fokus → tidak ada metrik → **tidak ada baris**. |
+| **Bukti** | spec/07 5.3: *“tiap metrik punya `value`, `confidence`, `evidence_count`”*; spec/01 §6 (`metrics jsonb`); spec/06 kepemilikan tabel. Uji: `test_human_state.py::test_pekerja_menghitung_human_state_dari_checkin_lalu_memperbaruinya` · `test_human_state_murni.py`. |
+| **Bacaan yang DITOLAK** | **(a)** *“Hitung dari payload event”* — ditolak: payload bisa basi (penyaluran ulang sesudah `PUT` yang lebih baru); dari baris otoritatif, hasilnya konvergen. **(b)** *“Tanggal menurut zona profil atau UTC”* — ditolak: hari yang pengguna laporkan adalah hari yang dimaksudnya, dan zona profil bisa diganti kapan saja (lihat K-32). **(c)** *“Tren berjendela beberapa hari”* — bukan V0: menyatukan hari menjadi tren, dan keyakinan yang tumbuh bersama buktinya, dikerjakan sesudah V0. |
+| **Harga yang diakui** | Human State V0 adalah keadaan **per hari**, bukan tren. `confidence` 1,0 hanya berarti *“ini laporanmu sendiri”* — tidak berkata apa pun tentang ketepatannya. |
+| **Cara membalikkan** | `intelligence/keadaan.py` (`MODEL`, `metrik_harian`) · `profile.simpan_human_state`; `tests/integration/test_human_state.py` diubah bersamanya. |
+
+---
+
+## K-36 · Mesin rekomendasi: skor sistem dari sinyal V0, terpisah dari saran agent
+
+> Direncanakan 1 Oktober 2026 (Sesi 35), dikodekan 5 Oktober 2026 saat Sprint 5 tugas 5.5
+> ditulis (`4ec7114`).
+
+| | |
+|---|---|
+| **Keputusan** | **(1)** Grup konsumen `rekomendasi` atas `habit.skipped` dan `checkin.logged` (spec/03 *Recommendation trigger* — boleh gagal, diulang). **(2)** `habit.skipped` → **satu** rekomendasi *“Kembali ke ‘…’”* (domain & subjek `habit`) untuk habit yang dilewati; isinya menyarankan versi lebih ringan menurut tier energi hari itu (K-23), atau *“coba lagi besok”*. **(3)** `score` 0–1 = rata-rata komponen **bobot sama** (K-38); `score_breakdown` membawa tiap komponen + `"weights":"equal"`; `scoring_version='v1'`; `rationale` terisi (penyelesaian 30 hari, energi, *“dilewati hari itu”*); `context_snapshot` menyimpan komponennya. **`confidence` dibiarkan kosong** — skor mesin bukan keyakinan agent. **(4)** Idempoten: `id` = `uuid5` per (habit, tanggal) + `ON CONFLICT DO NOTHING` — event yang disalurkan ulang tidak menumpuk baris, dan status yang sudah diubah pengguna tidak pernah tertimpa. **(5)** `checkin.logged` **menyegarkan** komponen `context` rekomendasi mesin yang masih `pending` untuk tanggal itu — `history` dari snapshot dipertahankan, energi terakhir menang. **(6)** `recommendation.create` (tool coach, 4.3) tetap jalur terpisah: agent memasok `confidence` + `rationale`-nya sendiri, `score` kosong. |
+| **Bukti** | spec/07 5.5: *“skor 0–1, `scoring_version`, `rationale` terisi”*; docs/87 §11: *“semua recommendation harus melewati scoring”*, contohnya rata-rata lima komponen; spec/01 §7. Uji: `test_rekomendasi.py::test_pekerja_menyekor_rekomendasi_dari_skip_lalu_menyegarkannya_dari_checkin` (memuat asersi *“skor mesin bukan confidence agent (K-36)”*) · `test_mesin_rekomendasi.py`. |
+| **Bacaan yang DITOLAK** | **(a)** *“Agent mengisi skor”* — ditolak: skor adalah keluaran mesin, bukan angka yang dikarang agent (Pasal 8, K-30). **(b)** *“Satu rekomendasi baru per event”* — ditolak: penyaluran ulang stream menumpuk saran yang sama. **(c)** *“Check-in menghitung ulang semua rekomendasi”* — ditolak: rekomendasi yang sudah dilihat atau diputuskan pengguna tidak diganggu; hanya `pending`. |
+| **Harga yang diakui** | V0 punya **satu** jenis rekomendasi mesin (kembali ke habit yang dilewati). Bobot sama adalah titik awal tanpa kalibrasi — `scoring_version` membuat rumus boleh berganti tanpa migrasi. |
+| **Cara membalikkan** | `intelligence/mesin.py` (`SKOR_VERSI`, `nilai_rekomendasi`); `tests/integration/test_rekomendasi.py` · `tests/unit/test_mesin_rekomendasi.py` diubah bersamanya. |
+
+---
+
+## K-37 · Umpan balik rekomendasi: hanya-tambah, dan status berubah hanya untuk `accepted`/`rejected`
+
+> Direncanakan 1 Oktober 2026 (Sesi 35), dikodekan 5 Oktober 2026 saat Sprint 5 tugas 5.6
+> ditulis (`d025832`).
+
+| | |
+|---|---|
+| **Keputusan** | **(1)** `POST /v1/recommendations/{id}/feedback {action, reason?, outcome?}` menambah satu baris `recommendation_feedback` (hanya-tambah) **dan** menyesuaikan `recommendations.status` dalam **satu transaksi**. **(2)** Peta status: `accepted` → `accepted` · `rejected` → `rejected` · `modified` · `snoozed` · `ignored` → **status tidak disentuh** — umpan baliknya tercatat sebagai bukti, rekomendasinya tetap bisa diterima nanti. **(3)** Berjalur `Idempotency-Key` (E-165): kunci yang sama tidak melahirkan umpan balik kedua. **(4)** Rekomendasi milik orang lain tak terlihat di bawah RLS → `404 recommendation_not_found`, tanpa menulis apa pun. **(5)** `reason` ≤ 2.000 karakter tanpa NUL; `outcome` objek ≤ 4.000 byte tanpa NUL bersarang. |
+| **Bukti** | spec/07 5.6: *“`modified` dan `snoozed` tidak dihitung sebagai penolakan”*; naskah 4 §24; spec/01 §7. Uji: `test_umpan_balik.py` — `test_accepted_dan_rejected_mengubah_status` · `test_modified_snoozed_ignored_bukan_penolakan` · `test_idempotency_key_tidak_melahirkan_umpan_balik_kedua` · `test_umpan_balik_append_only_banyak_baris` · `test_rekomendasi_tak_dikenal_404_tanpa_menulis` · `test_tak_bisa_umpan_balik_rekomendasi_pengguna_lain`. |
+| **Bacaan yang DITOLAK** | **(a)** *“`modified`/`snoozed` = `rejected`”* — ditolak oleh spec/07 sendiri: memilih B setelah disarankan A bukan penolakan, menunda bukan mengabaikan. **(b)** *“Status saja, tanpa riwayat umpan balik”* — ditolak: umpan balik berulang atas satu rekomendasi adalah bukti yang dibutuhkan evaluasi kelak; baris hanya-tambah menyimpannya. |
+| **Harga yang diakui** | `ignored` tidak mengubah status — rekomendasi yang diabaikan tetap `pending`/`shown` sampai pengguna menerima atau menolaknya. |
+| **Cara membalikkan** | `intelligence/umpan_balik.py` (`_STATUS_BARU`); `tests/integration/test_umpan_balik.py` diubah bersamanya. |
+
+---
+
+## K-38 · Komponen skor V0: `history` + `context`; nol komponen → tidak ada rekomendasi
+
+> Diputuskan 5 Oktober 2026, bersama K-36 (Sprint 5 tugas 5.5, `4ec7114`).
+
+| | |
+|---|---|
+| **Keputusan** | **(1)** Dua komponen — satu-satunya yang V0 punya datanya: **`history`** = `completion_rate_30d` habit itu (rentetan 2.4; padanan *Historical Success* docs/87) dan **`context`** = energi check-in hari itu, dinormalkan 1–5 → 0–1 seperti 5.3 (padanan *Context Fit*). **(2)** Komponen tanpa data **dilewati**, bukan diisi nol; skor = rata-rata komponen yang ada. **(3)** **Nol komponen → tidak ada skor → tidak ada rekomendasi** (`nilai_rekomendasi` → `None`, `cukup_untuk_menyatakan` — Confidence Layer 5.4). |
+| **Bukti** | docs/87: *Trend Relevance · Personal Preference · Context Fit · Historical Success · Weather Fit · Occasion Fit · Availability*, contohnya dirata-rata sama berat; lima sisanya tidak punya data di V0, dan mengarangnya dilarang (Pasal 8). Uji: `test_mesin_rekomendasi.py` — `test_tanpa_komponen_none` · `test_satu_komponen_skor_komponen_itu` · `test_rata_rata_bobot_sama` · `test_skor_selalu_0_sampai_1`. |
+| **Bacaan yang DITOLAK** | **(a)** *“Komponen tanpa data = 0”* — ditolak: ketiadaan data akan terbaca sebagai nilai buruk dan menarik skor turun. **(b)** *“Komponen lain diisi taksiran”* — ditolak: tidak ada sinyalnya di V0 (Pasal 8). |
+| **Harga yang diakui** | Rekomendasi dengan satu komponen berskor sama dengan komponen itu — skornya tidak membawa tanda seberapa sedikit dasarnya, kecuali lewat `score_breakdown`. |
+| **Cara membalikkan** | `intelligence/mesin.py` (`_rekomendasi_habit`, `nilai_rekomendasi`); naikkan `scoring_version` bila komponennya berubah. |
+
+---
+
 ## K-39 · Sapuan hapus akun: proses pekerja lewat tiga fungsi sempit, Qdrant dibuang selagi akun terkunci
 
-> Diputuskan 6 Oktober 2026, saat 6.5 Stage B ditulis. (K-33 … K-38 — Sprint 5 — dirujuk kode
-> dan [`SESSION-LOG.md`](SESSION-LOG.md) Sesi 35, tetapi **belum ditulis di berkas ini**; nomor
-> berikutnya sengaja tidak menimpanya.)
+> Diputuskan 6 Oktober 2026, saat 6.5 Stage B ditulis. (K-33 … K-38 — Sprint 5 — semula hanya
+> dirujuk kode dan [`SESSION-LOG.md`](SESSION-LOG.md) Sesi 35; 🔧 ditulis di atas pada 8 Oktober 2026.)
 >
 > Yang dipertanyakan: spec/01 *Prosedur hapus akun* menyebut tahap 3–6 dijalankan *“peran
 > pemeliharaan (bukan api)”* tanpa bentuk — peran login baru? alat `tools/` dengan kredensial
@@ -667,6 +757,7 @@ sesudahnya.
 | **Bacaan yang DITOLAK** | **(a)** *“Alat `tools/` memakai kredensial pemilik skema”* — ditolak: kredensial yang melewati RLS dan semua hak hidup panjang di proses terjadwal; tiga fungsi yang menolak akun belum jatuh tempo memberi batas sekecil itu tanpa kredensial baru. **(b)** *“Peran login ketiga (`hvx_pemeliharaan`)”* — ditolak: permukaan baru (compose, `peran-lokal.sql`, `pastikan_peran_aplikasi`) untuk kerja yang sudah punya rumah di pekerja. **(c)** *“Hapus baris dulu, Qdrant sesudah commit”* — ditolak: gagal di antaranya meninggalkan titik tanpa pemilik yang tak bisa lagi dicari (`user_id`-nya sudah tiada; menyimpan daftarnya butuh tabel ke-24). **(d)** *“Kunci `FOR UPDATE`”* — ditolak: foreign key tulisan anak mengambil `FOR KEY SHARE`, jadi penulis anak ikut menunggu Qdrant. **(e)** *“Hash polos id akun sebagai id semu”* — ditolak: id yang pernah terlihat (cadangan, log lama) langsung cocok lagi. **(f)** *“Restore tanpa batas”* (Stage A) — ditolak: akun yang dipulihkan sesudah titiknya dibuang hidup kembali tanpa vektor memorinya, diam-diam (**E-216**). |
 | **Harga yang diakui** | ⚠️ Baris akun terkunci selama panggilan Qdrant (batas waktu 5 dtk): login atau restore pada akun yang sedang disapu menunggu sebanyak itu. Akun jatuh tempo dihapus ≤ 5 menit sesudah waktunya. Sapuan tanpa Qdrant menunda akun bertitik **tanpa batas** (peringatan di log) — dipilih daripada titik tanpa pemilik. Satu akun yang terus gagal tidak menahan yang lain, tetapi mengulang galatnya tiap lima menit. Pembersihan Redis sesudah commit boleh gagal tanpa bisa diulang (akunnya sudah tiada; jejaknya mati sendiri dalam 24 jam). Rujukan stream tidak dibuang per akun. `ip_hash` baris audit tidak diubah (**C-34**). |
 | **Cara membalikkan** | `identity/penghapusan.py` · migrasi 0011 · `pekerja.JEDA_SAPUAN_HAPUS_S`; `tests/integration/test_sapuan_hapus_akun.py` dan 20 mutasi `6.5b` diubah bersamanya. |
+| 🔧 **Diubah 7 Okt 2026** | (6.4, **K-46**) **C-34** diputuskan atas delegasi pemilik: `hapus_akun_jatuh_tempo` kini juga mengosongkan `ip_hash` baris audit akun yang dihapus (migrasi 0013) — kalimat *“`ip_hash` baris audit tidak diubah”* di *Harga yang diakui* tidak berlaku lagi. |
 
 ---
 
@@ -691,6 +782,110 @@ sesudahnya.
 
 ---
 
+## K-41 · Privacy Center: tiap modul menyatakan bagiannya; ringkasan = jumlah, bukan isi; izin dari registry yang ditegakkan
+
+> Diputuskan 7 Oktober 2026, saat 6.4 ditulis (`3db89f8`). Ditulis di berkas ini 8 Oktober 2026
+> dari kode dan pesan commit-nya.
+>
+> Yang dipertanyakan: spec/04 *Privacy Center* memberi rutenya (`summary` · `permissions` ·
+> `export` · `data/{category}`), tetapi tidak bagaimana satu modul meringkas data milik dua belas
+> modul, padahal modul domain tidak saling impor (spec/06 aturan 3) dan SQL sebuah modul hanya
+> menyebut tabel miliknya (aturan 5).
+
+| | |
+|---|---|
+| **Keputusan** | **(1)** Rumahnya `identity` (izin, persetujuan, dan jejak audit miliknya): rute `/v1/privacy/*` di `identity.router_privasi`. **(2)** **Tiap modul menyatakan bagiannya sendiri**: `BAGIAN_PRIVASI` (`BagianData` — kategori, tabel, SQL hitung dan ekspor, ditulis di modul PEMILIK tabel) dan `PENGHAPUS_PRIVASI` (K-42). `hvx.main` merakitnya di `app.state` (K-23); tanpa sambungannya rute **menolak berjalan** (`RuntimeError`), bukan menjawab *“tidak ada data”*. **(3)** Tiap tabel ber-`user_id` di spec/01 dinyatakan **tepat sekali** — penegak `tests/unit/test_cakupan_privasi.py`: tabel baru yang lupa dinyatakan membuatnya merah. **(4)** `GET /privacy/summary` = **jumlah per kategori dan per tabel, bukan isi**; baris yang **diturunkan** sistem dihitung terpisah (`derived_count`); tiap kategori (13) membawa masa simpannya dalam kalimat untuk pengguna (GDPR Art. 13(2)(a)), `deletable`, dan alasannya bila tidak; plus `not_collected` — lokasi · kalender · keuangan · wearable (naskah 5 §26, tanda ○). Dibaca dalam **satu potret** (`REPEATABLE READ`, `transaksi_pengguna(…, satu_potret=True)`); baris arsip (`deleted_at`) ikut dihitung — masih tersimpan, jadi masih diketahui. **(5)** `GET /privacy/permissions` = tiap agent aktif dan tiap (scope, aksi) yang **sungguh bisa ditanyakan gerbang risiko** (4.5) — dibangun dari registry yang sama, bukan daftar kedua — dengan keputusan yang **BERLAKU** (`source: user` = tersimpan dan belum kedaluwarsa; `default` = bawaan gerbang: R0·R1 `allow`, R2 ke atas `ask`, scope sensitif selalu `ask`). `PUT` hanya untuk izin yang diminta agent — selain itu `404 permission_not_requested` — dan berlaku seketika di `MesinIzin`. |
+| **Bukti** | naskah 5 §26 (*Profile ✓ · Goals ✓ · Journal ✓ …*, izin per agent); spec/04: *“`GET /privacy/summary` sengaja mengembalikan jumlah baris, bukan isinya”*; spec/06 aturan 3 · 5. Uji: `test_privacy_center.py` — `test_ringkasan_menghitung_semua_kategori_tanpa_isi` · `test_ringkasan_hanya_milik_pengguna_itu` · `test_izin_per_agent_menampilkan_bawaan_gerbang` · `test_ubah_izin_berlaku_seketika_di_mesin_izin` · `test_izin_yang_tidak_diminta_atau_cacat_ditolak`; `test_cakupan_privasi.py` (9 uji, termasuk `test_tiap_tabel_milik_pengguna_dinyatakan_tepat_sekali` · `test_tiap_modul_hanya_menyatakan_tabel_miliknya` · `test_katalog_izin_agent_sama_dengan_registry_yang_ditegakkan`). |
+| **Bacaan yang DITOLAK** | **(a)** *“`identity` membaca semua tabel langsung”* — ditolak: melanggar aturan 5 (`test_batas_tabel`) dan menjadikan satu modul tahu bentuk semua tabel. **(b)** *“Daftar izin tersendiri untuk layar”* — ditolak: dua daftar menyimpang diam-diam; layar harus menampilkan yang ditegakkan gerbang. **(c)** *“Ringkasan menampilkan isi”* — ditolak oleh spec/04: layar ini menjawab *“apa yang kamu tahu tentang saya”* tanpa menumpahkan seluruh data. |
+| **Harga yang diakui** | Tiap tabel baru wajib dinyatakan di modulnya — sengaja, uji yang menagihnya. Satu kueri hitung per tabel per permintaan ringkasan. Baris arsip terhitung walau tidak tampil di layar lain. |
+| **Cara membalikkan** | `identity/privasi.py` · `routes_privasi.py` · `*/privasi.py` tiap modul · perakitan di `hvx.main`; `tests/integration/test_privacy_center.py` dan `tests/unit/test_cakupan_privasi.py` diubah bersamanya. |
+
+---
+
+## K-42 · Hapus per kategori: hapus KERAS beserta turunannya, satu transaksi, sandi diminta lagi
+
+> Diputuskan 7 Oktober 2026, saat 6.4 ditulis (`3db89f8`, migrasi **0013**).
+
+| | |
+|---|---|
+| **Keputusan** | **(1)** `DELETE /v1/privacy/data/{category} {password}` → `202 {category, deleted: {tabel: jumlah}}`. **Hapus KERAS**, bukan arsip. **(2)** Kategori SUMBER membawa **turunannya**, di transaksi yang sama, turunan dijalankan SESUDAH sumbernya (supaya memori yang baru diekstrak ekstraksi yang sedang berjalan ikut terlihat dan ikut dilupakan — K-27): **event** jenisnya · **memori** scope sumbernya (jurnal → `journal_raw`, mood → `mood`, habit · goal · check-in → scope masing-masing) dikosongkan seketika (`content=''`, `deleted_at`) · **`human_states`** (turunan check-in, 5.3) · **rekomendasi** (mesin: menurut domain/subjek/konteks; tulisan agent: ikut terhapus bersama SALAH SATU sumber yang mungkin, sebab sumber pastinya tidak tercatat per baris). Kategori `memories` (*“lupakan semua”*, sumbernya tetap) dan `history` (seluruh riwayat kejadian + pola `behavioral`) bisa dihapus sendiri. **(3)** `account` · `profile` · `audit` **tidak** bisa dihapus di sini → `409 category_not_deletable`, diperiksa **sebelum** sandi ditebak; jalannya hapus akun (6.5, K-39). **(4)** `events` tetap tanpa `UPDATE`/`DELETE` bagi `hvx_app` (spec/01 §10): satu fungsi `SECURITY DEFINER` sempit, `hapus_event_pengguna(jenis[], subjek_tipe, subjek_id)` — hanya event milik pengguna yang **sedang dilayani transaksi**, hanya jenis yang disebut; tanpa pengguna yang dilayani ia menolak. **(5)** Sandi diminta lagi (OWASP ASVS V3.7.1); tebakan lewat pintu ini berbagi jatah dengan login gagal (`PenjagaGagalMasuk`, **E-226**); penolakan berjejak `data.deletion_rejected`, keberhasilan `data.deleted` (metadata: jumlah baris) di transaksi yang sama. **(6)** Titik Qdrant memori yang dilupakan dibuang penyelaras sesudah commit (Qdrant tidak ikut transaksi, spec/01 §12) — karena itu `202`. |
+| **Bukti** | naskah 11 §7.25 *Deletion Engine*: *“tidak boleh hanya menghapus row di PostgreSQL”* — event, memori → vektor, nilai turunan; dan *event boleh dihapus atas permintaan pemiliknya, tidak boleh diubah oleh sistem*. C-33: payload event membawa teks bebas yang tabel sumbernya sudah tidak punya. Uji: `test_privacy_center.py` — `test_hapus_kategori_membuang_tabelnya_dan_turunannya_saja` · `test_hapus_jurnal_membawa_event_dan_memorinya_bukan_milik_mood` · `test_hapus_mood_membuang_rekomendasi_agent_bukan_milik_mesin` · `test_hapus_percakapan_menyisakan_jejak_run_tanpa_tautan` · `test_hapus_kategori_butuh_sandi_yang_benar` · `test_kategori_yang_tidak_bisa_dihapus_ditolak_sebelum_sandi` · `test_tebakan_sandi_ulang_berbagi_jatah_dengan_login_gagal`; `test_cakupan_privasi.py` — `test_tiap_jenis_event_ikut_terhapus_bersama_kategori_sumbernya` · `test_memori_turunan_ikut_terlupa_bersama_kategori_sumbernya`. |
+| **Bacaan yang DITOLAK** | **(a)** *“`GRANT DELETE ON events TO hvx_app`”* — ditolak: spec/01 §10 melarang membuka `events` dengan melebarkan `GRANT`; hak umum membuat tiap jalur kode api bisa menghapus riwayat, bukan hanya jalur permintaan pemiliknya — fungsi sempit hanya menghapus jenis yang disebut, untuk pengguna yang dilayani, dan tidak bisa **mengubah** event. **(b)** *“Hapus sumbernya saja”* — ditolak oleh §7.25: nilai turunan tetap membawa jejak perilaku walau sumbernya hilang. |
+| **Harga yang diakui** | ⚠️ **Tidak bisa dibatalkan.** Rekomendasi agent ikut terhapus walau sumber sebenarnya mungkin kategori lain — dipilih sisi yang melindungi; rekomendasi bisa dihitung ulang, teks yang menginap tidak bisa ditarik. Menghapus check-in menghapus **seluruh** `human_states` (V0 tak punya sumber lain). Jejak kerja asisten (`agent_runs`) tidak dihapus di sini — ikut akun (kategori `audit`). |
+| **Cara membalikkan** | `identity.privasi.hapus_kategori` · `PENGHAPUS_PRIVASI` tiap modul · migrasi 0013 (`hapus_event_pengguna`, spec/01 §12); uji di atas diubah bersamanya. |
+
+---
+
+## K-43 · Ekspor: sandi ulang, dibangun saat diunduh, sekali pakai, tanpa rahasia di URL
+
+> Diputuskan 7 Oktober 2026, saat 6.4 ditulis (`3db89f8`).
+
+| | |
+|---|---|
+| **Keputusan** | **(1)** `POST /v1/privacy/export {password}` → `202 {export_id, status: "ready", expires_at}`: sandi diminta lagi (berbagi jatah dengan login gagal), dibatasi **5 per pengguna per jam**, berjejak `data.export_requested`. Redis hanya menyimpan **status** di kunci ber-`user_id` (`…:ekspor:<user_id>:<export_id>`), umur **1 jam** — tidak pernah isi (prinsip E-171). Tanpa `Idempotency-Key`: ulangannya membuat catatan sekali-pakai lain, tidak menulis data domain. **(2)** `GET /privacy/export/{id}` → status, `expires_at`, dan `download_url` relatif selagi `ready`. **(3)** `GET /privacy/export/{id}/download` — butuh **sesi pemiliknya**, **sekali pakai** (satu skrip Lua: hanya `ready` → `downloaded`, umur tetap); yang kedua `410 export_already_downloaded`; gagal membangun sesudah catatannya diambil → dikembalikan ke `ready`. **(4)** Dokumen **dibangun saat diunduh** dari PostgreSQL di bawah RLS, dalam satu potret (`REPEATABLE READ`), dengan jejak `data.exported` di transaksi baca yang sama: JSON `{"format": "humanverse-export", "format_version": 1, exported_at, user_id, categories: {kategori: {tabel: [baris…]}}}` dari `BAGIAN_PRIVASI` yang sama dengan ringkasan (K-41) — **tanpa `password_hash`, selamanya**. `Content-Disposition: attachment` · `Cache-Control: no-store`. **(5)** Aplikasi web menyimpannya sebagai unduhan peramban (Blob, URL-nya dicabut sesudah diklik); platform lain belum — layarnya mengatakannya. |
+| **Bukti** | spec/04: `POST /privacy/export → 202 { export_id } (async, tautan sekali pakai)` · `GET /privacy/export/{id}`; GDPR Art. 15 · 20; UU PDP Pasal 7 · 13; OWASP ASVS V3.7.1 (sandi ulang untuk tindakan sensitif) · V8.3.1 (data sensitif tidak di URL). Uji: `test_privacy_center.py` — `test_ekspor_sekali_pakai_memuat_isi_tanpa_hash_sandi` · `test_ekspor_milik_a_tidak_terlihat_dan_tidak_terunduh_oleh_b` · `test_ekspor_butuh_sandi_dan_dibatasi_per_jam` · `test_ekspor_tak_dikenal_404`; Flutter `test/ujung/privasi_nyata_test.dart` lawan api hidup. |
+| **Bacaan yang DITOLAK** | **(a)** *“Bangun berkas di latar, simpan sampai diunduh”* — ditolak: salinan seluruh data seseorang yang menginap di Redis atau penyimpanan berkas adalah satu tempat bocor lagi. **(b)** *“Tautan unduh bertoken”* — ditolak: rahasia di URL masuk riwayat peramban, log proksi, dan `Referer` (ASVS V8.3.1). **(c)** *“Ekspor tanpa sandi ulang”* — ditolak: token yang dicuri tidak boleh cukup untuk menyalin seluruh hidup seseorang. |
+| **Harga yang diakui** | Unduhan memegang satu transaksi baca selama dokumen dibangun — sebesar seluruh data pengguna. Tautan hanya 1 jam dan sekali unduh; unduhan yang terputus di jalan menuntut ekspor baru. Di aplikasi non-web ekspor belum bisa disimpan ke perangkat (penyimpanan perangkat: **C-35**). |
+| **Cara membalikkan** | `identity/privasi.py` bagian *ekspor* (`UMUR_EKSPOR_S`, `BATAS_EKSPOR`, `VERSI_EKSPOR`) · `routes_privasi.py` · `apps/mobile/lib/api/simpan_berkas*.dart`; uji di atas diubah bersamanya. |
+
+---
+
+## K-44 · Notifikasi V0: pilihan per jenis dan satu gerbang kirim — tanpa pengiriman
+
+> Diputuskan 7 Oktober 2026, saat 6.3 ditulis (`887170d`).
+>
+> Yang dipertanyakan: spec/07 6.3 *“bisa dimatikan per jenis”* — padahal V0 **tidak mengirim**
+> notifikasi apa pun (A-28: V0 reaktif; kanal push menuntut aplikasi perangkat dan izin OS-nya).
+
+| | |
+|---|---|
+| **Keputusan** | **(1)** Yang dikerjakan V0 adalah bagian yang harus ada **sebelum** satu notifikasi pun dikirim: pilihan pengguna per jenis, tersimpan, dan **satu gerbang murni** `profile.keputusan_kirim` → `now` · `later` · `silent` yang wajib dilewati pengirim mana pun kelak: dimatikan → `silent`; pagu harian habis → `silent` (*Do nothing*, §11.44); jam tenang → `later`. **(2)** Empat jenis: `habit_reminder` (bawaan **mati** — menunggu jam pengingat per habit), `weekly_review` (bawaan **nyala**), `recommendation` (bawaan **mati** — menunggu A-28), `account_security` (**nyala dan wajib** — tidak bisa dimatikan, melewati jam tenang dan pagu). Jam tenang bawaan **22:00–07:00** (boleh melintasi tengah malam, boleh `null`); pagu **10/hari** (naskah 11 §11.17). **(3)** `GET`/`PATCH /v1/me/notifications`; disimpan di `profiles.preferences.notifications` — **hanya pilihan pengguna**, bukan bawaan, supaya bawaan yang kelak berubah tetap berlaku bagi yang belum memilih. Dibaca lalu ditulis di bawah kunci baris (`FOR NO KEY UPDATE`): dua `PATCH` serentak untuk jenis berbeda tidak saling menimpa. `PATCH /me/profile` **menolak** menyentuh kunci itu — satu penulis per kunci. **(4)** Jawaban API menyatakan `delivery: "none"` — jujur bahwa V0 tidak mengirim. |
+| **Bukti** | naskah 7 Layer 38 (*“Jangan spam”*, quiet hours) · naskah 11 §11.43 *Interruption Manager* (*Notify now · Notify later · Silent*) · §11.17 (`notification: send: 10/day`); *privacy/attention by default* GDPR Art. 25(2), izin notifikasi dalam konteks (Android 13 `POST_NOTIFICATIONS`, Apple HIG); keamanan akun sebagai perlindungan pemiliknya (lih. GDPR Art. 34). Uji: `test_notifikasi_murni.py` (7) · `test_notifikasi_dan_tinjauan.py` — `test_notifikasi_bawaan_dan_jujur_bahwa_v0_tidak_mengirim` · `test_tiap_jenis_dimatikan_sendiri_dan_tersimpan` · `test_profil_tidak_menimpa_pilihan_notifikasi` · `test_preferensi_notifikasi_cacat_ditolak` · `test_dua_perubahan_serentak_tidak_saling_menimpa`. |
+| **Bacaan yang DITOLAK** | **(a)** *“Semua jenis menyala bawaan”* — ditolak: perhatian pengguna dilindungi secara bawaan; yang menyala hanya yang jelas ia harapkan. **(b)** *“Keamanan akun bisa dimatikan”* — ditolak: pemberitahuan bahwa akunmu dihapus, diekspor, atau dimasuki adalah perlindungan bagimu, bukan pemasaran. **(c)** *“Tabel preferensi tersendiri”* — tidak diperlukan: `profiles.preferences jsonb` (spec/01) sudah rumahnya, tanpa migrasi. **(d)** *“Menunda 6.3 sampai ada pengiriman”* — ditolak: gerbang lebih dulu daripada yang dijaganya (`AGENTS.md` §2). |
+| **Harga yang diakui** | ⚠️ Gerbangnya belum pernah dilewati pengirim sungguhan — V0 tidak mengirim. Hitungan *terkirim hari ini* adalah masukan gerbang yang kelak dipasok pengirimnya; V0 belum menyimpannya. Pengingat habit belum punya jam per habit. |
+| **Cara membalikkan** | `profile/notifikasi.py` (`JENIS`, `PAGU_HARIAN`, `JAM_TENANG_BAWAAN`) · `profile/routes.py` · `profile/repository.py`; uji di atas diubah bersamanya. |
+
+---
+
+## K-45 · Tinjauan mingguan: lima pertanyaan dari data, dihitung saat dibaca, “Kenapa?” tetap bertanya
+
+> Diputuskan 7 Oktober 2026, saat 6.2 ditulis (`a354a70`).
+>
+> Yang dipertanyakan: spec/07 6.2 *“menjawab 5 pertanyaan naskah 4 §31”* — *What went well? ·
+> What changed? · What failed? · Why? · What should change next week?* — padahal V0 tidak punya
+> model yang menalar (K-28), dan *Why* adalah klaim sebab.
+
+| | |
+|---|---|
+| **Keputusan** | **(1)** `GET /v1/reviews/weekly?week=YYYY-Www` — minggu ISO di zona profil; bawaannya minggu berjalan. Minggu cacat → `400 invalid_week`; minggu yang belum dimulai → `422 week_in_future`. **(2)** **Dihitung saat dibaca, tidak disimpan** — dari habit, check-in, dan mood lewat pintu keluar modul pemiliknya (`habits.habit_rentang` · `checkins.checkin_rentang` · `checkins.mood_rentang`). **(3)** Periode dihitung dengan aturan rentetan 2.4 (harian per hari, mingguan satu periode; habit bulanan tidak dihakimi per minggu; minggu berjalan belum *gagal*). Ambang V0: ≥ 0,8 periode terpenuhi → *berjalan baik*, < 0,5 → *belum berhasil*; perubahan antar-minggu dibandingkan hanya bila ≥ 2 periode terhitung di **kedua** minggu (0,2 untuk tingkat penyelesaian, 0,5 untuk rata-rata skala). **(4)** Tiap butir membawa `evidence_count`; tanpa butir, pertanyaannya ber-sikap `ask` (Confidence Layer 5.4). **(5)** **“Kenapa?” selalu `ask`**: sistem hanya memberi hal yang terjadi **bersamaan** (energi di hari terpenuhi vs terlewat, bila selisihnya ≥ 1) dan alasan yang pengguna **catat sendiri** saat melewatkan habit (≤ 3, dipotong 80 karakter) — tanpa klaim sebab. **(6)** Saran minggu depan: versi minimum di hari berenergi rendah (*Tiny Habits*, tier adaptif naskah 4 §34) dan ajakan rencana *jika–maka* (*implementation intentions*). **(7)** Sumbu §31 yang tidak diukur V0 (belajar · keuangan · sosial · karier · gaya hidup) dinyatakan `not_measured` — seperti dashboard 6.1. |
+| **Bukti** | naskah 4 §31 · §7 (asosiatif, bukan kausal; `pola.tanpa_klaim_kausal`) · §34; minimisasi data GDPR Art. 5(1)(c); Gibbs (1988) dan *retrospective* Derby & Larsen (2006) — refleksi sendiri yang membuat tinjauan berguna; Fogg (2019); meta-analisis Gollwitzer & Sheeran (2006). Uji: `test_tinjauan_murni.py` (10, termasuk `test_lima_pertanyaan_dijawab_dari_bukti_dan_kenapa_tetap_bertanya` · `test_kalimat_sistem_tidak_mengklaim_sebab` · `test_habit_bulanan_tidak_dihakimi_per_minggu`) · `test_notifikasi_dan_tinjauan.py` — `test_tinjauan_tanpa_data_bertanya_di_kelima_pertanyaan` · `test_tinjauan_minggu_lalu_dari_data_sungguhan` · `test_minggu_cacat_atau_belum_dimulai_ditolak`. |
+| **Bacaan yang DITOLAK** | **(a)** *“Sistem menjawab ‘Kenapa?’”* — ditolak: data observasional tidak membuktikan sebab (§7). **(b)** *“Simpan tinjauan tiap minggu”* — ditolak: salinan baru tentang pengguna yang tidak ikut terhapus bersama sumbernya di Privacy Center (K-42); refleksi pengguna sendiri tempatnya jurnal. **(c)** *“Tujuh sumbu §31 diberi angka”* — ditolak: lima belum punya ukuran (A-19/B-38), sama dengan 6.1. |
+| **Harga yang diakui** | Ambang 0,8 · 0,5 · 0,2 · 0,5 · 1,0 adalah pilihan V0, belum dikalibrasi data nyata (#34 berlaku juga di sini). Tinjauan dihitung ulang tiap kali dibuka. |
+| **Cara membalikkan** | `intelligence/tinjauan.py` (`VERSI`, ambang di kepala berkas) · rute di `intelligence/routes.py`; uji di atas diubah bersamanya. |
+
+---
+
+## K-46 · Tiga butir C diputuskan atas delegasi pemilik: hapus jurnal keras, mood sensitif, `ip_hash` dikosongkan
+
+> Diputuskan 7 Oktober 2026, saat 6.4 ditulis (`3db89f8`), **atas delegasi pemilik**
+> (dicatat sebagai **H-28** di [`99-CATATAN-AUDIT.md`](99-CATATAN-AUDIT.md)): *“keputusan di anda
+> berikan pertimbangan internasional dari para pakar.”*
+>
+> ⚠️ **Satu-satunya entri di berkas ini yang memutuskan butir C.** Batas di atas (*“seluruh butir
+> C tetap milik pemilik”*) tidak dicabut: delegasi itu diberikan untuk **C-31 · C-32 · C-34** — tiga
+> butir yang 6.4 tidak bisa diselesaikan tanpanya — dan tidak meluas ke butir C lain (C-33 · C-35
+> · C-36 tetap terbuka).
+
+| | |
+|---|---|
+| **Keputusan** | **(C-31) Hapus jurnal = hapus KERAS.** `DELETE /journal/{id}` menghapus barisnya, event `journal.created`-nya (`hapus_event_pengguna` subjek itu), dan memori turunannya, di transaksi yang sama. Migrasi 0013 membuang jurnal yang **sudah** dihapus-lunak sebelumnya beserta event-nya. **(C-32) `mood` sensitif.** `SCOPE_RESMI["mood"].sensitif = True`: coach-agent membaca mood (`mood.recent`, `memory.search`) hanya sesudah pengguna menyimpan `allow` di Privacy Center — bawaan R0 tidak lagi membukanya; dan `mood` masuk larangan aturan 6 bagi agent pihak ketiga. Check-in harian (energi · fokus · tidur) **tidak** ikut. Delegasi antar-agent tidak ditanya untuk scope sensitif yang tidak dibacanya — yang membaca ditanya di run-nya sendiri (**E-227**, `MesinIzin.cek(delegasi=True)`). **(C-34) `ip_hash` dikosongkan** saat sapuan hapus akun (`hapus_akun_jatuh_tempo`, migrasi 0013); jejak audit tetap ada sebagai bukti dengan id semu (K-39). Masa simpan baris audit itu **tidak** diubah (`@retention: forever`, spec/01 §8) — dinyatakan apa adanya di Privacy Center (*“selama layanan berjalan … dianonimkan, tanpa jejak jaringan”*). |
+| **Bukti** | **C-31:** GDPR Art. 17 (hak penghapusan) · Art. 5(1)(e) (pembatasan penyimpanan) · UU PDP No. 27/2022 Pasal 8; jurnal adalah Level 3 *Sensitive* (naskah [`133`](133-DATA-CLASSIFICATION.md)) dan tidak ada rute pemulihan — hapus-lunak menyimpannya bertahun-tahun tanpa jalan pulang. **C-32:** mood yang dilaporkan (valensi, label *“cemas”*, catatan bebas) adalah data kesehatan menurut GDPR Art. 4(15) · Art. 9 dan data pribadi spesifik menurut UU PDP Pasal 4 ayat (2) huruf a; garis check-in mengikuti lampiran WP29 (Feb 2015) tentang aplikasi gaya hidup. **C-34:** GDPR Recital 49 — kepentingan keamanan jaringan yang membenarkan `ip_hash` berakhir bersama akunnya. Uji: `test_jurnal.py` (hapus keras + event) · `test_izin.py` · `test_gerbang_risiko.py` (C-32 · E-227) · `test_alat_v0.py` · `test_memori.py` · `test_privacy_center.py` (`mood` sensitif di daftar izin) · `test_sapuan_hapus_akun.py::test_sapuan_menghapus_semua_jejak_akun_dan_hanya_akun_itu` (asersi `ip_hash` C-34). |
+| **Bacaan yang DITOLAK** | **(C-31)** *“Hapus-lunak dengan jendela batal 30 hari”* dan *“tetap seperti sekarang, dinyatakan di Privacy Center”* (pilihan **(b)** · **(c)** di C-31) — ditolak: tulisan paling pribadi yang pemiliknya minta dihapus tidak menginap. **(C-32)** *“Check-in ikut sensitif”* — ditolak: penilaian diri gaya hidup, bukan status kesehatan (WP29). **(C-34)** *“Pertahankan `ip_hash` sebagai kepentingan sah forensik”* — ditolak: sesudah akunnya tiada, yang tersisa hanya kemampuan mempertemukan baris-baris itu dengan akun lain lewat jaringan yang sama. |
+| **Harga yang diakui** | ⚠️ **C-31 tidak bisa dibalik** — jurnal yang dihapus, dan jurnal yang sudah dihapus-lunak sebelum migrasi 0013, hilang tanpa jendela batal. **C-32:** coach menjawab tanpa mood sampai pengguna mengizinkannya. **C-34:** korelasi forensik antar-akun sesudah penghapusan hilang. Ketiganya keputusan **hukum & privasi** yang diambil agent atas delegasi — pemilik tetap boleh membaliknya, dan yang menanggung akibatnya tetap pengguna. |
+| **Cara membalikkan** | **C-31:** `journal/repository.py` (`_HAPUS`) + migrasi baru (pembersihan 0013 tidak bisa dibalik). **C-32:** `identity/scope.py` (`SCOPE_RESMI`) · `agents/registri.py` (`SCOPE_TERLARANG_PIHAK_KETIGA_6`) · spec/05 tabel scope. **C-34:** migrasi baru yang mengganti `hapus_akun_jatuh_tempo`. Uji di atas diubah bersamanya. |
+
+---
+
 ## Yang sengaja **tidak** saya putuskan
 
 | Butir | Kenapa |
@@ -698,7 +893,7 @@ sesudahnya.
 | ~~[#139](../../issues/139) Master Architecture v2.0~~ | ✅ **pemilik memerintahkannya 10 Sep 2026** (*“kerjakan semua tugas dan fase yang masih tersisa”*) — dikerjakan, hasilnya [`../arch/`](../arch/README.md) |
 | ~~[#3](../../issues/3) siapa mengerjakan V0~~ | ✅ **pemilik memutuskannya 16 Sep 2026** — AI coding agent di branch + PR, pemilik yang menggabungkan (**H-25**). Yang tetap bukan milik saya: **waktu** pemilik untuk meninjau |
 | [#20](../../issues/20) cek merek & domain | menuntut pencarian merek dan pembelian |
-| **seluruh butir C** (hukum & privasi) | risikonya ditanggung orang yang tidak ikut memilih |
+| **seluruh butir C** (hukum & privasi) | risikonya ditanggung orang yang tidak ikut memilih — 🔧 kecuali C-31 · C-32 · C-34, didelegasikan pemilik 7 Okt 2026 (**H-28**, **K-46**) |
 | §16.5 · §16.7 rantai humanoid | benda yang bisa melukai orang — gerbangnya bukan keputusan gaya |
 | [#4](../../issues/4) Mental Wellness | cakupan produk |
 | [#34](../../issues/34) ambang Confidence | butuh data nyata untuk dikalibrasi; menebak angkanya lebih buruk daripada membiarkannya terbuka |

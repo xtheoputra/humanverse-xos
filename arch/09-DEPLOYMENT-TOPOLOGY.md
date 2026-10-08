@@ -49,6 +49,55 @@ menambah lapisan.
 Menambahkannya lebih awal adalah cara paling cepat membuat 4–6 minggu menjadi
 4–6 bulan.
 
+### §2.1 🔒 Web, dan gratis — kata pemilik **H-29** (8 Okt 2026)
+
+> *“kedepannya, aplikasi ini dapat dijalankan juga di web gratis ya, vercel
+> atau apapun itu”* — pemilik, 8 Okt 2026 ([`../docs/99`](../docs/99-CATATAN-AUDIT.md) **H-29**).
+
+**Yang mengikat, tiga baris:**
+
+| | Arti | Akibat |
+|---|---|---|
+| **web** | aplikasi web = **target `web` proyek Flutter yang sama** ([`03`](03-MONOREPO-FINAL.md) E-176, [`05`](05-TECHNOLOGY-STACK.md) §4) | tidak ada basis kode web kedua |
+| **gratis** | penerapan web **tanpa tagihan** — sejalan **H-26** (*“jangan ada tagihan”*); penyedia **tidak** dipatok (*“vercel atau apapun itu”*) | jalur berbayar tidak dipilih agent; jalur yang **meminta kartu** walau gratis = keputusan pemilik (risiko tagihan) |
+| **kedepannya** | **bukan** tugas V0 — 51 tugas [`../spec/07`](../spec/07-BACKLOG-V0.md) tidak bertambah | jatuh di **D1** (pengguna selain pemiliknya); D1–D2 di tabel atas kini wajib punya **jalur gratis** |
+
+**Diukur hari ini** (`v0/sprint-6-product` 17d0959): `flutter build web --release`
+**berhasil** — 45 dtk, `build/web` 41 MB berkas statis. Alamat api lewat
+`--dart-define=HVX_API=…`; api sudah menerima asal lain lewat `HVX_CORS_ORIGINS`
+(asal persis, tanpa `*`); ekspor 6.4 sudah punya jalur unduh peramban
+(`simpan_berkas_web.dart`). **Aplikasinya siap web; yang belum siap adalah
+tempat menjalankan api-nya secara gratis.**
+
+| Komponen | Yang ia butuhkan | Hosting statis / fungsi serverless gratis |
+|---|---|---|
+| aplikasi Flutter web | berkas statis | ✅ penyedia mana pun (Vercel · Cloudflare Pages · Netlify · …) |
+| api (FastAPI) | HTTP; SSE percakapan selama satu giliran (4.8); cek peran saat mulai (B-40) | ⚠️ bisa sebagai fungsi, tetapi batas durasi memotong SSE panjang, dan tiap instans membuka koneksi PostgreSQL sendiri → butuh *pooler* |
+| **pekerja** (`hvx.pekerja`) | proses **hidup terus**: relay tiap 1 dtk, `XREADGROUP BLOCK`, penyelaras 2 dtk, sapuan hapus akun tiap 5 mnt | ❌ **tidak bisa di fungsi serverless** — tanpa pekerja, event tak sampai ke konsumen (memori, proyektor, rekomendasi) dan akun yang minta dihapus **tidak pernah terhapus** (6.5 — janji kepada pengguna) |
+| PostgreSQL 16 | RLS · peran `hvx_app`/`hvx_pekerja` · fungsi `SECURITY DEFINER` · login migrasi terpisah | ⚠️ layanan terkelola gratis harus mengizinkan **membuat peran dan fungsi**; api **menolak mulai** sebagai superuser/`BYPASSRLS` — syarat yang dicek per penyedia, bukan dilonggarkan |
+| Redis 7 | skrip Lua (sesi · batas laju · ekspor sekali pakai) · Streams + grup konsumen | ⚠️ cek `EVAL` + `XREADGROUP`; kuota perintah paket gratis lawan pekerja yang berputar tiap detik |
+| Qdrant | pencarian memori semantik | opsional — tanpa `HVX_QDRANT_URL` memori tetap di PostgreSQL |
+
+🔴 **Yang bertabrakan — ditulis sekarang supaya tidak ditemukan sesudah ada data:**
+
+1. Paket gratis yang **menidurkan atau menghapus basis data menganggur**
+   bertabrakan dengan pemicu **D2** (jurnal = data yang hilangnya tak bisa dibuat
+   ulang) dan **H-27**. Cadangan yang **dipulihkan sungguhan** (§5 aturan 5)
+   adalah syarat sebelum pengguna kedua, bukan sesudahnya.
+2. Jurnal (Level 3) dan mood (data kesehatan jiwa, **K-46**) di penyedia pihak
+   ketiga, kemungkinan di luar Indonesia — **C-36**, milik pemilik.
+3. Syarat paket gratis berubah lebih cepat daripada dokumen ini — mis. paket
+   Hobby Vercel hanya untuk penggunaan **pribadi non-komersial** (sejauh yang
+   diketahui Juni 2026). Produk yang dijual mengubah syaratnya → **#18** (tarif).
+   **Cek ulang syarat tiap penyedia saat D1 dipicu.**
+
+**Dua bentuk — tidak dipilih sekarang, dipilih saat D1 dipicu:**
+
+| | Bentuk | Untung | Harga |
+|---|---|---|---|
+| **W-a** | aplikasi web di hosting statis gratis **+ satu mesin gratis** menjalankan `docker compose` yang **sama** | §5 aturan 1 utuh (satu artefak); kode tidak berubah | mesin gratis yang tahan lama jarang ada, dan yang ada sering meminta kartu |
+| **W-b** | aplikasi web + api di fungsi serverless gratis + PostgreSQL/Redis/Qdrant terkelola gratis | tiap bagian dikelola penyedianya | **pekerja tetap butuh proses hidup terus** di tempat lain; lima penyedia, lima syarat, lima cara mati |
+
 ---
 
 ## §3 `deploy` — atribut, bukan folder
@@ -136,6 +185,8 @@ pemilik.
 |---|---|
 | Tahap deployment | **6** (D0–D5), tiap tahap punya **pemicu terukur** |
 | Tahap tanpa pemicu | **NIHIL** |
+| Aplikasi bisa dibangun untuk web (**H-29**) | ✅ diukur 8 Okt 2026 (`flutter build web`) — ⚠️ **belum dijaga gerbang**: impor yang hanya ada di perangkat (`dart:io`) bisa mematahkannya tanpa ada yang merah |
+| Jalur **gratis** untuk D1–D2 (**H-29** · **H-26**) | ⏳ W-a / W-b dipilih saat D1 dipicu; pekerja wajib punya proses hidup terus di keduanya |
 | Folder `edge/` di pohon | **1** (`platform/edge/`) — turun dari 4 |
 | Modul tanpa `deploy` | ditolak CI — [`11`](11-PENEGAKAN.md) P-5 |
 | Pengaman ber-`deploy: cloud` yang pemicunya `communication loss` | **NIHIL** |

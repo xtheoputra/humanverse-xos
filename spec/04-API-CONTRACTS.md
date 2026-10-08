@@ -21,7 +21,7 @@ REST, JSON, awalan **`/v1`**. Autentikasi `Authorization: Bearer <access_token>`
 |---|---|
 | Waktu | ISO-8601 UTC dengan `Z`. Tanggal lokal pengguna sebagai `YYYY-MM-DD`. |
 | Id | uuid string. **Klien boleh membuat id sendiri** (dukungan luring). |
-| Tulis | `POST`/`PATCH` **domain** menerima header `Idempotency-Key` — `[A-Za-z0-9_.:=-]{1,128}`, telanjang atau sebagai sf-string bertanda kutip (`"…"`, bentuk draf IETF; keduanya kunci yang sama). Kunci yang sama mengembalikan hasil yang sama — status **pertama** dan sumber daya yang ditulisnya **dibaca ulang saat itu**, bertanda `Idempotent-Replayed: true`; sumber daya yang sudah dihapus → `404`. Kunci yang sama dengan permintaan **lain** → `422 idempotency_key_reused`; saat permintaan pertama masih berjalan → `409 idempotency_in_progress` + `Retry-After`. Hanya hasil 2xx yang diingat (24 jam, **rujukan** — bukan isi: E-171), kuncinya **milik pengguna** — kunci yang sama dari dua pengguna tidak saling memutar ulang — dan tiap pengguna paling banyak **1.000 kunci baru per 24 jam** (`429`, [K-24](../docs/KEPUTUSAN-DIDELEGASIKAN.md)). **Tidak** untuk `/auth/*`: jawabannya memuat token, dan memutar ulang jawaban berarti menyimpan token mentah ([K-21](../docs/KEPUTUSAN-DIDELEGASIKAN.md)) — `refresh` yang diulang dengan token yang sama tetap **pemakaian ulang**. `PATCH /me/profile` idempoten dengan sendirinya. ✅ **Diterapkan Sprint 2 (E-165)**: `platform.Idempoten`, dan `tests/unit/test_idempotensi_terpasang.py` menolak rute tulis domain yang tidak menerimanya |
+| Tulis | `POST`/`PATCH` **domain** menerima header `Idempotency-Key` — `[A-Za-z0-9_.:=-]{1,128}`, telanjang atau sebagai sf-string bertanda kutip (`"…"`, bentuk draf IETF; keduanya kunci yang sama). Kunci yang sama mengembalikan hasil yang sama — status **pertama** dan sumber daya yang ditulisnya **dibaca ulang saat itu**, bertanda `Idempotent-Replayed: true`; sumber daya yang sudah dihapus → `404`. Kunci yang sama dengan permintaan **lain** → `422 idempotency_key_reused`; saat permintaan pertama masih berjalan → `409 idempotency_in_progress` + `Retry-After`. Hanya hasil 2xx yang diingat (24 jam, **rujukan** — bukan isi: E-171), kuncinya **milik pengguna** — kunci yang sama dari dua pengguna tidak saling memutar ulang — dan tiap pengguna paling banyak **1.000 kunci baru per 24 jam** (`429`, [K-24](../docs/KEPUTUSAN-DIDELEGASIKAN.md)). **Tidak** untuk `/auth/*`: jawabannya memuat token, dan memutar ulang jawaban berarti menyimpan token mentah ([K-21](../docs/KEPUTUSAN-DIDELEGASIKAN.md)) — `refresh` yang diulang dengan token yang sama tetap **pemakaian ulang**. `PATCH /me/profile` dan `PATCH /me/notifications` idempoten dengan sendirinya; `POST /privacy/export` **tanpa** kunci — tidak menulis data domain, dan badannya sandi, yang tidak boleh ikut diingat 24 jam (K-43). ✅ **Diterapkan Sprint 2 (E-165)**: `platform.Idempoten`, dan `tests/unit/test_idempotensi_terpasang.py` menolak rute tulis domain yang tidak menerimanya |
 | Halaman | `?limit=` (maks 100, bawaan 50) + `?cursor=`; balasan `{ items, next_cursor }` — `next_cursor` `null` di halaman terakhir. Kursor **keyset** `(waktu, id)`, opak bagi klien, dan milik **daftar asalnya**; kursor rusak — atau dari daftar lain — → `400 invalid_cursor`. Daftar tanpa `?cursor=` di bawah ini membalas `{ items }`, dan ukurannya dibatasi **saat menulis** (goal · milestone · habit — K-24), tidak pernah dipotong diam-diam |
 | Saringan `status` | tanpa `?status=` = **semua** status yang belum dihapus; `?status=active` di contoh bukan bawaan |
 | Galat | `{ "error": { "code", "message", "details"? } }` |
@@ -42,6 +42,8 @@ POST   /auth/refresh         { refresh_token }                            → 20
 POST   /auth/logout                                                       → 204
 GET    /me                                                                → 200 { user, profile }
 PATCH  /me/profile           { display_name?, timezone?, locale?, preferences? }
+GET    /me/notifications                         → 200 { types[], quiet_hours, daily_cap, delivery }   ✅ 6.3
+PATCH  /me/notifications     { types?: { <jenis>: bool }, quiet_hours?: { start, end } | null }   → 200 (bentuk sama)   ✅ 6.3
 DELETE /me                   { password }        → 202 { deletion_scheduled_at }   ✅ 6.5
 POST   /me/restore                               → 200   (batal hapus, selama tenggang 30 hari)   ✅ 6.5
                                                  → 409 deletion_grace_expired  (tenggang habis)
@@ -57,6 +59,16 @@ POST   /me/restore                               → 200   (batal hapus, selama 
 > * `DELETE /me` meminta sandi lagi (`403 invalid_credentials` bila salah) dan
 >   idempoten: saat sudah `pending_deletion` ia mengembalikan jadwal yang ada, tanpa
 >   menyetel ulang jam tenggang.
+> * 🔧 **E-226 — sandi ulang berbagi jatah login gagal** (kode 7 Okt 2026, ditulis
+>   di sini 8 Okt 2026). Tebakan sandi ulang — di sini
+>   dan di `POST /privacy/export` · `DELETE /privacy/data/{category}` — memakai **jatah
+>   login gagal akun itu** (kunci email sebagaimana `citext` mengenalinya), dipakai
+>   **sebelum** sandinya dicocokkan dan dikosongkan bila cocok. Jatah habis →
+>   `429 rate_limited` + `Retry-After`, juga dengan sandi yang benar — sama dengan
+>   `login`. Versi pertama hanya dibatasi batas per pengguna (300/menit): token akses
+>   yang dicuri cukup untuk menebak sandi ratusan kali per menit lewat pintu ini.
+>   Penolakan tercatat di jejak audit pemiliknya (`account.deletion_rejected` ·
+>   `data.export_rejected` · `data.deletion_rejected`).
 > * Akun `pending_deletion` **boleh login** (`suspended` tidak) — satu-satunya jalan
 >   membatalkan, karena `DELETE /me` mencabut semua sesinya. Selama tenggang asisten
 >   **tidak melayani**: `POST /conversations/{id}/messages` dan `…/confirmations` →
@@ -67,6 +79,32 @@ POST   /me/restore                               → 200   (batal hapus, selama 
 >   (E-216).
 > * Penghapusannya sendiri (tahap 3–6) dikerjakan proses pekerja, bukan rute —
 >   [`01`](01-DATABASE-SCHEMA.md) *Prosedur hapus akun*.
+
+> 🔧 **`/me/notifications` ditambahkan 8 Okt 2026 — dikodekan 7 Okt (6.3, K-44).**
+> [`07`](07-BACKLOG-V0.md) 6.3 meminta notifikasi *“bisa dimatikan per jenis”*; rute ini
+> belum pernah ditulis di sini. V0 **tidak mengirim** notifikasi apa pun (A-28) — jawaban
+> selalu `delivery: "none"`, supaya klien tidak menjanjikannya. Yang ada: pilihan
+> pengguna, tersimpan, dan satu gerbang (`profile.keputusan_kirim` → `now` · `later` ·
+> `silent`) yang wajib dilewati pengirim mana pun kelak.
+>
+> * `types[]` = `{ key, label, enabled, default, required }` untuk empat jenis V0:
+>   `habit_reminder` (bawaan mati) · `weekly_review` (nyala) · `recommendation` (mati) ·
+>   `account_security` (nyala, **`required`** — tidak bisa dimatikan, melewati jam tenang
+>   dan pagu). `quiet_hours` bawaan `{ "start": "22:00", "end": "07:00" }` (boleh
+>   melintasi tengah malam), `daily_cap` 10 (naskah 11 §11.17).
+> * `PATCH` mengubah **hanya** jenis yang dikirim; `quiet_hours` tidak dikirim = tidak
+>   diubah, `null` = tanpa jam tenang. Yang disimpan hanya pilihan pengguna, bukan
+>   bawaannya — bawaan yang kelak berubah tetap berlaku bagi yang belum memilih.
+>   Dua `PATCH` serentak untuk jenis berbeda tidak saling menimpa (kunci baris).
+> * Galat: jam bukan `HH:MM`, nilai jenis bukan boolean, lebih dari 20 kunci, medan tak
+>   dikenal → `400` · jenis tak dikenal → `422 unknown_notification_type` ·
+>   `account_security: false` → `422 notification_required` · jam mulai = jam selesai →
+>   `422 invalid_quiet_hours`.
+> * Disimpan di `profiles.preferences.notifications`, dengan **satu penulis per kunci**:
+>   `PATCH /me/profile` yang `preferences`-nya memuat `notifications` → `400`, dan
+>   `PATCH /me/profile` yang mengganti `preferences` utuh **mempertahankan** pilihan
+>   notifikasi yang tersimpan — klien yang mengirim preferensi lamanya tidak menimpa
+>   pilihan yang baru disimpan perangkat lain.
 
 > 🔧 **`consents` ditambahkan 17 Sep 2026 (E-164), saat tugas 1.1 ditulis.**
 > [`07`](07-BACKLOG-V0.md) 1.4 menuntut persetujuan dicatat **saat daftar** —
@@ -89,7 +127,8 @@ POST   /me/restore                               → 200   (batal hapus, selama 
 | `login` | `401 invalid_credentials` — **sama persis** untuk sandi salah dan email tak terdaftar · `403 account_not_active` · `429` per IP, dan per akun sesudah jatah login gagalnya habis — juga dengan sandi yang benar, juga bagi email tak terdaftar, dan bagi tiap ejaan yang basis data anggap email yang sama (huruf besar-kecil, juga Unicode: `vİctim@` = `victim@`) |
 | `refresh` | `401 invalid_refresh_token` — token segar **berotasi**; token bekas yang dipakai lagi **mencabut seluruh sesi**; akun yang tidak lagi `active` → sesinya dicabut |
 | rute bersesi | `401 unauthenticated` + `WWW-Authenticate: Bearer` — token palsu, kedaluwarsa, dan dicabut dijawab sama · `429` per pengguna |
-| `PATCH /me/profile` | `400` untuk medan tak dikenal dan `null` eksplisit — tidak diabaikan diam-diam |
+| `PATCH /me/profile` | `400` untuk medan tak dikenal dan `null` eksplisit — tidak diabaikan diam-diam · `400` bila `preferences` memuat `notifications` (milik `PATCH /me/notifications`, K-44) |
+| `DELETE /me` | `403 invalid_credentials` sandi salah · `429` sesudah jatah login gagal akun itu habis — juga dengan sandi yang benar (E-226) |
 
 ---
 
@@ -205,9 +244,16 @@ POST   /activities           { id?, kind, occurred_at, ended_at?, duration_secon
 > Tiap jurnal melahirkan satu memori episodik (scope `journal_raw`). Menyunting
 > jurnal mengganti isi memori itu, dan menghapusnya **mengosongkan** memori itu
 > — keduanya di transaksi yang sama dengan jurnalnya; titik vektornya
-> diselaraskan pekerja sesudah commit. `DELETE` sendiri tetap hapus-lunak
-> (`deleted_at`): isi jurnal tersimpan sampai akun dihapus — **C-31**, milik
-> pemilik.
+> diselaraskan pekerja sesudah commit.
+>
+> 🔧 **`DELETE /journal/{id}` = hapus KERAS sejak 7 Okt 2026 — C-31 diputuskan (K-46,
+> delegasi pemilik; ditulis di sini 8 Okt).** Versi pertama hapus-lunak (`deleted_at`):
+> tulisan paling pribadi yang dihapus pemiliknya tetap tersimpan sampai akunnya dihapus,
+> tanpa rute pemulihan apa pun (GDPR Art. 17 · UU PDP Pasal 8). Kini barisnya **dan**
+> event `journal.created`-nya dihapus, dan memori turunannya dikosongkan (titiknya
+> dibuang penyelaras), di satu transaksi — `204`, dan
+> `DELETE` kedua → `404`. Jurnal yang sudah dihapus-lunak sebelumnya dibuang migrasi
+> `0013`. Menghapus **semua** jurnal sekaligus: `DELETE /privacy/data/journal`.
 
 > 🔧 **`/activities` (spec/07 3.8, 24 Sep 2026 — tinjauan kontrak Sprint 3, K5).**
 > Klien **tidak** menyatakan sumber: badan dengan `source` → `400`, rute selalu
@@ -366,6 +412,7 @@ Peristiwa SSE `done`:
 
 ```
 GET    /dashboard                     → { as_of, dimensions:[{key,value,confidence,evidence_count,why}] }  🔧 6.1
+GET    /reviews/weekly               ?week=YYYY-Www   → { week, start, end, complete, timezone, axes[], not_measured[], questions[], review_version }  🔧 6.2
 GET    /recommendations              ?status=&domain=      → { items }
 POST   /recommendations/{id}/feedback { action, reason?, outcome? }   → 201
 POST   /recommendations/{id}/shown                                    → 204
@@ -381,27 +428,137 @@ POST   /recommendations/{id}/shown                                    → 204
 > cold start (belum ada check-in). `GET /recommendations` daftar terbatas terbaru
 > dulu (bukan berkursor); `?status=` divalidasi terhadap `recommendations.status`.
 
+> 🔧 **`GET /reviews/weekly` ditambahkan 8 Okt 2026 — dikodekan 7 Okt (6.2, K-45).**
+> [`07`](07-BACKLOG-V0.md) 6.2: *menjawab 5 pertanyaan naskah 4 §31*. Dihitung **saat
+> dibaca** dari habit, check-in, dan mood — tidak disimpan (menghapus sumbernya di Privacy
+> Center juga menghapus tinjauannya).
+>
+> * `?week=` minggu ISO (`2026-W40`, Senin–Minggu) di **zona profil** (`UTC` bila
+>   kosong); tanpa `week` = minggu yang sedang berjalan. Bukan pola `YYYY-Www` → `400`;
+>   minggu yang tidak ada (`W53` di tahun 52 minggu) atau di luar rentang tanggal
+>   lintas-endpoint (1900–2999) → `400 invalid_week`; minggu yang belum dimulai →
+>   `422 week_in_future`. `complete: false` selama minggunya belum berakhir.
+> * `axes[]` = `{ key, label, value, previous, unit, evidence_count, why }` — `habits`
+>   (bagian periode terjadwal yang terpenuhi, `unit: "0-1"`), lalu rata-rata yang
+>   dilaporkan sendiri: `energy` · `focus` · `mood` (`"1-5"`) · `sleep` (`"jam"`);
+>   `previous` = minggu sebelumnya atau `null`. Sumbu tanpa data tidak muncul; sumbu §31
+>   yang V0 tidak ukur ada di `not_measured[]` (`learning` · `finance` · `social` ·
+>   `career` · `lifestyle` — sama dengan dashboard 6.1).
+> * `questions[]` — selalu lima, berurutan `went_well` · `changed` · `failed` · `why` ·
+>   `change_next_week`: `{ key, question, stance, items:[{text, evidence_count}], prompt }`.
+>   Tanpa butir → `stance: "ask"` (Confidence Layer 5.4). **`why` selalu `ask`**: data
+>   observasional tidak membuktikan sebab (naskah 4 §7) — butirnya hanya alasan yang
+>   pengguna catat sendiri saat melewatkan habit dan hal yang terjadi **bersamaan**
+>   (energi di hari terpenuhi vs terlewat), bukan klaim kausal.
+> * Aturan periode = rentetan 2.4: `partial` memenuhi, `skipped` netral (tidak dihitung
+>   gagal), hari di luar jadwal dan sebelum habit dibuat tidak dihitung, periode yang
+>   belum berakhir belum gagal; habit bulanan tidak dinilai per minggu.
+>   `review_version: "tinjauan-mingguan@v1"`.
+
 ---
 
 ## Privacy Center
 
 ```
-GET    /privacy/summary      → apa yang diketahui sistem, per kategori + jumlah baris
-GET    /privacy/permissions  → izin per agent
-PUT    /privacy/permissions/{subject_type}/{subject_id}/{scope}  { action, decision, expires_at? }
-POST   /privacy/export       → 202 { export_id }   (async, tautan sekali pakai)
-GET    /privacy/export/{id}  → 200 { status, download_url?, expires_at? }
-DELETE /privacy/data/{category}                    → 202
+GET    /privacy/summary      → 200 { categories[], not_collected[] }   — jumlah per kategori, bukan isi
+GET    /privacy/permissions  → 200 { agents[] }                        — keputusan yang BERLAKU per agent
+PUT    /privacy/permissions/{subject_type}/{subject_id}/{scope}  { action, decision, expires_at? }   → 200 izin yang berlaku
+POST   /privacy/export       { password }   → 202 { export_id, status: "ready", expires_at, download_url }
+GET    /privacy/export/{id}                 → 200 { export_id, status, expires_at, download_url }
+GET    /privacy/export/{id}/download        → 200 berkas JSON, SEKALI pakai   (Content-Disposition: attachment)
+DELETE /privacy/data/{category}  { password }   → 202 { category, deleted: { <tabel>: <baris> } }
 ```
+
+> 🔧 **Diselaraskan 8 Okt 2026 dengan kode 6.4 (7 Okt; K-41 · K-42 · K-43 · K-46).**
+> Bentuk lama di atas (`POST /privacy/export` → `202 { export_id }` *async*, tautan
+> unduh di `download_url`) tidak pernah dikodekan apa adanya. Yang berubah, dan kenapa:
+>
+> * **Ekspor dan hapus meminta sandi lagi** (OWASP ASVS 4.0.3 V3.7.1) — token yang dicuri
+>   tidak boleh cukup untuk menyalin atau memusnahkan seluruh data seseorang. Tebakannya
+>   memakai jatah login gagal akun itu (**E-226**, lihat *Identity*): sandi salah →
+>   `403 invalid_credentials`, jatah habis → `429`.
+> * **Ekspor tidak dibangun di latar, dan tidak menginap.** `POST` hanya mencatat
+>   permintaan (`ready`, berlaku **1 jam**; paling banyak **5 per pengguna per jam** →
+>   `429 rate_limited`); isinya **dibangun saat diunduh** dari PostgreSQL, di bawah RLS,
+>   dalam satu potret (`REPEATABLE READ`). Redis hanya memegang status, tidak pernah isi
+>   (prinsip E-171).
+> * **Tak ada rahasia di URL** (ASVS V8.3.1). `download_url` jalur
+>   `/v1/privacy/export/{id}/download` — tanpa token; unduhan butuh **sesi pemiliknya**
+>   dan catatan yang masih `ready`. Sekali pakai, atomik (satu skrip Lua): unduhan kedua
+>   → `410 export_already_downloaded`; tak ada, kedaluwarsa, atau milik pengguna lain →
+>   `404 export_not_found`. Pembangunan yang gagal mengembalikan catatannya ke `ready`.
+>   `download_url` terisi selama `ready` — di jawaban `POST` maupun `GET /privacy/export/{id}`
+>   (🔧 8 Okt 2026: versi pertama memberi `null` di jawaban `POST`); `null` sesudah diunduh.
+> * **Isi ekspor:** `{ format: "humanverse-export", format_version: 1, exported_at,
+>   user_id, categories: { <kategori>: { <tabel>: [baris…] } } }` — tiap tabel ber-`user_id`
+>   [`01`](01-DATABASE-SCHEMA.md) tepat sekali (`tests/unit/test_cakupan_privasi.py`),
+>   tanpa `password_hash`, memori hanya yang hidup. Header `Cache-Control: no-store` dan
+>   `Content-Disposition: attachment; filename="humanverse-export-YYYYMMDD.json"`
+>   (diekspos CORS). Jejak: `data.export_requested` · `data.exported` (+ jumlah baris).
+>   `POST /privacy/export` **tanpa** `Idempotency-Key` (aturan *Tulis*).
+> * **Hapus per kategori = hapus KERAS, sampai ke turunannya** (naskah 11 §7.25 —
+>   *“tidak boleh hanya menghapus row di PostgreSQL”*), satu transaksi, jejak
+>   `data.deleted` di transaksi yang sama. `deleted` menyebut baris per tabel,
+>   termasuk turunannya. `202`, bukan `200`: titik vektor memori yang dilupakan dibuang
+>   penyelaras sesudah commit — Qdrant tidak ikut transaksi ([`01`](01-DATABASE-SCHEMA.md) §12).
+>   Idempoten dengan sendirinya: hapus kedua menghapus nol baris.
+>
+>   | `category` | Yang ikut terhapus |
+>   |---|---|
+>   | `goals` · `habits` · `checkins` · `moods` | barisnya (+ milestone · penyelesaian) · event domainnya (lewat `hapus_event_pengguna`, migrasi `0013` — `hvx_app` tetap tanpa `DELETE` atas `events`) · memori ber-scope sumbernya · rekomendasi yang mungkin diturunkan darinya (termasuk semua yang dibuat agent) · `checkins` juga `human_states` |
+>   | `journal` | `journal_entries` · event `journal.*` · memori `journal_raw` |
+>   | `activities` | `activities` |
+>   | `memories` | seluruh memori — *“lupakan semua yang kamu ingat tentangku”*; sumbernya tetap |
+>   | `conversations` | percakapan dan pesannya |
+>   | `recommendations` | rekomendasi dan umpan baliknya |
+>   | `history` | seluruh riwayat event (sisa teks bebas C-33) · memori pola perilaku (`kind='behavioral'`) |
+>
+>   `account` · `profile` · `audit` **tidak** bisa dihapus di sini (`409
+>   category_not_deletable`; ringkasan menyebut `why_not_deletable` dan jalannya — hapus
+>   akun, atau ubah lewat Profil). Kategori tak dikenal → `404 unknown_category`. Keduanya
+>   diperiksa **sebelum** sandi, jadi tidak memakai jatah tebakan.
+> * **`GET /privacy/summary`** — `categories[]` = `{ key, label, count, derived_count,
+>   tables: { <tabel>: <baris> }, deletable, retention, why_not_deletable }` untuk tiga belas
+>   kategori, dari satu potret basis data: `count` = yang kamu catat, `derived_count` =
+>   yang sistem turunkan darinya (mis. `human_states`, rekomendasi, jejak kerja agent);
+>   baris yang diarsipkan (`deleted_at`) ikut dihitung — masih tersimpan, jadi masih
+>   diketahui — kecuali memori yang sudah dilupakan (isinya sudah kosong, tinggal
+>   menunggu penyelaras). `retention` = masa simpan dalam kalimat untuk pengguna (GDPR Art. 13(2)(a)).
+>   `not_collected[]` = yang **tidak** dikumpulkan V0 (lokasi · kalender · keuangan ·
+>   wearable) — jawaban *“apa yang kamu tahu tentang saya”* juga menyebut yang tidak.
+> * **`GET /privacy/permissions`** — `agents[]` = `{ subject_type: "agent", subject_id,
+>   purpose[], permissions[] }`, tiap izin `{ scope, action, decision, source, expires_at,
+>   sensitive, confirm_each_time }` untuk tiap (scope, aksi) yang **sungguh** diminta tool
+>   agent aktif. `source: "user"` = keputusan tersimpan yang belum kedaluwarsa;
+>   `"default"` = bawaan gerbang risiko (R0·R1 `allow`, R2 ke atas `ask`, scope sensitif
+>   selalu `ask` — termasuk **`mood` sejak C-32**, K-46; R3 ke atas `confirm_each_time`).
+>   Scope sensitif di pemanggilan agent lain (delegasi) **tidak** ditampilkan: delegasi
+>   tidak membaca apa pun, izin yang bermakna milik agent yang membaca (**E-227**).
+> * **`PUT /privacy/permissions/…`** — `{ action: read|write|execute|share|delete,
+>   decision: allow|deny|ask, expires_at? }` → `200` izin yang berlaku sesudahnya
+>   (bentuk butir `permissions[]`). Hanya untuk (agent, scope, aksi) yang diminta —
+>   selainnya `404 permission_not_requested`, bukan baris yang tak pernah ditanyakan;
+>   `expires_at` wajib berzona dan di depan → selainnya `422 expires_at_in_past`.
+>   Idempoten dengan sendirinya.
 
 > 🔧 **`{subject_type}` ditambahkan 17 Sep 2026 (E-163), saat mesin izin 1.5
 > ditulis.** Kunci unik `permissions` di [`01`](01-DATABASE-SCHEMA.md) adalah
 > `(user_id, subject_type, subject_id, scope, action)`. Nama agent
 > (`^[a-z][a-z0-9-]{2,39}$`, [`05`](05-AGENT-CONTRACTS.md)) dan id integrasi
 > bisa sama — tanpa `subject_type`, `PUT` tidak bisa menunjuk satu baris.
-> `decision: ask` = kembali bertanya. Rutenya datang bersama layar 6.4.
+> `decision: ask` = kembali bertanya. ✅ Rutenya dikodekan bersama layar 6.4 (7 Okt
+> 2026): `{subject_type}` selain `agent` lolos bentuk jalur, tetapi V0 hanya punya izin
+> agent — `404 permission_not_requested`.
 >
 > Ini menerjemahkan layar Privacy Center naskah 5 §26 menjadi endpoint.
 > **`GET /privacy/summary` sengaja mengembalikan jumlah baris, bukan isinya** —
 > layar itu untuk menjawab *"apa yang kamu tahu tentang saya"*, dan jawabannya
 > harus bisa dibaca tanpa menumpahkan seluruh data ke layar.
+
+| Rute | Galat yang dijanjikan |
+|---|---|
+| `POST /privacy/export` | `403 invalid_credentials` · `429` (5 per jam per pengguna, atau jatah login gagal akun habis — E-226) |
+| `GET /privacy/export/{id}` | `404 export_not_found` — tidak ada, kedaluwarsa, atau milik pengguna lain (tanpa membedakannya) |
+| `GET /privacy/export/{id}/download` | `404 export_not_found` · `410 export_already_downloaded` |
+| `DELETE /privacy/data/{category}` | `404 unknown_category` · `409 category_not_deletable` — keduanya sebelum sandi · `403 invalid_credentials` · `429` |
+| `PUT /privacy/permissions/…` | `400` bentuk jalur/badan salah, `expires_at` tanpa zona · `404 permission_not_requested` · `422 expires_at_in_past` |
