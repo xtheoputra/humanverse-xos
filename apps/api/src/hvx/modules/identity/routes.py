@@ -94,6 +94,7 @@ async def keluar(request: Request, pengguna: PenggunaDiperlukan, sesi: Sesi) -> 
 async def hapus_akun(
     request: Request, badan: PermintaanHapusAkun, pengguna: PenggunaDiperlukan, sesi: Sesi
 ) -> JawabanHapusDijadwalkan:
+    await batasi_kredensial_ip(request)  # argon2 per IP, sama dengan login (S2)
     dijadwalkan = await service.jadwalkan_penghapusan(
         platform.engine_dari(request),
         sesi,

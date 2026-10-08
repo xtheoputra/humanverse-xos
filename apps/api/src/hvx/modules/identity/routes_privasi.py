@@ -20,7 +20,7 @@ from hvx.modules import platform
 from . import privasi, service
 from .dependensi import PenggunaDiperlukan
 from .izin import MesinIzin, mesin_izin
-from .laju import penjaga_gagal_masuk
+from .laju import batasi_kredensial_ip, penjaga_gagal_masuk
 from .schemas import (
     DaftarIzinAgent,
     IzinBerlaku,
@@ -118,6 +118,7 @@ async def minta_ekspor(
     hasil = await platform.pembatas_laju(request).ambil(privasi.BATAS_EKSPOR, str(pengguna.user_id))
     if not hasil.lolos:
         raise platform.galat_terlalu_sering(hasil)
+    await batasi_kredensial_ip(request)  # argon2 per IP, sama dengan login (S2)
     engine = platform.engine_dari(request)
     ip_hash = platform.sidik_ip(request)
     await service.verifikasi_sandi_ulang(
@@ -183,6 +184,7 @@ async def hapus_data(
     """Idempoten dengan sendirinya — hapus kedua menghapus nol baris."""
     penghapus = _penghapus(request)
     privasi.periksa_kategori_bisa_dihapus(category, penghapus)  # 404/409 sebelum sandi ditebak
+    await batasi_kredensial_ip(request)  # argon2 per IP, sama dengan login (S2)
     engine = platform.engine_dari(request)
     ip_hash = platform.sidik_ip(request)
     await service.verifikasi_sandi_ulang(

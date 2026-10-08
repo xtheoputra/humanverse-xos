@@ -9571,6 +9571,60 @@ MUTASI: list[Mutasi] = [
         harus_memuat="hapus `history` meninggalkan proyeksi penyelesaian habit di aktivitas",
         kelompok="db",
     ),
+    Mutasi(
+        "S2",
+        "hapus data Privacy Center mencocokkan sandi tanpa batas per IP (argon2 ×100 login)",
+        [
+            Sunting(
+                f"{MODUL}/identity/routes_privasi.py",
+                "    privasi.periksa_kategori_bisa_dihapus(category, penghapus)  # 404/409 sebelum "
+                "sandi ditebak\n    await batasi_kredensial_ip(request)",
+                "    privasi.periksa_kategori_bisa_dihapus(category, penghapus)  # 404/409 sebelum "
+                "sandi ditebak\n    pass",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_privacy_center.py::"
+            "test_sandi_ulang_dibatasi_per_ip_seperti_login[hapus-data]"
+        ),
+        harus_memuat="pencocokan sandi ke-4 dari IP yang sama (daftar + sandi ulang) tidak dibatasi",
+        kelompok="db",
+    ),
+    Mutasi(
+        "S2",
+        "ekspor Privacy Center mencocokkan sandi tanpa batas per IP",
+        [
+            Sunting(
+                f"{MODUL}/identity/routes_privasi.py",
+                "        raise platform.galat_terlalu_sering(hasil)\n"
+                "    await batasi_kredensial_ip(request)",
+                "        raise platform.galat_terlalu_sering(hasil)\n    pass",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_privacy_center.py::"
+            "test_sandi_ulang_dibatasi_per_ip_seperti_login[ekspor]"
+        ),
+        harus_memuat="pencocokan sandi ke-4 dari IP yang sama (daftar + sandi ulang) tidak dibatasi",
+        kelompok="db",
+    ),
+    Mutasi(
+        "S2",
+        "DELETE /me mencocokkan sandi tanpa batas per IP",
+        [
+            Sunting(
+                f"{MODUL}/identity/routes.py",
+                "    await batasi_kredensial_ip(request)  # argon2 per IP, sama dengan login (S2)\n",
+                "",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_privacy_center.py::"
+            "test_sandi_ulang_dibatasi_per_ip_seperti_login[hapus-akun]"
+        ),
+        harus_memuat="pencocokan sandi ke-4 dari IP yang sama (daftar + sandi ulang) tidak dibatasi",
+        kelompok="db",
+    ),
     # ── Sprint 6 · 6.5 hapus akun (Stage B): sapuan tahap 3–6 oleh proses pekerja ──
     Mutasi(
         "6.5b",

@@ -726,3 +726,59 @@ async def test_hapus_sumber_membuang_proyeksi_perilaku_turunannya(
         )
         == 1
     ), f"hapus `{kategori}` membuang aktivitas yang DICATAT pengguna"
+
+
+@pytest.fixture
+async def api_kredensial_ip_kecil(
+    basis_data_termigrasi: Callable[[str], BasisDataV0], url_redis_uji: str
+) -> AsyncIterator[ApiUji]:
+    """Aplikasi utuh dengan batas pencocokan sandi per IP 3/10 menit — daftar memakai satu."""
+    db = basis_data_termigrasi("privasi")
+    awalan = f"uji-{uuid.uuid4().hex[:12]}"
+    app = create_app(
+        Settings(
+            env="test",
+            database_url=db.dsn_aplikasi,
+            redis_url=url_redis_uji,
+            redis_prefix=awalan,
+            rate_limit_auth_ip="3/600",
+        )
+    )
+    async with (
+        LifespanManager(app),
+        httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://uji") as k,
+    ):
+        yield ApiUji(app=app, klien=k, db=db, awalan_redis=awalan, engine_pekerja=None)
+
+
+@pytest.mark.parametrize("pintu", ["hapus-data", "ekspor", "hapus-akun"])
+async def test_sandi_ulang_dibatasi_per_ip_seperti_login(
+    api_kredensial_ip_kecil: ApiUji, pintu: str
+) -> None:
+    """Tinjauan keamanan S5–6 (S2): tiap sandi ulang menjalankan argon2id (64 MiB, di thread)
+    — sama mahalnya dengan login. Login dibatasi per IP (`rate_limit_auth_ip`, 30/10 menit)
+    justru karena itu; pintu sandi ulang hanya dibatasi per pengguna (300/menit) dan per
+    akun — yang DIKOSONGKAN tiap kali sandinya benar. Satu akun cukup untuk memaksa ratusan
+    argon2 per menit per IP: 100× batas login. Kini pencocokan sandi di pintu mana pun memakai
+    jatah per IP yang sama, SEBELUM argon2 — juga untuk sandi yang benar."""
+    api = api_kredensial_ip_kecil
+    r = await api.klien.post("/v1/auth/register", json=_daftar_badan(_email()))
+    assert r.status_code == 201, r.text
+    token = r.json()["tokens"]["access_token"]
+
+    async def coba(sandi: str) -> Any:
+        if pintu == "hapus-data":
+            return await _hapus(api, token, "journal", sandi=sandi)
+        if pintu == "ekspor":
+            return await _minta_ekspor(api, token, sandi=sandi)
+        return await api.klien.request(
+            "DELETE", "/v1/me", json={"password": sandi}, headers=auth(token)
+        )
+
+    for _ in range(2):
+        assert (await coba("tebakan-yang-salah-terus")).status_code == 403
+    r = await coba(SANDI)
+    assert r.status_code == 429, (
+        f"pencocokan sandi ke-4 dari IP yang sama (daftar + sandi ulang) tidak dibatasi: {r.text}"
+    )
+    assert "Retry-After" in r.headers
