@@ -12016,6 +12016,33 @@ MUTASI: list[Mutasi] = [
         harus_memuat="dashboard tidak menyajikan hari terbaru",
         kelompok="db",
     ),
+    # ── 5.4 Confidence Layer — enam kerusakan dicoba, semuanya tertangkap; dua jadi bukti ──
+    Mutasi(
+        "5.4",
+        "satu bukti tidak lagi cukup (>= jadi >) — ambang bergeser diam-diam",
+        [
+            Sunting(
+                f"{MODUL}/intelligence/keyakinan.py",
+                "evidence_count >= BUKTI_MINIMUM",
+                "evidence_count > BUKTI_MINIMUM",
+            )
+        ],
+        _pytest("tests/unit/test_keyakinan.py::test_satu_bukti_cukup_untuk_menyatakan"),
+        harus_memuat="satu bukti harus boleh MENYATAKAN",
+    ),
+    Mutasi(
+        "5.4",
+        "bukti negatif (mustahil) dianggap cukup untuk menyatakan",
+        [
+            Sunting(
+                f"{MODUL}/intelligence/keyakinan.py",
+                "evidence_count >= BUKTI_MINIMUM",
+                "abs(evidence_count) >= BUKTI_MINIMUM",
+            )
+        ],
+        _pytest("tests/unit/test_keyakinan.py::test_negatif_yang_mustahil_tetap_bertanya"),
+        harus_memuat="bukti negatif harus BERTANYA",
+    ),
 ]
 
 

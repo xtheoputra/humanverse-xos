@@ -22,7 +22,9 @@ def test_nol_bukti_bertanya() -> None:
 def test_satu_bukti_cukup_untuk_menyatakan() -> None:
     # Ambang V0 = 1: satu bukti sudah boleh dinyatakan. Apakah SATU cukup untuk
     # diyakini adalah pertanyaan pita (#34) — bukan pertanyaan sikap nol/bukan-nol.
-    assert intelligence.sikap(1) is Sikap.MENYATAKAN
+    assert intelligence.sikap(1) is Sikap.MENYATAKAN, (
+        "satu bukti harus boleh MENYATAKAN (ambang V0 = 1)"
+    )
     assert intelligence.cukup_untuk_menyatakan(1)
     assert intelligence.BUKTI_MINIMUM == 1
 
@@ -35,4 +37,6 @@ def test_bukti_banyak_tetap_menyatakan(n: int) -> None:
 def test_negatif_yang_mustahil_tetap_bertanya() -> None:
     # evidence_count integer tak pernah negatif (spec/01 CHECK >= 0); kalaupun begitu,
     # sisi amannya BERTANYA — bukan menyatakan dari bukti yang tak ada.
-    assert intelligence.sikap(-1) is Sikap.BERTANYA
+    assert intelligence.sikap(-1) is Sikap.BERTANYA, (
+        "bukti negatif harus BERTANYA, bukan menyatakan"
+    )
