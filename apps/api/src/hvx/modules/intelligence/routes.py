@@ -48,13 +48,19 @@ async def daftar_rekomendasi(
     pengguna: identity.PenggunaDiperlukan,
     status: Status = None,
     domain: Domain = None,
+    limit: platform.Batas = platform.BATAS_BAWAAN,
+    cursor: platform.Kursor = None,
 ) -> DaftarRekomendasi:
     if status is not None and status not in _STATUS:
         raise platform.GalatApi(400, "invalid_status", "status rekomendasi tak dikenal")
-    items = await rekomendasi.daftar_rekomendasi(
-        platform.engine_dari(request), pengguna.user_id, status=status, domain=domain
+    return await rekomendasi.daftar_rekomendasi(
+        platform.engine_dari(request),
+        pengguna.user_id,
+        status=status,
+        domain=domain,
+        batas=limit,
+        kursor=cursor,
     )
-    return DaftarRekomendasi(items=items)
 
 
 @router.post("/recommendations/{rekomendasi_id}/shown", status_code=204)

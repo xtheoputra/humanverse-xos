@@ -419,7 +419,7 @@ Peristiwa SSE `done`:
 ```
 GET    /dashboard                     → { as_of, dimensions:[{key,value,confidence,evidence_count,why}] }  🔧 6.1
 GET    /reviews/weekly               ?week=YYYY-Www   → { week, start, end, complete, timezone, axes[], not_measured[], questions[], review_version }  🔧 6.2
-GET    /recommendations              ?status=&domain=      → { items }
+GET    /recommendations              ?status=&domain=&limit=&cursor=   → { items, next_cursor }   🔧 K5
 POST   /recommendations/{id}/feedback { action, reason?, outcome? }   → 201
 POST   /recommendations/{id}/shown                                    → 204
 ```
@@ -431,8 +431,16 @@ POST   /recommendations/{id}/shown                                    → 204
 > ukuran disepakati (**A-19**/**B-38**, [`../docs/99`](../docs/99-CATATAN-AUDIT.md)):
 > menampilkannya sebagai angka = mengambil posisi dalam model yang belum diputuskan
 > pemilik, jadi tidak ditampilkan sampai keputusan itu ada. `dimensions` kosong =
-> cold start (belum ada check-in). `GET /recommendations` daftar terbatas terbaru
-> dulu (bukan berkursor); `?status=` divalidasi terhadap `recommendations.status`.
+> cold start (belum ada check-in). `GET /recommendations` terbaru dulu;
+> `?status=` divalidasi terhadap `recommendations.status` (`400 invalid_status`).
+>
+> 🔧 **`GET /recommendations` berkursor — 8 Okt 2026 (tinjauan kontrak Sprint 5–6, K5).**
+> Versi pertama (dan kalimat di atas) menyebutnya *“daftar terbatas terbaru dulu (bukan
+> berkursor)”*: 50 baris terbaru, sisanya **terpotong diam-diam** — yang dilarang aturan
+> *Halaman* di atas, karena rekomendasi **tidak** dibatasi saat menulis (satu per habit per
+> hari dilewati, 5.5, ditambah saran agent). Kini mengikuti aturan *Halaman*: `?limit=`
+> (maks 100, bawaan 50) + `?cursor=` keyset `(created_at, id)` milik daftar ini;
+> `next_cursor` `null` di halaman terakhir; kursor rusak → `400 invalid_cursor`.
 
 > 🔧 **`GET /reviews/weekly` ditambahkan 8 Okt 2026 — dikodekan 7 Okt (6.2, K-45).**
 > [`07`](07-BACKLOG-V0.md) 6.2: *menjawab 5 pertanyaan naskah 4 §31*. Dihitung **saat

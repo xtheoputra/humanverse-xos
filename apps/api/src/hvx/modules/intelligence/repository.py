@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Mapping, Sequence
+from datetime import datetime
 from decimal import Decimal
 from typing import Any
 from uuid import UUID
@@ -261,8 +262,10 @@ _DAFTAR_REKOMENDASI = text(
     WHERE user_id = :user_id
       AND (CAST(:status AS text) IS NULL OR status = :status)
       AND (CAST(:domain AS text) IS NULL OR domain = :domain)
+      AND (CAST(:k_waktu AS timestamptz) IS NULL
+           OR (created_at, id) < (CAST(:k_waktu AS timestamptz), CAST(:k_id AS uuid)))
     ORDER BY created_at DESC, id DESC
-    LIMIT :limit
+    LIMIT :batas
     """
 )
 
@@ -281,12 +284,20 @@ async def daftar_rekomendasi(
     *,
     status: str | None,
     domain: str | None,
-    limit: int,
+    batas: int,
+    sesudah: tuple[datetime, UUID] | None,
 ) -> list[RekomendasiRingkas]:
     baris = (
         await conn.execute(
             _DAFTAR_REKOMENDASI,
-            {"user_id": user_id, "status": status, "domain": domain, "limit": limit},
+            {
+                "user_id": user_id,
+                "status": status,
+                "domain": domain,
+                "k_waktu": sesudah[0] if sesudah else None,
+                "k_id": sesudah[1] if sesudah else None,
+                "batas": batas,
+            },
         )
     ).all()
     return [_rekomendasi_ringkas(b) for b in baris]

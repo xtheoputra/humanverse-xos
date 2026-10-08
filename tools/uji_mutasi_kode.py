@@ -10173,6 +10173,56 @@ MUTASI: list[Mutasi] = [
         harus_memuat="saran tier tidak mengikuti energi yang dipakai skornya",
         kelompok="db",
     ),
+    Mutasi(
+        "E-232",
+        "turunan habits ikut menghapus aktivitas yang DICATAT pengguna (K4 tinjauan kontrak)",
+        [
+            Sunting(
+                f"{MODUL}/activities/privasi.py",
+                "\"DELETE FROM activities WHERE user_id = :u AND source = 'inferred' AND kind = :kind\",",
+                "\"DELETE FROM activities WHERE user_id = :u AND (source = 'inferred' AND kind = :kind"
+                " OR source = 'manual')\",",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_privacy_center.py::"
+            "test_hapus_sumber_membuang_proyeksi_perilaku_turunannya[habits]"
+        ),
+        harus_memuat="membuang aktivitas yang DICATAT pengguna",
+        kelompok="db",
+    ),
+    Mutasi(
+        "K5",
+        "GET /recommendations tak pernah memberi next_cursor — sisanya terpotong diam-diam",
+        [
+            Sunting(
+                f"{MODUL}/intelligence/rekomendasi.py",
+                '        lanjut = platform.kursor_waktu("recommendations", items[-1].created_at, items[-1].id)\n',
+                "        lanjut = None\n",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_dashboard.py::test_daftar_rekomendasi_tidak_dipotong_diam_diam"
+        ),
+        harus_memuat="GET /recommendations memotong diam-diam",
+        kelompok="db",
+    ),
+    Mutasi(
+        "K5",
+        "keyset rekomendasi memakai <= — baris batas halaman terulang di halaman berikutnya",
+        [
+            Sunting(
+                f"{MODUL}/intelligence/repository.py",
+                "           OR (created_at, id) < (CAST(:k_waktu AS timestamptz), CAST(:k_id AS uuid)))\n",
+                "           OR (created_at, id) <= (CAST(:k_waktu AS timestamptz), CAST(:k_id AS uuid)))\n",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_dashboard.py::test_daftar_rekomendasi_tidak_dipotong_diam_diam"
+        ),
+        harus_memuat="halaman rekomendasi mengulang baris",
+        kelompok="db",
+    ),
     # ── Sprint 6 · 6.6 luring dasar: antrean penyelesaian habit (Flutter, K-40) ──
     Mutasi(
         "6.6",

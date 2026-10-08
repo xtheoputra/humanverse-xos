@@ -102,6 +102,7 @@ class RekomendasiRingkas(BaseModel):
 
 class DaftarRekomendasi(BaseModel):
     items: list[RekomendasiRingkas]
+    next_cursor: str | None  # spec/04 *Halaman* — `null` di halaman terakhir
 
 
 # ── spec/07 6.2 — tinjauan mingguan (naskah 4 §31, K-45) ─────────────────────

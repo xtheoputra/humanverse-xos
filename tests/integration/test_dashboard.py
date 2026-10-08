@@ -138,3 +138,44 @@ async def test_tandai_shown_rekomendasi_tak_dikenal_404(api_bersama: ApiUji) -> 
     )
     assert r.status_code == 404, r.text
     assert r.json()["error"]["code"] == "recommendation_not_found"
+
+
+# ── Tinjauan kontrak Sprint 5–6 (8 Okt 2026) ─────────────────────────────────
+
+
+async def test_daftar_rekomendasi_tidak_dipotong_diam_diam(api_bersama: ApiUji) -> None:
+    """spec/04 *Halaman*: daftar tanpa `?cursor=` dibatasi SAAT MENULIS dan *“tidak pernah
+    dipotong diam-diam”*. Rekomendasi TIDAK dibatasi saat menulis (satu per habit per hari
+    dilewati, plus saran agent) — jadi `GET /recommendations` wajib berkursor: semua baris
+    tercapai, tidak ada yang terulang, `next_cursor` `null` di halaman terakhir."""
+    uid, token = await api_bersama.pengguna_baru()
+    rid = uuid.uuid4
+    with psycopg.connect(psycopg_dsn(api_bersama.db.dsn_pemilik)) as k:
+        semua = [str(rid()) for _ in range(53)]
+        for i, r_id in enumerate(semua):
+            k.execute(
+                "INSERT INTO recommendations (id, user_id, domain, title, status, created_at) "
+                "VALUES (%s, %s, 'habit', 'saran', 'pending', "
+                "now() - make_interval(secs => %s))",
+                (r_id, uid, i % 7),  # waktu kembar → pemecah seri `id` ikut diuji
+            )
+        k.commit()
+
+    terbaca: list[str] = []
+    jalur = "/v1/recommendations?status=pending&limit=20"
+    for _ in range(10):
+        r = await api_bersama.klien.get(jalur, headers=auth(token))
+        assert r.status_code == 200, r.text
+        isi = r.json()
+        terbaca += [x["id"] for x in isi["items"]]
+        if isi.get("next_cursor") is None:
+            break
+        jalur = f"/v1/recommendations?status=pending&limit=20&cursor={isi['next_cursor']}"
+    assert len(terbaca) == len(set(terbaca)), "halaman rekomendasi mengulang baris"
+    assert set(terbaca) == set(semua), (
+        f"GET /recommendations memotong diam-diam: {len(terbaca)} dari {len(semua)} terbaca"
+    )
+
+    r = await api_bersama.klien.get("/v1/recommendations?cursor=bukan-kursor", headers=auth(token))
+    assert r.status_code == 400, r.text
+    assert r.json()["error"]["code"] == "invalid_cursor"
