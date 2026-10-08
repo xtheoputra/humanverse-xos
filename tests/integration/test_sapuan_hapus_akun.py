@@ -21,7 +21,7 @@ import uuid
 from collections.abc import AsyncIterator
 from datetime import date, timedelta
 from functools import partial
-from typing import Any
+from typing import Any, cast
 from uuid import UUID
 
 import httpx
@@ -29,7 +29,7 @@ import psycopg
 import pytest
 from _bantuan_db import ApiUji, auth, psycopg_dsn
 from psycopg import sql
-from test_auth import SANDI
+from test_auth import SANDI, _daftar_badan, _email
 from test_hapus_akun import _akun, _daftar
 
 from hvx import pekerja
@@ -697,3 +697,81 @@ async def test_buang_titik_pada_koleksi_yang_belum_ada_bukan_galat(url_qdrant_uj
         await memory.buang_titik_pengguna(klien, f"tidak-ada-{uuid.uuid4().hex[:10]}", uuid.uuid4())
     finally:
         await klien.tutup()
+
+
+async def test_token_segar_lama_sesudah_akun_dihapus_tidak_menghidupkan_id_aslinya(
+    api_bersama: ApiUji,
+) -> None:
+    """Tinjauan keamanan S5–6 (S4): token segar yang sudah diputar meninggalkan penanda `bekas`
+    di Redis selama umur token segar (30 hari) — dan penanda itu menyimpan `user_id` ASLI.
+    Sesudah akun dihapus, siapa pun yang memegang token lama itu (perangkat lama yang
+    mengulang penyegaran, K-21; atau pencurinya) memicu jejak `session.refresh_reused` atas
+    id asli + `ip_hash` peminta — tiap kali dikirim ulang. Itu persis yang dibuang sapuan:
+    K-39 (*id asli tidak terbaca di kolom mana pun*) dan C-34 (*tanpa jejak jaringan*)."""
+    api = api_bersama
+    r = await api.klien.post("/v1/auth/register", json=_daftar_badan(_email()))
+    assert r.status_code == 201, r.text
+    uid = UUID(r.json()["user"]["id"])
+    lama = r.json()["tokens"]["refresh_token"]
+    r = await api.klien.post("/v1/auth/refresh", json={"refresh_token": lama})
+    assert r.status_code == 200, r.text  # `lama` kini token BEKAS
+
+    _tandai_hapus(api, uid, -60)
+    assert await _sapu(api, None) >= 1
+    assert not _ada_akun(api, uid), "kontrol: akun tidak terhapus"
+    assert _jumlah_audit(api, uid) == 0, "kontrol: sapuan meninggalkan id asli"
+
+    for _ in range(2):
+        ulang = await api.klien.post("/v1/auth/refresh", json={"refresh_token": lama})
+        assert ulang.status_code == 401, ulang.text
+    with _pemilik(api) as k:
+        (bocor,) = k.execute(
+            "SELECT count(*) FROM audit_logs WHERE audit_logs::text LIKE %s", (f"%{uid}%",)
+        ).fetchone() or (0,)
+    assert bocor == 0, "token segar lama menulis id asli akun yang sudah dihapus ke audit_logs"
+
+
+class _SesiTakTerjangkau:
+    """Redis jatuh tepat sesudah commit sapuan — pencabutan sesi gagal (dicatat, tak dilempar)."""
+
+    async def cabut_semua(self, user_id: UUID) -> int:
+        raise RuntimeError("redis tidak terjangkau")
+
+
+@pytest.mark.parametrize("pintu", ["refresh", "logout"])
+async def test_sesi_yang_lolos_pencabutan_sapuan_tidak_menghidupkan_id_aslinya(
+    api_bersama: ApiUji, pintu: str
+) -> None:
+    """Tinjauan keamanan S5–6 (S4, jalur kedua): pencabutan sesi sesudah commit sapuan boleh
+    gagal — *“token yang tersisa … mati di penyegaran pertama”* (penghapusan.py). Penyegaran
+    itu memang menolak, tetapi lebih dulu menulis `session.revoked` atas id ASLI akun yang
+    sudah dihapus, lengkap dengan `ip_hash` peminta (K-39 · C-34); `logout` dengan token
+    akses yang tersisa menulis `session.logged_out` yang sama."""
+    api = api_bersama
+    r = await api.klien.post("/v1/auth/register", json=_daftar_badan(_email()))
+    assert r.status_code == 201, r.text
+    uid = UUID(r.json()["user"]["id"])
+    segar = r.json()["tokens"]["refresh_token"]
+    akses = r.json()["tokens"]["access_token"]
+
+    _tandai_hapus(api, uid, -60)
+    terhapus = await identity.sapu_akun_jatuh_tempo(
+        api.engine_pekerja,
+        _settings(api),
+        sesi=cast(identity.PenyimpanSesi, _SesiTakTerjangkau()),
+        buang_titik=None,
+    )
+    assert terhapus >= 1
+    assert not _ada_akun(api, uid), "kontrol: akun tidak terhapus"
+
+    if pintu == "refresh":
+        jawab = await api.klien.post("/v1/auth/refresh", json={"refresh_token": segar})
+        assert jawab.status_code == 401, jawab.text
+    else:
+        jawab = await api.klien.post("/v1/auth/logout", headers=auth(akses))
+        assert jawab.status_code in (204, 401), jawab.text
+    with _pemilik(api) as k:
+        (bocor,) = k.execute(
+            "SELECT count(*) FROM audit_logs WHERE audit_logs::text LIKE %s", (f"%{uid}%",)
+        ).fetchone() or (0,)
+    assert bocor == 0, f"{pintu} sesi yang lolos sapuan menulis id asli akun yang dihapus"

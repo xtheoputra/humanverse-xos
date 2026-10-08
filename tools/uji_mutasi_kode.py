@@ -9676,6 +9676,57 @@ MUTASI: list[Mutasi] = [
         harus_memuat="human state dari check-in yang sudah dihapus hidup terus",
         kelompok="db",
     ),
+    Mutasi(
+        "S4",
+        "token segar bekas sesudah akun dihapus menulis jejak atas id ASLI (K-39 · C-34)",
+        [
+            Sunting(
+                f"{MODUL}/identity/service.py",
+                "            if await repository.kunci_akun_ada(conn, curian.user_id):\n",
+                "            if True:\n",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_sapuan_hapus_akun.py::"
+            "test_token_segar_lama_sesudah_akun_dihapus_tidak_menghidupkan_id_aslinya"
+        ),
+        harus_memuat="token segar lama menulis id asli akun yang sudah dihapus ke audit_logs",
+        kelompok="db",
+    ),
+    Mutasi(
+        "S4",
+        "sesi yang lolos pencabutan sapuan menulis `session.revoked` atas id ASLI",
+        [
+            Sunting(
+                f"{MODUL}/identity/service.py",
+                "        if not aktif and await repository.kunci_akun_ada(conn, pemilik.user_id):\n",
+                "        if not aktif:\n",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_sapuan_hapus_akun.py::"
+            "test_sesi_yang_lolos_pencabutan_sapuan_tidak_menghidupkan_id_aslinya[refresh]"
+        ),
+        harus_memuat="refresh sesi yang lolos sapuan menulis id asli akun yang dihapus",
+        kelompok="db",
+    ),
+    Mutasi(
+        "S4",
+        "logout dengan token akses yang lolos sapuan menulis `session.logged_out` atas id ASLI",
+        [
+            Sunting(
+                f"{MODUL}/identity/service.py",
+                "        if await repository.kunci_akun_ada(conn, pengguna.user_id):\n",
+                "        if True:\n",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_sapuan_hapus_akun.py::"
+            "test_sesi_yang_lolos_pencabutan_sapuan_tidak_menghidupkan_id_aslinya[logout]"
+        ),
+        harus_memuat="logout sesi yang lolos sapuan menulis id asli akun yang dihapus",
+        kelompok="db",
+    ),
     # ── Sprint 6 · 6.5 hapus akun (Stage B): sapuan tahap 3–6 oleh proses pekerja ──
     Mutasi(
         "6.5b",

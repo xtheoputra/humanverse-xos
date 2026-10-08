@@ -222,16 +222,22 @@ async def segarkan(
     if hasil.dipakai_ulang is not None:
         curian = hasil.dipakai_ulang
         async with platform.transaksi_pengguna(engine, curian.user_id) as conn:
-            await audit(
-                conn,
-                aksi="session.refresh_reused",
-                aktor_tipe="system",
-                aktor_id="auth",
-                user_id=curian.user_id,
-                subjek_tipe="session",
-                subjek_id=str(curian.sesi_id),
-                ip_hash=ip_hash,
-            )
+            # Penanda token bekas hidup 30 hari di Redis dan membawa `user_id` ASLI. Akun yang
+            # sudah dihapus tidak mendapat jejak baru atas id aslinya — sapuan sudah
+            # menganonimkannya (K-39) dan membuang jejak jaringannya (C-34); tanpa pemeriksaan
+            # ini tiap pengiriman ulang token lama menghidupkan keduanya (tinjauan keamanan
+            # S5–6, S4).
+            if await repository.kunci_akun_ada(conn, curian.user_id):
+                await audit(
+                    conn,
+                    aksi="session.refresh_reused",
+                    aktor_tipe="system",
+                    aktor_id="auth",
+                    user_id=curian.user_id,
+                    subjek_tipe="session",
+                    subjek_id=str(curian.sesi_id),
+                    ip_hash=ip_hash,
+                )
     if hasil.token is None:
         raise _galat(401, "invalid_refresh_token", "Token segar tidak sah atau sudah dipakai.")
     return hasil.token
@@ -242,7 +248,8 @@ async def _masih_aktif(engine: AsyncEngine, pemilik: SesiAktif, *, ip_hash: str 
     async with platform.transaksi_pengguna(engine, pemilik.user_id) as conn:
         akun = await repository.ambil_pengguna(conn, pemilik.user_id)
         aktif = akun is not None and akun.status in _STATUS_SESI_SAH
-        if not aktif:
+        # Akun yang barisnya sudah dihapus sapuan: tanpa jejak atas id aslinya (S4, K-39).
+        if not aktif and await repository.kunci_akun_ada(conn, pemilik.user_id):
             await audit(
                 conn,
                 aksi="session.revoked",
@@ -262,16 +269,19 @@ async def keluar(
 ) -> None:
     await sesi.cabut(pengguna.sesi_id)
     async with platform.transaksi_pengguna(engine, pengguna.user_id) as conn:
-        await audit(
-            conn,
-            aksi="session.logged_out",
-            aktor_tipe="user",
-            aktor_id=str(pengguna.user_id),
-            user_id=pengguna.user_id,
-            subjek_tipe="session",
-            subjek_id=str(pengguna.sesi_id),
-            ip_hash=ip_hash,
-        )
+        # Token akses yang lolos pencabutan sapuan (Redis jatuh sesudah commit): akun sudah
+        # tiada — tanpa jejak atas id aslinya (S4, K-39).
+        if await repository.kunci_akun_ada(conn, pengguna.user_id):
+            await audit(
+                conn,
+                aksi="session.logged_out",
+                aktor_tipe="user",
+                aktor_id=str(pengguna.user_id),
+                user_id=pengguna.user_id,
+                subjek_tipe="session",
+                subjek_id=str(pengguna.sesi_id),
+                ip_hash=ip_hash,
+            )
 
 
 async def verifikasi_sandi_ulang(

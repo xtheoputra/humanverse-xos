@@ -73,6 +73,16 @@ _PENGGUNA = text(
 )
 
 
+# Baris akun masih ADA — dan tetap ada sampai transaksi pemanggil selesai: `FOR KEY SHARE`
+# menahan `DELETE` sapuan hapus akun (tahap 3, `FOR UPDATE`), jadi jejak yang ditulis di
+# transaksi ini masih ikut dianonimkan sapuan; sapuan yang menang lebih dulu → `False`.
+_KUNCI_AKUN_ADA = text("SELECT 1 FROM users WHERE id = :id FOR KEY SHARE")
+
+
+async def kunci_akun_ada(conn: AsyncConnection, user_id: UUID) -> bool:
+    return (await conn.execute(_KUNCI_AKUN_ADA, {"id": user_id})).first() is not None
+
+
 async def ambil_pengguna(conn: AsyncConnection, user_id: UUID) -> PenggunaRingkas | None:
     baris = (await conn.execute(_PENGGUNA, {"user_id": user_id})).mappings().first()
     return PenggunaRingkas.model_validate(dict(baris)) if baris else None
