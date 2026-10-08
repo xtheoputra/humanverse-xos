@@ -3990,20 +3990,6 @@ MUTASI: list[Mutasi] = [
     ),
     Mutasi(
         "3.6",
-        "ekstraksi membaca jurnal yang sudah dihapus",
-        [
-            Sunting(
-                f"{MODUL}/journal/repository.py",
-                "    WHERE id = :id AND deleted_at IS NULL" + NL + "    FOR SHARE",
-                "    WHERE id = :id" + NL + "    FOR SHARE",
-            )
-        ],
-        _pytest(f"{UJI_MEMORI}::test_jurnal_yang_dihapus_sebelum_diekstrak_tidak_diingat"),
-        harus_memuat="jurnal terhapus tetap diingat",
-        kelompok="db",
-    ),
-    Mutasi(
-        "3.6",
         "ekstraksi tanpa kunci BAGI — PATCH serentak kalah, memori memuat isi lama",
         [
             Sunting(
@@ -5058,23 +5044,6 @@ MUTASI: list[Mutasi] = [
         ],
         _pytest(f"{UJI_JURNAL}::test_jurnal_masa_depan_422"),
         harus_memuat="PATCH ke masa depan diterima",
-        kelompok="db",
-    ),
-    Mutasi(
-        "3.4",
-        "PATCH menyunting jurnal yang sudah dihapus — isinya hidup lagi di memori",
-        [
-            Sunting(
-                f"{MODUL}/journal/repository.py",
-                "                         ELSE occurred_at END"
-                + NL
-                + "    WHERE id = :id AND deleted_at IS NULL"
-                + NL,
-                "                         ELSE occurred_at END" + NL + "    WHERE id = :id" + NL,
-            )
-        ],
-        _pytest(f"{UJI_JURNAL}::test_jurnal_yang_dihapus_tidak_bisa_diubah_atau_dihapus_lagi"),
-        harus_memuat="PATCH sesudah DELETE: 200",
         kelompok="db",
     ),
     Mutasi(
@@ -9840,7 +9809,7 @@ MUTASI: list[Mutasi] = [
         "anonimisasi audit melewatkan actor_id — id asli tetap terbaca di jejak",
         [
             Sunting(
-                f"{MIGRASI}/0011_sapuan_hapus_akun.up.sql",
+                f"{MIGRASI}/0013_privacy_center.up.sql",
                 "          actor_id = replace(a.actor_id, p_user_id::text, p_semu::text),\n",
                 "",
             )
@@ -9857,7 +9826,7 @@ MUTASI: list[Mutasi] = [
         "fungsi hapus tidak memeriksa jatuh tempo — pekerja yang dibajak menghapus akun aktif",
         [
             Sunting(
-                f"{MIGRASI}/0011_sapuan_hapus_akun.up.sql",
+                f"{MIGRASI}/0013_privacy_center.up.sql",
                 "      WHERE u.id = p_user_id\n"
                 "        AND u.status = 'pending_deletion' AND u.deletion_scheduled_at <= now()\n"
                 "      FOR UPDATE;",

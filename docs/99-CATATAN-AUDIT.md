@@ -264,6 +264,22 @@ memakai **habit-agent**; kedua mutasi berbunyi.
 > mengubah apa yang diuji oleh uji-uji LAMA — yang tidak menyebut `mood` sama sekali. Hanya putaran
 > **penuh** yang menangkapnya.
 
+#### E-248 — lima mutasi basis data diam sejak 7 Okt — ditemukan gerbang resmi kedua
+
+Gerbang `--lapor-github` atas `226e275` (dijalankan pemilik di terminalnya sendiri) hijau sampai
+`pytest`, lalu **merah di mutasi basis data**. Seluruh 538 mutasi db dijalankan ulang per potongan:
+**5 diam**, kelimanya sejak perubahan 7 Okt — tak satu agen pun hari itu menjalankan kelompok db utuh.
+
+| Mutasi | Kenapa diam | Dibetulkan |
+|---|---|---|
+| 3.6 *ekstraksi membaca jurnal yang sudah dihapus* · 3.4 *PATCH menyunting jurnal yang sudah dihapus* | **ekuivalen sejak C-31**: hapus jurnal kini KERAS dan 0013 membersihkan sisa hapus-lunak — tak ada jalur yang mengisi `deleted_at`, jadi saringan `deleted_at IS NULL` tidak bisa dibuktikan merah | dipensiunkan; saringan tetap sebagai pertahanan berlapis. Hapus keras dijaga mutasi `K-46` (C-31) |
+| 3.7 *batas hasil tidak dijaga* | `mood` sensitif (C-32) ditolak izin **sebelum** Qdrant — uji gagal karena *DID NOT RAISE*, bukan karena yang dimaksud | kasus `batas` memakai scope `habits` |
+| 6.5b ×2 (*actor_id* · *jatuh tempo*) | menyasar `hapus_akun_jatuh_tempo` di migrasi **0011**, yang ditimpa `CREATE OR REPLACE` di **0013** (C-34) — kerusakannya tak pernah berlaku | jangkar dipindah ke 0013 |
+
+> 🔴 **E-231 · E-247 · E-248 satu pola:** keputusan 7 Okt (C-31 · C-32 · C-34) mengubah apa yang
+> diuji oleh uji dan mutasi LAMA yang tidak menyebutnya. Tiap agen membuktikan **mutasinya sendiri**;
+> hanya putaran **penuh** — lint 276 + db 538 — yang menangkapnya, dan butuh dua gerbang resmi.
+
 > **B2 lensa buta = E-236 lensa kontrak** (check-in yang diganti tanpa metrik meninggalkan human
 > state lama): kode E-236 dipakai, uji dan mutasi B2 disimpan.
 

@@ -875,8 +875,8 @@ async def test_tanpa_scope_diizinkan_qdrant_tidak_ditanya(api_bersama: ApiUji) -
     [
         (["habit"], "rapat", 5, "daftar resmi"),  # salah ketik — bukan scope resmi
         (["mood"], "   ", 5, "kosong"),
-        (["mood"], "rapat", 0, "batas"),
-        (["mood"], "rapat", memory.MAKS_HASIL + 1, "batas"),
+        (["habits"], "rapat", 0, "batas"),
+        (["habits"], "rapat", memory.MAKS_HASIL + 1, "batas"),
     ],
 )
 async def test_permintaan_yang_salah_bentuk_ditolak(
