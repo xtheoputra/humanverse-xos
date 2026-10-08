@@ -29,8 +29,8 @@ Diperbarui: 8 Oktober 2026 · Mencakup **dua puluh empat naskah**:
 |---|---|---|
 | [H](#h-sudah-diputuskan--ditutup) | **Sudah diputuskan / ditutup** | 29 |
 | [A](#a-perlu-jawaban-pemilik) | Pertanyaan yang memblokir | 26 |
-| [B](#b-risiko-teknis) | Risiko teknis | 42 |
-| [C](#c-risiko-hukum--kepatuhan) | Risiko hukum & kepatuhan | 36 |
+| [B](#b-risiko-teknis) | Risiko teknis | 43 |
+| [C](#c-risiko-hukum--kepatuhan) | Risiko hukum & kepatuhan | 38 |
 | [D](#d-celah-yang-belum-tertutup) | Celah yang belum tertutup | 5 |
 | [E](#e-ketidakcocokan-antar-naskah) | **Ketidakcocokan antar-naskah** | 162 |
 | [F](#f-yang-sudah-saya-periksa-dan-ternyata-benar) | Sudah diperiksa, ternyata benar | 136 |
@@ -126,6 +126,61 @@ saat menulis mutasi C-32. ✅ Kasusnya kini memakai **habit-agent** (hanya `habi
 > dirujuk kode tanpa entri, tak ada catatan Sesi 38, dan `simpan_berkas.dart` merujuk **K-47**
 > yang tidak pernah ada (yang dimaksud: **C-35**). Semuanya dibetulkan di commit yang sama
 > dengan catatan ini.
+
+---
+
+## 🔍 Tinjauan tiga lensa Sprint 5–6 (8 Okt 2026) — sebelum PR
+
+Langkah *AI Review* AGENTS.md §3 yang **belum pernah dijalankan** untuk Sprint 5–6. Aturannya sama
+dengan Sprint 1–4: temuan tidak dipercaya dari laporannya — tiap cacat ditulis dulu sebagai uji
+yang **merah pada `65ce010`**, baru dibetulkan, lalu dikunci mutasi yang berbunyi. Tiga peninjau
+serentak, masing-masing di worktree (`hvx-s56-tinjau-1/2/3`) dan tumpukan uji sendiri.
+
+### Lensa keamanan — 4 temuan, 11 mutasi berbunyi
+
+#### E-232 — hapus `habits`/`history` meninggalkan proyeksi perilaku turunannya (S1, medium)
+
+Behavior projector (5.1) menyimpan tiap penyelesaian habit sebagai aktivitas `source='inferred'`
+(id penyelesaian, tanggal, status, tier). `DELETE /privacy/data/habits` dan `/history` tidak
+menyentuhnya — tetap terekspor dan tampil di `GET /activities`: persis *“hapus sumbernya saja”*
+yang ditolak **K-42**. ✅ `activities/privasi.py`: dua penghapus turunan (`habits` → `inferred`
+ber-`kind='habit'`, `history` → semua `inferred`); aktivitas manual tak tersentuh. Uji:
+`test_hapus_sumber_membuang_proyeksi_perilaku_turunannya[habits|history]`.
+
+#### E-233 — sandi ulang: argon2 64 MiB tanpa batas per IP (S2, medium — DoS)
+
+E-226 memberi sandi ulang jatah per **akun**, yang dikosongkan tiap kali sandinya benar; batas
+lainnya hanya per pengguna (300/menit). Login dibatasi 30/10 menit **per IP** — maka satu akun
+memaksa ±100× argon2 login dari satu IP. ✅ `DELETE /me`, ekspor, dan hapus data memanggil
+`batasi_kredensial_ip` **sebelum** argon2. Uji:
+`test_sandi_ulang_dibatasi_per_ip_seperti_login[hapus-data|ekspor|hapus-akun]`. ⚠️ Jatahnya
+**dibagi** dengan login (pengguna di balik NAT operator berbagi) — diterima, sama dengan login.
+
+#### E-234 — hapus kategori berbalapan dengan konsumen yang sedang menurunkan datanya (S3, low–medium)
+
+Konsumen pekerja (human state · pola · rekomendasi · proyeksi) menyisipkan turunan di
+transaksinya sendiri; hapus kategori yang berjalan **sebelum** transaksi itu commit tidak melihat
+dan tidak menunggunya — `human_states` dari check-in yang sudah dihapus hidup terus, tanpa event
+yang memicu pembersihannya lagi. Hanya ekstraksi jurnal yang terjaga (K-27). ✅
+`platform.kunci_turunan` — kunci penasihat per pengguna: **bersama** di tiap transaksi penangan
+(`events/stream.py`), **eksklusif** sebagai pernyataan pertama `hapus_kategori`. Uji (konsumen
+ditahan sebelum commit): `test_hapus_kategori_tidak_balapan_dengan_konsumen_yang_menurunkan_datanya`.
+
+#### E-235 — token/sesi lama menghidupkan id asli akun yang sudah dihapus (S4, medium — K-39 · C-34 jebol)
+
+Penanda token segar `bekas` hidup 30 hari di Redis dan membawa `user_id` **asli**: sesudah sapuan
+menghapus akunnya, tiap kiriman ulang token lama menulis `session.refresh_reused` atas id asli
+**plus `ip_hash` peminta** — tepat yang dianonimkan K-39 dan dikosongkan C-34. Jalur kedua: bila
+pencabutan sesi sesudah commit sapuan gagal, `refresh`/`logout` menulis `session.revoked` ·
+`session.logged_out` atas id asli. ✅ `identity.repository.kunci_akun_ada` (`FOR KEY SHARE`,
+menahan `DELETE` sapuan sampai jejaknya commit); `segarkan` · `_masih_aktif` · `keluar` menulis
+jejak hanya bila baris akunnya masih ada. Uji: `test_token_segar_lama_sesudah_akun_dihapus_…` ·
+`test_sesi_yang_lolos_pencabutan_sapuan_…[refresh|logout]`.
+
+> **Dugaan yang tidak dibuktikan merah** (dicatat, bukan temuan): pekerja **O(N) per event** →
+> **B-43**; `POST /me/restore` menjawab `200 active` lewat token yang lolos pencabutan sesudah akunnya
+> terhapus; tanpa Qdrant, akun bertitik ditunda selamanya dan tetap bisa dipakai melewati tenggang
+> (dipilih desain, K-39).
 
 ---
 
@@ -1781,6 +1836,7 @@ Diurutkan dari yang paling menghambat.
 
 | # | Catatan |
 |---|---|
+| B-43 | 🆕 **Pekerja O(N) per event** (tinjauan keamanan Sprint 5–6, 8 Okt 2026, dugaan — belum dibuktikan merah). Proyektor (5.1) mencari `payload ->> 'completion_id' = …`, yang tidak terjangkau indeks GIN `jsonb_path_ops` — tiap event memindai semua event pemiliknya; pola (5.2, `events.riwayat_habit`) memuat seluruh penyelesaian satu habit tiap event → O(N²). Dalam batas laju, satu akun bisa menulis ±432 ribu event per hari, dan grup konsumen dipakai bersama semua pengguna. V0 hanya punya satu pengguna; sebelum **D1**: kueri `@>` + jendela waktu, atau indeks ekspresi di `spec/01`. |
 | **B-39** | 🆕🛑🛑 **`send low-risk message` di R2 memindahkan pengiriman pesan KE BAWAH ambang konfirmasi — dan *“low-risk”* tak pernah didefinisikan.** Melacak satu tindakan yang sama melintasi keempat tangga risiko: naskah 4 §16 **3** · naskah 5 §16 **3** (*“Kirim pesan kepada seseorang”*) · Phase 8 §8.16 **R3** (audit di berkas itu sendiri mencatat *“Level 3 | R3 ✅ sama”*) · **Phase 11 §11.15 → R2**. **H-15** ([#5](../../issues/5)) sudah menutup ambangnya: **otomatis sampai R2, konfirmasi wajib mulai R3** ⇒ pemindahan itu **melewati ambang**. 🛑 Dan §11.15 menaruh pesan di **DUA tingkat dalam satu tabel** — `send low-risk message` (R2) lawan `important communication` (R3) — dipisahkan hanya oleh **dua kata sifat yang tak pernah didefinisikan**; pencarian seluruh `docs/`: `low-risk` muncul dua kali, satu di baris ini dan satu di konteks tak berhubungan. ⭐ **Tetangganya di baris yang sama DISELAMATKAN, pesan tidak**: `purchase low-value item` punya cacat identik (kata sifat tanpa angka) dan sudah ditandai audit, tetapi §11.17 memberinya `purchases: { amount_limit: 0 }`. §11.17 memberi bawaan untuk `calendar.create_event` (20/hari), `notification.send` (10/hari, dan itu pemberitahuan kepada PENGGUNANYA SENDIRI), `purchases.amount_limit` (0) — **tak ada entri untuk pesan kepada pihak ketiga**; §11.18 mendaftar `Messages` sebagai kategori budget tanpa pernah memberinya nilai. 🔴 **Dari tiga kategori di baris R2, yang tidak mendapat definisi maupun angka bawaan justru satu-satunya yang punya ORANG LAIN di ujung penerimanya.** **C-19** ([#81](../../issues/81)) mengandalkan R3⇒konfirmasi untuk melindungi penerima, dan mencatat *“important communication di R3”* — **ia tidak melihat baris R2 di tabel yang sama**. Pengamannya punya jalan memutar di tabel yang sama. Usul termurah: beri pesan angka bawaannya sendiri di §11.17 sejajar `purchases` (mis. `messages: { to_third_party: 0 }`) — menyalin pola yang sudah terbukti di baris yang sama. Lihat [`SENSUS-TANGGA.md`](SENSUS-TANGGA.md) · [#152](../../issues/152). |
 | B-38 | 🆕🛑 **Tujuh angka keadaan peradaban tanpa satu pun rumus; tujuh mekanisme privasi tanpa satu pun parameter; dan tabel tanpa retensi untuk KEEMPAT kalinya.** **(1)** §20.5 memberi `economic.stability 0.71 · technological.acceleration 0.89 · environmental.pressure 0.62 · scientific.discovery_rate 0.83 · infrastructure.resilience 0.77 · **social.cohesion 0.68** · uncertainty 0.34`. ⭐⭐ Pemilik **membantah angkanya sendiri di bawahnya** (*“bukan angka kebenaran … dengan confidence dan provenance”*) dan menaruh **`uncertainty` sebagai field tingkat atas** — keduanya belum pernah ada. 🔴 Tetapi ketujuhnya tidak sekelas: `social cohesion` **diperdebatkan di bidangnya sendiri**, dan menyatakannya sebagai satu angka berarti mengambil posisi dalam perdebatan yang belum selesai lalu **memberi angka itu ke §20.7 (simulasi) dan §20.9 (pilihan keputusan)**. Kekeliruannya tidak akan terlihat sebagai kekeliruan — ia terlihat seperti pengukuran. Bagian **D** sudah mencatat lima model angka tanpa rumus; ini menambah tujuh sekaligus, pada objek terbesar. Usul: **tiap sumbu menyebut apa yang diukurnya dan dari mana; sumbu tanpa ukuran disepakati disajikan sebagai beberapa indikator, bukan satu angka.** **(2)** ⭐⭐⭐⭐ §20.12 memberi **tujuh mekanisme privasi BERNAMA** (`Federated Learning · **Differential Privacy** · **Secure Aggregation** · Data Minimization · Pseudonymization · Local Processing · Confidential Computing`) — dan dua di antaranya **menjawab langsung B-36** ([#126](../../issues/126)), yang meminta *anggaran privasi* dan *ambang peserta minimum*: itu tepat yang privasi diferensial dan agregasi aman lakukan. ⚠️ Yang belum: **satu pun angka.** Privasi diferensial tanpa `epsilon` adalah nama tanpa jaminan; `Secure Aggregation` tanpa ambang peserta juga. ⇒ #126 **belum bisa ditutup**, tetapi ia berhenti menjadi pertanyaan arsitektur dan menjadi pertanyaan parameter. ⚠️ Dan *“tidak boleh … **secara default**”* membuka jalur bukan-default tanpa menyatakan jalurnya — di bagian yang dibuka dengan *“Ini wajib”*. **(3)** §20.29: tiga puluh tabel, **nol kolom retensi/kedaluwarsa/klasifikasi** — keempat kalinya berturut-turut (§17.43 punya; §18.28, §19.31, §20.29 tidak), sementara **§20.13 memberi PENGGUNA kendali `How long`**: kendali tanpa tempat penyimpanan tidak bisa ditegakkan (**B-35**/[#127](../../issues/127), **C-9**/[#22](../../issues/22)). ⚠️ Ditambah **nol tabel untuk Konstitusi, persetujuan, maupun override** — padahal §20.35 menjadikan `HUMAN APPROVAL` gerbang wajib dan Pasal 4 menuntut auditability; persetujuan yang tak tersimpan tak bisa diaudit. Lihat [`267`](267-CIVILIZATION-KNOWLEDGE-GRAPH-STATE-DAN-TWIN.md) & [`273`](273-API-EVENT-BUS-REPOSITORY-DAN-DATABASE.md). |
 | B-37 | 🆕🛑🛑 **Larangan mengarang sitasi ditulis, tetapi tak satu pun langkah menegakkannya — dan pipeline ekstraksinya mengulang C-26 persis.** ⭐⭐⭐ §19.20 menulis batas terbaik yang bisa ditulis untuk domain ini: ***“sitasi harus nyata, tidak boleh mengarang referensi”*** — larangan pada **KELUARAN**, jenis yang bisa dijadikan uji, sejalan §17.7 dan §18.25. 🔴 Tetapi penegakannya nihil di tiga tempat: **(a)** §19.2 (pipeline sepuluh langkah) berakhir di `Scientific Report` tanpa langkah pemeriksaan sitasi; **(b)** §19.31 memberi tabel `citations` **tanpa kolom yang menyatakan sebuah sitasi sudah dicocokkan dengan sumbernya**; **(c)** §19.33 memberi `S19.9 Writing & Review` tanpa menyebut verifikasi. ⭐ **Perbaikannya nyaris gratis sebab bahannya lengkap**: §19.4 sudah melakukan `Citation Extraction` dan menarik dari **Crossref · Semantic Scholar · OpenAlex** — tiga sistem yang justru ada untuk menyelesaikan identitas rujukan. Aturannya bisa mutlak: **`citations.resolved_paper_id` wajib, dan rujukan yang tidak punya simpul `Paper` TIDAK BISA ditulis** — ditegakkan oleh bentuk data, bukan oleh kepatuhan model. 🔴 **Dan rantai §19.4 mengulang C-26** ([#118](../../issues/118)) persis: `Document → OCR → Parsing → Section Detection → Citation Extraction → Entity Extraction → Knowledge Graph` — **tanpa satu pun langkah verifikasi**, sementara §19.5 mengekstrak `Result: 92%` **tanpa metrik, tugas, pembagian data, maupun sebaran**, lalu §19.7 membandingkannya. ⇒ Tiga usul C-26 berlaku tanpa perubahan dan lebih murah di sini (sumbernya publik): tiap entitas menyimpan **kutipan aslinya**, pipeline terdaftar sebagai model, ekstraksi **ditandai belum terverifikasi**. ⚠️ Ditambah **titik buta §19.8**: *“belum banyak studi”* tidak bisa dibedakan dari *“sudah dicoba, hasilnya nol, tidak terbit”* — dan bias publikasi bersifat **sistematis**, sehingga Gap Detection akan **paling percaya diri justru di tempat yang sudah terbukti buntu**, lalu §19.9 mewarisinya lewat skor `Novelty`. Penawarnya ada di naskah ini: `datasets` + `code repositories` + preprint (§19.4). ⚠️ Dan *“jutaan paper”* (§19.34) adalah satu-satunya butir DoD berangka — **indeks penuh ≠ salinan penuh**; metadata bisa dipisah dari naskah. Lihat [`257`](257-INGESTION-ENTITY-EXTRACTION-DAN-EVIDENCE-RANKING.md) & [`262`](262-REPRODUCIBILITY-WRITING-ENGINE-DAN-PEER-REVIEW.md). |
@@ -1827,6 +1883,8 @@ Diurutkan dari yang paling menghambat.
 
 | # | Catatan |
 |---|---|
+| C-38 | 🆕 **Penanda token segar `bekas` menyimpan `user_id` asli 30 hari sesudah akunnya dihapus** (tinjauan keamanan Sprint 5–6, 8 Okt 2026). Sesudah **E-235** penanda itu tak lagi bisa menulis jejak, tetapi id asli tetap di Redis sampai TTL — begitu juga kunci ekspor (≤ 1 jam), cache & generasi izin (≤ 24 jam), dan kunci laju per pengguna. K-39 hanya menjanjikan sesi dan idempotensi yang dibuang. Yang perlu dijawab pemilik: **(a)** apakah semua kunci Redis milik akun dibuang saat sapuan (butuh indeks per pengguna di Redis), atau **(b)** TTL-nya diterima sebagai retensi, dan dinyatakan di Privacy Center. |
+| C-37 | 🆕 **Menghapus percakapan tidak melupakan memori `coaching_notes` yang ditulis agent dari percakapan itu** (tinjauan keamanan Sprint 5–6, 8 Okt 2026). K-42 memetakan turunan untuk jurnal, mood, check-in, habit — tidak untuk `conversations`. Yang perlu dijawab pemilik: apakah catatan coach adalah **turunan** percakapan (ikut terhapus) atau **memori pengguna** tersendiri (dihapus lewat kategori `memories`). |
 | C-36 | 🆕 **Data pengguna di penyedia hosting gratis pihak ketiga** (**H-29**, 8 Okt 2026). Menjalankan aplikasi di web gratis berarti api dan basis datanya di penyedia pihak ketiga — kemungkinan di luar Indonesia, dengan syarat yang bisa diubah sepihak, tanpa SLA, dan pada sebagian paket gratis basis data yang **menganggur ditidurkan atau dihapus**. Yang tersimpan: jurnal (Level 3), mood (data kesehatan jiwa — C-32), kebiasaan, jejak audit. Yang perlu dijawab pemilik: **(a)** apakah data pengguna selain pemilik boleh disimpan di luar Indonesia (UU PDP Pasal 56 — transfer lintas batas) dan pada penyedia yang mana; **(b)** apakah penyedia yang meminta kartu walau paketnya gratis boleh dipakai (risiko tagihan, **H-26**); **(c)** siapa memegang cadangan dan kuncinya (`HVX_IP_HASH_KEY`, kunci penyemat **K-26**) bila penyedianya menghapus data. Tidak diputuskan di kode — belum ada penerapan web; pemicunya **D1** ([`../arch/09`](../arch/09-DEPLOYMENT-TOPOLOGY.md) §2.1). |
 | C-35 | 🆕 **Data pengguna di penyimpanan perangkat: antrean luring dan token** (luring dasar 6.6, 6 Okt 2026). Antrean luring (habit · tanggal · tier) dan token segar hanya di **memori** (**K-40**) — catatan yang belum terkirim hilang bersama prosesnya, dan aplikasi yang dibuka tanpa jaringan tak punya sesi. Menyimpannya berarti menaruh catatan kebiasaan (dekat dengan data kesehatan) dan token di perangkat yang bisa hilang, dipinjam, atau — di web — dibaca skrip mana pun di asal yang sama. Yang perlu dijawab pemilik: **(a)** apakah antrean boleh bertahan di perangkat, dan di penyimpanan apa (aman per platform, bukan localStorage); **(b)** apakah token segar boleh disimpan (Keychain/Keystore) — tanpanya luring sesudah aplikasi ditutup mustahil; **(c)** kapan semuanya dibuang: saat keluar, saat hapus akun (6.5), atau sesudah waktu tertentu. Tidak diputuskan di kode: privasi, ditanggung pengguna yang perangkatnya dipakai orang lain. Bertaut **C-34**. |
 | C-34 | ✅ **Diputuskan 7 Okt 2026 atas delegasi pemilik (H-28, K-46)** — `ip_hash` dikosongkan saat sapuan (migrasi 0013). Catatan asal: **Jejak audit yang dipertahankan sesudah akun dihapus masih membawa `ip_hash`** (sapuan hapus akun 6.5, 6 Okt 2026). `spec/01` tahap 5: `audit_logs` tetap, `user_id` diganti id semu (K-39 melakukannya juga di `actor_id` · `subject_id` · `metadata`, E-215). `ip_hash` — HMAC-SHA256 berkunci atas alamat klien (IPv6 per /64), kolom *“hash, bukan IP mentah”* — **tidak diubah**, karena `spec/01` tidak memerintahkannya dan menghapusnya adalah keputusan tentang arti *“hapus”* dan retensi audit. Akibatnya: baris-baris audit akun yang sudah dihapus **masih bisa dikaitkan satu sama lain dan dengan akun lain lewat jaringan yang sama**, dan siapa pun yang memegang `HVX_IP_HASH_KEY` dapat mencocokkan alamat yang ditebak (IPv4: 2³² kemungkinan). Yang perlu dijawab pemilik: **(a)** apakah `ip_hash` dikosongkan (`NULL`) saat akunnya dihapus — kehilangan korelasi forensik antar-akun — atau dipertahankan dengan alasan keamanan (*legitimate interest*) yang dicatat; **(b)** berapa lama baris audit akun yang dihapus disimpan (`@retention: forever` di `spec/01` §8 — termasuk untuk akun yang sudah menuntut hapus?). Tidak diputuskan di kode: hukum & privasi, ditanggung orang yang sudah pergi dan tak ikut memilih. |
