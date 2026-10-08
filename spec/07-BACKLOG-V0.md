@@ -285,9 +285,11 @@ Tidak ada tugas yang boleh masuk `main` tanpa baris **HUMAN REVIEW**.
 > | 5.5 | `4ec7114` (**K-36** · **K-38**): skor 0–1 = rata-rata bobot sama `history` + `context`, `score_breakdown`, `scoring_version='v1'`, `rationale` terisi; idempoten per (habit, tanggal); nol komponen → **tidak ada** rekomendasi | lima komponen docs/87 lain tak punya data di V0 |
 > | 5.6 | `d025832` (**K-37**): umpan balik hanya-tambah; `modified` · `snoozed` · `ignored` **tidak** mengubah status — hanya `accepted`/`rejected`; `Idempotency-Key`; milik orang lain → 404 | — |
 >
-> ⚠️ **Bukti mesin yang tipis:** mutasi kode 5.1 · 5.2 · 5.3 = **nol**, 5.4–5.6 = dua per tugas
-> (Sprint 4: 277). Tinjauan *penegak buta* Sprint 5 belum pernah dijalankan — langkah AI Review
-> sebelum PR (AGENTS.md §3).
+> 🔧 **Bukti mesin yang tipis — ditutup 8 Okt 2026:** mutasi kode 5.1 · 5.2 · 5.3 semula **nol**,
+> 5.4–5.6 dua per tugas. Tinjauan *penegak buta* Sprint 5–6 (`docs/99`): **50 dari 86 kerusakan
+> lolos seluruh suite**; 49 kini merah. Mutasi sekarang: 5.1 = 9 · 5.2 = 15 · 5.3 = 6 · 5.4 = 4 ·
+> 5.5 = 9 · 5.6 = 4. Cacat yang ketahuan di jalan: **E-246** (pola 0 % dari nol bukti), **E-236**
+> (human state basi), **E-237 · E-238 · E-239 · E-240** (tinjauan kontrak).
 
 ---
 

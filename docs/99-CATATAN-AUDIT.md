@@ -217,6 +217,57 @@ dulu: `test_restore_tidak_mengaku_aktif_untuk_akun_yang_tidak_aktif[suspended|te
 > `scoring_version='v1'` (bawaan kolom) padahal tidak pernah diskor — labelnya menyesatkan (K-36(6));
 > aplikasi Flutter belum punya layar *restore* (UX, bukan kontrak).
 
+### Lensa penegak buta — 50 dari 86 kerusakan lolos seluruh suite
+
+Pertanyaannya satu: kerusakan kode mana yang **lolos seluruh suite**? *“Lolos”* dibuktikan
+langsung — semua kerusakan yang lolos diterapkan sekaligus (tiga putaran, jangkar yang bentrok
+dipisah) dan suite utuh tetap **1.317 hijau**. Bukan hanya berkas uji terdekat.
+
+| Tugas | Dicoba | Lolos | Tertangkap | Ekuivalen / dibiarkan | Mutasi sesudahnya |
+|---|---|---|---|---|---|
+| 5.1 projector | 13 | 7 | 3 | 3 ekuivalen | 0 → **9** |
+| 5.2 pola | 17 | 14 | 3 | – | 0 → **15** |
+| 5.3 human state | 8 | 5 | 3 | – | 0 → **6** |
+| 5.4 Confidence Layer | 6 | 0 | 6 | – | 2 → **4** |
+| 5.5 rekomendasi | 13 | 7 | 5 | 1 ekuivalen | 2 → **9** |
+| 5.6 umpan balik | 7 | 2 | 5 | – | 2 → **4** |
+| 6.1 dashboard | 10 | 7 | 3 | – | 3 → **10** |
+| 6.5 Stage A | 12 | 8 | 4 | 1 dibiarkan (butir C) | 3 → **11** |
+
+Yang paling mahal di antara yang lolos: membangun ulang proyeksi **menghapus aktivitas manual**
+(saringan `source='inferred'` bisa dibuang tanpa satu uji pun merah) · pola yang dikuatkan lagi
+**tetap luruh** · jam pola dibaca dalam UTC, bukan zona profil · dua habit **saling menimpa** pola
+· perubahan status umpan balik dipindah ke transaksi kedua (K-37) tanpa ada yang merah · `DELETE /me`
+berulang **menyetel ulang** jam tenggang. 49 dari 50 kini merah. Yang dibiarkan: akun `suspended`
+bisa dijadwalkan hapus — hak hapus akun yang ditangguhkan adalah butir **C**, tidak dikunci uji.
+
+#### E-246 — pola *“dipenuhi 0 %”* dari nol bukti (B1)
+
+Periode jatuh tempo tanpa satu penyelesaian pun memberi `completion_rate_30d = 0.0`, bukan `None`.
+Habit tanpa penyelesaian (semua dicabut, atau dipicu `habit.skipped`) menulis pola *“dipenuhi 0 %”*
+dengan `evidence_count` **0** — persis yang Confidence Layer 5.4 larang di sisi tulis.
+✅ `pola_konsistensi` menuntut `cukup_untuk_menyatakan(total)`. Uji:
+`test_habit_tanpa_penyelesaian_tidak_menyatakan_konsistensi` ·
+`test_konsistensi_tanpa_penyelesaian_tidak_dinyatakan`.
+
+> **B2 lensa buta = E-236 lensa kontrak** (check-in yang diganti tanpa metrik meninggalkan human
+> state lama): kode E-236 dipakai, uji dan mutasi B2 disimpan.
+
+### 🔑 Tiga lensa di satu pohon — yang bertabrakan secara MAKNA, bukan teks
+
+Tiap lensa hijau di worktree-nya sendiri. Di `v0/sprint-6-product` hasilnya hidup bersama, dan
+bentrokan teks (berkas uji yang sama-sama ditambah di akhir) hanya separuh masalahnya:
+* **dua uji rekomendasi lensa buta merah TANPA mutasi** — keduanya memicu `checkin.logged` buatan
+  berenergi baru tanpa mengganti check-in-nya, padahal sejak **E-237** penyegaran membaca
+  check-in otoritatif. Ujinya kini mengganti check-in lebih dulu;
+* **empat jangkar mutasi** lensa buta menyasar kode yang diubah lensa kontrak (K3 · K5 · K10);
+* mutasi 6.1 *“daftar tanpa batas”* (`LIMIT ALL`) menjadi **ekuivalen** sejak K5 memotong halaman di
+  Python — kini menyasar pemotongan itu.
+
+Yang menangkapnya: menjalankan ulang **setiap** mutasi ketiga lensa di pohon gabungan, bukan
+mempercayai laporan per lensa. Hasil akhir: S1–S4 · E-232 · K1–K10 · 3.3 · E-245 **47/47**;
+5.1–5.6 · 6.1 · 6.5 seluruhnya berbunyi.
+
 ---
 
 ## 🔨 Sprint 6 · 6.6 luring dasar (6 Okt 2026) — apa yang berubah bagi berkas ini
