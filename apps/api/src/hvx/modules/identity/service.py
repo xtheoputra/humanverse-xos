@@ -338,7 +338,7 @@ async def jadwalkan_penghapusan(
     Perubahan status & jejaknya satu transaksi; pencabutan sesi (Redis) sesudah commit.
     Idempoten: DELETE /me saat sudah `pending_deletion` mengembalikan jadwal yang ada,
     tanpa menyetel ulang jam tenggang."""
-    akun = await verifikasi_sandi_ulang(
+    await verifikasi_sandi_ulang(
         engine,
         pengguna.user_id,
         kata_sandi,
@@ -359,10 +359,17 @@ async def jadwalkan_penghapusan(
                 ip_hash=ip_hash,
                 metadata={"tenggang_hari": TENGGANG_HAPUS_HARI},
             )
-    if dijadwalkan is None:  # sudah `pending_deletion` sebelumnya — kembalikan jadwalnya
-        dijadwalkan = akun.deletion_scheduled_at
-        if dijadwalkan is None:  # status tak bisa dihapus (mis. `suspended`)
-            raise _galat(409, "deletion_not_possible", "Akun tidak bisa dijadwalkan hapus.")
+        else:
+            # Sudah `pending_deletion` — kembalikan jadwalnya, dibaca ULANG sesudah UPDATE di
+            # atas (yang menunggu kunci baris penulis serentak). 🔴 Versi pertama memakai
+            # `akun` yang dibaca SEBELUM sandi dicocokkan: dua `DELETE /me` serentak (ketukan
+            # ganda) sama-sama membaca `active`, dan yang kalah balapan menjawab
+            # `409 deletion_not_possible` untuk akun yang SUDAH dijadwalkan dihapus
+            # (tinjauan kontrak S5–6, K10).
+            kini = await repository.akun_untuk_hapus(conn, pengguna.user_id)
+            dijadwalkan = kini.deletion_scheduled_at if kini is not None else None
+    if dijadwalkan is None:  # status tak bisa dihapus (mis. `suspended`)
+        raise _galat(409, "deletion_not_possible", "Akun tidak bisa dijadwalkan hapus.")
     # Semua sesi dicabut SEKETIKA — termasuk yang sedang dipakai memanggil ini.
     await sesi.cabut_semua(pengguna.user_id)
     return dijadwalkan

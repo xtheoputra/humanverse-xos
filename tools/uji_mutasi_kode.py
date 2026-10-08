@@ -10274,6 +10274,24 @@ MUTASI: list[Mutasi] = [
         harus_memuat="konsumen wajib `pola` membuang event ke stream mati",
         kelompok="db",
     ),
+    Mutasi(
+        "K10",
+        "DELETE /me yang kalah balapan memakai bacaan sebelum sandi — 409 untuk akun terjadwal",
+        [
+            Sunting(
+                f"{MODUL}/identity/service.py",
+                "            kini = await repository.akun_untuk_hapus(conn, pengguna.user_id)\n"
+                "            dijadwalkan = kini.deletion_scheduled_at if kini is not None else None\n",
+                "            dijadwalkan = None\n",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_hapus_akun.py::"
+            "test_hapus_serentak_dua_kali_keduanya_202_dengan_jadwal_yang_sama"
+        ),
+        harus_memuat="DELETE /me serentak tidak idempoten",
+        kelompok="db",
+    ),
     # ── Sprint 6 · 6.6 luring dasar: antrean penyelesaian habit (Flutter, K-40) ──
     Mutasi(
         "6.6",

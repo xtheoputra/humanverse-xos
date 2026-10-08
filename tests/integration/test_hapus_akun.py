@@ -8,6 +8,7 @@ kode status.
 
 from __future__ import annotations
 
+import asyncio
 from typing import Any
 
 import psycopg
@@ -91,3 +92,30 @@ async def test_restore_idempoten_pada_akun_aktif(api_uji: ApiUji) -> None:
     r = await api_uji.klien.post("/v1/me/restore", headers=auth(token))
     assert r.status_code == 200, r.text
     assert _akun(api_uji, uid)[0] == "active"
+
+
+# ── Tinjauan kontrak Sprint 5–6 (8 Okt 2026) ─────────────────────────────────
+
+
+async def test_hapus_serentak_dua_kali_keduanya_202_dengan_jadwal_yang_sama(
+    api_uji: ApiUji,
+) -> None:
+    """spec/04: `DELETE /me` *idempoten — saat sudah `pending_deletion` ia mengembalikan
+    jadwal yang ada*. Ketukan ganda di aplikasi = dua permintaan serentak: yang kalah
+    balapan tidak boleh menjawab galat (*“Akun tidak bisa dijadwalkan hapus.”*) untuk akun
+    yang SUDAH dijadwalkan dihapus — pengguna mengira penghapusannya gagal."""
+    _, uid, token = await _daftar(api_uji)
+
+    async def hapus() -> Any:
+        return await api_uji.klien.request(
+            "DELETE", "/v1/me", json={"password": SANDI}, headers=auth(token)
+        )
+
+    a, b = await asyncio.gather(hapus(), hapus())
+
+    kode = sorted((a.status_code, b.status_code))
+    assert kode == [202, 202], (
+        f"DELETE /me serentak tidak idempoten: {a.status_code} {a.text} · {b.status_code} {b.text}"
+    )
+    assert a.json()["deletion_scheduled_at"] == b.json()["deletion_scheduled_at"]
+    assert _akun(api_uji, uid)[0] == "pending_deletion"

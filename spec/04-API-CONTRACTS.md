@@ -58,7 +58,9 @@ POST   /me/restore                               → 200   (batal hapus, selama 
 >
 > * `DELETE /me` meminta sandi lagi (`403 invalid_credentials` bila salah) dan
 >   idempoten: saat sudah `pending_deletion` ia mengembalikan jadwal yang ada, tanpa
->   menyetel ulang jam tenggang.
+>   menyetel ulang jam tenggang. 🔧 Juga **serentak** (8 Okt 2026, tinjauan kontrak S5–6
+>   K10): dua `DELETE /me` sekaligus (ketukan ganda) keduanya `202` dengan jadwal yang
+>   sama — versi pertama menjawab yang kalah balapan `409 deletion_not_possible`.
 > * 🔧 **E-226 — sandi ulang berbagi jatah login gagal** (kode 7 Okt 2026, ditulis
 >   di sini 8 Okt 2026). Tebakan sandi ulang — di sini
 >   dan di `POST /privacy/export` · `DELETE /privacy/data/{category}` — memakai **jatah
