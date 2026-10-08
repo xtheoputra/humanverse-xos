@@ -9,7 +9,9 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Awaitable, Callable
+from datetime import UTC, datetime, timedelta
 from typing import Any
+from uuid import UUID, uuid4
 
 import psycopg
 import pytest
@@ -116,6 +118,129 @@ async def test_pekerja_menyekor_rekomendasi_dari_skip_lalu_menyegarkannya_dari_c
             "SELECT count(*) FROM recommendations WHERE user_id = %s", (uid,)
         ).fetchone()
     assert n == 1
+
+
+# ── Tinjauan penegak buta S5–6: penangan dipanggil LANGSUNG (tanpa pekerja) ──────────
+
+
+async def _picu(api: ApiUji, uid: UUID, event_type: str, **isi: Any) -> None:
+    """Satu event pemicu (`habit.skipped` / `checkin.logged`) → mesin rekomendasi."""
+    sekarang = datetime.now(UTC)
+    event = events.EventMasuk(
+        id=uuid4(),
+        user_id=uid,
+        event_type=event_type,
+        schema_version=1,
+        occurred_at=sekarang,
+        recorded_at=sekarang,
+        source="app",
+        subject_type="habit" if "habit_id" in isi else None,
+        subject_id=UUID(isi.pop("habit_id")) if "habit_id" in isi else None,
+        payload=isi,
+    )
+    async with transaksi_pengguna(api.app.state.engine, uid) as conn:
+        await intelligence.sarankan(conn, event)
+
+
+def _baris(api: ApiUji, uid: Any) -> list[dict[str, Any]]:
+    with psycopg.connect(psycopg_dsn(api.db.dsn_pemilik)) as k:
+        baris = k.execute(
+            "SELECT id, status, score, score_breakdown, context_snapshot FROM recommendations "
+            "WHERE user_id = %s ORDER BY context_snapshot->>'for_date'",
+            (uid,),
+        ).fetchall()
+    kolom = ("id", "status", "score", "score_breakdown", "context_snapshot")
+    return [dict(zip(kolom, b, strict=True)) for b in baris]
+
+
+async def test_skip_disalurkan_ulang_tidak_menggandakan_dan_tidak_menimpa_status(
+    api_bersama: ApiUji,
+) -> None:
+    """Idempoten per (habit, tanggal): id `uuid5` + `ON CONFLICT DO NOTHING` — event yang
+    disalurkan ulang tidak menambah baris, tidak gagal, dan tidak mengembalikan pilihan
+    pengguna ke `pending`."""
+    uid, token = await api_bersama.pengguna_baru()
+    habit = await buat_habit(api_bersama, token, title="Lari pagi")
+    hari = "2026-09-20"
+    r = await api_bersama.klien.put(f"/v1/checkins/{hari}", json={"energy": 2}, headers=auth(token))
+    assert r.status_code in (200, 201), r.text
+
+    await _picu(api_bersama, uid, "habit.skipped", habit_id=habit["id"], for_date=hari)
+    await _picu(api_bersama, uid, "habit.skipped", habit_id=habit["id"], for_date=hari)
+    assert len(_baris(api_bersama, uid)) == 1, "skip yang disalurkan ulang menggandakan rekomendasi"
+
+    ((rec,),) = [_baris(api_bersama, uid)]
+    with psycopg.connect(psycopg_dsn(api_bersama.db.dsn_pemilik)) as k:
+        k.execute("UPDATE recommendations SET status = 'accepted' WHERE id = %s", (rec["id"],))
+        k.commit()
+    await _picu(api_bersama, uid, "habit.skipped", habit_id=habit["id"], for_date=hari)
+    ((sesudah,),) = [_baris(api_bersama, uid)]
+    assert sesudah["status"] == "accepted", "penyaluran ulang menimpa status pilihan pengguna"
+
+
+async def test_checkin_hanya_menyegarkan_rekomendasi_hari_itu(api_bersama: ApiUji) -> None:
+    """Energi baru hari D menyegarkan komponen `context` rekomendasi pending hari D saja —
+    skor, `score_breakdown`, dan `context_snapshot`-nya; hari lain tak tersentuh."""
+    uid, token = await api_bersama.pengguna_baru()
+    habit = await buat_habit(api_bersama, token, title="Lari pagi")
+    for hari in ("2026-09-20", "2026-09-21"):
+        r = await api_bersama.klien.put(
+            f"/v1/checkins/{hari}", json={"energy": 2}, headers=auth(token)
+        )
+        assert r.status_code in (200, 201), r.text
+        await _picu(api_bersama, uid, "habit.skipped", habit_id=habit["id"], for_date=hari)
+
+    await _picu(api_bersama, uid, "checkin.logged", for_date="2026-09-20", energy=5)
+
+    d20, d21 = _baris(api_bersama, uid)
+    assert float(d20["score"]) == 1.0
+    assert d20["score_breakdown"] == {"context": 1.0, "weights": "equal"}
+    assert d20["context_snapshot"] == {"for_date": "2026-09-20", "context": 1.0}, (
+        "context_snapshot tidak mengikuti energi terbaru"
+    )
+    assert float(d21["score"]) == 0.25, "check-in satu hari menyegarkan rekomendasi hari lain"
+    assert d21["context_snapshot"]["context"] == 0.25
+
+
+async def test_history_ikut_dan_bertahan_saat_konteks_disegarkan(api_bersama: ApiUji) -> None:
+    """Dua komponen V0: `history` (penyelesaian 30 hari) + `context` (energi). Menyegarkan
+    `context` dari check-in mempertahankan `history` yang tersimpan."""
+    uid, token = await api_bersama.pengguna_baru()
+    habit = await buat_habit(api_bersama, token, title="Lari pagi")
+    hari_ini = _hari_ini_di(api_bersama, "Asia/Jakarta")
+    with psycopg.connect(psycopg_dsn(api_bersama.db.dsn_pemilik)) as k:
+        k.execute(
+            "UPDATE habits SET created_at = now() - interval '10 days' WHERE id = %s",
+            (habit["id"],),
+        )
+        k.commit()
+    for mundur in (9, 8, 7, 6, 5):
+        c = await _catat(
+            api_bersama,
+            token,
+            habit["id"],
+            for_date=(hari_ini - timedelta(days=mundur)).isoformat(),
+        )
+        assert c.status_code == 201, c.text
+    r = await api_bersama.klien.put(
+        f"/v1/checkins/{hari_ini.isoformat()}", json={"energy": 2}, headers=auth(token)
+    )
+    assert r.status_code in (200, 201), r.text
+
+    await _picu(
+        api_bersama, uid, "habit.skipped", habit_id=habit["id"], for_date=hari_ini.isoformat()
+    )
+    ((rec,),) = [_baris(api_bersama, uid)]
+    riwayat = rec["score_breakdown"].get("history")
+    assert riwayat is not None, f"komponen history tidak ikut dalam skor: {rec['score_breakdown']}"
+    assert 0 < riwayat < 1, riwayat
+
+    await _picu(api_bersama, uid, "checkin.logged", for_date=hari_ini.isoformat(), energy=5)
+    ((segar,),) = [_baris(api_bersama, uid)]
+    assert segar["score_breakdown"] == {"history": riwayat, "context": 1.0, "weights": "equal"}, (
+        f"penyegaran check-in membuang komponen history: {segar['score_breakdown']}"
+    )
+    assert float(segar["score"]) == round((riwayat + 1.0) / 2, 3)
 
 
 # ── Tinjauan kontrak Sprint 5–6 (8 Okt 2026) ─────────────────────────────────

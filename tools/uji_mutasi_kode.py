@@ -12043,6 +12043,129 @@ MUTASI: list[Mutasi] = [
         _pytest("tests/unit/test_keyakinan.py::test_negatif_yang_mustahil_tetap_bertanya"),
         harus_memuat="bukti negatif harus BERTANYA",
     ),
+    # ── 5.5 mesin rekomendasi ──
+    Mutasi(
+        "5.5",
+        "id rekomendasi mesin acak (bukan uuid5) — skip yang disalurkan ulang menggandakan",
+        [
+            Sunting(
+                f"{MODUL}/intelligence/mesin.py",
+                '        id_=uuid.uuid5(_NS, f"habit-reengage:{habit_id}:{for_date.isoformat()}"),',
+                "        id_=uuid.uuid4(),",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_rekomendasi.py::"
+            "test_skip_disalurkan_ulang_tidak_menggandakan_dan_tidak_menimpa_status"
+        ),
+        harus_memuat="skip yang disalurkan ulang menggandakan rekomendasi",
+        kelompok="db",
+    ),
+    Mutasi(
+        "5.5",
+        "sisip mesin tanpa ON CONFLICT DO NOTHING — penyaluran ulang gagal (konsumen macet)",
+        [
+            Sunting(
+                f"{MODUL}/intelligence/repository.py",
+                "CAST(:context_snapshot AS jsonb))\n    ON CONFLICT (id) DO NOTHING\n",
+                "CAST(:context_snapshot AS jsonb))\n",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_rekomendasi.py::"
+            "test_skip_disalurkan_ulang_tidak_menggandakan_dan_tidak_menimpa_status"
+        ),
+        harus_memuat="recommendations_pkey",
+        kelompok="db",
+    ),
+    Mutasi(
+        "5.5",
+        "penyaluran ulang mengembalikan pilihan pengguna ke pending (DO UPDATE)",
+        [
+            Sunting(
+                f"{MODUL}/intelligence/repository.py",
+                "    ON CONFLICT (id) DO NOTHING\n    RETURNING id\n",
+                "    ON CONFLICT (id) DO UPDATE SET status = 'pending', score = EXCLUDED.score\n"
+                "    RETURNING id\n",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_rekomendasi.py::"
+            "test_skip_disalurkan_ulang_tidak_menggandakan_dan_tidak_menimpa_status"
+        ),
+        harus_memuat="penyaluran ulang menimpa status pilihan pengguna",
+        kelompok="db",
+    ),
+    Mutasi(
+        "5.5",
+        "check-in satu hari menyegarkan rekomendasi hari lain",
+        [
+            Sunting(
+                f"{MODUL}/intelligence/repository.py",
+                "      AND context_snapshot->>'for_date' = :for_date\n",
+                "",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_rekomendasi.py::"
+            "test_checkin_hanya_menyegarkan_rekomendasi_hari_itu"
+        ),
+        harus_memuat="check-in satu hari menyegarkan rekomendasi hari lain",
+        kelompok="db",
+    ),
+    Mutasi(
+        "5.5",
+        "penyegaran skor tidak memperbarui context_snapshot",
+        [
+            Sunting(
+                f"{MODUL}/intelligence/mesin.py",
+                '            context_snapshot={"for_date": for_date.isoformat(), **komponen},\n'
+                "        )\n\n\n_PEMICU",
+                "            context_snapshot=snap,\n        )\n\n\n_PEMICU",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_rekomendasi.py::"
+            "test_checkin_hanya_menyegarkan_rekomendasi_hari_itu"
+        ),
+        harus_memuat="context_snapshot tidak mengikuti energi terbaru",
+        kelompok="db",
+    ),
+    Mutasi(
+        "5.5",
+        "komponen history (penyelesaian 30 hari) tidak ikut dalam skor",
+        [
+            Sunting(
+                f"{MODUL}/intelligence/mesin.py",
+                "    if rentetan is not None and rentetan.completion_rate_30d is not None:\n"
+                '        komponen["history"]',
+                '    if False:\n        komponen["history"]',
+            )
+        ],
+        _pytest(
+            "tests/integration/test_rekomendasi.py::"
+            "test_history_ikut_dan_bertahan_saat_konteks_disegarkan"
+        ),
+        harus_memuat="komponen history tidak ikut dalam skor",
+        kelompok="db",
+    ),
+    Mutasi(
+        "5.5",
+        "penyegaran check-in membuang komponen history yang tersimpan",
+        [
+            Sunting(
+                f"{MODUL}/intelligence/mesin.py",
+                '        if "history" in snap:\n            komponen["history"] = float(snap["history"])\n',
+                "",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_rekomendasi.py::"
+            "test_history_ikut_dan_bertahan_saat_konteks_disegarkan"
+        ),
+        harus_memuat="penyegaran check-in membuang komponen history",
+        kelompok="db",
+    ),
 ]
 
 
