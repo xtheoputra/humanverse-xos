@@ -1383,7 +1383,7 @@ Menutup janji *Delete* di Privacy Center (naskah 5 §26) tanpa merusak audit:
 
 | Tahap | Tindakan |
 |---|---|
-| 1 | `users.status = 'pending_deletion'`, `deletion_scheduled_at = now()+30h`, **semua sesi dicabut** (`cabut_semua`), agent berhenti melayani |
+| 1 | `users.status = 'pending_deletion'`, `deletion_scheduled_at = now()+30 hari` (🔧 8 Okt 2026: tertulis `now()+30h` — **30 jam**; kode, kolom `users`, dan tahap 2 semuanya 30 hari — tinjauan kontrak S5–6 K8), **semua sesi dicabut** (`cabut_semua`), agent berhenti melayani |
 | 2 | Tenggang **30 hari** — pengguna masih bisa membatalkan (`POST /me/restore`) |
 | 3 | `DELETE FROM users` → cascade menghapus profil, goal, habit, jurnal, mood, memori, percakapan, rekomendasi, event, human_states |
 | 4 | Titik embedding di Qdrant dihapus berdasarkan `memories.embedding_id` yang dikumpulkan **sebelum** tahap 3 — atau per saringan `user_id` payload (`platform.KlienVektor.hapus_milik`, 3.5), yang juga membuang titik yatim |
@@ -1422,8 +1422,9 @@ Menutup janji *Delete* di Privacy Center (naskah 5 §26) tanpa merusak audit:
 >   `str(user_id)` ke `actor_id` pada tiap aksi pengguna; menganonimkan `user_id` saja
 >   meninggalkan id asli di sana). Id semu = HMAC-SHA256 berkunci (`HVX_IP_HASH_KEY`, label
 >   `akun-terhapus`) dipotong 128 bit: baris audit satu akun tetap bisa dipertemukan,
->   tetapi tak bisa dibalik tanpa kunci. `ip_hash` **tidak** diubah — pertanyaan pemilik
->   (**C-34**).
+>   tetapi tak bisa dibalik tanpa kunci. 🔧 `ip_hash` **dikosongkan** (`NULL`) sejak migrasi
+>   `0013` — **C-34** diputuskan atas delegasi pemilik (**K-46**); kalimat lama *“`ip_hash`
+>   tidak diubah”* tertinggal sesudah fungsi §12 berubah (tinjauan kontrak S5–6 K8, 8 Okt 2026).
 > * **Restore hanya selama tenggang (E-216).** `POST /me/restore` sesudah
 >   `deletion_scheduled_at` → `409 deletion_grace_expired`: sapuan boleh membuang titik
 >   Qdrant-nya kapan saja, dan akun yang dipulihkan di antaranya hidup kembali tanpa
