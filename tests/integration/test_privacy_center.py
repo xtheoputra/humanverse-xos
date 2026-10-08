@@ -25,7 +25,7 @@ from asgi_lifespan import LifespanManager
 from test_auth import SANDI, _daftar_badan, _email
 
 from hvx.main import create_app
-from hvx.modules import identity
+from hvx.modules import identity, intelligence
 from hvx.modules.platform import Settings, buat_engine
 
 pytestmark = pytest.mark.integration
@@ -37,7 +37,7 @@ TANGGAL = (datetime.now(UTC) - timedelta(days=2)).date().isoformat()
 # `data.deleted` di `audit_logs`. Selain ini, tidak satu baris pun berubah.
 TURUNAN: dict[str, set[str]] = {
     "goals": {"events", "memories", "recommendations", "recommendation_feedback"},
-    "habits": {"events", "memories", "recommendations", "recommendation_feedback"},
+    "habits": {"events", "memories", "recommendations", "recommendation_feedback", "activities"},
     "checkins": {
         "events",
         "memories",
@@ -51,7 +51,7 @@ TURUNAN: dict[str, set[str]] = {
     "memories": set(),
     "conversations": set(),
     "recommendations": set(),
-    "history": {"memories"},
+    "history": {"memories", "activities"},
 }
 
 
@@ -678,3 +678,51 @@ async def test_izin_yang_tidak_diminta_atau_cacat_ditolak(
     if kode:
         assert r.json()["error"]["code"] == kode
     assert _satu(api_privasi, "SELECT count(*) FROM permissions WHERE user_id = %s", uid) == 0
+
+
+# ───────────────────────────── tinjauan keamanan Sprint 5–6 (8 Okt 2026) ──
+
+
+@pytest.mark.parametrize("kategori", ["habits", "history"])
+async def test_hapus_sumber_membuang_proyeksi_perilaku_turunannya(
+    api_privasi: ApiUji, kategori: str
+) -> None:
+    """Tinjauan keamanan S5–6 (S1): lajur `activities` `source='inferred'` adalah PROYEKSI
+    event habit (Behavior projector 5.1) — `completion_id`, tanggal, status, dan tier tiap
+    penyelesaian. Versi pertama tidak menyatakannya turunan siapa pun: hapus `habits` (atau
+    seluruh riwayat kejadian) meninggalkan riwayat penyelesaian habit itu utuh di aktivitas,
+    ikut terekspor dan tampil di `GET /activities` — persis *“nilai turunan tetap membawa
+    jejak perilaku walau sumbernya hilang”* yang K-42 tolak (naskah 11 §7.25)."""
+    uid, token = await _daftar(api_privasi)
+    await _isi_semuanya(api_privasi, uid, token)
+    k, h = api_privasi.klien, auth(token)
+    habit = (
+        await k.post(
+            "/v1/habits", json={"title": "Baca buku", "period": "day", "target_count": 1}, headers=h
+        )
+    ).json()
+    r = await k.post(
+        f"/v1/habits/{habit['id']}/completions",
+        json={"for_date": TANGGAL, "status": "done"},
+        headers=h,
+    )
+    assert r.status_code == 201, r.text
+    # Behavior projector — di pekerja ia konsumen stream; di sini dijalankan langsung.
+    await intelligence.bangun_ulang_proyeksi(api_privasi.app.state.engine, uuid.UUID(uid))
+    proyeksi = "SELECT count(*) FROM activities WHERE user_id = %s AND source = 'inferred'"
+    assert _satu(api_privasi, proyeksi, uid) == 1, "prasyarat: penyelesaian tidak terproyeksi"
+
+    r = await _hapus(api_privasi, token, kategori)
+    assert r.status_code == 202, r.text
+
+    assert _satu(api_privasi, proyeksi, uid) == 0, (
+        f"hapus `{kategori}` meninggalkan proyeksi penyelesaian habit di aktivitas"
+    )
+    assert (
+        _satu(
+            api_privasi,
+            "SELECT count(*) FROM activities WHERE user_id = %s AND source = 'manual'",
+            uid,
+        )
+        == 1
+    ), f"hapus `{kategori}` membuang aktivitas yang DICATAT pengguna"

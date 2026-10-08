@@ -9536,6 +9536,41 @@ MUTASI: list[Mutasi] = [
         harus_memuat="login pending_deletion ditolak",
         kelompok="db",
     ),
+    # ── Tinjauan keamanan Sprint 5–6 (8 Okt 2026) ──
+    Mutasi(
+        "S1",
+        "hapus `habits` tidak membuang proyeksi penyelesaian habit (aktivitas inferred)",
+        [
+            Sunting(
+                f"{MODUL}/activities/privasi.py",
+                "AND source = 'inferred' AND kind = :kind\"",
+                "AND source = 'inferred' AND kind = :kind AND false\"",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_privacy_center.py::"
+            "test_hapus_sumber_membuang_proyeksi_perilaku_turunannya[habits]"
+        ),
+        harus_memuat="hapus `habits` meninggalkan proyeksi penyelesaian habit di aktivitas",
+        kelompok="db",
+    ),
+    Mutasi(
+        "S1",
+        "hapus seluruh riwayat kejadian tidak membuang proyeksinya (aktivitas inferred)",
+        [
+            Sunting(
+                f"{MODUL}/activities/privasi.py",
+                "AND source = 'inferred'\",",
+                "AND source = 'inferred' AND false\",",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_privacy_center.py::"
+            "test_hapus_sumber_membuang_proyeksi_perilaku_turunannya[history]"
+        ),
+        harus_memuat="hapus `history` meninggalkan proyeksi penyelesaian habit di aktivitas",
+        kelompok="db",
+    ),
     # ── Sprint 6 · 6.5 hapus akun (Stage B): sapuan tahap 3–6 oleh proses pekerja ──
     Mutasi(
         "6.5b",
