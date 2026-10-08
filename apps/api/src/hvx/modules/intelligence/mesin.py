@@ -156,12 +156,19 @@ async def _dari_checkin(conn: AsyncConnection, event: events.EventMasuk) -> None
 
     Hanya menyentuh rekomendasi mesin yang MASIH `pending` (status yang sudah diubah
     pengguna tidak diganggu), dan hanya menghitung ulang — `history` yang tersimpan di
-    `context_snapshot` dipertahankan, `context` diganti energi terbaru."""
+    `context_snapshot` dipertahankan, `context` diganti energi terbaru.
+
+    🔴 Energi dibaca dari check-in OTORITATIF, bukan `payload` event (K-35 (a)): versi
+    pertama memakai payload, dan `checkin.logged` lama yang diserahkan ulang SESUDAH yang
+    baru (klaim ulang stream sesudah 30 dtk menganggur) memutar konteksnya kembali ke
+    energi yang sudah diganti — urutan tiba yang menang, bukan energi terakhir (spec/03
+    aturan 2; tinjauan kontrak S5–6, K2)."""
     mentah = event.payload.get("for_date")
     if mentah is None:
         return
     for_date = date.fromisoformat(str(mentah))
-    energi = event.payload.get("energy")
+    checkin = await checkins.checkin_pada(conn, event.user_id, for_date)
+    energi = checkin.energy if checkin else None
     for baris in await repository.pending_mesin(
         conn, event.user_id, SKOR_VERSI, for_date.isoformat()
     ):
@@ -169,7 +176,7 @@ async def _dari_checkin(conn: AsyncConnection, event: events.EventMasuk) -> None
         komponen: Komponen = {}
         if "history" in snap:
             komponen["history"] = float(snap["history"])
-        if isinstance(energi, int):
+        if energi is not None:
             komponen["context"] = _norm(energi)
         skor = nilai_rekomendasi(komponen)
         if skor is None:  # tak mungkin bila history ada; jaga-jaga, biarkan apa adanya

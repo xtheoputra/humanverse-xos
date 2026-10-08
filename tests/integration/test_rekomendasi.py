@@ -14,11 +14,13 @@ from typing import Any
 import psycopg
 import pytest
 from _bantuan_db import ApiUji, auth, psycopg_dsn
+from psycopg.rows import dict_row
 from test_habits import buat_habit
 from test_penyelesaian import _catat, _hari_ini_di
 
 from hvx import pekerja
-from hvx.modules.platform import Settings
+from hvx.modules import events, intelligence
+from hvx.modules.platform import Settings, transaksi_pengguna
 
 pytestmark = pytest.mark.integration
 
@@ -114,3 +116,55 @@ async def test_pekerja_menyekor_rekomendasi_dari_skip_lalu_menyegarkannya_dari_c
             "SELECT count(*) FROM recommendations WHERE user_id = %s", (uid,)
         ).fetchone()
     assert n == 1
+
+
+# ── Tinjauan kontrak Sprint 5–6 (8 Okt 2026) ─────────────────────────────────
+
+
+def _event(api: ApiUji, uid: Any, jenis: str) -> list[events.EventMasuk]:
+    """Event satu jenis milik pengguna, urut tiba — dibaca pemilik skema, apa adanya."""
+    with psycopg.connect(psycopg_dsn(api.db.dsn_pemilik), row_factory=dict_row) as k:
+        baris = k.execute(
+            "SELECT id, user_id, event_type, schema_version, occurred_at, recorded_at, source, "
+            "subject_type, subject_id, payload FROM events "
+            "WHERE user_id = %s AND event_type = %s ORDER BY recorded_at, id",
+            (uid, jenis),
+        ).fetchall()
+    return [events.EventMasuk(**b) for b in baris]
+
+
+async def _sarankan(api: ApiUji, uid: Any, ev: events.EventMasuk) -> None:
+    """Satu penyerahan konsumen `rekomendasi` — di transaksi pemilik event, seperti pekerja."""
+    async with transaksi_pengguna(api.app.state.engine, uid) as conn:
+        await intelligence.sarankan(conn, ev)
+
+
+async def test_penyegaran_konteks_dari_checkin_otoritatif_bukan_urutan_tiba(
+    api_bersama: ApiUji,
+) -> None:
+    """K-36 (5) *“energi terakhir menang”* + spec/03 aturan 2 (*consumer tidak boleh
+    mengandalkan urutan datang*): `checkin.logged` yang tiba TERLAMBAT — diklaim ulang
+    sesudah 30 dtk menganggur, sesudah yang lebih baru selesai — tidak boleh memutar
+    konteks rekomendasi kembali ke energi yang sudah diganti. K-35 (a) menolak payload
+    event untuk alasan yang sama: payload bisa basi."""
+    uid, token = await api_bersama.pengguna_baru()
+    hari = _hari_ini_di(api_bersama, "UTC").isoformat()
+    habit = await buat_habit(api_bersama, token, title="Lari pagi")
+    r = await api_bersama.klien.put(f"/v1/checkins/{hari}", json={"energy": 2}, headers=auth(token))
+    assert r.status_code == 201, r.text
+    s = await _catat(api_bersama, token, habit["id"], for_date=hari, status="skipped")
+    assert s.status_code == 201, s.text
+    (dilewati,) = _event(api_bersama, uid, "habit.skipped")
+    await _sarankan(api_bersama, uid, dilewati)
+
+    u = await api_bersama.klien.put(f"/v1/checkins/{hari}", json={"energy": 5}, headers=auth(token))
+    assert u.status_code == 200, u.text
+    lama, baru = _event(api_bersama, uid, "checkin.logged")
+    await _sarankan(api_bersama, uid, baru)
+    await _sarankan(api_bersama, uid, lama)  # penyerahan ulang yang terlambat
+
+    (rec,) = _rekomendasi(api_bersama, uid)
+    assert rec["score_breakdown"].get("context") == 1.0, (
+        "konteks rekomendasi diputar kembali ke energi yang sudah diganti (urutan tiba): "
+        f"{rec['score_breakdown']}"
+    )

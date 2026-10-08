@@ -10117,6 +10117,24 @@ MUTASI: list[Mutasi] = [
         harus_memuat="human_state menyatakan energi/fokus yang sudah diganti pemiliknya",
         kelompok="db",
     ),
+    Mutasi(
+        "K2",
+        "penyegaran konteks kembali memakai payload event — urutan tiba yang menang",
+        [
+            Sunting(
+                f"{MODUL}/intelligence/mesin.py",
+                "    checkin = await checkins.checkin_pada(conn, event.user_id, for_date)\n"
+                "    energi = checkin.energy if checkin else None\n",
+                '    energi = event.payload.get("energy")\n',
+            )
+        ],
+        _pytest(
+            "tests/integration/test_rekomendasi.py::"
+            "test_penyegaran_konteks_dari_checkin_otoritatif_bukan_urutan_tiba"
+        ),
+        harus_memuat="konteks rekomendasi diputar kembali ke energi yang sudah diganti",
+        kelompok="db",
+    ),
     # ── Sprint 6 · 6.6 luring dasar: antrean penyelesaian habit (Flutter, K-40) ──
     Mutasi(
         "6.6",
