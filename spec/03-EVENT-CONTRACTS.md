@@ -155,6 +155,7 @@ menyusul — supaya nama dan bentuknya tidak berubah nanti.
 | **Habit streak** | `habit.*` | ✅ wajib |
 | **Memory extractor** | `journal.created`, `mood.logged` | boleh gagal & diulang |
 | **Recommendation trigger** | `checkin.logged`, `habit.skipped` | boleh gagal |
+| **Human State** 🔧 | `checkin.logged` | boleh gagal & diulang |
 | **Analytics** | semua | boleh gagal |
 
 > Consumer yang "boleh gagal" wajib **idempoten**, karena akan diulang.
@@ -177,11 +178,22 @@ menyusul — supaya nama dan bentuknya tidak berubah nanti.
 > stream Redis. Tiap consumer adalah satu **grup**; ia membaca isi event dari
 > PostgreSQL di transaksi **pemiliknya** (RLS berlaku) dan meng-ACK **sesudah**
 > commit. Pesan yang menganggur 30 dtk diklaim anggota grup lain; sesudah 5 kali
-> diserahkan ia pindah ke stream **mati**. Yang terpasang di V0: **Memory
-> extractor** (grup `memori`, 3.6). Behavior projector, Habit streak,
-> Recommendation trigger, dan Analytics menyusul bersama tugasnya (5.1, 5.5) —
-> grup baru membaca stream **dari awal**, jadi tidak ada event yang terlewat
+> diserahkan ia pindah ke stream **mati** (konsumen *boleh gagal* saja — lihat K6 di
+> atas). Grup baru membaca stream **dari awal**, jadi tidak ada event yang terlewat
 > selama stream belum dipangkas melewatinya.
+>
+> 🔧 **Yang terpasang di V0 — diselaraskan 8 Okt 2026 dengan `rakit_konsumen` di `hvx/pekerja.py`
+> (tinjauan kontrak Sprint 5–6, K7).** Kalimat sebelumnya (*“yang terpasang: Memory
+> extractor; sisanya menyusul (5.1, 5.5)”*) tertinggal sesudah Sprint 5 memasangnya:
+>
+> | Consumer | Grup | Mendengarkan (sungguhan) | Tugas |
+> |---|---|---|---|
+> | Behavior projector | `proyektor` — **wajib** | semua jenis V0 (`REGISTRY`); V0 memproyeksikan siklus penyelesaian habit | 5.1 |
+> | Habit streak | `pola` — **wajib** | `habit.completed` · `habit.skipped` · `habit.completion_retracted` — `habit.created` tidak mengubah riwayat penyelesaian. Rentetan sendiri dihitung **saat dibaca** (`rentetan_pada` modul habits, 2.4); grup ini menghitung pola perilaku habit | 5.2 |
+> | Human State | `human-state` | `checkin.logged` — baris tabel di atas ditambahkan bersama kalimat ini; konsumen ini lahir di 5.3 tanpa pernah dicatat di sini | 5.3 |
+> | Recommendation trigger | `rekomendasi` | `checkin.logged` · `habit.skipped` | 5.5 |
+> | Memory extractor | `memori` | `journal.created` · `mood.logged` | 3.6 |
+> | Analytics | — | **tidak terpasang**: tidak ada tugas [`07`](07-BACKLOG-V0.md) untuknya | — |
 
 ---
 
