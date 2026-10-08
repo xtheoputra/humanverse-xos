@@ -12,6 +12,7 @@ ditulis lewat HTTP seperti pengguna menulisnya, dan diperiksa PEMILIK skema:
 
 from __future__ import annotations
 
+import asyncio
 import uuid
 from collections.abc import AsyncIterator, Callable
 from datetime import UTC, datetime, timedelta
@@ -25,7 +26,7 @@ from asgi_lifespan import LifespanManager
 from test_auth import SANDI, _daftar_badan, _email
 
 from hvx.main import create_app
-from hvx.modules import identity, intelligence
+from hvx.modules import events, identity, intelligence
 from hvx.modules.platform import Settings, buat_engine
 
 pytestmark = pytest.mark.integration
@@ -782,3 +783,98 @@ async def test_sandi_ulang_dibatasi_per_ip_seperti_login(
         f"pencocokan sandi ke-4 dari IP yang sama (daftar + sandi ulang) tidak dibatasi: {r.text}"
     )
     assert "Retry-After" in r.headers
+
+
+@pytest.fixture
+async def api_privasi_sendiri(
+    basis_data_termigrasi: Callable[[str], BasisDataV0], url_redis_uji: str
+) -> AsyncIterator[ApiUji]:
+    """Basis data sendiri — relay uji menyalurkan SEMUA event basis datanya, dan konsumen di
+    bawah ini tidak boleh menyentuh data uji lain."""
+    db = basis_data_termigrasi("privasi")
+    awalan = f"uji-{uuid.uuid4().hex[:12]}"
+    app = create_app(
+        Settings(
+            env="test",
+            database_url=db.dsn_aplikasi,
+            redis_url=url_redis_uji,
+            redis_prefix=awalan,
+        )
+    )
+    async with (
+        LifespanManager(app),
+        httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://uji") as k,
+    ):
+        engine_pekerja = buat_engine(db.dsn_pekerja)
+        try:
+            yield ApiUji(
+                app=app, klien=k, db=db, awalan_redis=awalan, engine_pekerja=engine_pekerja
+            )
+        finally:
+            await engine_pekerja.dispose()
+
+
+def _ada_yang_menunggu_kunci(api: ApiUji) -> bool:
+    with _pemilik(api) as p:
+        return bool(
+            p.execute(
+                "SELECT count(*) FROM pg_locks l JOIN pg_stat_activity a USING (pid) "
+                "WHERE NOT l.granted AND a.datname = current_database()"
+            ).fetchone()[0]
+        )
+
+
+async def test_hapus_kategori_tidak_balapan_dengan_konsumen_yang_menurunkan_datanya(
+    api_privasi_sendiri: ApiUji,
+) -> None:
+    """Tinjauan keamanan S5–6 (S3): konsumen pekerja (human state 5.3, pola 5.2, rekomendasi
+    5.5, proyeksi 5.1) MENURUNKAN data di transaksinya sendiri. Hapus kategori yang berjalan
+    selagi transaksi itu belum commit tidak melihat baris turunan yang baru disisipkan — dan
+    tidak menunggunya: begitu konsumen commit, turunan dari sumber yang SUDAH dihapus hidup
+    terus (di sini: energi & fokus di `human_states`, tampil di dashboard), tanpa event yang
+    bisa memicu pembersihannya lagi. Hanya ekstraksi jurnal yang dijaga (K-27, `FOR SHARE`)."""
+    api = api_privasi_sendiri
+    uid, token = await _daftar(api)
+    r = await api.klien.put(
+        f"/v1/checkins/{TANGGAL}", json={"energy": 2, "focus": 3}, headers=auth(token)
+    )
+    assert r.status_code == 201, r.text
+    await events.Relay(api.engine_pekerja, api.app.state.redis, api.awalan_redis).putaran()
+
+    menurunkan, lanjutkan = asyncio.Event(), asyncio.Event()
+
+    async def tahan_sebelum_commit(conn: Any, event: events.EventMasuk) -> None:
+        await intelligence.hitung_human_state(conn, event)
+        menurunkan.set()
+        await lanjutkan.wait()
+
+    konsumen = events.KonsumenStream(
+        engine=api.engine_pekerja,
+        redis=api.app.state.redis,
+        awalan=api.awalan_redis,
+        grup="human-state",
+        nama="uji",
+        jenis=intelligence.JENIS_KEADAAN,
+        tangani=tahan_sebelum_commit,
+        blok_ms=50,
+    )
+    await konsumen.siapkan()
+    putaran = asyncio.create_task(konsumen.putaran())
+    try:
+        await asyncio.wait_for(menurunkan.wait(), timeout=15)
+        hapus = asyncio.create_task(_hapus(api, token, "checkins"))
+        # Tunggu sampai penghapusan SELESAI (tanpa penjaga) atau MENUNGGU kunci (dengan).
+        for _ in range(300):
+            if hapus.done() or _ada_yang_menunggu_kunci(api):
+                break
+            await asyncio.sleep(0.02)
+    finally:
+        lanjutkan.set()
+    assert await asyncio.wait_for(putaran, timeout=15) == 1
+    r = await asyncio.wait_for(hapus, timeout=15)
+    assert r.status_code == 202, r.text
+
+    assert _satu(api, "SELECT count(*) FROM daily_checkins WHERE user_id = %s", uid) == 0
+    assert _satu(api, "SELECT count(*) FROM human_states WHERE user_id = %s", uid) == 0, (
+        "human state dari check-in yang sudah dihapus hidup terus (konsumen commit sesudahnya)"
+    )

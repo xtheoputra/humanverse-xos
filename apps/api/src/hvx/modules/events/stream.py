@@ -175,6 +175,8 @@ class KonsumenStream:
             return 0
         try:
             async with platform.transaksi_pengguna(self._engine, UUID(isi["user_id"])) as conn:
+                # Penangan MENURUNKAN data: hapus kategori menunggu commit-nya (S3).
+                await platform.kunci_turunan(conn, UUID(isi["user_id"]))
                 baris = (await conn.execute(_MENURUT_ID, {"id": UUID(isi["id"])})).first()
                 if baris is not None:
                     await self._tangani(conn, EventMasuk(**baris._asdict()))

@@ -194,6 +194,28 @@ async def transaksi_pengguna(
         yield conn
 
 
+# Satu kunci per pengguna antara yang MENURUNKAN data (bersama) dan yang menghapus kategori
+# beserta turunannya (eksklusif) — lihat `kunci_turunan`.
+_KUNCI_TURUNAN_BERSAMA = text("SELECT pg_advisory_xact_lock_shared(hashtextextended(:kunci, 0))")
+_KUNCI_TURUNAN_EKSKLUSIF = text("SELECT pg_advisory_xact_lock(hashtextextended(:kunci, 0))")
+
+
+async def kunci_turunan(conn: AsyncConnection, user_id: UUID, *, eksklusif: bool = False) -> None:
+    """Kunci transaksi atas data TURUNAN seorang pengguna — dipegang sampai commit/rollback.
+
+    🔴 Tinjauan keamanan S5–6 (S3): konsumen pekerja (human state, pola, rekomendasi,
+    proyeksi) menyisipkan turunan di transaksinya sendiri; hapus kategori Privacy Center
+    yang berjalan sebelum transaksi itu commit tidak melihat baris barunya dan tidak
+    menunggunya — turunan dari sumber yang sudah dihapus hidup terus, tanpa event yang
+    memicu pembersihannya lagi. Konsumen mengambil kunci ini BERSAMA (tidak saling
+    menahan); penghapus mengambilnya EKSKLUSIF sebagai pernyataan pertamanya — ia
+    menunggu konsumen yang sedang berjalan, dan konsumen berikutnya menunggu commit-nya
+    lalu tidak lagi menemukan event sumbernya.
+    """
+    kueri = _KUNCI_TURUNAN_EKSKLUSIF if eksklusif else _KUNCI_TURUNAN_BERSAMA
+    await conn.execute(kueri, {"kunci": f"turunan:{user_id}"})
+
+
 @asynccontextmanager
 async def transaksi_sistem(engine: AsyncEngine) -> AsyncIterator[AsyncConnection]:
     """Satu transaksi TANPA pengguna — hanya baris sistem (`user_id` NULL) yang terjangkau.

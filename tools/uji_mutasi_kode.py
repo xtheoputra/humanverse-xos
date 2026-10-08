@@ -9625,6 +9625,57 @@ MUTASI: list[Mutasi] = [
         harus_memuat="pencocokan sandi ke-4 dari IP yang sama (daftar + sandi ulang) tidak dibatasi",
         kelompok="db",
     ),
+    Mutasi(
+        "S3",
+        "hapus kategori tidak menunggu konsumen yang sedang menurunkan data — turunan lolos",
+        [
+            Sunting(
+                f"{MODUL}/identity/privasi.py",
+                "        await platform.kunci_turunan(conn, user_id, eksklusif=True)\n",
+                "",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_privacy_center.py::"
+            "test_hapus_kategori_tidak_balapan_dengan_konsumen_yang_menurunkan_datanya"
+        ),
+        harus_memuat="human state dari check-in yang sudah dihapus hidup terus",
+        kelompok="db",
+    ),
+    Mutasi(
+        "S3",
+        "konsumen pekerja menurunkan data tanpa kunci bersama — penghapus tidak menunggunya",
+        [
+            Sunting(
+                f"{MODUL}/events/stream.py",
+                '                await platform.kunci_turunan(conn, UUID(isi["user_id"]))\n',
+                "",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_privacy_center.py::"
+            "test_hapus_kategori_tidak_balapan_dengan_konsumen_yang_menurunkan_datanya"
+        ),
+        harus_memuat="human state dari check-in yang sudah dihapus hidup terus",
+        kelompok="db",
+    ),
+    Mutasi(
+        "S3",
+        "kunci turunan penghapus diambil BERSAMA — tidak menahan konsumen",
+        [
+            Sunting(
+                f"{MODUL}/platform/db.py",
+                "    kueri = _KUNCI_TURUNAN_EKSKLUSIF if eksklusif else _KUNCI_TURUNAN_BERSAMA\n",
+                "    kueri = _KUNCI_TURUNAN_BERSAMA\n",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_privacy_center.py::"
+            "test_hapus_kategori_tidak_balapan_dengan_konsumen_yang_menurunkan_datanya"
+        ),
+        harus_memuat="human state dari check-in yang sudah dihapus hidup terus",
+        kelompok="db",
+    ),
     # ── Sprint 6 · 6.5 hapus akun (Stage B): sapuan tahap 3–6 oleh proses pekerja ──
     Mutasi(
         "6.5b",

@@ -564,6 +564,10 @@ async def hapus_kategori(
     urut = [p for p in langkah if not p.turunan] + [p for p in langkah if p.turunan]
     terhapus: dict[str, int] = {}
     async with platform.transaksi_pengguna(engine, user_id) as conn:
+        # Pertama: tunggu konsumen pekerja yang sedang menurunkan data pengguna ini, dan
+        # tahan yang berikutnya sampai commit — turunan yang disisipkan di tengah tidak
+        # lolos dari penghapus turunan di bawah (tinjauan keamanan S5–6, S3).
+        await platform.kunci_turunan(conn, user_id, eksklusif=True)
         for p in urut:
             terhapus[p.tabel] = terhapus.get(p.tabel, 0) + await p.hapus(conn, user_id)
         await audit(
