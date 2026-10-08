@@ -12300,6 +12300,130 @@ MUTASI: list[Mutasi] = [
         _pytest("tests/unit/test_dasbor_murni.py::test_why_memakai_label_manusiawi"),
         harus_memuat="Why memakai key mentah",
     ),
+    # ── 6.5 Stage A: DELETE /me · POST /me/restore · login pending_deletion · migrasi 0010 ──
+    Mutasi(
+        "6.5",
+        "tenggang hapus akun bukan 30 hari (spec/01 tahap 2)",
+        [
+            Sunting(
+                f"{MODUL}/identity/service.py",
+                "TENGGANG_HAPUS_HARI = 30",
+                "TENGGANG_HAPUS_HARI = 3",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_hapus_akun.py::test_jadwal_hapus_tepat_30_hari_dan_berjejak"
+        ),
+        harus_memuat="tenggang hapus bukan 30 hari",
+        kelompok="db",
+    ),
+    Mutasi(
+        "6.5",
+        "penjadwalan hapus akun tanpa jejak audit",
+        [
+            Sunting(
+                f"{MODUL}/identity/service.py",
+                '                aksi="account.deletion_scheduled",',
+                '                aksi="account.deletion_scheduled_x",',
+            )
+        ],
+        _pytest(
+            "tests/integration/test_hapus_akun.py::test_jadwal_hapus_tepat_30_hari_dan_berjejak"
+        ),
+        harus_memuat="jadwal hapus tanpa jejak audit",
+        kelompok="db",
+    ),
+    Mutasi(
+        "6.5",
+        "DELETE /me berulang menyetel ulang jam tenggang",
+        [
+            Sunting(
+                f"{MODUL}/identity/repository.py",
+                "    WHERE id = :id AND status = 'active'\n    RETURNING deletion_scheduled_at\n",
+                "    WHERE id = :id AND status IN ('active', 'pending_deletion')\n"
+                "    RETURNING deletion_scheduled_at\n",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_hapus_akun.py::"
+            "test_delete_berulang_tidak_menyetel_ulang_jam_tenggang"
+        ),
+        harus_memuat="DELETE berulang mengembalikan jadwal berbeda",
+        kelompok="db",
+    ),
+    Mutasi(
+        "6.5",
+        "DELETE /me berulang dalam tenggang ditolak 409 (jadwal lama tak dikembalikan)",
+        [
+            Sunting(
+                f"{MODUL}/identity/service.py",
+                "        dijadwalkan = akun.deletion_scheduled_at\n",
+                "        dijadwalkan = None\n",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_hapus_akun.py::"
+            "test_delete_berulang_tidak_menyetel_ulang_jam_tenggang"
+        ),
+        harus_memuat="DELETE /me berulang ditolak",
+        kelompok="db",
+    ),
+    Mutasi(
+        "6.5",
+        "restore tanpa jejak audit",
+        [
+            Sunting(
+                f"{MODUL}/identity/service.py",
+                '                aksi="account.deletion_cancelled",',
+                '                aksi="account.deletion_cancelled_x",',
+            )
+        ],
+        _pytest("tests/integration/test_hapus_akun.py::test_restore_berjejak_sekali"),
+        harus_memuat="restore tanpa jejak audit",
+        kelompok="db",
+    ),
+    Mutasi(
+        "6.5",
+        "tebakan sandi di DELETE /me tidak berjejak",
+        [
+            Sunting(
+                f"{MODUL}/identity/service.py",
+                '        aksi_ditolak="account.deletion_rejected",',
+                '        aksi_ditolak="account.deletion_rejected_x",',
+            )
+        ],
+        _pytest("tests/integration/test_hapus_akun.py::test_sandi_salah_saat_hapus_berjejak"),
+        harus_memuat="tebakan sandi di DELETE /me tidak berjejak",
+        kelompok="db",
+    ),
+    Mutasi(
+        "6.5",
+        "penyegaran token akun pending_deletion ditolak — restore hanya selama token akses hidup",
+        [
+            Sunting(
+                f"{MODUL}/identity/service.py",
+                "        aktif = akun is not None and akun.status in _STATUS_SESI_SAH",
+                '        aktif = akun is not None and akun.status == "active"',
+            )
+        ],
+        _pytest("tests/integration/test_hapus_akun.py::test_sesi_pending_deletion_bisa_disegarkan"),
+        harus_memuat="penyegaran sesi pending_deletion ditolak",
+        kelompok="db",
+    ),
+    Mutasi(
+        "6.5",
+        "migrasi 0010: deletion_scheduled_at tanpa zona waktu (≠ spec/01)",
+        [
+            Sunting(
+                f"{MIGRASI}/0010_jadwal_hapus_akun.up.sql",
+                "  ADD COLUMN deletion_scheduled_at timestamptz;",
+                "  ADD COLUMN deletion_scheduled_at timestamp;",
+            )
+        ],
+        _pytest(f"{UJI_MIGRASI}::test_migrasi_menghasilkan_skema_yang_sama_persis_dengan_spec01"),
+        harus_memuat="deletion_scheduled_at', 'timestamp without time zone'",
+        kelompok="db",
+    ),
 ]
 
 

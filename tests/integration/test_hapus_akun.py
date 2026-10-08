@@ -94,6 +94,110 @@ async def test_restore_idempoten_pada_akun_aktif(api_uji: ApiUji) -> None:
     assert _akun(api_uji, uid)[0] == "active"
 
 
+# ── Tinjauan penegak buta S5–6 ──────────────────────────────────────────────────
+
+
+def _jejak(api: ApiUji, uid: str, aksi: str) -> list[dict[str, Any]]:
+    """Metadata baris audit `aksi` milik pengguna itu, urut terjadi."""
+    with psycopg.connect(psycopg_dsn(api.db.dsn_pemilik)) as k:
+        return [
+            b[0]
+            for b in k.execute(
+                "SELECT metadata FROM audit_logs WHERE user_id = %s AND action = %s ORDER BY id",
+                (uid, aksi),
+            ).fetchall()
+        ]
+
+
+async def _hapus(api: ApiUji, token: str, sandi: str = SANDI) -> Any:
+    return await api.klien.request(
+        "DELETE", "/v1/me", json={"password": sandi}, headers=auth(token)
+    )
+
+
+async def _masuk(api: ApiUji, email: str) -> dict[str, Any]:
+    r = await api.klien.post("/v1/auth/login", json={"email": email, "password": SANDI})
+    assert r.status_code == 200, r.text
+    tokens: dict[str, Any] = r.json()["tokens"]
+    return tokens
+
+
+async def test_jadwal_hapus_tepat_30_hari_dan_berjejak(api_uji: ApiUji) -> None:
+    """spec/01 *Prosedur hapus akun* tahap 2: tenggang 30 hari — dan perubahan status
+    berjejak audit di transaksi yang sama (AGENTS.md §7)."""
+    _, uid, token = await _daftar(api_uji)
+
+    r = await _hapus(api_uji, token)
+
+    assert r.status_code == 202, r.text
+    with psycopg.connect(psycopg_dsn(api_uji.db.dsn_pemilik)) as k:
+        (hari,) = k.execute(
+            "SELECT extract(epoch FROM deletion_scheduled_at - now()) / 86400 FROM users "
+            "WHERE id = %s",
+            (uid,),
+        ).fetchone() or (None,)
+    assert hari is not None
+    assert 29.9 < float(hari) <= 30, f"tenggang hapus bukan 30 hari: {float(hari):.2f}"
+    assert _jejak(api_uji, uid, "account.deletion_scheduled") == [{"tenggang_hari": 30}], (
+        "jadwal hapus tanpa jejak audit"
+    )
+
+
+async def test_delete_berulang_tidak_menyetel_ulang_jam_tenggang(api_uji: ApiUji) -> None:
+    """Idempoten: DELETE /me kedua (sesudah login lagi dalam tenggang) mengembalikan jadwal
+    YANG SAMA — jam tenggang tidak mundur, dan tidak ada jejak penjadwalan kedua."""
+    email, uid, token = await _daftar(api_uji)
+    pertama = await _hapus(api_uji, token)
+    assert pertama.status_code == 202, pertama.text
+    dijadwalkan = _akun(api_uji, uid)[1]
+
+    kedua = await _hapus(api_uji, (await _masuk(api_uji, email))["access_token"])
+
+    assert kedua.status_code == 202, f"DELETE /me berulang ditolak: {kedua.text}"
+    assert kedua.json() == pertama.json(), "DELETE berulang mengembalikan jadwal berbeda"
+    assert _akun(api_uji, uid)[1] == dijadwalkan, "DELETE berulang menyetel ulang jam tenggang"
+    assert len(_jejak(api_uji, uid, "account.deletion_scheduled")) == 1
+
+
+async def test_restore_berjejak_sekali(api_uji: ApiUji) -> None:
+    email, uid, token = await _daftar(api_uji)
+    assert (await _hapus(api_uji, token)).status_code == 202
+    baru = (await _masuk(api_uji, email))["access_token"]
+
+    for _ in range(2):  # yang kedua: akun sudah active — no-op, tanpa jejak kedua
+        r = await api_uji.klien.post("/v1/me/restore", headers=auth(baru))
+        assert r.status_code == 200, r.text
+
+    assert len(_jejak(api_uji, uid, "account.deletion_cancelled")) == 1, (
+        "restore tanpa jejak audit (atau berjejak ganda)"
+    )
+
+
+async def test_sandi_salah_saat_hapus_berjejak(api_uji: ApiUji) -> None:
+    _, uid, token = await _daftar(api_uji)
+
+    r = await _hapus(api_uji, token, "sandi-salah-sekali-2026")
+
+    assert r.status_code == 403, r.text
+    assert _jejak(api_uji, uid, "account.deletion_rejected") == [{"alasan": "sandi_salah"}], (
+        "tebakan sandi di DELETE /me tidak berjejak"
+    )
+
+
+async def test_sesi_pending_deletion_bisa_disegarkan(api_uji: ApiUji) -> None:
+    """Login DAN penyegaran token sah selama tenggang — tanpa itu pengguna yang membatalkan
+    di hari ke-2 kehilangan sesinya begitu token aksesnya kedaluwarsa."""
+    email, _uid, token = await _daftar(api_uji)
+    assert (await _hapus(api_uji, token)).status_code == 202
+    tokens = await _masuk(api_uji, email)
+
+    r = await api_uji.klien.post(
+        "/v1/auth/refresh", json={"refresh_token": tokens["refresh_token"]}
+    )
+
+    assert r.status_code == 200, f"penyegaran sesi pending_deletion ditolak: {r.text}"
+
+
 # ── Tinjauan kontrak Sprint 5–6 (8 Okt 2026) ─────────────────────────────────
 
 
