@@ -274,6 +274,11 @@ async def test_sapuan_menghapus_semua_jejak_akun_dan_hanya_akun_itu(
     )
     assert kunci_lain, "kontrol: akun lain tak punya jejak idempotensi"
     assert audit_sebelum >= 4, "kontrol: akun contoh hampir tanpa jejak audit"
+    with _pemilik(api) as k:
+        (berjaringan,) = k.execute(
+            "SELECT count(*) FROM audit_logs WHERE user_id = %s AND ip_hash IS NOT NULL", (uid,)
+        ).fetchone() or (0,)
+    assert berjaringan >= 1, "kontrol: tak satu jejak audit pun membawa ip_hash — uji C-34 buta"
 
     terhapus = await _sapu(api, partial(memory.buang_titik_pengguna, *koleksi))
 
@@ -299,6 +304,12 @@ async def test_sapuan_menghapus_semua_jejak_akun_dan_hanya_akun_itu(
             "SELECT count(*) FROM audit_logs WHERE audit_logs::text LIKE %s", (f"%{uid}%",)
         ).fetchone() or (0,)
     assert bocor == 0, "id asli akun yang dihapus masih terbaca di audit_logs"
+    # C-34 (K-46): jejak yang dipertahankan tidak lagi bisa dipertemukan lewat jaringan.
+    with _pemilik(api) as k:
+        (jaringan,) = k.execute(
+            "SELECT count(*) FROM audit_logs WHERE user_id = %s AND ip_hash IS NOT NULL", (semu,)
+        ).fetchone() or (0,)
+    assert jaringan == 0, "ip_hash tertinggal di jejak audit akun yang dihapus (C-34)"
 
     # Jejak idempotensi di Redis (rujukan + kuota) menunjuk pemiliknya 24 jam — ikut dibuang.
     assert await _kunci_redis(api, uid) == [], "jejak idempotensi akun yang dihapus tertinggal"
