@@ -10,7 +10,13 @@ from .notifikasi import JENIS as JENIS_NOTIFIKASI
 from .notifikasi import PAGU_HARIAN as PAGU_HARIAN_NOTIFIKASI
 from .notifikasi import JenisNotifikasi, keputusan_kirim
 from .privasi import BAGIAN_PRIVASI, PENGHAPUS_PRIVASI
-from .repository import buat_profil, human_state_terkini, simpan_human_state, zona_waktu
+from .repository import (
+    buat_profil,
+    hapus_human_state,
+    human_state_terkini,
+    simpan_human_state,
+    zona_waktu,
+)
 from .repository import notifikasi as preferensi_notifikasi  # nama `notifikasi` = submodul
 from .routes import router
 from .schemas import Profil, UbahProfil
@@ -26,6 +32,7 @@ __all__ = [
     "UbahProfil",
     "buat_profil",
     "buat_profil_awal",
+    "hapus_human_state",
     "human_state_terkini",
     "keputusan_kirim",
     "preferensi_notifikasi",

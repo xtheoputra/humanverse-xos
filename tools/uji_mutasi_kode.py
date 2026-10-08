@@ -10082,6 +10082,41 @@ MUTASI: list[Mutasi] = [
         harus_memuat="pekerja tidak membersihkan jejak idempotensi",
         kelompok="db",
     ),
+    # ── Tinjauan kontrak Sprint 5–6 (8 Okt 2026) ──
+    Mutasi(
+        "K1",
+        "check-in tanpa energi & fokus membiarkan human_state lama (versi pertama: return)",
+        [
+            Sunting(
+                f"{MODUL}/intelligence/keadaan.py",
+                "        await profile.hapus_human_state(conn, event.user_id, for_date=for_date, model_version=MODEL)\n",
+                "",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_human_state.py::"
+            "test_checkin_diganti_tanpa_energi_dan_fokus_tidak_meninggalkan_keadaan_lama"
+        ),
+        harus_memuat="human_state menyatakan energi/fokus yang sudah diganti pemiliknya",
+        kelompok="db",
+    ),
+    Mutasi(
+        "K1",
+        "hapus_human_state menyaring versi model yang salah — baris hari itu tidak terhapus",
+        [
+            Sunting(
+                f"{MODUL}/profile/repository.py",
+                '    "WHERE user_id = :user_id AND for_date = :for_date AND model_version = :model_version"',
+                '    "WHERE user_id = :user_id AND for_date = :for_date AND model_version <> :model_version"',
+            )
+        ],
+        _pytest(
+            "tests/integration/test_human_state.py::"
+            "test_checkin_diganti_tanpa_energi_dan_fokus_tidak_meninggalkan_keadaan_lama"
+        ),
+        harus_memuat="human_state menyatakan energi/fokus yang sudah diganti pemiliknya",
+        kelompok="db",
+    ),
     # ── Sprint 6 · 6.6 luring dasar: antrean penyelesaian habit (Flutter, K-40) ──
     Mutasi(
         "6.6",

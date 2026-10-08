@@ -13,9 +13,11 @@ from typing import Any
 import psycopg
 import pytest
 from _bantuan_db import ApiUji, auth, psycopg_dsn
+from psycopg.rows import dict_row
 
 from hvx import pekerja
-from hvx.modules.platform import Settings
+from hvx.modules import events, intelligence
+from hvx.modules.platform import Settings, transaksi_pengguna
 
 pytestmark = pytest.mark.integration
 
@@ -90,3 +92,57 @@ async def test_pekerja_menghitung_human_state_dari_checkin_lalu_memperbaruinya(
             (uid, _TANGGAL),
         ).fetchone()
     assert n == 1
+
+
+# ── Tinjauan kontrak Sprint 5–6 (8 Okt 2026) ─────────────────────────────────
+
+
+def _event_checkin_terakhir(api: ApiUji, uid: Any, for_date: str) -> events.EventMasuk:
+    """`checkin.logged` terbaru untuk satu tanggal — dibaca pemilik skema, apa adanya."""
+    with psycopg.connect(psycopg_dsn(api.db.dsn_pemilik), row_factory=dict_row) as k:
+        baris = k.execute(
+            "SELECT id, user_id, event_type, schema_version, occurred_at, recorded_at, source, "
+            "subject_type, subject_id, payload FROM events "
+            "WHERE user_id = %s AND event_type = 'checkin.logged' "
+            "AND payload ->> 'for_date' = %s ORDER BY recorded_at DESC, id DESC LIMIT 1",
+            (uid, for_date),
+        ).fetchone()
+    assert baris is not None, "check-in tidak menerbitkan checkin.logged"
+    return events.EventMasuk(**baris)
+
+
+async def _proses_keadaan(api: ApiUji, uid: Any, for_date: str) -> None:
+    ev = _event_checkin_terakhir(api, uid, for_date)
+    async with transaksi_pengguna(api.app.state.engine, uid) as conn:
+        await intelligence.hitung_human_state(conn, ev)
+
+
+async def test_checkin_diganti_tanpa_energi_dan_fokus_tidak_meninggalkan_keadaan_lama(
+    api_bersama: ApiUji,
+) -> None:
+    """K-35 (1)·(5): keadaan hari itu dihitung dari check-in OTORITATIF, dan check-in tanpa
+    energi & fokus = tidak ada baris. `PUT /checkins` MENGGANTI (spec/04): sesudah pengguna
+    mengganti check-in-nya tanpa energi/fokus, energi lamanya tidak boleh tetap dinyatakan
+    — di `human_states` maupun di dashboard (*“yang kamu laporkan sendiri”*, 6.1)."""
+    uid, token = await api_bersama.pengguna_baru()
+    r = await api_bersama.klien.put(
+        f"/v1/checkins/{_TANGGAL}", json={"energy": 4, "focus": 2}, headers=auth(token)
+    )
+    assert r.status_code == 201, r.text
+    await _proses_keadaan(api_bersama, uid, _TANGGAL)
+    assert _human_state(api_bersama, uid, _TANGGAL) is not None
+
+    u = await api_bersama.klien.put(
+        f"/v1/checkins/{_TANGGAL}", json={"sleep_hours": 7.5}, headers=auth(token)
+    )
+    assert u.status_code == 200, u.text
+    await _proses_keadaan(api_bersama, uid, _TANGGAL)
+
+    assert _human_state(api_bersama, uid, _TANGGAL) is None, (
+        "human_state menyatakan energi/fokus yang sudah diganti pemiliknya (K-35)"
+    )
+    d = await api_bersama.klien.get("/v1/dashboard", headers=auth(token))
+    assert d.status_code == 200, d.text
+    assert d.json() == {"as_of": None, "dimensions": []}, (
+        f"dashboard menampilkan laporan yang sudah diganti: {d.json()}"
+    )

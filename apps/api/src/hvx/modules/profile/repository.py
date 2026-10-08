@@ -74,6 +74,10 @@ _SIMPAN_HUMAN_STATE = text(
     """
 )
 _MEDAN_METRIK = frozenset({"value", "confidence", "evidence_count"})
+_HAPUS_HUMAN_STATE = text(
+    "DELETE FROM human_states "
+    "WHERE user_id = :user_id AND for_date = :for_date AND model_version = :model_version"
+)
 
 # Human state terkini (Dashboard 6.1): baris paling baru per pengguna. `for_date`
 # lebih dulu (keadaan HARI mana), lalu `computed_at` sebagai pemecah seri.
@@ -149,6 +153,17 @@ async def simpan_human_state(
             "metrics": json.dumps(dict(metrics), sort_keys=True),
             "model_version": model_version,
         },
+    )
+
+
+async def hapus_human_state(
+    conn: AsyncConnection, user_id: UUID, *, for_date: date, model_version: str
+) -> None:
+    """Buang `human_state` satu hari satu versi — check-in yang menjadi dasarnya tidak lagi
+    memuat metrik (K-35: tanpa metrik, tanpa baris). Di transaksi pemanggil."""
+    await conn.execute(
+        _HAPUS_HUMAN_STATE,
+        {"user_id": user_id, "for_date": for_date, "model_version": model_version},
     )
 
 

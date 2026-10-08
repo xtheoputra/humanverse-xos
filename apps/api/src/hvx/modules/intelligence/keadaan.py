@@ -71,10 +71,13 @@ async def hitung_human_state(conn: AsyncConnection, event: events.EventMasuk) ->
         return
     for_date = date.fromisoformat(str(mentah))
     checkin = await checkins.checkin_pada(conn, event.user_id, for_date)
-    if checkin is None:
-        return
-    metrik = metrik_harian(energy=checkin.energy, focus=checkin.focus)
-    if not metrik:  # check-in hanya tidur/kosong — tidak ada yang dinyatakan
+    metrik = metrik_harian(energy=checkin.energy, focus=checkin.focus) if checkin else {}
+    if not metrik:
+        # Check-in hanya tidur/kosong — tidak ada yang dinyatakan, JUGA bila hari itu pernah
+        # berbaris: `PUT /checkins` MENGGANTI (spec/04). 🔴 Versi pertama hanya `return`,
+        # dan energi yang sudah diganti pemiliknya tetap dinyatakan di `human_states` dan
+        # dashboard (tinjauan kontrak S5–6, K1).
+        await profile.hapus_human_state(conn, event.user_id, for_date=for_date, model_version=MODEL)
         return
     await profile.simpan_human_state(
         conn, event.user_id, for_date=for_date, metrics=metrik, model_version=MODEL
