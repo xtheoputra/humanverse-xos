@@ -10293,6 +10293,27 @@ MUTASI: list[Mutasi] = [
         harus_memuat="DELETE /me serentak tidak idempoten",
         kelompok="db",
     ),
+    Mutasi(
+        "E-245",
+        "restore menjawab 200 active untuk akun suspended/terhapus (versi pertama)",
+        [
+            Sunting(
+                f"{MODUL}/identity/service.py",
+                '                "Masa tenggang penghapusan sudah berakhir; akun tidak bisa dipulihkan.",\n'
+                "            )\n"
+                '        if status != "active":\n'
+                '            raise _galat(403, "account_not_active", "Akun tidak aktif.")\n',
+                '                "Masa tenggang penghapusan sudah berakhir; akun tidak bisa dipulihkan.",\n'
+                "            )\n",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_hapus_akun.py::"
+            "test_restore_tidak_mengaku_aktif_untuk_akun_yang_tidak_aktif[suspended]"
+        ),
+        harus_memuat="restore mengaku memulihkan akun suspended",
+        kelompok="db",
+    ),
     # ── Sprint 6 · 6.6 luring dasar: antrean penyelesaian habit (Flutter, K-40) ──
     Mutasi(
         "6.6",

@@ -119,3 +119,26 @@ async def test_hapus_serentak_dua_kali_keduanya_202_dengan_jadwal_yang_sama(
     )
     assert a.json()["deletion_scheduled_at"] == b.json()["deletion_scheduled_at"]
     assert _akun(api_uji, uid)[0] == "pending_deletion"
+
+
+@pytest.mark.parametrize("status", ["suspended", "terhapus"])
+async def test_restore_tidak_mengaku_aktif_untuk_akun_yang_tidak_aktif(
+    api_uji: ApiUji, status: str
+) -> None:
+    """Tinjauan S5–6 (E-245, dicurigai lensa keamanan DAN kontrak): `UPDATE` restore hanya
+    menyentuh `pending_deletion`, tetapi rutenya menjawab `200 {"status": "active"}` untuk
+    akun `suspended` — atau yang barisnya sudah tiada — selama token aksesnya masih hidup.
+    Statusnya tidak berubah, jadi jawabannya bohong; kini `403 account_not_active`."""
+    _, uid, token = await _daftar(api_uji)
+    with psycopg.connect(psycopg_dsn(api_uji.db.dsn_pemilik)) as k:
+        if status == "suspended":
+            k.execute("UPDATE users SET status = 'suspended' WHERE id = %s", (uid,))
+        else:
+            k.execute("DELETE FROM users WHERE id = %s", (uid,))
+
+    r = await api_uji.klien.post("/v1/me/restore", headers=auth(token))
+
+    assert r.status_code == 403, f"restore mengaku memulihkan akun {status}: {r.text}"
+    assert r.json()["error"]["code"] == "account_not_active"
+    if status == "suspended":
+        assert _akun(api_uji, uid)[0] == "suspended", "restore mengaktifkan akun suspended"

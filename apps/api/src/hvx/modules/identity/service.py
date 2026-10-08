@@ -382,6 +382,11 @@ async def batalkan_penghapusan(engine: AsyncEngine, user_id: UUID, *, ip_hash: s
     Hanya SELAMA tenggang (K-39): sesudah `deletion_scheduled_at` sapuan boleh membuang titik
     Qdrant-nya kapan saja, dan akun yang dipulihkan sesudah itu kehilangan memori
     vektornya diam-diam — jadi `409 deletion_grace_expired`, bukan `200`.
+
+    🔴 Versi pertama menjawab `200 {"status": "active"}` untuk akun `suspended` — atau yang
+    barisnya sudah tiada — selama token aksesnya masih hidup: `UPDATE`-nya tidak menyentuh
+    status lain, jadi jawabannya bohong (tinjauan S5–6, E-245). Kini `403 account_not_active`,
+    sama dengan pintu yang lain.
     """
     async with platform.transaksi_pengguna(engine, user_id) as conn:
         dibatalkan = await repository.batalkan_hapus(conn, user_id)
@@ -395,12 +400,15 @@ async def batalkan_penghapusan(engine: AsyncEngine, user_id: UUID, *, ip_hash: s
                 ip_hash=ip_hash,
             )
             return
-        if await repository.status_akun(conn, user_id) == "pending_deletion":
+        status = await repository.status_akun(conn, user_id)
+        if status == "pending_deletion":
             raise _galat(
                 409,
                 "deletion_grace_expired",
                 "Masa tenggang penghapusan sudah berakhir; akun tidak bisa dipulihkan.",
             )
+        if status != "active":
+            raise _galat(403, "account_not_active", "Akun tidak aktif.")
 
 
 async def pastikan_akun_melayani(conn: AsyncConnection, user_id: UUID) -> None:

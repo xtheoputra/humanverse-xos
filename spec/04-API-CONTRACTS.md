@@ -85,6 +85,9 @@ POST   /me/restore                               → 200   (batal hapus, selama 
 >   **hanya selama `deletion_scheduled_at` belum lewat**: sesudahnya
 >   `409 deletion_grace_expired` — sapuan boleh membuang titik Qdrant-nya kapan saja
 >   (E-216).
+>   🔧 Akun `suspended` — atau yang barisnya sudah tiada, lewat token akses yang masih
+>   hidup — `403 account_not_active`; versi pertama menjawab `200 {"status": "active"}`
+>   tanpa mengubah apa pun (E-245, 8 Okt 2026).
 > * Penghapusannya sendiri (tahap 3–6) dikerjakan proses pekerja, bukan rute —
 >   [`01`](01-DATABASE-SCHEMA.md) *Prosedur hapus akun*.
 
