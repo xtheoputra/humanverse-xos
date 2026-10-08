@@ -11585,6 +11585,163 @@ MUTASI: list[Mutasi] = [
         ),
         harus_memuat="pohon prosesnya tidak dihentikan",
     ),
+    # ── Tinjauan penegak buta Sprint 5–6 (8 Okt 2026) ──
+    # Kerusakan yang dirancang tanpa melihat ujinya lebih dulu; yang LOLOS seluruh suite
+    # pada 65ce010 kini merah oleh uji yang ditambah/dikuatkan bersama blok ini.
+    # ── 5.1 Behavior projector ──
+    Mutasi(
+        "5.1",
+        "membangun ulang proyeksi menghapus aktivitas MANUAL (kosongkan tanpa saring source)",
+        [
+            Sunting(
+                f"{MODUL}/activities/repository.py",
+                "\"DELETE FROM activities WHERE user_id = :user_id AND source = 'inferred'\"",
+                '"DELETE FROM activities WHERE user_id = :user_id"',
+            )
+        ],
+        _pytest(
+            "tests/integration/test_proyektor.py::"
+            "test_proyeksi_tidak_pernah_menyentuh_aktivitas_manual"
+        ),
+        harus_memuat="membangun ulang proyeksi menghapus aktivitas manual",
+        kelompok="db",
+    ),
+    Mutasi(
+        "5.1",
+        "pencabutan proyeksi menghapus aktivitas manual ber-id sama",
+        [
+            Sunting(
+                f"{MODUL}/activities/repository.py",
+                "    WHERE id = :id AND user_id = :user_id AND source = 'inferred'\n",
+                "    WHERE id = :id AND user_id = :user_id\n",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_proyektor.py::"
+            "test_proyeksi_tidak_pernah_menyentuh_aktivitas_manual"
+        ),
+        harus_memuat="pencabutan proyeksi menghapus aktivitas manual ber-id sama",
+        kelompok="db",
+    ),
+    Mutasi(
+        "5.1",
+        "sisip proyeksi menimpa (DO UPDATE) aktivitas manual ber-id sama",
+        [
+            Sunting(
+                f"{MODUL}/activities/repository.py",
+                "'inferred', CAST(:payload AS jsonb))\n    ON CONFLICT (id) DO NOTHING\n",
+                "'inferred', CAST(:payload AS jsonb))\n"
+                "    ON CONFLICT (id) DO UPDATE SET source = 'inferred', payload = EXCLUDED.payload\n",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_proyektor.py::"
+            "test_proyeksi_tidak_pernah_menyentuh_aktivitas_manual"
+        ),
+        harus_memuat="proyeksi menimpa aktivitas manual ber-id sama",
+        kelompok="db",
+    ),
+    Mutasi(
+        "5.1",
+        "bangun ulang tidak mengosongkan dulu — proyeksi basi/yatim bertahan",
+        [
+            Sunting(
+                f"{MODUL}/intelligence/proyektor.py",
+                "        await activities.kosongkan_proyeksi(conn, user_id)\n",
+                "",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_proyektor.py::test_bangun_ulang_dari_nol_membuang_proyeksi_basi"
+        ),
+        harus_memuat="bangun ulang tidak dari nol",
+        kelompok="db",
+    ),
+    Mutasi(
+        "5.1",
+        "habit.completion_retracted tidak memicu projector (aliran langsung tak mencabut)",
+        [
+            Sunting(
+                f"{MODUL}/intelligence/proyektor.py",
+                '    "habit.completion_retracted": _proyeksikan_habit,\n',
+                "",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_proyektor.py::"
+            "test_pekerja_memproyeksikan_habit_selesai_menjadi_aktivitas_inferred"
+        ),
+        harus_memuat="pencabutan lewat pekerja tidak membuang proyeksi",
+        kelompok="db",
+    ),
+    Mutasi(
+        "5.1",
+        "konsumen projector hanya mendengar habit.completed (spec/03: SEMUA jenis)",
+        [
+            Sunting(
+                f"{MODUL}/intelligence/proyektor.py",
+                "JENIS_EVENT: frozenset[str] = frozenset(events.REGISTRY)",
+                'JENIS_EVENT: frozenset[str] = frozenset({"habit.completed"})',
+            )
+        ],
+        _pytest(
+            "tests/integration/test_proyektor.py::"
+            "test_pekerja_memproyeksikan_habit_selesai_menjadi_aktivitas_inferred"
+        ),
+        harus_memuat="pencabutan lewat pekerja tidak membuang proyeksi",
+        kelompok="db",
+    ),
+    Mutasi(
+        "5.1",
+        "teks bebas `note` ikut ke payload proyeksi (C-33)",
+        [
+            Sunting(
+                f"{MODUL}/intelligence/proyektor.py",
+                '_MEDAN_HABIT = ("completion_id", "for_date", "status", "tier_used")',
+                '_MEDAN_HABIT = ("completion_id", "for_date", "status", "tier_used", "note")',
+            )
+        ],
+        _pytest(
+            "tests/integration/test_proyektor.py::"
+            "test_bangun_ulang_dari_nol_identik_dan_tanpa_duplikat"
+        ),
+        harus_memuat="teks bebas `note` ikut ke proyeksi",
+        kelompok="db",
+    ),
+    Mutasi(
+        "5.1",
+        "pencabutan diabaikan: ada `completed` saja sudah terproyeksi",
+        [
+            Sunting(
+                f"{MODUL}/intelligence/proyektor.py",
+                "    if selesai is not None and dicabut is None:",
+                "    if selesai is not None:",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_proyektor.py::"
+            "test_bangun_ulang_dari_nol_identik_dan_tanpa_duplikat"
+        ),
+        harus_memuat="penyelesaian yang dicabut ikut terproyeksi",
+        kelompok="db",
+    ),
+    Mutasi(
+        "5.1",
+        "id proyeksi acak — bangun ulang tidak identik",
+        [
+            Sunting(
+                f"{MODUL}/intelligence/proyektor.py",
+                '    return uuid.uuid5(_NS, f"habit-completion:{completion_id}")',
+                "    return uuid.uuid4()",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_proyektor.py::"
+            "test_bangun_ulang_dari_nol_identik_dan_tanpa_duplikat"
+        ),
+        harus_memuat="bangun ulang kedua tidak identik",
+        kelompok="db",
+    ),
 ]
 
 
