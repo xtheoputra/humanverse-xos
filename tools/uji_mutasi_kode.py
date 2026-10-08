@@ -10135,6 +10135,44 @@ MUTASI: list[Mutasi] = [
         harus_memuat="konteks rekomendasi diputar kembali ke energi yang sudah diganti",
         kelompok="db",
     ),
+    Mutasi(
+        "K3",
+        "penyegaran skor tidak menulis ulang rationale — alasan menyebut energi lama",
+        [
+            Sunting(
+                f"{MODUL}/intelligence/repository.py",
+                "        context_snapshot = CAST(:context_snapshot AS jsonb),\n"
+                "        body = :body,\n"
+                "        rationale = CAST(:rationale AS jsonb)\n",
+                "        context_snapshot = CAST(:context_snapshot AS jsonb),\n"
+                "        body = :body\n",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_rekomendasi.py::"
+            "test_penyegaran_menulis_ulang_alasan_dan_saran_sesuai_skornya"
+        ),
+        harus_memuat="alasan tidak menyebut energi yang dipakai skornya",
+        kelompok="db",
+    ),
+    Mutasi(
+        "K3",
+        "penyegaran skor tidak menulis ulang body — saran tier mengikuti energi lama",
+        [
+            Sunting(
+                f"{MODUL}/intelligence/repository.py",
+                "        context_snapshot = CAST(:context_snapshot AS jsonb),\n"
+                "        body = :body,\n",
+                "        context_snapshot = CAST(:context_snapshot AS jsonb),\n",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_rekomendasi.py::"
+            "test_penyegaran_menulis_ulang_alasan_dan_saran_sesuai_skornya"
+        ),
+        harus_memuat="saran tier tidak mengikuti energi yang dipakai skornya",
+        kelompok="db",
+    ),
     # ── Sprint 6 · 6.6 luring dasar: antrean penyelesaian habit (Flutter, K-40) ──
     Mutasi(
         "6.6",

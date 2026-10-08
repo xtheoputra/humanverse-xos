@@ -168,3 +168,51 @@ async def test_penyegaran_konteks_dari_checkin_otoritatif_bukan_urutan_tiba(
         "konteks rekomendasi diputar kembali ke energi yang sudah diganti (urutan tiba): "
         f"{rec['score_breakdown']}"
     )
+
+
+async def test_penyegaran_menulis_ulang_alasan_dan_saran_sesuai_skornya(
+    api_bersama: ApiUji,
+) -> None:
+    """spec/01 §7: `rationale` = Explainable AI (naskah 4 §29), *“bisa ditampilkan apa
+    adanya”*. Sesudah `checkin.logged` menyegarkan `context` (K-36 (5)), alasan yang
+    tertampil wajib menyebut energi yang SUNGGUH dipakai skornya — bukan energi lama yang
+    sudah diganti — dan saran tier-nya mengikuti energi yang sama (K-23)."""
+    uid, token = await api_bersama.pengguna_baru()
+    hari = _hari_ini_di(api_bersama, "UTC").isoformat()
+    habit = await buat_habit(
+        api_bersama,
+        token,
+        title="Lari pagi",
+        adaptive_tiers=[{"label": "Lari 5 km"}, {"label": "Jalan 10 menit"}],
+    )
+    r = await api_bersama.klien.put(f"/v1/checkins/{hari}", json={"energy": 1}, headers=auth(token))
+    assert r.status_code == 201, r.text
+    s = await _catat(api_bersama, token, habit["id"], for_date=hari, status="skipped")
+    assert s.status_code == 201, s.text
+    (dilewati,) = _event(api_bersama, uid, "habit.skipped")
+    await _sarankan(api_bersama, uid, dilewati)
+    (awal,) = await _daftar(api_bersama, token)
+
+    u = await api_bersama.klien.put(f"/v1/checkins/{hari}", json={"energy": 5}, headers=auth(token))
+    assert u.status_code == 200, u.text
+    _lama, baru = _event(api_bersama, uid, "checkin.logged")
+    await _sarankan(api_bersama, uid, baru)
+
+    (rec,) = await _daftar(api_bersama, token)
+    assert rec["score_breakdown"]["context"] == 1.0
+    assert f"Energi 5/5 pada {hari}." in rec["rationale"], (
+        f"alasan tidak menyebut energi yang dipakai skornya: {rec['rationale']}"
+    )
+    assert not any("Energi 1/5" in a for a in rec["rationale"]), (
+        f"alasan masih menyebut energi yang sudah diganti: {rec['rationale']}"
+    )
+    assert rec["body"] != awal["body"], (
+        f"saran tier tidak mengikuti energi yang dipakai skornya: {rec['body']!r}"
+    )
+
+
+async def _daftar(api: ApiUji, token: str) -> list[dict[str, Any]]:
+    r = await api.klien.get("/v1/recommendations", headers=auth(token))
+    assert r.status_code == 200, r.text
+    items: list[dict[str, Any]] = r.json()["items"]
+    return items

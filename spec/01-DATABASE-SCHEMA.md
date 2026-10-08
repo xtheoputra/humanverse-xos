@@ -745,6 +745,16 @@ CREATE INDEX recommendation_feedback_user_idx
 >
 > `action='modified'` dan `'snoozed'` melengkapi naskah 4 §24: memilih B
 > setelah disarankan A **bukan** penolakan, dan menunda **bukan** mengabaikan.
+>
+> 🔧 **Rekomendasi mesin yang masih `pending` disegarkan — dan alasannya ikut (8 Okt
+> 2026, tinjauan kontrak Sprint 5–6 K2 · K3).** `checkin.logged` menghitung ulang
+> komponen `context` (K-36 (5)) dari check-in **otoritatif**, bukan `payload` event —
+> event lama yang diserahkan ulang sesudah yang baru tidak memutar konteksnya mundur
+> (aturan 2 [`03`](03-EVENT-CONTRACTS.md)). `score` · `score_breakdown` ·
+> `context_snapshot` · `body` · `rationale` ditulis **bersama**: alasan yang tertampil
+> selalu menyebut komponen yang dipakai skornya (versi pertama hanya mengganti skor —
+> *“Energi 2/5”* di samping skor dari energi 5). Begitu tidak lagi `pending`, barisnya
+> membeku: `context_snapshot` = konteks rekomendasi **yang dilihat** pengguna.
 
 ---
 

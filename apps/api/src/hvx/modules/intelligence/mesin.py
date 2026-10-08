@@ -90,6 +90,28 @@ def _tier_ringan(habit: habits.Habit, energi: int | None) -> str | None:
     return str(label) if isinstance(label, str) and label.strip() else None
 
 
+def _saran_dan_alasan(
+    habit: habits.Habit, komponen: Komponen, energi: int | None, for_date: date
+) -> tuple[str, list[str]]:
+    """`body` + `rationale` dari komponen yang SUNGGUH dipakai skornya — satu sumber untuk
+    rekomendasi baru dan yang disegarkan, supaya alasan yang tertampil tidak pernah
+    menyebut energi lain dari yang dihitung (spec/01 §7, naskah 4 §29)."""
+    tier = _tier_ringan(habit, energi)
+    dasar = "Melewatkan sesekali tidak mematahkan kebiasaan."
+    body = (
+        f'{dasar} Besok coba versi lebih ringan: "{tier}".'
+        if tier
+        else f"{dasar} Coba lagi besok dengan target yang pas."
+    )
+    rationale: list[str] = []
+    if "history" in komponen:
+        rationale.append(f"Penyelesaian 30 hari terakhir: {round(komponen['history'] * 100)}%.")
+    if energi is not None:
+        rationale.append(f"Energi {energi}/5 pada {for_date.isoformat()}.")
+    rationale.append(f'"{habit.title}" dilewati hari itu.')
+    return body, rationale
+
+
 async def _rekomendasi_habit(
     conn: AsyncConnection, user_id: UUID, habit_id: UUID, for_date: date
 ) -> None:
@@ -112,20 +134,7 @@ async def _rekomendasi_habit(
     if skor is None:  # nol bukti → tidak menyarankan (Confidence Layer 5.4)
         return
 
-    tier = _tier_ringan(habit, energi)
-    dasar = "Melewatkan sesekali tidak mematahkan kebiasaan."
-    body = (
-        f'{dasar} Besok coba versi lebih ringan: "{tier}".'
-        if tier
-        else f"{dasar} Coba lagi besok dengan target yang pas."
-    )
-    rationale: list[str] = []
-    if "history" in komponen:
-        rationale.append(f"Penyelesaian 30 hari terakhir: {round(komponen['history'] * 100)}%.")
-    if energi is not None:
-        rationale.append(f"Energi {energi}/5 pada {for_date.isoformat()}.")
-    rationale.append(f'"{habit.title}" dilewati hari itu.')
-
+    body, rationale = _saran_dan_alasan(habit, komponen, energi, for_date)
     await repository.sisip_mesin(
         conn,
         id_=uuid.uuid5(_NS, f"habit-reengage:{habit_id}:{for_date.isoformat()}"),
@@ -179,8 +188,12 @@ async def _dari_checkin(conn: AsyncConnection, event: events.EventMasuk) -> None
         if energi is not None:
             komponen["context"] = _norm(energi)
         skor = nilai_rekomendasi(komponen)
-        if skor is None:  # tak mungkin bila history ada; jaga-jaga, biarkan apa adanya
+        habit = await habits.habit_pada(conn, baris.subject_id)
+        if skor is None or habit is None:  # nol komponen / habit dihapus: biarkan apa adanya
             continue
+        # 🔴 Versi pertama hanya mengganti skor: alasan dan saran tier tetap menyebut energi
+        # LAMA, padahal skornya dihitung dari yang baru (tinjauan kontrak S5–6, K3).
+        body, rationale = _saran_dan_alasan(habit, komponen, energi, for_date)
         await repository.perbarui_skor(
             conn,
             baris.id,
@@ -188,6 +201,8 @@ async def _dari_checkin(conn: AsyncConnection, event: events.EventMasuk) -> None
             score=skor.score,
             score_breakdown=skor.breakdown,
             context_snapshot={"for_date": for_date.isoformat(), **komponen},
+            body=body,
+            rationale=rationale,
         )
 
 

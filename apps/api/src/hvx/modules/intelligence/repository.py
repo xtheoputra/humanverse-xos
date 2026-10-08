@@ -89,7 +89,9 @@ _PERBARUI_SKOR = text(
     UPDATE recommendations
     SET score = :score,
         score_breakdown = CAST(:score_breakdown AS jsonb),
-        context_snapshot = CAST(:context_snapshot AS jsonb)
+        context_snapshot = CAST(:context_snapshot AS jsonb),
+        body = :body,
+        rationale = CAST(:rationale AS jsonb)
     WHERE id = :id AND user_id = :user_id AND status = 'pending'
     """
 )
@@ -154,8 +156,11 @@ async def perbarui_skor(
     score: Decimal,
     score_breakdown: Mapping[str, Any],
     context_snapshot: Mapping[str, Any],
+    body: str | None,
+    rationale: Sequence[str],
 ) -> None:
-    """Hitung ulang skor sebuah rekomendasi yang masih pending — status tidak disentuh."""
+    """Hitung ulang skor sebuah rekomendasi yang masih pending — beserta saran & alasannya
+    (yang tertampil harus menyebut komponen yang dipakai skor, K3); status tidak disentuh."""
     await conn.execute(
         _PERBARUI_SKOR,
         {
@@ -164,6 +169,8 @@ async def perbarui_skor(
             "score": score,
             "score_breakdown": json.dumps(score_breakdown, ensure_ascii=False),
             "context_snapshot": json.dumps(context_snapshot, ensure_ascii=False),
+            "body": body,
+            "rationale": json.dumps(list(rationale), ensure_ascii=False),
         },
     )
 
