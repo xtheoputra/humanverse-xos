@@ -12424,6 +12424,45 @@ MUTASI: list[Mutasi] = [
         harus_memuat="deletion_scheduled_at', 'timestamp without time zone'",
         kelompok="db",
     ),
+    # ── 5.2 (lanjutan): riwayat penyelesaian hidup yang menjadi bahan pola ──
+    Mutasi(
+        "5.2",
+        "riwayat pola tanpa saring habit — penyelesaian habit lain ikut terhitung",
+        [Sunting(f"{MODUL}/events/proyeksi.py", "      AND c.subject_id = :habit_id\n", "")],
+        _pytest("tests/integration/test_pola.py::test_pola_dua_habit_tidak_saling_menimpa"),
+        harus_memuat="pola satu habit menghitung penyelesaian habit lain",
+        kelompok="db",
+    ),
+    Mutasi(
+        "5.2",
+        "riwayat pola menghitung habit.skipped sebagai penyelesaian",
+        [
+            Sunting(
+                f"{MODUL}/events/proyeksi.py",
+                "      AND c.event_type = 'habit.completed'\n",
+                "      AND c.event_type IN ('habit.completed', 'habit.skipped')\n",
+            )
+        ],
+        _pytest("tests/integration/test_pola.py::test_lewati_bukan_penyelesaian_dalam_pola"),
+        harus_memuat="hari yang dilewati dihitung sebagai penyelesaian",
+        kelompok="db",
+    ),
+    Mutasi(
+        "5.2",
+        "pencabutan dicocokkan tanpa completion_id — satu pencabutan menyembunyikan semua",
+        [
+            Sunting(
+                f"{MODUL}/events/proyeksi.py",
+                "          AND r.payload ->> 'completion_id' = c.payload ->> 'completion_id'\n",
+                "",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_pola.py::test_pola_luruh_sekali_lalu_hidup_lagi_saat_dikuatkan"
+        ),
+        harus_memuat="pola yang dikuatkan lagi tetap luruh",
+        kelompok="db",
+    ),
 ]
 
 

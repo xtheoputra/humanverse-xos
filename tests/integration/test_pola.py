@@ -248,6 +248,9 @@ async def test_pola_dua_habit_tidak_saling_menimpa(api_bersama: ApiUji) -> None:
     assert len(hari) == 2, f"pola satu habit menimpa pola habit lain: {hari}"
     assert any("Lari pagi" in h for h in hari)
     assert any("Baca buku" in h for h in hari)
+    assert all("(1/1)" in h for h in hari), (
+        f"pola satu habit menghitung penyelesaian habit lain: {hari}"
+    )
 
 
 async def test_habit_tanpa_penyelesaian_tidak_menyatakan_konsistensi(api_bersama: ApiUji) -> None:
@@ -303,3 +306,22 @@ async def test_pola_tidak_mengisi_ulang_memori_yang_dilupakan(api_bersama: ApiUj
         ).fetchone() or (None, None)
     assert dihapus is not None
     assert isi == "", f"pola mengisi ulang memori yang sudah dilupakan: {isi!r}"
+
+
+async def test_lewati_bukan_penyelesaian_dalam_pola(api_bersama: ApiUji) -> None:
+    """Pola dibangun dari penyelesaian `done`/`partial` saja — hari yang DILEWATI
+    (`habit.skipped`) bukan bukti bahwa kebiasaan itu dijalankan."""
+    uid, token = await api_bersama.pengguna_baru()
+    hid = await _habit(api_bersama, token)
+    await _selesai(api_bersama, token, hid, "2026-09-11")
+    lewat = await api_bersama.klien.post(
+        f"/v1/habits/{hid}/completions",
+        json={"for_date": "2026-09-12", "status": "skipped"},
+        headers=auth(token),
+    )
+    assert lewat.status_code == 201, lewat.text
+    await _picu(api_bersama, uid, hid)
+
+    ((isi, _, bukti),) = _pola(api_bersama, uid, "diselesaikan pada hari")
+    assert bukti == 1, f"hari yang dilewati dihitung sebagai penyelesaian: {isi}"
+    assert "(1/1)" in isi
