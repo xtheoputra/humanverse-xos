@@ -10223,6 +10223,57 @@ MUTASI: list[Mutasi] = [
         harus_memuat="halaman rekomendasi mengulang baris",
         kelompok="db",
     ),
+    Mutasi(
+        "K6",
+        "KonsumenStream mengabaikan `wajib` — konsumen wajib membuang ke stream mati",
+        [
+            Sunting(
+                f"{MODUL}/events/stream.py",
+                "        if diklaim and not self.wajib and await self._kali_diserahkan(id_pesan) > self._maks_kirim:\n",
+                "        if diklaim and await self._kali_diserahkan(id_pesan) > self._maks_kirim:\n",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_proyektor.py::"
+            "test_konsumen_wajib_menahan_event_bukan_membuangnya_ke_stream_mati"
+        ),
+        harus_memuat="konsumen wajib `proyektor` membuang event ke stream mati",
+        kelompok="db",
+    ),
+    Mutasi(
+        "K6",
+        "pekerja memasang Behavior projector tanpa `wajib=True` (versi pertama)",
+        [
+            Sunting(
+                "apps/api/src/hvx/pekerja.py",
+                "            tangani=intelligence.proyeksikan_perilaku,\n            wajib=True,\n",
+                "            tangani=intelligence.proyeksikan_perilaku,\n",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_proyektor.py::"
+            "test_konsumen_wajib_menahan_event_bukan_membuangnya_ke_stream_mati"
+        ),
+        harus_memuat="konsumen wajib `proyektor` membuang event ke stream mati",
+        kelompok="db",
+    ),
+    Mutasi(
+        "K6",
+        "pekerja memasang Habit streak (pola) tanpa `wajib=True` (versi pertama)",
+        [
+            Sunting(
+                "apps/api/src/hvx/pekerja.py",
+                "            tangani=intelligence.deteksi_pola_habit,\n            wajib=True,\n",
+                "            tangani=intelligence.deteksi_pola_habit,\n",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_proyektor.py::"
+            "test_konsumen_wajib_menahan_event_bukan_membuangnya_ke_stream_mati"
+        ),
+        harus_memuat="konsumen wajib `pola` membuang event ke stream mati",
+        kelompok="db",
+    ),
     # ── Sprint 6 · 6.6 luring dasar: antrean penyelesaian habit (Flutter, K-40) ──
     Mutasi(
         "6.6",

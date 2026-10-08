@@ -240,3 +240,75 @@ async def test_cabut_sesudah_proyeksi_menghapusnya_dan_putar_ulang_tak_menghidup
     assert _inferred(api_bersama, uid) == [], (
         "event completed yang disalurkan ulang menghidupkan baris dicabut"
     )
+
+
+# ── Tinjauan kontrak Sprint 5–6 (8 Okt 2026) ─────────────────────────────────
+
+
+async def test_konsumen_wajib_menahan_event_bukan_membuangnya_ke_stream_mati(
+    api_bersama: ApiUji,
+) -> None:
+    """spec/03 *Consumer V0*: Behavior projector *“✅ wajib — kegagalannya menahan event”*,
+    Habit streak *“✅ wajib”*. Konsumen yang *boleh gagal* memindahkan pesan ke stream mati
+    sesudah 5 kali diserahkan (K-25 (3)); konsumen WAJIB tidak boleh — event yang terbuang
+    di sana tidak pernah diproyeksikan, dan proyeksinya tidak lagi sama dengan yang dibangun
+    ulang dari `events` (5.1). Pesan yang sudah berkali-kali gagal (mis. basis data mati
+    beberapa menit) tetap diproses begitu penangannya bisa. Konsumennya diambil dari
+    perkabelan pekerja yang sungguh dipakai (`pekerja.rakit_konsumen`), dengan bawaannya."""
+    uid, _token = await api_bersama.pengguna_baru()
+    cid, hid = uuid4(), uuid4()
+    await _terbit_selesai(
+        api_bersama,
+        uid,
+        completion_id=cid,
+        habit_id=hid,
+        for_date=date(2026, 9, 1),
+        occurred_at=_T0,
+    )
+    with psycopg.connect(psycopg_dsn(api_bersama.db.dsn_pemilik)) as k:
+        (eid,) = k.execute(
+            "SELECT id FROM events WHERE user_id = %s AND idempotency_key = %s",
+            (uid, f"habit-completion:{cid}"),
+        ).fetchone()
+    awalan = f"uji-wajib-{uuid4().hex[:10]}"
+    r = api_bersama.app.state.redis
+    settings = Settings(
+        env="test",
+        database_url=api_bersama.db.dsn_pekerja,
+        redis_url="redis://tidak-dipakai",
+        redis_prefix=awalan,
+    )
+    konsumen = {k.grup: k for k in pekerja.rakit_konsumen(api_bersama.engine_pekerja, r, settings)}
+    await events.Relay(api_bersama.engine_pekerja, r, awalan).putaran()
+    stream = events.kunci_stream(awalan)
+
+    for grup in ("proyektor", "pola"):
+        k = konsumen[grup]
+        await k.siapkan()
+        # Grup sudah menyelesaikan semua pesan lain; pesan uji sudah diserahkan 10 kali dan
+        # gagal — menganggur sejam di daftar tunggu (PEL).
+        sasaran = None
+        for _s, pesan in await r.xreadgroup(grup, "gagal", {stream: ">"}, count=1_000_000):
+            for id_pesan, isi in pesan:
+                if isi.get("id") == str(eid):
+                    sasaran = id_pesan
+                else:
+                    await r.xack(stream, grup, id_pesan)
+        assert sasaran is not None, "relay tidak menyalin event uji"
+        await r.xclaim(stream, grup, "gagal", 0, [sasaran], idle=3_600_000, retrycount=10)
+
+        await k.putaran()
+
+        mati = [
+            isi.get("id")
+            for _i, isi in await r.xrange(events.kunci_mati(awalan))
+            if isi.get("grup") == grup
+        ]
+        assert str(eid) not in mati, (
+            f"konsumen wajib `{grup}` membuang event ke stream mati (spec/03 Consumer V0)"
+        )
+        assert int((await r.xpending(stream, grup))["pending"]) == 0, (
+            f"konsumen wajib `{grup}` tidak menyelesaikan event yang ditahannya"
+        )
+
+    assert len(_inferred(api_bersama, uid)) == 1, "event yang ditahan tidak pernah diproyeksikan"

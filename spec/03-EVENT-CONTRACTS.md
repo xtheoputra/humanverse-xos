@@ -160,6 +160,16 @@ menyusul — supaya nama dan bentuknya tidak berubah nanti.
 > Consumer yang "boleh gagal" wajib **idempoten**, karena akan diulang.
 > Di V0 antreannya Redis Streams dengan consumer group; Kafka baru bila
 > skalanya menuntut (naskah 5 §5).
+>
+> 🔧 **"Wajib" = tanpa stream mati (8 Okt 2026, tinjauan kontrak Sprint 5–6, K6).**
+> Konsumen *boleh gagal* memindahkan pesan ke stream mati sesudah 5 kali diserahkan
+> (K-25). Konsumen **wajib** tidak: pesannya tetap di daftar tunggu grupnya dan dicoba
+> tiap 30 dtk menganggur sampai berhasil — *“kegagalannya menahan event”*, bukan
+> membuangnya — sementara pesan lain grup itu tetap mengalir
+> (`KonsumenStream(wajib=True)`). Versi pertama Sprint 5 memasang Behavior projector dan
+> Habit streak dengan bawaan *boleh gagal*: basis data yang mati ±3 menit membuang event
+> ke stream mati, dan proyeksinya diam-diam berbeda dari yang dibangun ulang dari
+> `events` (5.1). Konsumen wajib karena itu juga wajib idempoten.
 
 > 🔧 **Bentuk V0-nya (spec/07 3.3 · 3.6, K-25).** Tabel `events` adalah kotak
 > keluar: relay di proses pekerja (`hvx/pekerja.py`) menyalin **rujukan** tiap event yang
