@@ -69,6 +69,12 @@ POST   /me/restore                               → 200   (batal hapus, selama 
 >   yang dicuri cukup untuk menebak sandi ratusan kali per menit lewat pintu ini.
 >   Penolakan tercatat di jejak audit pemiliknya (`account.deletion_rejected` ·
 >   `data.export_rejected` · `data.deletion_rejected`).
+> * 🔧 **E-233 — sandi ulang juga berbagi jatah per IP login** (8 Okt 2026, tinjauan keamanan
+>   Sprint 5–6). Jatah per akun dikosongkan tiap kali sandinya benar, jadi satu akun bisa
+>   memaksa argon2 64 MiB jauh lebih sering daripada pintu `login` (30 / 10 menit per IP).
+>   Ketiga pintu sandi ulang kini memakai jatah **per IP yang sama dengan login**, sebelum
+>   argon2 → `429 rate_limited` + `Retry-After`. Jatahnya dibagi dengan login — pengguna di
+>   balik NAT yang sama berbagi, seperti untuk login.
 > * Akun `pending_deletion` **boleh login** (`suspended` tidak) — satu-satunya jalan
 >   membatalkan, karena `DELETE /me` mencabut semua sesinya. Selama tenggang asisten
 >   **tidak melayani**: `POST /conversations/{id}/messages` dan `…/confirmations` →
@@ -128,7 +134,7 @@ POST   /me/restore                               → 200   (batal hapus, selama 
 | `refresh` | `401 invalid_refresh_token` — token segar **berotasi**; token bekas yang dipakai lagi **mencabut seluruh sesi**; akun yang tidak lagi `active` → sesinya dicabut |
 | rute bersesi | `401 unauthenticated` + `WWW-Authenticate: Bearer` — token palsu, kedaluwarsa, dan dicabut dijawab sama · `429` per pengguna |
 | `PATCH /me/profile` | `400` untuk medan tak dikenal dan `null` eksplisit — tidak diabaikan diam-diam · `400` bila `preferences` memuat `notifications` (milik `PATCH /me/notifications`, K-44) |
-| `DELETE /me` | `403 invalid_credentials` sandi salah · `429` sesudah jatah login gagal akun itu habis — juga dengan sandi yang benar (E-226) |
+| `DELETE /me` | `403 invalid_credentials` sandi salah · `429` sesudah jatah login gagal akun itu habis — juga dengan sandi yang benar (E-226) — atau jatah per IP login habis (E-233) |
 
 ---
 
@@ -505,13 +511,13 @@ DELETE /privacy/data/{category}  { password }   → 202 { category, deleted: { <
 >
 >   | `category` | Yang ikut terhapus |
 >   |---|---|
->   | `goals` · `habits` · `checkins` · `moods` | barisnya (+ milestone · penyelesaian) · event domainnya (lewat `hapus_event_pengguna`, migrasi `0013` — `hvx_app` tetap tanpa `DELETE` atas `events`) · memori ber-scope sumbernya · rekomendasi yang mungkin diturunkan darinya (termasuk semua yang dibuat agent) · `checkins` juga `human_states` |
+>   | `goals` · `habits` · `checkins` · `moods` | barisnya (+ milestone · penyelesaian) · event domainnya (lewat `hapus_event_pengguna`, migrasi `0013` — `hvx_app` tetap tanpa `DELETE` atas `events`) · memori ber-scope sumbernya · rekomendasi yang mungkin diturunkan darinya (termasuk semua yang dibuat agent) · `checkins` juga `human_states` · 🔧 `habits` juga proyeksi perilakunya — `activities` `source='inferred'` `kind='habit'` (5.1; E-232, 8 Okt 2026) |
 >   | `journal` | `journal_entries` · event `journal.*` · memori `journal_raw` |
 >   | `activities` | `activities` |
 >   | `memories` | seluruh memori — *“lupakan semua yang kamu ingat tentangku”*; sumbernya tetap |
 >   | `conversations` | percakapan dan pesannya |
 >   | `recommendations` | rekomendasi dan umpan baliknya |
->   | `history` | seluruh riwayat event (sisa teks bebas C-33) · memori pola perilaku (`kind='behavioral'`) |
+>   | `history` | seluruh riwayat event (sisa teks bebas C-33) · memori pola perilaku (`kind='behavioral'`) · 🔧 seluruh proyeksi `activities` `source='inferred'` — tanpa riwayatnya, membangun ulang pun tak melahirkannya lagi (E-232) |
 >
 >   `account` · `profile` · `audit` **tidak** bisa dihapus di sini (`409
 >   category_not_deletable`; ringkasan menyebut `why_not_deletable` dan jalannya — hapus
@@ -557,8 +563,8 @@ DELETE /privacy/data/{category}  { password }   → 202 { category, deleted: { <
 
 | Rute | Galat yang dijanjikan |
 |---|---|
-| `POST /privacy/export` | `403 invalid_credentials` · `429` (5 per jam per pengguna, atau jatah login gagal akun habis — E-226) |
+| `POST /privacy/export` | `403 invalid_credentials` · `429` (5 per jam per pengguna, jatah login gagal akun habis — E-226, atau jatah per IP login habis — E-233) |
 | `GET /privacy/export/{id}` | `404 export_not_found` — tidak ada, kedaluwarsa, atau milik pengguna lain (tanpa membedakannya) |
 | `GET /privacy/export/{id}/download` | `404 export_not_found` · `410 export_already_downloaded` |
-| `DELETE /privacy/data/{category}` | `404 unknown_category` · `409 category_not_deletable` — keduanya sebelum sandi · `403 invalid_credentials` · `429` |
+| `DELETE /privacy/data/{category}` | `404 unknown_category` · `409 category_not_deletable` — keduanya sebelum sandi · `403 invalid_credentials` · `429` (jatah login gagal akun — E-226, atau per IP — E-233) |
 | `PUT /privacy/permissions/…` | `400` bentuk jalur/badan salah, `expires_at` tanpa zona · `404 permission_not_requested` · `422 expires_at_in_past` |
