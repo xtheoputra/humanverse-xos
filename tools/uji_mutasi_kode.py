@@ -12120,8 +12120,8 @@ MUTASI: list[Mutasi] = [
             Sunting(
                 f"{MODUL}/intelligence/mesin.py",
                 '            context_snapshot={"for_date": for_date.isoformat(), **komponen},\n'
-                "        )\n\n\n_PEMICU",
-                "            context_snapshot=snap,\n        )\n\n\n_PEMICU",
+                "            body=body,\n",
+                "            context_snapshot=snap,\n            body=body,\n",
             )
         ],
         _pytest(
@@ -12211,8 +12211,8 @@ MUTASI: list[Mutasi] = [
         [
             Sunting(
                 f"{MODUL}/intelligence/repository.py",
-                "    ORDER BY created_at DESC, id DESC\n    LIMIT :limit\n",
-                "    ORDER BY created_at ASC, id ASC\n    LIMIT :limit\n",
+                "    ORDER BY created_at DESC, id DESC\n    LIMIT :batas\n",
+                "    ORDER BY created_at ASC, id ASC\n    LIMIT :batas\n",
             )
         ],
         _pytest(
@@ -12223,12 +12223,12 @@ MUTASI: list[Mutasi] = [
     ),
     Mutasi(
         "6.1",
-        "daftar rekomendasi tanpa batas",
+        "daftar rekomendasi tanpa batas (halaman tidak dipotong; LIMIT ALL di SQL ekuivalen sejak E-239)",
         [
             Sunting(
-                f"{MODUL}/intelligence/repository.py",
-                "    ORDER BY created_at DESC, id DESC\n    LIMIT :limit\n",
-                "    ORDER BY created_at DESC, id DESC\n    LIMIT ALL\n",
+                f"{MODUL}/intelligence/rekomendasi.py",
+                "        items = items[:batas]\n",
+                "        pass\n",
             )
         ],
         _pytest(
@@ -12357,8 +12357,8 @@ MUTASI: list[Mutasi] = [
         [
             Sunting(
                 f"{MODUL}/identity/service.py",
-                "        dijadwalkan = akun.deletion_scheduled_at\n",
-                "        dijadwalkan = None\n",
+                "            dijadwalkan = kini.deletion_scheduled_at if kini is not None else None\n",
+                "            dijadwalkan = None\n",
             )
         ],
         _pytest(

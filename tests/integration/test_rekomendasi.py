@@ -190,6 +190,11 @@ async def test_checkin_hanya_menyegarkan_rekomendasi_hari_itu(api_bersama: ApiUj
         assert r.status_code in (200, 201), r.text
         await _picu(api_bersama, uid, "habit.skipped", habit_id=habit["id"], for_date=hari)
 
+    # Penyegaran membaca check-in OTORITATIF (E-237), bukan payload event — ganti dulu.
+    r = await api_bersama.klien.put(
+        "/v1/checkins/2026-09-20", json={"energy": 5}, headers=auth(token)
+    )
+    assert r.status_code == 200, r.text
     await _picu(api_bersama, uid, "checkin.logged", for_date="2026-09-20", energy=5)
 
     d20, d21 = _baris(api_bersama, uid)
@@ -235,6 +240,11 @@ async def test_history_ikut_dan_bertahan_saat_konteks_disegarkan(api_bersama: Ap
     assert riwayat is not None, f"komponen history tidak ikut dalam skor: {rec['score_breakdown']}"
     assert 0 < riwayat < 1, riwayat
 
+    # Penyegaran membaca check-in OTORITATIF (E-237), bukan payload event — ganti dulu.
+    r = await api_bersama.klien.put(
+        f"/v1/checkins/{hari_ini.isoformat()}", json={"energy": 5}, headers=auth(token)
+    )
+    assert r.status_code == 200, r.text
     await _picu(api_bersama, uid, "checkin.logged", for_date=hari_ini.isoformat(), energy=5)
     ((segar,),) = [_baris(api_bersama, uid)]
     assert segar["score_breakdown"] == {"history": riwayat, "context": 1.0, "weights": "equal"}, (
