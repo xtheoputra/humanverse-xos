@@ -3677,7 +3677,8 @@ MUTASI: list[Mutasi] = [
         [
             Sunting(
                 f"{MODUL}/events/stream.py",
-                "        if diklaim and await self._kali_diserahkan(id_pesan) > self._maks_kirim:",
+                # 🔧 K6 (tinjauan kontrak S5–6): syaratnya kini juga `not self.wajib`.
+                "        if diklaim and not self.wajib and await self._kali_diserahkan(id_pesan) > self._maks_kirim:",
                 "        if False:",
             )
         ],
