@@ -182,6 +182,41 @@ jejak hanya bila baris akunnya masih ada. Uji: `test_token_segar_lama_sesudah_ak
 > terhapus; tanpa Qdrant, akun bertitik ditunda selamanya dan tetap bisa dipakai melewati tenggang
 > (dipilih desain, K-39).
 
+### Lensa kontrak — 10 temuan (6 kode · 4 dokumen), 13 mutasi berbunyi
+
+| # | Kode lensa | Temuan | Yang dibetulkan |
+|---|---|---|---|
+| **E-236** | K1 | `PUT /checkins` yang mengganti check-in **tanpa** energi & fokus meninggalkan `human_states` lama — dashboard 6.1 masih menampilkan energi yang sudah diganti (K-35) | `intelligence/keadaan.py` + pintu baru `profile.hapus_human_state` |
+| **E-237** | K2 | penyegaran konteks rekomendasi memakai **payload** event: `checkin.logged` lama yang diserahkan ulang sesudah yang baru memutar skor mundur (spec/03 aturan 2, K-36) | `intelligence/mesin.py` membaca `checkins.checkin_pada` (otoritatif) |
+| **E-238** | K3 | penyegaran hanya mengganti skor: `rationale` masih *“Energi 1/5”* dan saran tier untuk energi lama, padahal skornya dari energi 5 | `mesin.py` · `repository.perbarui_skor` menulis `body` + `rationale`; `spec/01` §7 🔧 |
+| (= **E-232**) | K4 | hapus `habits` tidak membawa proyeksi `inferred` — **temuan yang sama** dengan lensa keamanan | kode E-232 (habits **dan** history) dipakai; commit K4 tidak dipindahkan; dua mutasi K4 diganti satu mutasi `E-232` atas SQL E-232 (*aktivitas yang DICATAT ikut terhapus*) |
+| **E-239** | K5 | `GET /recommendations` memotong **diam-diam** di 50 baris — melanggar aturan *Halaman* `spec/04`, yang sendiri menulisnya *“bukan berkursor”* (kontradiksi di dalam spec) | `?limit=&cursor=` · `next_cursor` (`platform.kursor_waktu`); `spec/04` |
+| **E-240** | K6 | konsumen **wajib** (Behavior projector · Habit streak) memakai bawaan *boleh gagal*: sesudah 5 kali, event dibuang ke stream mati — `spec/03`: *“kegagalannya menahan event”* | `KonsumenStream(wajib=True)` tanpa stream mati, dipasang `hvx.pekerja`; jangkar 23 mutasi 3.3 disesuaikan |
+| **E-241** | K7 | `spec/03` *Consumer V0* masih *“yang terpasang: Memory extractor saja”* | tabel konsumen terpasang = `rakit_konsumen` |
+| **E-242** | K8 | `spec/01` *Prosedur hapus akun*: `now()+30h` (30 **jam**) untuk 30 hari, dan *“`ip_hash` tidak diubah”* basi sejak 0013 | `spec/01` |
+| **E-243** | K9 | aturan *Tulis* `spec/04` tidak menyebut `POST /recommendations/{id}/shown` · `POST /me/restore` sebagai rute tanpa `Idempotency-Key` (`TANPA_IDEMPOTENSI` uji sudah) | `spec/04` |
+| **E-244** | K10 | dua `DELETE /me` serentak (ketukan ganda): yang kalah menjawab `409 deletion_not_possible` untuk akun yang **sudah** dijadwalkan (3/3 percobaan) | jadwal dibaca ulang di transaksi `UPDATE` → keduanya `202`, jadwal sama |
+
+#### E-245 — `POST /me/restore` mengaku memulihkan akun `suspended` atau yang sudah terhapus
+
+Dicurigai **kedua** lensa, dibuktikan tak satu pun. `UPDATE` restore hanya menyentuh
+`pending_deletion` — akun `suspended` **tidak** ikut aktif — tetapi rutenya menjawab
+`200 {"status": "active"}` untuk akun `suspended` atau yang barisnya sudah tiada, selama token
+aksesnya hidup. ✅ `403 account_not_active` (`identity/service.batalkan_penghapusan`). Uji merah
+dulu: `test_restore_tidak_mengaku_aktif_untuk_akun_yang_tidak_aktif[suspended|terhapus]`; mutasi
+`E-245` berbunyi.
+
+> **Bukti di pohon gabungan.** Kedua lensa dibuktikan di worktree masing-masing; di
+> `v0/sprint-6-product` perbaikannya hidup bersama (S3 dan K6 sama-sama menyentuh
+> `events/stream.py`). Semua mutasinya dijalankan ulang di pohon gabungan: S1–S4 · E-232 ·
+> K1–K10 · 23 mutasi 3.3 · E-245 — **47/47 berbunyi**.
+>
+> **Belum dibuktikan mesin menurut lensa kontrak:** 5.1 membandingkan bangun ulang dengan bangun
+> ulang, bukan aliran langsung lewat pekerja lawan bangun ulang; 5.4 hanya ambang nol (#34 milik
+> pemilik). **Dugaan kecil yang tidak dibetulkan:** rekomendasi agent tersimpan
+> `scoring_version='v1'` (bawaan kolom) padahal tidak pernah diskor — labelnya menyesatkan (K-36(6));
+> aplikasi Flutter belum punya layar *restore* (UX, bukan kontrak).
+
 ---
 
 ## 🔨 Sprint 6 · 6.6 luring dasar (6 Okt 2026) — apa yang berubah bagi berkas ini
