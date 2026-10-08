@@ -222,7 +222,7 @@ async def test_ringkasan_menghitung_semua_kategori_tanpa_isi(api_privasi: ApiUji
     assert kat["journal"]["count"] == 1
     assert kat["goals"]["tables"] == {"goals": 1, "goal_milestones": 1}
     assert kat["habits"]["tables"] == {"habits": 1, "habit_completions": 1}
-    assert kat["checkins"]["count"] == 1
+    assert kat["checkins"]["count"] == 1, "baris turunan terhitung sebagai catatan pengguna"
     assert kat["checkins"]["derived_count"] == 1, "human state turunan tidak terhitung"
     assert kat["memories"]["count"] == 6
     # goal · habit · penyelesaian · check-in · mood · jurnal (milestone & aktivitas tanpa event V0)
@@ -230,7 +230,7 @@ async def test_ringkasan_menghitung_semua_kategori_tanpa_isi(api_privasi: ApiUji
     assert kat["account"]["tables"]["users"] == 1
     assert kat["account"]["tables"]["consents"] >= 2
     assert kat["journal"]["deletable"]
-    assert not kat["account"]["deletable"]
+    assert not kat["account"]["deletable"], "kategori yang tak bisa dihapus tampil bisa dihapus"
     assert kat["audit"]["why_not_deletable"], "kategori yang tak bisa dihapus tanpa alasan"
     assert all(k["retention"] for k in isi["categories"]), "ada kategori tanpa masa simpan"
     assert {t["key"] for t in isi["not_collected"]} == {
@@ -413,7 +413,7 @@ async def test_kategori_yang_tidak_bisa_dihapus_ditolak_sebelum_sandi(
 ) -> None:
     _uid, token = await _daftar(api_privasi)
     r = await _hapus(api_privasi, token, kategori, sandi="sandi-salah-pun-tak-ditebak")
-    assert r.status_code == status, r.text
+    assert r.status_code == status, f"`{kategori}` menebak sandi sebelum ditolak: {r.text}"
     assert r.json()["error"]["code"] == kode
 
 
@@ -483,6 +483,9 @@ async def test_ekspor_sekali_pakai_memuat_isi_tanpa_hash_sandi(api_privasi: ApiU
     assert r.status_code == 202, r.text
     eid = r.json()["export_id"]
     assert r.json()["status"] == "ready"
+    assert r.json()["download_url"] == f"/v1/privacy/export/{eid}/download", (
+        "jawaban POST `ready` tanpa jalur unduh — beda dengan GET untuk status yang sama"
+    )
 
     st = await api_privasi.klien.get(f"/v1/privacy/export/{eid}", headers=auth(token))
     assert st.status_code == 200, st.text
@@ -494,7 +497,7 @@ async def test_ekspor_sekali_pakai_memuat_isi_tanpa_hash_sandi(api_privasi: ApiU
     u = await api_privasi.klien.get(jalur, headers=auth(token))
     assert u.status_code == 200, u.text
     assert "attachment" in u.headers["content-disposition"]
-    assert u.headers["cache-control"] == "no-store"
+    assert u.headers.get("cache-control") == "no-store", "unduhan ekspor boleh disimpan cache"
     dok = u.json()
     assert (dok["format"], dok["format_version"]) == ("humanverse-export", 1)
     assert dok["user_id"] == uid
@@ -590,7 +593,12 @@ async def test_izin_per_agent_menampilkan_bawaan_gerbang(api_privasi: ApiUji) ->
     tulis = izin[("habit-agent", "habits", "write")]
     assert tulis["decision"] == "ask", "R2 (habit.complete) berbawaan allow di layar"
     assert izin[("coach-agent", "mood", "read")]["sensitive"] is True, "mood bukan sensitif (C-32)"
-    assert izin[("coach-agent", "mood", "read")]["decision"] == "ask"
+    assert izin[("coach-agent", "mood", "read")]["decision"] == "ask", (
+        "layar menjanjikan `allow` atas scope sensitif yang gerbang tanyakan (E-180)"
+    )
+    assert ("orchestrator-agent", "mood", "execute") not in izin, (
+        "layar menampilkan izin delegasi atas scope sensitif yang tidak dibacanya (E-227)"
+    )
 
 
 async def test_ubah_izin_berlaku_seketika_di_mesin_izin(api_privasi: ApiUji) -> None:
@@ -666,7 +674,7 @@ async def test_izin_yang_tidak_diminta_atau_cacat_ditolak(
     r = await api_privasi.klien.put(
         f"/v1/privacy/permissions/{jalur}", json=badan, headers=auth(token)
     )
-    assert r.status_code == status, r.text
+    assert r.status_code == status, f"izin yang tidak diminta/cacat diterima: {r.text}"
     if kode:
         assert r.json()["error"]["code"] == kode
     assert _satu(api_privasi, "SELECT count(*) FROM permissions WHERE user_id = %s", uid) == 0

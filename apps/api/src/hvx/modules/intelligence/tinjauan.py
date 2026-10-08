@@ -82,10 +82,18 @@ _AJAKAN = {
 
 
 def awal_minggu(teks: str) -> date:
-    """`2026-W40` → Senin minggu ISO itu. `ValueError` bila minggu itu tidak ada (W53)."""
+    """`2026-W40` → Senin minggu ISO itu. `ValueError` bila minggu itu tidak ada (W53) atau
+    keluar dari rentang tanggal lintas-endpoint 1900–2999 (spec/04).
+
+    🔴 Versi pertama hanya memeriksa bentuknya: `0001-W01` lolos sampai rute menghitung
+    minggu sebelumnya (`senin - 7 hari`) → `OverflowError` → **500**, dan `1000-W01`
+    dijawab 200 (temuan 8 Okt 2026)."""
     if not re.fullmatch(POLA_MINGGU, teks):
         raise ValueError("minggu wajib YYYY-Www")
-    return date.fromisocalendar(int(teks[:4]), int(teks[6:]), 1)
+    senin = date.fromisocalendar(int(teks[:4]), int(teks[6:]), 1)
+    if not platform.TANGGAL_MIN <= senin <= platform.TANGGAL_MAKS - timedelta(days=6):
+        raise ValueError("minggu di luar rentang 1900–2999")
+    return senin
 
 
 def label_minggu(senin: date) -> str:

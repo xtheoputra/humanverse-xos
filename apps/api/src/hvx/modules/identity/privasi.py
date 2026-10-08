@@ -437,10 +437,13 @@ async def minta_ekspor(
             subjek_id=str(ekspor_id),
             ip_hash=ip_hash,
         )
+    # `ready` tanpa `download_url` (versi pertama) memaksa klien menyusun jalurnya sendiri —
+    # bentuknya kini sama dengan `status_ekspor` untuk status yang sama.
     return {
         "export_id": ekspor_id,
         "status": _SIAP,
         "expires_at": datetime.now(UTC) + timedelta(seconds=UMUR_EKSPOR_S),
+        "download_url": _jalur_unduh(ekspor_id),
     }
 
 
@@ -461,8 +464,13 @@ async def status_ekspor(
         "download_url": None,
     }
     if status == _SIAP:
-        hasil["download_url"] = f"/v1/privacy/export/{ekspor_id}/download"
+        hasil["download_url"] = _jalur_unduh(ekspor_id)
     return hasil
+
+
+def _jalur_unduh(ekspor_id: UUID) -> str:
+    """Jalur tanpa rahasia (ASVS V8.3.1) — pengunduhnya tetap butuh token akses."""
+    return f"/v1/privacy/export/{ekspor_id}/download"
 
 
 async def unduh_ekspor(

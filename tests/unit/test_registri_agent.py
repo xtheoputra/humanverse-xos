@@ -69,8 +69,11 @@ def test_memory_agent_tidak_pernah_menyentuh_journal_raw() -> None:
 
 
 def _pihak_ketiga(m: Mentah, scope: str) -> None:
-    m["coach-agent"]["kind"] = "third_party"
-    m["coach-agent"]["memory"]["read"].append(scope)
+    """habit-agent — hanya `habits`, juga lewat tool-nya. coach-agent membaca `mood` (C-32)
+    dan `memory.search` menyentuh `journal_raw`: sebagai pihak ketiga ia melanggar aturan 6
+    apa pun scope yang ditambahkan, jadi kasus per scope menjadi buta (8 Okt 2026)."""
+    m["habit-agent"]["kind"] = "third_party"
+    m["habit-agent"]["memory"]["read"].append(scope)
 
 
 def _agen_kedua(m: Mentah) -> None:
@@ -105,6 +108,7 @@ KASUS: list[tuple[str, str, Callable[[Mentah, Mentah], None]]] = [
     ),
     ("5", "dua versi aktif satu nama", lambda a, m: _agen_kedua(m)),
     ("6", "pihak ketiga meminta journal_raw", lambda a, m: _pihak_ketiga(m, "journal_raw")),
+    ("6", "pihak ketiga meminta mood (C-32)", lambda a, m: _pihak_ketiga(m, "mood")),
     ("7", "tool menyentuh orang lain di bawah R3", _tool_menyentuh_orang_lain),
     ("8", "tool tanpa risk_level", lambda a, m: a["goal.list"].pop("risk_level")),
     ("9", "pihak ketiga meminta lokasi", lambda a, m: _pihak_ketiga(m, "location")),

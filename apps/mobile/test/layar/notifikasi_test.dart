@@ -39,7 +39,11 @@ void main() {
     await t.tap(find.byKey(const Key('notif-weekly_review')));
     await t.pumpAndSettle();
 
-    expect(layanan.panggilan.last, 'ubah-notifikasi {weekly_review: false}');
+    expect(
+      layanan.panggilan.last,
+      'ubah-notifikasi {weekly_review: false}',
+      reason: 'mematikan satu jenis mengirim jenis lain',
+    );
     expect(_nyala(t, 'weekly_review'), isFalse);
     expect(_nyala(t, 'account_security'), isTrue);
   });

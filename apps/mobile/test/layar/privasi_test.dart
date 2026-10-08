@@ -47,7 +47,11 @@ void main() {
       expect(find.textContaining('1 diturunkan sistem'), findsOneWidget);
       expect(find.text('Lokasi · Kalender'), findsOneWidget);
       // Yang tak bisa dihapus tidak punya tombol hapus — hanya alasannya.
-      expect(find.byKey(const Key('hapus-audit')), findsNothing);
+      expect(
+        find.byKey(const Key('hapus-audit')),
+        findsNothing,
+        reason: 'kategori yang tak bisa dihapus punya tombol hapus',
+      );
       expect(find.byKey(const Key('hapus-journal')), findsOneWidget);
     },
   );
@@ -60,7 +64,11 @@ void main() {
 
     await t.tap(find.byKey(const Key('hapus-journal')));
     await t.pumpAndSettle();
-    expect(find.textContaining('permanen'), findsOneWidget);
+    expect(
+      find.textContaining('permanen'),
+      findsOneWidget,
+      reason: 'hapus tanpa dialog sandi ulang',
+    );
     await _isiSandi(t, layanan.sandiBenar);
 
     expect(layanan.panggilan, contains('hapus journal'));

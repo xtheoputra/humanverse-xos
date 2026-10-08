@@ -31,7 +31,9 @@ def test_tiap_jenis_bisa_dimatikan_sendiri(jenis: str) -> None:
     lain = [k for k in profile.JENIS_NOTIFIKASI if k not in (jenis, "account_security")]
     pref = _pref(**{jenis: False}, **dict.fromkeys(lain, True))
 
-    assert profile.keputusan_kirim(pref, jenis, time(12, 0), 0) == "silent"
+    assert profile.keputusan_kirim(pref, jenis, time(12, 0), 0) == "silent", (
+        f"{jenis} yang dimatikan tetap dikirim"
+    )
     for k in lain:
         assert profile.keputusan_kirim(pref, k, time(12, 0), 0) == "now", (
             f"mematikan {jenis} ikut membungkam {k}"
@@ -40,7 +42,9 @@ def test_tiap_jenis_bisa_dimatikan_sendiri(jenis: str) -> None:
 
 def test_keamanan_akun_tidak_bisa_dibungkam_dan_melewati_jam_tenang_juga_pagu() -> None:
     pref = {"types": {"account_security": False}, "quiet_hours": {"start": "00:00", "end": "23:59"}}
-    assert profile.keputusan_kirim(pref, "account_security", time(3, 0), 999) == "now"
+    assert profile.keputusan_kirim(pref, "account_security", time(3, 0), 999) == "now", (
+        "keamanan akun dibungkam pilihan, jam tenang, atau pagu"
+    )
 
 
 @pytest.mark.parametrize(
@@ -48,7 +52,10 @@ def test_keamanan_akun_tidak_bisa_dibungkam_dan_melewati_jam_tenang_juga_pagu() 
     [(time(21, 59), "now"), (time(22, 0), "later"), (time(3, 0), "later"), (time(7, 0), "now")],
 )
 def test_jam_tenang_melintasi_tengah_malam_menunda(jam: time, hasil: str) -> None:
-    assert profile.keputusan_kirim(None, "weekly_review", jam, 0) == hasil  # bawaan 22:00–07:00
+    # bawaan 22:00–07:00
+    assert profile.keputusan_kirim(None, "weekly_review", jam, 0) == hasil, (
+        f"jam tenang melintasi tengah malam salah di {jam}"
+    )
 
 
 def test_jam_tenang_siang_dan_tanpa_jam_tenang() -> None:
@@ -63,7 +70,9 @@ def test_pagu_harian_naskah_berhenti_bukan_menunda() -> None:
     pagu = profile.PAGU_HARIAN_NOTIFIKASI
     assert pagu == 10, "pagu §11.17 `notification: send: 10/day` diubah tanpa naskah"
     assert profile.keputusan_kirim(None, "weekly_review", time(12, 0), pagu - 1) == "now"
-    assert profile.keputusan_kirim(None, "weekly_review", time(12, 0), pagu) == "silent"
+    assert profile.keputusan_kirim(None, "weekly_review", time(12, 0), pagu) == "silent", (
+        "pagu harian tidak menghentikan pengiriman"
+    )
 
 
 def test_jenis_tak_dikenal_ditolak_bukan_dikirim() -> None:

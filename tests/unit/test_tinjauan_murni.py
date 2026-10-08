@@ -106,7 +106,9 @@ def test_periode_harian_mengikuti_aturan_rentetan() -> None:
     n = intelligence.nilai_habit(h, SENIN, HARI_INI)
 
     assert n is not None
-    assert (n.terpenuhi, n.terlewat, n.dimaafkan, n.berjalan) == (2, 1, 1, 0)
+    assert (n.terpenuhi, n.terlewat, n.dimaafkan, n.berjalan) == (2, 1, 1, 0), (
+        "periode tidak dihitung seperti rentetan 2.4"
+    )
     assert n.hari_terlewat == (_hari(4),)
     assert n.alasan == ("lembur",)
 
@@ -116,7 +118,9 @@ def test_minggu_berjalan_belum_gagal() -> None:
     n = intelligence.nilai_habit(h, SENIN, _hari(2))  # Rabu: Rabu–Minggu belum berakhir
 
     assert n is not None
-    assert (n.terpenuhi, n.terlewat, n.berjalan) == (1, 1, 5)
+    assert (n.terpenuhi, n.terlewat, n.berjalan) == (1, 1, 5), (
+        "periode yang belum berakhir dihitung gagal"
+    )
 
 
 @pytest.mark.parametrize(
@@ -224,6 +228,18 @@ def test_mood_dan_perubahan_antar_minggu() -> None:
 def test_minggu_cacat_ditolak(teks: str) -> None:
     with pytest.raises(ValueError, match="YYYY-Www"):
         intelligence.awal_minggu(teks)
+
+
+@pytest.mark.parametrize("teks", ["0001-W01", "1000-W01", "1899-W52", "3000-W01", "9999-W52"])
+def test_minggu_di_luar_rentang_tanggal_ditolak(teks: str) -> None:
+    """Rentang tanggal lintas-endpoint 1900–2999 (spec/04) — `0001-W01` dulu menjadi 500."""
+    with pytest.raises(ValueError, match="1900–2999"):
+        intelligence.awal_minggu(teks)
+
+
+def test_minggu_di_tepi_rentang_diterima() -> None:
+    assert intelligence.awal_minggu("1900-W01") == date(1900, 1, 1)
+    assert intelligence.awal_minggu("2999-W52") == date(2999, 12, 23)
 
 
 def test_minggu_53_hanya_di_tahun_yang_punya() -> None:

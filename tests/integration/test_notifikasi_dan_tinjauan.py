@@ -75,7 +75,9 @@ async def test_profil_tidak_menimpa_pilihan_notifikasi(api_bersama: ApiUji) -> N
 
     r = await k.patch("/v1/me/profile", json={"preferences": {"tema": "gelap"}}, headers=h)
     assert r.status_code == 200, r.text
-    assert _jenis((await k.get("/v1/me/notifications", headers=h)).json())["recommendation"]
+    assert _jenis((await k.get("/v1/me/notifications", headers=h)).json())["recommendation"], (
+        "PATCH /me/profile menghapus pilihan notifikasi"
+    )
     with psycopg.connect(psycopg_dsn(api_bersama.db.dsn_pemilik)) as p:
         (pref,) = p.execute(
             "SELECT preferences FROM profiles WHERE user_id = %s", (uid,)
@@ -109,7 +111,7 @@ async def test_preferensi_notifikasi_cacat_ditolak(
     _uid, token = await api_bersama.pengguna_baru()
     r = await api_bersama.klien.patch("/v1/me/notifications", json=badan, headers=auth(token))
 
-    assert r.status_code == status, r.text
+    assert r.status_code == status, f"preferensi cacat diterima: {badan} → {r.text}"
     if kode:
         assert r.json()["error"]["code"] == kode
     sesudah = (await api_bersama.klien.get("/v1/me/notifications", headers=auth(token))).json()
@@ -233,6 +235,8 @@ async def test_tinjauan_minggu_lalu_dari_data_sungguhan(api_bersama: ApiUji) -> 
         ("2026-40", 400, None),
         ("2026-W54", 400, None),
         ("2027-W53", 400, "invalid_week"),
+        ("0001-W01", 400, "invalid_week"),  # dulu 500: senin - 7 hari melimpah
+        ("1000-W01", 400, "invalid_week"),  # dulu 200: di luar 1900–2999 (spec/04)
         ("2999-W01", 422, "week_in_future"),
     ],
 )
@@ -242,6 +246,6 @@ async def test_minggu_cacat_atau_belum_dimulai_ditolak(
     _uid, token = await api_bersama.pengguna_baru()
     r = await api_bersama.klien.get(f"/v1/reviews/weekly?week={minggu}", headers=auth(token))
 
-    assert r.status_code == status, r.text
+    assert r.status_code == status, f"minggu {minggu} tidak ditolak semestinya: {r.text}"
     if kode:
         assert r.json()["error"]["code"] == kode
