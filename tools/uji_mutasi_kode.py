@@ -11742,6 +11742,169 @@ MUTASI: list[Mutasi] = [
         harus_memuat="bangun ulang kedua tidak identik",
         kelompok="db",
     ),
+    # ── 5.2 pola perilaku ──
+    Mutasi(
+        "5.2",
+        "pola yang didukung data lagi tetap luruh (upsert tak mengosongkan valid_until)",
+        [Sunting(f"{MODUL}/memory/repository.py", "      valid_until = NULL,\n", "")],
+        _pytest(
+            "tests/integration/test_pola.py::test_pola_luruh_sekali_lalu_hidup_lagi_saat_dikuatkan"
+        ),
+        harus_memuat="pola yang dikuatkan lagi tetap luruh",
+        kelompok="db",
+    ),
+    Mutasi(
+        "5.2",
+        "luruh berulang menggeser valid_until — sejarah 'dulu begini' bergeser",
+        [
+            Sunting(
+                f"{MODUL}/memory/repository.py",
+                "      AND deleted_at IS NULL AND valid_until IS NULL\n",
+                "      AND deleted_at IS NULL\n",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_pola.py::test_pola_luruh_sekali_lalu_hidup_lagi_saat_dikuatkan"
+        ),
+        harus_memuat="luruh berulang menggeser valid_until",
+        kelompok="db",
+    ),
+    Mutasi(
+        "5.2",
+        "upsert pola mengisi ulang isi memori yang sudah dilupakan (Privacy Center)",
+        [
+            Sunting(
+                f"{MODUL}/memory/repository.py",
+                "THEN NULL ELSE memories.embedding_model END\n    WHERE memories.deleted_at IS NULL\n",
+                "THEN NULL ELSE memories.embedding_model END\n",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_pola.py::test_pola_tidak_mengisi_ulang_memori_yang_dilupakan"
+        ),
+        harus_memuat="pola mengisi ulang memori yang sudah dilupakan",
+        kelompok="db",
+    ),
+    Mutasi(
+        "5.2",
+        "jam pola waktu dibaca dalam UTC, bukan zona profil",
+        [
+            Sunting(
+                f"{MODUL}/intelligence/pola.py",
+                "    jam = [e.occurred_at.astimezone(zi).hour for e in riwayat]",
+                "    jam = [e.occurred_at.hour for e in riwayat]",
+            )
+        ],
+        _pytest("tests/integration/test_pola.py::test_pola_waktu_dihitung_di_zona_profil"),
+        harus_memuat="pola waktu tidak memakai zona profil",
+        kelompok="db",
+    ),
+    Mutasi(
+        "5.2",
+        "habit dihapus: ketiga polanya tetap berlaku",
+        [
+            Sunting(
+                f"{MODUL}/intelligence/pola.py",
+                "        for mid in (id_hari, id_waktu, id_konsisten):\n"
+                "            await memory.luruhkan_pola(conn, uid, mid)\n"
+                "        return\n",
+                "        return\n",
+            )
+        ],
+        _pytest("tests/integration/test_pola.py::test_habit_dihapus_meluruhkan_semua_polanya"),
+        harus_memuat="habit dihapus, polanya masih berlaku",
+        kelompok="db",
+    ),
+    Mutasi(
+        "5.2",
+        "id pola tidak per habit — pola dua habit saling menimpa",
+        [
+            Sunting(
+                f"{MODUL}/intelligence/pola.py",
+                '    return uuid.uuid5(_NS, f"{user_id}:{habit_id}:{jenis}")',
+                '    return uuid.uuid5(_NS, f"{user_id}:{jenis}")',
+            )
+        ],
+        _pytest("tests/integration/test_pola.py::test_pola_dua_habit_tidak_saling_menimpa"),
+        harus_memuat="pola satu habit menimpa pola habit lain",
+        kelompok="db",
+    ),
+    Mutasi(
+        "5.2",
+        "B1: konsistensi '0%' dinyatakan dari nol penyelesaian (evidence_count 0)",
+        [
+            Sunting(
+                f"{MODUL}/intelligence/pola.py",
+                "    if not cukup_untuk_menyatakan(total):\n        return None\n",
+                "",
+            )
+        ],
+        _pytest(
+            "tests/unit/test_pola_murni.py::test_konsistensi_tanpa_penyelesaian_tidak_dinyatakan"
+        ),
+        harus_memuat="pola konsistensi dinyatakan dari nol penyelesaian",
+    ),
+    Mutasi(
+        "5.2",
+        "batas bagian hari bergeser (jam 11 masih pagi)",
+        [
+            Sunting(
+                f"{MODUL}/intelligence/pola.py", "    if 5 <= jam < 11:", "    if 5 <= jam <= 11:"
+            )
+        ],
+        _pytest("tests/unit/test_pola_murni.py::test_pola_waktu_batas_bagian_hari"),
+        harus_memuat="jam 11 bukan siang",
+    ),
+    Mutasi(
+        "5.2",
+        "kata kausal 'membuat' tidak dijaga (naskah 4 §7)",
+        [Sunting(f"{MODUL}/intelligence/pola.py", '    "membuat",\n', "")],
+        _pytest("tests/unit/test_pola_murni.py::test_tanpa_klaim_kausal_menolak_tiap_kata_sebab"),
+        harus_memuat="klaim sebab lolos penjaga: 'olahraga membuat",
+    ),
+    Mutasi(
+        "5.2",
+        "penjaga kausal peka huruf besar ('Karena …' lolos)",
+        [
+            Sunting(
+                f"{MODUL}/intelligence/pola.py", "    rendah = teks.lower()", "    rendah = teks"
+            )
+        ],
+        _pytest("tests/unit/test_pola_murni.py::test_tanpa_klaim_kausal_menolak_tiap_kata_sebab"),
+        harus_memuat="klaim sebab lolos penjaga: 'Karena",
+    ),
+    Mutasi(
+        "5.2",
+        "keyakinan pola tak divalidasi 0–1 sebelum ditulis",
+        [
+            Sunting(
+                f"{MODUL}/memory/perilaku.py",
+                "    if not confidence.is_finite() or not Decimal(0) <= confidence <= Decimal(1):\n"
+                '        raise ValueError("confidence wajib 0–1")\n',
+                "",
+            )
+        ],
+        _pytest(
+            "tests/unit/test_pola_murni.py::test_catat_pola_menolak_keyakinan_di_luar_0_sampai_1"
+        ),
+        harus_memuat="sampai ke basis data",
+    ),
+    Mutasi(
+        "5.2",
+        "scope pola tak diperiksa terhadap daftar resmi spec/05",
+        [
+            Sunting(
+                f"{MODUL}/memory/perilaku.py",
+                "    if scope not in identity.SCOPE_RESMI:\n"
+                '        raise ValueError("scope di luar daftar resmi spec/05")\n',
+                "",
+            )
+        ],
+        _pytest(
+            "tests/unit/test_pola_murni.py::test_catat_pola_menolak_scope_di_luar_daftar_resmi"
+        ),
+        harus_memuat="pola ber-scope tak resmi sampai ke basis data",
+    ),
 ]
 
 
