@@ -9,7 +9,8 @@ from __future__ import annotations
 
 import json
 from collections.abc import Mapping
-from datetime import date
+from dataclasses import dataclass
+from datetime import date, datetime
 from typing import Any
 from uuid import UUID
 
@@ -153,8 +154,14 @@ _SELESAI_TANGGAL = text(
     """
 )
 
+# Baris yang dihapus dipulangkan — pembatalannya diterbitkan sebagai event
+# (`habit.completion_retracted`, spec/07 3.2) dengan id baris itu sendiri.
 _HAPUS_SELESAI = text(
-    "DELETE FROM habit_completions WHERE habit_id = :habit_id AND for_date = :for_date"
+    """
+    DELETE FROM habit_completions
+    WHERE habit_id = :habit_id AND for_date = :for_date
+    RETURNING id, for_date, clock_timestamp() AS dicabut_pada
+    """
 )
 
 # ── spec/07 2.4 — rentetan ───────────────────────────────────────────────────
@@ -333,8 +340,19 @@ async def selesai_id(conn: AsyncConnection, completion_id: UUID) -> Penyelesaian
     return _penyelesaian(baris) if baris else None
 
 
-async def hapus_selesai(conn: AsyncConnection, habit_id: UUID, for_date: date) -> None:
-    await conn.execute(_HAPUS_SELESAI, {"habit_id": habit_id, "for_date": for_date})
+@dataclass(frozen=True)
+class SelesaiDicabut:
+    id: UUID
+    for_date: date
+    dicabut_pada: datetime
+
+
+async def hapus_selesai(
+    conn: AsyncConnection, habit_id: UUID, for_date: date
+) -> SelesaiDicabut | None:
+    """Baris yang dihapus — atau `None` bila tanggal itu memang tidak tercatat."""
+    b = (await conn.execute(_HAPUS_SELESAI, {"habit_id": habit_id, "for_date": for_date})).first()
+    return SelesaiDicabut(b.id, b.for_date, b.dicabut_pada) if b else None
 
 
 async def mulai_lokal(conn: AsyncConnection, habit_id: UUID, zona: str) -> date | None:
@@ -353,3 +371,66 @@ async def selesai_tanggal(
     """{habit_id: penyelesaian} semua habit pengguna pada tanggal itu — SATU kueri."""
     hasil = await conn.execute(_SELESAI_TANGGAL, {"user_id": user_id, "for_date": for_date})
     return {p.habit_id: p for p in (_penyelesaian(b) for b in hasil.mappings())}
+
+
+# ── spec/07 6.2 — tinjauan mingguan (dibaca `intelligence`, di transaksi pemanggil) ──
+
+
+@dataclass(frozen=True)
+class HabitDalamRentang:
+    """Satu habit hidup dan catatannya di sebuah rentang tanggal LOKAL."""
+
+    id: UUID
+    title: str
+    period: str
+    target_count: int
+    weekdays: tuple[int, ...] | None  # `schedule.weekdays` — None = tiap hari
+    status: str
+    mulai: date  # tanggal lokal habit dibuat (zona profil SAAT INI)
+    adaptive_tiers: tuple[str, ...]  # label tier, berat → ringan
+    # {for_date: (status, catatan pengguna)} — catatan `skipped` adalah alasan dari pemiliknya
+    catatan: Mapping[date, tuple[str, str | None]]
+
+
+_HABIT_RENTANG = text(
+    """
+    SELECT h.id, h.title, h.period, h.target_count, h.schedule, h.adaptive_tiers, h.status,
+           (h.created_at AT TIME ZONE :zona)::date AS mulai,
+           c.for_date, c.status AS status_catatan, c.note
+    FROM habits h
+    LEFT JOIN habit_completions c
+      ON c.habit_id = h.id AND c.for_date BETWEEN :dari AND :sampai
+    WHERE h.user_id = :user_id AND h.deleted_at IS NULL
+    ORDER BY h.created_at, h.id, c.for_date
+    """
+)
+
+
+async def habit_rentang(
+    conn: AsyncConnection, user_id: UUID, dari: date, sampai: date, zona: str
+) -> list[HabitDalamRentang]:
+    """Habit hidup pengguna beserta catatannya di [dari, sampai] — SATU kueri."""
+    hasil = await conn.execute(
+        _HABIT_RENTANG, {"user_id": user_id, "dari": dari, "sampai": sampai, "zona": zona}
+    )
+    urut: dict[UUID, dict[str, Any]] = {}
+    for b in hasil.mappings():
+        h = urut.setdefault(
+            b["id"],
+            {
+                "id": b["id"],
+                "title": b["title"],
+                "period": b["period"],
+                "target_count": int(b["target_count"]),
+                "weekdays": tuple(b["schedule"].get("weekdays") or ()) or None,
+                "status": b["status"],
+                "mulai": b["mulai"],
+                "adaptive_tiers": tuple(
+                    str(t.get("label", "")) for t in (b["adaptive_tiers"] or [])
+                ),
+                "catatan": {},
+            },
+        )
+        if b["for_date"] is not None:
+            h["catatan"][b["for_date"]] = (str(b["status_catatan"]), b["note"])
+    return [HabitDalamRentang(**h) for h in urut.values()]

@@ -134,7 +134,7 @@ async def _jam_redis_ms(redis: Any) -> int:
     return int(detik) * 1000 + int(mikro) // 1000
 
 
-@pytest.mark.parametrize(("mundur_ms", "lolos"), [(1_500, True), (10_000, False)])
+@pytest.mark.parametrize(("mundur_ms", "lolos"), [(1_500, True), (4_000, True), (10_000, False)])
 async def test_langkah_mundur_jam_redis_kecil_diserap_besar_tidak(
     url_redis_uji: str, mundur_ms: int, lolos: bool
 ) -> None:

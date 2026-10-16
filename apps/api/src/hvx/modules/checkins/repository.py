@@ -53,6 +53,17 @@ _PADA = text(
     """
 )
 
+# Isi check-in SEBELUM PUT — dikunci sampai transaksi selesai, supaya "berubah
+# atau tidak" diputuskan terhadap baris yang tidak bisa berubah di tengahnya.
+_SEBELUM = text(
+    """
+    SELECT energy, focus, sleep_hours
+    FROM daily_checkins
+    WHERE user_id = :user_id AND for_date = :for_date
+    FOR UPDATE
+    """
+)
+
 _RENTANG = text(
     """
     SELECT id, for_date, energy, focus, sleep_hours, note, created_at, updated_at
@@ -121,6 +132,22 @@ async def simpan(
     return HasilSimpan(_checkin(lama), baru=False)
 
 
+async def sebelum(
+    conn: AsyncConnection, user_id: UUID, for_date: date
+) -> tuple[int | None, int | None, float | None] | None:
+    """(energy, focus, sleep_hours) tanggal itu — `None` bila belum pernah check-in.
+
+    `sleep_hours` sebagai float, SAMA dengan `Checkin.sleep_hours` (E-170): yang
+    dibandingkan `service.simpan` harus bertipe sama — `Decimal("7.1") != 7.1`,
+    dan check-in yang identik akan terbaca "berubah" lalu menerbitkan event palsu.
+    """
+    b = (await conn.execute(_SEBELUM, {"user_id": user_id, "for_date": for_date})).first()
+    if b is None:
+        return None
+    tidur = float(b.sleep_hours) if b.sleep_hours is not None else None
+    return (b.energy, b.focus, tidur)
+
+
 async def rentang(
     conn: AsyncConnection, *, user_id: UUID, dari: date, sampai: date
 ) -> list[Checkin]:
@@ -131,6 +158,19 @@ async def rentang(
 async def terakhir(conn: AsyncConnection, *, user_id: UUID, batas: int) -> list[Checkin]:
     hasil = await conn.execute(_TERAKHIR, {"user_id": user_id, "batas": batas})
     return [_checkin(b) for b in hasil.mappings()]
+
+
+async def checkin_pada(conn: AsyncConnection, user_id: UUID, for_date: date) -> Checkin | None:
+    """Check-in pengguna pada tanggal LOKAL itu — `None` bila belum ada.
+
+    Pembaca lapisan atas (Behavior Engine 5.3) yang menghitung `human_states` dari
+    keadaan OTORITATIF check-in, bukan dari payload event yang bisa basi saat
+    disalurkan ulang. Berjalan di koneksi & RLS pemanggil.
+    """
+    baris = (
+        (await conn.execute(_PADA, {"user_id": user_id, "for_date": for_date})).mappings().first()
+    )
+    return _checkin(baris) if baris else None
 
 
 async def energi_pada(conn: AsyncConnection, user_id: UUID, for_date: date) -> int | None:
@@ -249,3 +289,35 @@ async def batas_waktu_mood(conn: AsyncConnection, longgar_s: int) -> datetime:
     if not isinstance(nilai, datetime):  # pragma: no cover - bentuk dari PostgreSQL
         raise TypeError(type(nilai).__name__)
     return nilai
+
+
+# ── spec/07 6.2 — tinjauan mingguan (dibaca `intelligence`, di transaksi pemanggil) ──
+
+# Valensi per tanggal LOKAL pengguna — tanggal mood dari `occurred_at` di zona profil,
+# sama dengan cara tanggal check-in dicatat (spec/01: tanggal lokal, bukan UTC).
+_MOOD_RENTANG = text(
+    """
+    SELECT (occurred_at AT TIME ZONE :zona)::date AS tanggal, valence
+    FROM mood_entries
+    WHERE user_id = :user_id AND deleted_at IS NULL
+      AND (occurred_at AT TIME ZONE :zona)::date BETWEEN :dari AND :sampai
+    ORDER BY occurred_at, id
+    """
+)
+
+
+async def mood_rentang(
+    conn: AsyncConnection, user_id: UUID, dari: date, sampai: date, zona: str
+) -> list[tuple[date, int]]:
+    """(tanggal lokal, valensi) tiap mood yang dilaporkan di rentang itu, inklusif."""
+    hasil = await conn.execute(
+        _MOOD_RENTANG, {"user_id": user_id, "dari": dari, "sampai": sampai, "zona": zona}
+    )
+    return [(b.tanggal, int(b.valence)) for b in hasil]
+
+
+async def checkin_rentang(
+    conn: AsyncConnection, user_id: UUID, dari: date, sampai: date
+) -> list[Checkin]:
+    """Check-in di rentang tanggal LOKAL itu, inklusif — terbaru dulu."""
+    return await rentang(conn, user_id=user_id, dari=dari, sampai=sampai)

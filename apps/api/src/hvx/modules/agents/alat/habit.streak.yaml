@@ -1,0 +1,15 @@
+name: habit.streak
+version: 1.0.0
+kind: read
+description: Hitung rentetan dan tingkat penyelesaian sebuah habit
+scopes: [habits]
+risk_level: 0
+input:
+  habit_id: { type: uuid, required: true }
+output:                     # = GET /habits/{id}/streak (spec/04, E-176)
+  current: integer
+  longest: integer
+  completion_rate_30d: number | null
+side_effects: none
+reaches_third_party: false
+rate_limit: 60/min/user

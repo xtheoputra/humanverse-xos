@@ -10,10 +10,12 @@
 #   | api      | 8000              | HVX_API_PORT         |
 #   | postgres | 5432              | HVX_POSTGRES_PORT    |
 #   | redis    | 6379              | HVX_REDIS_PORT       |
+#   | qdrant   | 6333              | HVX_QDRANT_PORT      |
 #
 # Dua peran basis data, dan sengaja tidak pernah tertukar (B-40, spec/01 §10):
 #   migrate  → PEMILIK skema (HVX_POSTGRES_USER)       — membuat tabel, tidak melayani permintaan
 #   api      → HVX_API_DB_USER, anggota `hvx_app`       — bukan superuser, bukan pemilik; RLS berlaku
+#   pekerja  → HVX_PEKERJA_DB_USER, `hvx_app` + `hvx_pekerja` — fungsi relay & penyelaras (S4)
 #
 # ⚠️ Kredensial bawaan di bawah KHUSUS pengembangan lokal (`*-dev-only`) dan
 #    tidak pernah dipakai di lingkungan lain. Tahap D1+ membaca rahasia dari
@@ -60,6 +62,26 @@ services:
       timeout: 3s
       retries: 20
 
+  # Basis data vektor memori (ADR-003, spec/07 3.5). Tanpa kunci API di D0 —
+  # port hanya 127.0.0.1; D1+ memakai HVX_QDRANT_API_KEY dari pengelola rahasia.
+  qdrant:
+    image: qdrant/qdrant:v1.19.1@sha256:12364fe851b9f17356fc88189fc06d1b521262e04659ec7345975b00c9246a10
+    ports:
+      - "127.0.0.1:${HVX_QDRANT_PORT:-6333}:6333"
+    volumes:
+      - qdrant-data:/qdrant/storage
+    healthcheck:
+      # Citranya tanpa curl/wget — /readyz lewat /dev/tcp bash.
+      test:
+        - CMD
+        - bash
+        - -c
+        - "exec 3<>/dev/tcp/127.0.0.1/6333 && printf 'GET /readyz HTTP/1.0\r\n\r\n' >&3 && grep -q ' 200 ' <&3"
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
+
   # Sekali jalan: skema dimigrasikan SEBELUM api menerima permintaan pertama —
   # sebagai PEMILIK skema. Migrasi 0001 juga membuat peran NOLOGIN `hvx_app`.
   migrate:
@@ -85,6 +107,8 @@ services:
       PGDATABASE: ${HVX_POSTGRES_DB:-hvx}
       HVX_API_DB_USER: ${HVX_API_DB_USER:-hvx_api}
       HVX_API_DB_PASSWORD: ${HVX_API_DB_PASSWORD:-hvx-api-dev-only}
+      HVX_PEKERJA_DB_USER: ${HVX_PEKERJA_DB_USER:-hvx_pekerja_login}
+      HVX_PEKERJA_DB_PASSWORD: ${HVX_PEKERJA_DB_PASSWORD:-hvx-pekerja-dev-only}
     volumes:
       - ./infrastructure/postgres:/peran:ro
     depends_on:
@@ -124,6 +148,37 @@ services:
       retries: 12
       start_period: 5s
 
+  # Relay kotak keluar event → Redis Streams, grup konsumen (ekstraksi memori), dan
+  # penyelaras memories → Qdrant (spec/07 3.3 · 3.5 · 3.6). Citra yang sama dengan
+  # api, proses terpisah (`hvx/pekerja.py`): tanpa port — ia hanya berbicara ke
+  # PostgreSQL, Redis, dan Qdrant, sebagai anggota hvx_app.
+  pekerja:
+    <<: *api-image
+    command: ["python", "-m", "hvx.pekerja"]
+    environment:
+      HVX_ENV: ${HVX_ENV:-local}
+      # Login pekerja: anggota hvx_app DAN hvx_pekerja (fungsi relay & penyelaras, S4).
+      HVX_DATABASE_URL: postgresql://${HVX_PEKERJA_DB_USER:-hvx_pekerja_login}:${HVX_PEKERJA_DB_PASSWORD:-hvx-pekerja-dev-only}@postgres:5432/${HVX_POSTGRES_DB:-hvx}
+      HVX_REDIS_URL: redis://redis:6379/0
+      HVX_LOG_LEVEL: ${HVX_LOG_LEVEL:-INFO}
+      HVX_IP_HASH_KEY: ${HVX_IP_HASH_KEY:-hvx-dev-only-ip-hash-key-0123456789abcdef}
+      HVX_QDRANT_URL: http://qdrant:6333
+      # Kunci penyemat lokal (K-26) — tanpa kunci, vektor di Qdrant bisa dibalik jadi kata.
+      HVX_SEMATAN_KEY: ${HVX_SEMATAN_KEY:-hvx-dev-only-sematan-key-0123456789abcdef}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      qdrant:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+      db-roles:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
 volumes:
   postgres-data:
   redis-data:
+  qdrant-data:

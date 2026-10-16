@@ -58,9 +58,13 @@ di fase berikutnya.
 CREATE EXTENSION IF NOT EXISTS citext;
 
 -- dipakai semua tabel yang punya updated_at
+-- 🔧 E-223 (migrasi 0012): naik KETAT per baris. `now()` = awal TRANSAKSI, jadi dua versi
+-- baris berbeda bisa berbagi `updated_at` yang sama (dua UPDATE dalam satu transaksi, atau
+-- dua transaksi serentak) — padahal kunci event `checkin.logged` memakainya sebagai
+-- identitas versi baris. Tiap UPDATE menaikkannya ≥ 1 µs di atas nilai lamanya.
 CREATE OR REPLACE FUNCTION set_updated_at() RETURNS trigger AS $$
 BEGIN
-  NEW.updated_at = now();
+  NEW.updated_at = GREATEST(now(), OLD.updated_at + interval '1 microsecond');
   RETURN NEW;
 END $$ LANGUAGE plpgsql;
 
@@ -110,7 +114,8 @@ CREATE TABLE users (
   last_login_at   timestamptz,
   created_at      timestamptz NOT NULL DEFAULT now(),
   updated_at      timestamptz NOT NULL DEFAULT now(),
-  deleted_at      timestamptz
+  deleted_at      timestamptz,
+  deletion_scheduled_at timestamptz                  -- 🔧 0010 (6.5): now()+30 hari saat tahap 1 (E-218); NULL = tidak dijadwalkan
 );
 CREATE INDEX users_status_idx ON users (status) WHERE deleted_at IS NULL;
 
@@ -539,6 +544,7 @@ CREATE TABLE memories (
   created_at        timestamptz NOT NULL DEFAULT now(),
   updated_at        timestamptz NOT NULL DEFAULT now(),
   deleted_at        timestamptz,
+  embedding_model   text,                        -- 🔧 penyemat vektornya (3.5); NULL = belum/basi
   FOREIGN KEY (source_event_id, user_id) REFERENCES events (id, user_id)
     ON DELETE SET NULL (source_event_id)
 );
@@ -625,7 +631,7 @@ CREATE TABLE ai_conversations (
   UNIQUE (id, user_id)
 );
 CREATE INDEX ai_conversations_user_idx
-  ON ai_conversations (user_id, last_message_at DESC NULLS LAST)
+  ON ai_conversations (user_id, created_at DESC, id DESC)
   WHERE deleted_at IS NULL;
 
 -- @retention   : until-account-deleted
@@ -646,6 +652,9 @@ CREATE TABLE ai_messages (
   latency_ms      integer,
   cost_usd        numeric(12,6),
   created_at      timestamptz NOT NULL DEFAULT now(),
+  -- 🔧 0008 (E-194): tiap balasan AI membawa keyakinan & alasannya — juga saat dibaca ulang
+  confidence      numeric(4,3) CHECK (confidence BETWEEN 0 AND 1),
+  rationale       jsonb NOT NULL DEFAULT '[]'::jsonb,
   FOREIGN KEY (conversation_id, user_id) REFERENCES ai_conversations (id, user_id)
     ON DELETE CASCADE
 );
@@ -656,6 +665,11 @@ CREATE INDEX ai_messages_conversation_idx
 > `cost_usd` per pesan sejak V0 adalah penerapan **AI Cost Engine** (naskah 4
 > §48). Tanpa dicatat sejak awal, biaya baru terlihat di tagihan bulanan —
 > saat sudah terlambat.
+>
+> 🔧 **`ai_conversations_user_idx` = urutan daftar yang sungguh dipakai** (migrasi
+> `0009`, E-210): `GET /conversations` terurut `(created_at, id)` — kursor keyset
+> yang tidak bergeser saat percakapan lain menerima pesan (spec/04). Indeks 0001
+> menyusun `last_message_at`, yang tidak dipakai kueri mana pun.
 
 ```sql
 -- @retention   : until-account-deleted
@@ -731,6 +745,16 @@ CREATE INDEX recommendation_feedback_user_idx
 >
 > `action='modified'` dan `'snoozed'` melengkapi naskah 4 §24: memilih B
 > setelah disarankan A **bukan** penolakan, dan menunda **bukan** mengabaikan.
+>
+> 🔧 **Rekomendasi mesin yang masih `pending` disegarkan — dan alasannya ikut (8 Okt
+> 2026, tinjauan kontrak Sprint 5–6 K2 · K3).** `checkin.logged` menghitung ulang
+> komponen `context` (K-36 (5)) dari check-in **otoritatif**, bukan `payload` event —
+> event lama yang diserahkan ulang sesudah yang baru tidak memutar konteksnya mundur
+> (aturan 2 [`03`](03-EVENT-CONTRACTS.md)). `score` · `score_breakdown` ·
+> `context_snapshot` · `body` · `rationale` ditulis **bersama**: alasan yang tertampil
+> selalu menyebut komponen yang dipakai skornya (versi pertama hanya mengganti skor —
+> *“Energi 2/5”* di samping skor dari energi 5). Begitu tidak lagi `pending`, barisnya
+> membeku: `context_snapshot` = konteks rekomendasi **yang dilihat** pengguna.
 
 ---
 
@@ -812,6 +836,11 @@ CREATE TABLE agent_tools (
 > membuat *automatic rollback* (§23) punya arti: aktifkan versi lama, versi
 > baru turun status.
 >
+> 🔧 **Isi katalog V0 (tugas 4.2, K-29):** migrasi `0007` menyisipkan empat agent
+> spec/05 dan tool-nya — `manifest` = salinan beku manifest YAML (bentuk kanonik),
+> `id = uuid5(RUANG_ID_AGENT, 'nama@versi')`. Api hanya `SELECT` (§10), dan menolak
+> mulai bila katalog ini berbeda dari manifest yang divalidasinya.
+>
 > ⚠️ `agents` dan `agent_tools` **tidak ada di 19 tabel V0** §31, padahal
 > `agent_runs` di daftar itu jelas menunjuk sebuah agent. Naskah 6 memintanya.
 > Butir **E-42**.
@@ -880,6 +909,35 @@ ALTER TABLE recommendations
 >
 > `parent_run_id` merekam Orchestrator yang memanggil agent lain (§13) —
 > satu permintaan pengguna bisa jadi pohon eksekusi yang bisa ditelusuri.
+>
+> 🔧 **Cara runtime V0 mengisinya (tugas 4.4, 24 Sep 2026).** Baris ditulis
+> `running` **sebelum** program agent berjalan — rujukan ke run itu (rekomendasi,
+> run anak) sah sejak langkah pertama — lalu ditutup **sekali**
+> (`WHERE status = 'running'`): `succeeded` · `blocked` (gerbang risiko menahan —
+> menunggu manusia, bukan gagal) · `failed` · `cancelled` (klien pergi di tengah
+> aliran; token yang sudah keluar tetap tercatat dan dibayar). `tools_used` = tool
+> yang melewati gerbang, urut pertama dipakai; `memory_scopes` = scope yang
+> **benar-benar** disentuh; `model_used` = model yang dipakai, dipisah koma bila
+> lebih dari satu (turun kelas di tengah run, 4.9); `decision` = skalar pendek
+> (`action` wajib — `reply` · `delegate` · id yang disentuh). 🔧 Run yang tidak
+> berhasil (tinjauan kontrak Sprint 4 — bentuknya kini ditulis, bukan hanya ada di
+> kode): `failed` · `cancelled` → `{"action": "<status>"}`; `blocked` →
+> `{"action": "awaiting_confirmation", "tool", "agent", "risk_level", "kind"}` (`kind`
+> = `permission` · `confirmation`, sama dengan SSE spec/04) atau `{"action": "denied",
+> "tool", "code"}` (`deny` pengguna, R4). `error` = `{code, type}` — **tanpa pesan**,
+> sebab pesan galat bisa mengutip tulisan pengguna — juga run `cancelled`
+> (`{"code": "cancelled", "type": "CancelledError"}`), dan juga run yang programnya
+> **tidak pernah berjalan** karena langkah sesudah `running` gagal (pesan pengguna
+> ber-id kembar — E-200: dulu run itu `running` selamanya). `confirmed_by_user`
+> (🔧 E-199): run `blocked` = **jawaban atas pertanyaannya** — NULL sampai dijawab,
+> sekali pakai; run lain = `true` bila memakai aksi yang disetujui pengguna. Dulu
+> keduanya satu arti, dan run ulangan yang memakai persetujuan lalu ditahan lagi
+> tercatat "sudah dijawab" sebelum ditanyakan. `cost_usd` = run itu sendiri; biaya
+> satu permintaan (SSE `done`) = seluruh pohonnya. Run yang masih `running` memegang
+> biaya **sejauh ini + jatah panggilan model yang sedang berjalan** — anggaran (4.9,
+> K-32, **24 jam bergulir**) dibaca dari kolom yang sama di bawah kunci per pengguna,
+> jadi giliran serentak melihat jatah satu sama lain (E-201); run yang diturunkan ke
+> model kecil membawa `decision.model_downgraded = true`.
 
 ```sql
 -- @retention   : forever
@@ -993,7 +1051,8 @@ GRANT SELECT ON agents, agent_tools TO hvx_app;
 > di atas dijaga `tests/integration/test_kepemilikan_data.py`.
 >
 > ⚠️ **Yang sengaja tidak diberikan:** `DELETE` pada `users` (tahap 3 prosedur
-> hapus akun dijalankan peran pemeliharaan, bukan aplikasi — tugas 6.5) dan
+> hapus akun dijalankan proses pekerja lewat fungsi `hvx_pekerja` §12, bukan
+> aplikasi — tugas 6.5, K-39) dan
 > `UPDATE`/`DELETE` pada tabel hanya-tambah. Hapus kategori `events` di Privacy
 > Center (6.4) butuh jalur tersendiri; ia tidak boleh dibuka dengan melebarkan
 > `GRANT` di sini.
@@ -1100,6 +1159,172 @@ CREATE FUNCTION auth_lookup_for_login(p_email citext)
   $$;
 REVOKE ALL ON FUNCTION auth_lookup_for_login(citext) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION auth_lookup_for_login(citext) TO hvx_app;
+
+-- Peran PEKERJA (spec/07 3.3): NOLOGIN, satu-satunya pemegang EXECUTE fungsi
+-- relay dan penyelaras. Peran login proses pekerja anggota `hvx_app` DAN peran
+-- ini; peran login api hanya `hvx_app` — api menghadap internet (S4).
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'hvx_pekerja') THEN
+    CREATE ROLE hvx_pekerja NOLOGIN;
+  END IF;
+EXCEPTION WHEN duplicate_object THEN
+  NULL;
+END $$;
+
+-- Relay event (spec/07 3.3): kotak keluar `events` → Redis Streams. Relay
+-- membaca event SEMUA pengguna, urut waktu masuk — RLS `events` (§11) tidak
+-- meloloskannya. Sempit: hanya-baca, empat kolom RUJUKAN (payload TIDAK ikut —
+-- konsumen membacanya di bawah RLS pemiliknya), paling banyak 1000 baris.
+CREATE FUNCTION events_untuk_relay(p_sesudah timestamptz, p_sesudah_id uuid, p_batas integer)
+  RETURNS TABLE (id uuid, user_id uuid, event_type text, recorded_at timestamptz)
+  LANGUAGE sql STABLE SECURITY DEFINER
+  SET search_path = pg_catalog, public, pg_temp
+  AS $$
+    SELECT e.id, e.user_id, e.event_type, e.recorded_at
+    FROM public.events e
+    WHERE (e.recorded_at, e.id) > (p_sesudah, p_sesudah_id)
+    ORDER BY e.recorded_at, e.id
+    LIMIT least(greatest(p_batas, 1), 1000)
+  $$;
+REVOKE ALL ON FUNCTION events_untuk_relay(timestamptz, uuid, integer) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION events_untuk_relay(timestamptz, uuid, integer) TO hvx_pekerja;
+
+-- Penyelaras vektor memori (spec/07 3.5–3.7): memories → Qdrant, untuk SEMUA
+-- pengguna — RLS `memories` (§11) tidak meloloskannya. Sempit: hanya-baca, hanya
+-- `user_id` yang punya pekerjaan (memori terhapus yang titiknya belum dibuang,
+-- atau yang vektornya belum/tidak lagi cocok dengan penyemat `p_model`); isinya
+-- dibaca di transaksi PEMILIKNYA. Paling banyak 1000 pengguna per panggilan.
+-- Hanya untuk `hvx_pekerja`.
+CREATE FUNCTION memori_perlu_diselaraskan(p_model text, p_batas integer)
+  RETURNS TABLE (user_id uuid)
+  LANGUAGE sql STABLE SECURITY DEFINER
+  SET search_path = pg_catalog, public, pg_temp
+  AS $$
+    SELECT m.user_id
+    FROM public.memories m
+    JOIN public.users u ON u.id = m.user_id
+    WHERE u.status <> 'pending_deletion'
+      AND (m.deleted_at IS NOT NULL OR m.embedding_model IS DISTINCT FROM p_model)
+    GROUP BY m.user_id
+    ORDER BY min(m.updated_at), m.user_id
+    LIMIT least(greatest(p_batas, 1), 1000)
+  $$;
+REVOKE ALL ON FUNCTION memori_perlu_diselaraskan(text, integer) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION memori_perlu_diselaraskan(text, integer) TO hvx_pekerja;
+
+-- Sapuan hapus akun, tahap 3–6 (spec/07 6.5, K-39): tiga fungsi, satu per
+-- langkah, dan MASING-MASING menolak akun yang belum `pending_deletion` lewat
+-- `deletion_scheduled_at`. Pekerja yang dibajak hanya bisa mempercepat yang
+-- memang sudah waktunya. Hanya untuk `hvx_pekerja`.
+--
+-- 1. SIAPA yang waktunya — hanya baca, paling banyak 100 akun; `punya_titik`:
+--    ada memori yang pernah disemat ke Qdrant (tahap 4 wajib sanggup berjalan).
+CREATE FUNCTION akun_jatuh_tempo(p_batas integer)
+  RETURNS TABLE (user_id uuid, punya_titik boolean)
+  LANGUAGE sql STABLE SECURITY DEFINER
+  SET search_path = pg_catalog, public, pg_temp
+  AS $$
+    SELECT u.id,
+           EXISTS (SELECT 1 FROM public.memories m
+                   WHERE m.user_id = u.id AND m.embedding_id IS NOT NULL)
+    FROM public.users u
+    WHERE u.status = 'pending_deletion' AND u.deletion_scheduled_at <= now()
+    ORDER BY u.deletion_scheduled_at, u.id
+    LIMIT least(greatest(p_batas, 1), 100)
+  $$;
+REVOKE ALL ON FUNCTION akun_jatuh_tempo(integer) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION akun_jatuh_tempo(integer) TO hvx_pekerja;
+
+-- 2. KUNCI barisnya (`FOR NO KEY UPDATE`: menyerialkan `POST /me/restore` tanpa
+--    menahan penulis anak) dan periksa ulang waktunya. Kunci ditahan sampai
+--    transaksi pekerja selesai — tahap 4 (Qdrant) dikerjakan selagi terkunci.
+CREATE FUNCTION kunci_akun_jatuh_tempo(p_user_id uuid)
+  RETURNS boolean
+  LANGUAGE plpgsql VOLATILE SECURITY DEFINER
+  SET search_path = pg_catalog, public, pg_temp
+  AS $$
+  BEGIN
+    PERFORM 1 FROM public.users u
+      WHERE u.id = p_user_id
+        AND u.status = 'pending_deletion' AND u.deletion_scheduled_at <= now()
+      FOR NO KEY UPDATE;
+    RETURN FOUND;
+  END
+  $$;
+REVOKE ALL ON FUNCTION kunci_akun_jatuh_tempo(uuid) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION kunci_akun_jatuh_tempo(uuid) TO hvx_pekerja;
+
+-- 3. Tahap 5 · 3 · 6 dalam SATU transaksi: jejak audit akun dialihkan ke id semu
+--    (`p_semu`, HMAC berkunci dari pekerja — user_id, actor_id, subject_id, dan
+--    metadata yang memuat id lama), akunnya dihapus (CASCADE), lalu satu baris
+--    `account.deleted`. Gagal di tengah = tidak satu pun berubah.
+CREATE FUNCTION hapus_akun_jatuh_tempo(p_user_id uuid, p_semu uuid)
+  RETURNS boolean
+  LANGUAGE plpgsql VOLATILE SECURITY DEFINER
+  SET search_path = pg_catalog, public, pg_temp
+  AS $$
+  BEGIN
+    IF p_semu IS NULL OR p_semu = p_user_id THEN
+      RAISE EXCEPTION 'id semu wajib ada dan berbeda dari id akun';
+    END IF;
+    PERFORM 1 FROM public.users u
+      WHERE u.id = p_user_id
+        AND u.status = 'pending_deletion' AND u.deletion_scheduled_at <= now()
+      FOR UPDATE;
+    IF NOT FOUND THEN
+      RETURN false;
+    END IF;
+    UPDATE public.audit_logs a
+      SET user_id = p_semu,
+          actor_id = replace(a.actor_id, p_user_id::text, p_semu::text),
+          subject_id = replace(a.subject_id, p_user_id::text, p_semu::text),
+          metadata = replace(a.metadata::text, p_user_id::text, p_semu::text)::jsonb,
+          ip_hash = NULL
+      WHERE a.user_id = p_user_id;
+    DELETE FROM public.users WHERE id = p_user_id;
+    INSERT INTO public.audit_logs (data_subject, actor_type, actor_id, user_id, action,
+                                   subject_type, subject_id)
+      VALUES ('user', 'system', 'sapuan-hapus-akun', p_semu, 'account.deleted',
+              'user', p_semu::text);
+    RETURN true;
+  END
+  $$;
+REVOKE ALL ON FUNCTION hapus_akun_jatuh_tempo(uuid, uuid) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION hapus_akun_jatuh_tempo(uuid, uuid) TO hvx_pekerja;
+
+-- Privacy Center (spec/07 6.4, K-42): hapus per kategori ikut membuang riwayat event
+-- pengguna itu (naskah 11 §7.25). `events` tetap hanya-tambah bagi `hvx_app` (§10) — yang
+-- dibuka hanya PENGHAPUSAN, hanya event milik pengguna yang SEDANG DILAYANI transaksi
+-- (`app_current_user_id()`), hanya jenis yang disebut, dan bila diminta satu subjek.
+-- Tanpa pengguna yang dilayani: galat, bukan nol baris. Untuk `hvx_app`.
+CREATE FUNCTION hapus_event_pengguna(p_jenis text[], p_subjek_tipe text, p_subjek_id uuid)
+  RETURNS integer
+  LANGUAGE plpgsql VOLATILE SECURITY DEFINER
+  SET search_path = pg_catalog, public, pg_temp
+  AS $$
+  DECLARE
+    v_pengguna uuid := public.app_current_user_id();
+    v_jumlah integer;
+  BEGIN
+    IF v_pengguna IS NULL THEN
+      RAISE EXCEPTION 'hapus_event_pengguna: tidak ada pengguna yang dilayani transaksi ini'
+        USING ERRCODE = 'insufficient_privilege';
+    END IF;
+    IF (p_subjek_tipe IS NULL) <> (p_subjek_id IS NULL) THEN
+      RAISE EXCEPTION 'hapus_event_pengguna: subjek wajib tipe DAN id, atau keduanya kosong';
+    END IF;
+    DELETE FROM public.events e
+      WHERE e.user_id = v_pengguna
+        AND e.event_type = ANY(p_jenis)
+        AND (p_subjek_id IS NULL
+             OR (e.subject_type = p_subjek_tipe AND e.subject_id = p_subjek_id));
+    GET DIAGNOSTICS v_jumlah = ROW_COUNT;
+    RETURN v_jumlah;
+  END
+  $$;
+REVOKE ALL ON FUNCTION hapus_event_pengguna(text[], text, uuid) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION hapus_event_pengguna(text[], text, uuid) TO hvx_app;
 ```
 
 > 🔑 **Kenapa fungsi, bukan kebijakan RLS yang lebih longgar** (17 Sep 2026,
@@ -1114,6 +1339,41 @@ GRANT EXECUTE ON FUNCTION auth_lookup_for_login(citext) TO hvx_app;
 > `SECURITY DEFINER` di skema `public` ada di **daftar izin** uji itu, punya
 > `search_path` terpatok, dan **tidak** bisa dieksekusi `PUBLIC`. Fungsi ke-2
 > berarti baris baru di daftar itu — dan alasan di bagian ini.
+>
+> 🔧 **Fungsi ke-2: `events_untuk_relay` (24 Sep 2026, spec/07 3.3).** Relay
+> kotak keluar menerbitkan event semua pengguna ke Redis Streams. Yang
+> dikembalikannya hanya **rujukan** — id, pemilik, jenis, dua waktu — bukan
+> `payload`: konsumen membaca isi event di transaksi PEMILIKNYA
+> (`transaksi_pengguna`), jadi RLS tetap menjaga isi, dan Redis tidak pernah
+> menyimpan data pengguna (prinsip yang sama dengan `Idempotency-Key`, E-171).
+>
+> 🔧 **Fungsi ke-3: `memori_perlu_diselaraskan` (24 Sep 2026, spec/07 3.5–3.7).**
+> Qdrant tidak ikut transaksi PostgreSQL, jadi memori dan titik vektornya
+> diselaraskan **sesudah** commit oleh proses pekerja: memori baru disemat,
+> memori yang isinya berubah disemat ulang, dan titik memori yang dihapus
+> dibuang — naskah: *“tidak boleh hanya menghapus row di PostgreSQL”*
+> ([`../docs/139`](../docs/139-PRIVACY-DELETION-RETENTION.md)). Fungsi ini hanya
+> menjawab **pengguna mana** yang punya pekerjaan; baris dan isinya dibaca di
+> transaksi pemiliknya, di bawah RLS. Tiga kolom yang dibacanya berarti:
+> `embedding_model` = penyemat vektor yang **cocok dengan isi saat ini** (`NULL` =
+> belum disemat, atau isinya berubah sesudah disemat) · `embedding_id` = id
+> titik Qdrant sesudah pertama disemat (`NULL` = belum pernah) · `deleted_at`
+> terisi = isi sudah dikosongkan, titik dan barisnya menunggu dibuang.
+> ⚠️ Kondisi `embedding_model IS DISTINCT FROM p_model` memindai tabel penuh tiap
+> putaran — cukup untuk V0 (satu pengguna nyata, spec/06); V1 butuh kolom
+> penanda berindeks ([K-25](../docs/KEPUTUSAN-DIDELEGASIKAN.md)).
+>
+> 🔧 **Dua koreksi tinjauan Sprint 3.** **(K4)** Versi pertama memakai
+> `model_version` untuk penyemat — padahal kolom itu tempat ambang keyakinan
+> #34 ([`../arch/README.md`](../arch/README.md): versi yang menghasilkan memori
+> dan keyakinannya), dan penyelaras menimpanya tiap kali. Kini `embedding_model`
+> kolom sendiri, ditambahkan 0006 di ujung tabel. **(S4)** Fungsi ke-2 dan ke-3
+> semula untuk `hvx_app` — peran api yang menghadap internet: injeksi SQL di
+> sana membaca linimasa (pengguna · jenis · waktu) semua pengguna lewat fungsi
+> relay. Kini hanya `hvx_pekerja`, peran NOLOGIN yang hanya dimiliki login
+> proses pekerja; api **menolak mulai** sebagai anggotanya
+> (`platform.pastikan_peran_aplikasi`), dan fungsi relay tidak lagi
+> mengembalikan `occurred_at` yang tidak dipakainya.
 
 ---
 
@@ -1123,16 +1383,58 @@ Menutup janji *Delete* di Privacy Center (naskah 5 §26) tanpa merusak audit:
 
 | Tahap | Tindakan |
 |---|---|
-| 1 | `users.status = 'pending_deletion'`, sesi dicabut, agent berhenti melayani |
-| 2 | Tenggang **30 hari** — pengguna masih bisa membatalkan |
+| 1 | `users.status = 'pending_deletion'`, `deletion_scheduled_at = now()+30 hari` (🔧 8 Okt 2026: tertulis `now()+30h` — **30 jam**; kode, kolom `users`, dan tahap 2 semuanya 30 hari — tinjauan kontrak S5–6 K8), **semua sesi dicabut** (`cabut_semua`), agent berhenti melayani |
+| 2 | Tenggang **30 hari** — pengguna masih bisa membatalkan (`POST /me/restore`) |
 | 3 | `DELETE FROM users` → cascade menghapus profil, goal, habit, jurnal, mood, memori, percakapan, rekomendasi, event, human_states |
-| 4 | Titik embedding di Qdrant dihapus berdasarkan `memories.embedding_id` yang dikumpulkan **sebelum** tahap 3 |
+| 4 | Titik embedding di Qdrant dihapus berdasarkan `memories.embedding_id` yang dikumpulkan **sebelum** tahap 3 — atau per saringan `user_id` payload (`platform.KlienVektor.hapus_milik`, 3.5), yang juga membuang titik yatim |
 | 5 | `audit_logs` **tetap**, dengan `user_id` diacak jadi id semu satu arah; isinya sudah metadata saja |
 | 6 | Satu baris audit terakhir: `action='account.deleted'` |
 
 > ⚠️ Tahap 4 adalah jebakan paling mudah terlewat: **Qdrant tidak ikut
 > cascade.** Kumpulkan `embedding_id` lebih dulu, atau titik memori pengguna
 > akan tertinggal di sana selamanya.
+>
+> 🔧 **Autentikasi restore (5 Okt 2026, 6.5, keputusan pemilik).** Tahap 1
+> mencabut semua sesi, jadi pengguna tak punya sesi untuk `POST /me/restore`.
+> `masuk` karena itu **mengizinkan login akun `pending_deletion`** (`suspended`
+> tetap `403`): sesi barunya untuk membatalkan penghapusan (dan baca), agent
+> tidak melayani sampai akun `active` lagi. Restore mengembalikan `status='active'`
+> dan `deletion_scheduled_at=NULL`.
+>
+> 🔧 **Tahap 3–6 — dikodekan 6 Okt 2026 (6.5 Stage B, K-39).** Dijalankan proses
+> **pekerja** (`hvx.pekerja`, anggota `hvx_pekerja`) tiap lima menit, atas akun
+> `status='pending_deletion'` yang `deletion_scheduled_at <= now()`, lewat **tiga fungsi
+> §12** — bukan peran login ketiga, dan bukan `DELETE` untuk `hvx_app`:
+>
+> `akun_jatuh_tempo` (siapa) → `kunci_akun_jatuh_tempo` (kunci baris,
+> `FOR NO KEY UPDATE`, periksa ulang) → **tahap 4** (Qdrant, di luar SQL, selagi baris
+> terkunci) → `hapus_akun_jatuh_tempo` (tahap 5 · 3 · 6 satu transaksi) → sesi dicabut.
+>
+> * **Qdrant lebih dulu.** Urutan terbalik meninggalkan titik tanpa pemilik yang tak
+>   bisa lagi dicari (`user_id`-nya sudah tiada). Pembuangannya menurut saringan
+>   `user_id` payload (`hapus_milik`), jadi diulang aman; koleksi yang belum ada = tidak
+>   ada titik = sukses. Gagal di tengah membatalkan transaksi — akunnya utuh dan dicoba
+>   lagi putaran berikutnya.
+> * **Tanpa Qdrant terpasang di pekerja**, akun yang pernah punya titik (`embedding_id`
+>   terisi) **ditunda**, bukan dihapus — menghapus barisnya meninggalkan titiknya selamanya.
+> * **Tahap 5: id semu mengganti id akun di SEMUA kolom yang bisa memuatnya** —
+>   `user_id`, `actor_id`, `subject_id`, dan teks `metadata` (**E-215**: `audit()` menulis
+>   `str(user_id)` ke `actor_id` pada tiap aksi pengguna; menganonimkan `user_id` saja
+>   meninggalkan id asli di sana). Id semu = HMAC-SHA256 berkunci (`HVX_IP_HASH_KEY`, label
+>   `akun-terhapus`) dipotong 128 bit: baris audit satu akun tetap bisa dipertemukan,
+>   tetapi tak bisa dibalik tanpa kunci. 🔧 `ip_hash` **dikosongkan** (`NULL`) sejak migrasi
+>   `0013` — **C-34** diputuskan atas delegasi pemilik (**K-46**); kalimat lama *“`ip_hash`
+>   tidak diubah”* tertinggal sesudah fungsi §12 berubah (tinjauan kontrak S5–6 K8, 8 Okt 2026).
+> * **Restore hanya selama tenggang (E-216).** `POST /me/restore` sesudah
+>   `deletion_scheduled_at` → `409 deletion_grace_expired`: sapuan boleh membuang titik
+>   Qdrant-nya kapan saja, dan akun yang dipulihkan di antaranya hidup kembali tanpa
+>   vektor memorinya.
+> * **Penyelaras vektor melewati akun `pending_deletion` (E-217)** — penyematan ulang
+>   bisa menulis titik baru di antara tahap 4 dan commit tahap 3. Restore
+>   mengembalikannya.
+> * **Agent berhenti melayani** akun `pending_deletion` di pintu giliran (`kirim`,
+>   `jawab` → `403 account_pending_deletion`); membaca dan membatalkan tetap boleh.
+> * Sesi yang lahir selama tenggang (login untuk membatalkan) dicabut sesudah commit.
 
 ---
 

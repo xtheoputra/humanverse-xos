@@ -326,6 +326,64 @@ def test_pemicu_updated_at_benar_benar_memperbarui_kolomnya(
     assert diubah > dibuat
 
 
+def test_updated_at_naik_ketat_walau_dua_update_dalam_satu_transaksi(
+    basis_data_sekali_pakai: Callable[[str], str],
+) -> None:
+    """E-223: `now()` = awal TRANSAKSI, jadi dua versi baris bisa berbagi `updated_at`.
+
+    Kunci event `checkin:<tanggal>:<updated_at>` memakainya sebagai identitas versi
+    baris — dua transaksi serentak yang mulai di mikrodetik yang sama (diukur: 175 dari
+    400 percobaan, lima transaksi) menghasilkan `EventTidakSah` → 500. Satu transaksi
+    dengan dua UPDATE adalah bentuk deterministik dari balapan yang sama.
+    """
+    dsn = basis_data_sekali_pakai("monoton_satu")
+    command.upgrade(alembic(dsn), "head")
+
+    with psycopg.connect(psycopg_dsn(dsn)) as k:  # SATU transaksi
+        (uid,) = k.execute(
+            "INSERT INTO users (email, password_hash) VALUES ('m1@contoh.id', 'x') RETURNING id"
+        ).fetchone()
+        (a,) = k.execute(
+            "UPDATE users SET status = 'suspended' WHERE id = %s RETURNING updated_at", (uid,)
+        ).fetchone()
+        (b,) = k.execute(
+            "UPDATE users SET status = 'active' WHERE id = %s RETURNING updated_at", (uid,)
+        ).fetchone()
+
+    assert b > a, "updated_at tidak naik di antara dua versi baris — kunci event bisa kembar"
+
+
+def test_updated_at_tak_mundur_walau_transaksinya_mulai_lebih_awal(
+    basis_data_sekali_pakai: Callable[[str], str],
+) -> None:
+    """E-223: transaksi yang MULAI lebih awal tetapi menulis belakangan.
+
+    `now()` miliknya lebih kecil daripada `updated_at` yang baru saja ditulis transaksi
+    lain — tanpa `GREATEST`, versi baris yang lebih BARU mendapat `updated_at` yang lebih
+    LAMA (dan `occurred_at` event-nya ikut mundur).
+    """
+    dsn = basis_data_sekali_pakai("monoton_dua")
+    command.upgrade(alembic(dsn), "head")
+
+    with (
+        psycopg.connect(psycopg_dsn(dsn), autocommit=True) as cepat,
+        psycopg.connect(psycopg_dsn(dsn)) as lambat,
+    ):
+        (uid,) = cepat.execute(
+            "INSERT INTO users (email, password_hash) VALUES ('m2@contoh.id', 'x') RETURNING id"
+        ).fetchone()
+        lambat.execute("SELECT now()")  # transaksi `lambat` MULAI di sini
+        (u1,) = cepat.execute(
+            "UPDATE users SET status = 'suspended' WHERE id = %s RETURNING updated_at", (uid,)
+        ).fetchone()
+        (u2,) = lambat.execute(
+            "UPDATE users SET status = 'active' WHERE id = %s RETURNING updated_at", (uid,)
+        ).fetchone()
+        lambat.commit()
+
+    assert u2 > u1, "versi baris yang lebih baru mendapat updated_at yang lebih lama"
+
+
 def test_audit_logs_menolak_baris_pengguna_tanpa_user_id(
     basis_data_sekali_pakai: Callable[[str], str],
 ) -> None:

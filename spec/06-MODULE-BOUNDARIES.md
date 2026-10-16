@@ -112,7 +112,7 @@ dengan SQL — harus lewat `__init__.py` pemiliknya.
 | 3 | Modul domain (`goals`…`activities`, `profile`) **tidak boleh** saling mengimpor — komunikasinya lewat event, atau lewat **pembaca/pendengar yang disambung titik rakit** `hvx.main` di transaksi pemanggil (K-17, **K-23** — lihat catatan di bawah) | `import-linter` lapisan independen di `m1-m3-lapisan` · sambungannya: `tests/unit/test_main.py` |
 | 4 | `agents` boleh membaca modul lain; **tidak ada** modul yang mengimpor `agents` | `import-linter` — `agents` lapisan teratas `m1-m3-lapisan`, `exhaustive = true` |
 | 5 | `repository.py` hanya boleh menyebut tabel milik modulnya | `tests/unit/test_batas_tabel.py` — tabel kepemilikan dibaca **dari berkas ini**; SQL **tiap berkas `.py`** modul dipindai, bukan hanya `repository.py` · mutasi `06.5` |
-| 6 | Setiap tulisan ke tabel domain **yang punya event padanan** di [`03`](03-EVENT-CONTRACTS.md) **wajib** menerbitkan event | uji integrasi per modul — ⏳ **dilanggar sejak Sprint 2, dengan sengaja dan tercatat**: `goals` · `goal_milestones` · `habits` · `habit_completions` · `daily_checkins` · `mood_entries` ditulis TANPA event, sebab tabel `events` dan penerbitnya tugas 3.1–3.2 (**E-176**) |
+| 6 | Setiap tulisan ke tabel domain yang mengubah **fakta perilaku** **wajib** menerbitkan event padanannya di [`03`](03-EVENT-CONTRACTS.md), **di transaksi yang sama** — peta lengkapnya di bawah | `tests/integration/test_penerbitan_event.py` — tiap baris peta, lewat HTTP; kirim ulang tidak menerbitkan apa pun · mutasi `3.2` |
 
 > 🔧 **Aturan 6 semula: *“setiap tulisan ke tabel domain”* — dan `profile` modul
 > domain (aturan 3).** Sprint 1 menulis `profiles` (pendaftaran · `PATCH
@@ -135,16 +135,58 @@ dengan SQL — harus lewat `__init__.py` pemiliknya.
 > (RLS dan transaksinya sama). Yang terpasang: `pendengar_pendaftaran`
 > (identity → profile) · `pembaca_zona_waktu` (habits ← profile) ·
 > `pembaca_energi` (habits ← checkins) · `pembaca_goal_hidup` (habits ← goals) ·
-> `pendengar_goal_dihapus` (goals → habits). Rute yang butuh sambungan MENOLAK
-> berjalan tanpanya (`RuntimeError`), bukan jatuh ke bawaan diam-diam, dan
-> `tests/unit/test_main.py` memeriksa kelimanya terpasang.
+> `pendengar_goal_dihapus` (goals → habits) · `pendengar_jurnal_berubah`
+> (journal → memory, 3.6 — `memory` di ATAS `journal` dan boleh mengimpornya,
+> tetapi `journal` tidak boleh mengimpor `memory`). Rute yang butuh sambungan
+> MENOLAK berjalan tanpanya (`RuntimeError`), bukan jatuh ke bawaan diam-diam,
+> dan `tests/unit/test_main.py` memeriksa keenamnya terpasang.
 >
-> ⏳ **Aturan 6 dan Sprint 2 (E-176).** Keenam tabel di atas punya event
-> padanan di [`03`](03-EVENT-CONTRACTS.md), dan Sprint 2 menulisnya sebelum
-> tabel `events` ada (3.1). Menunggu 3.2 dicatat, bukan disembunyikan — sampai
-> 3.2, aturan **D** [`02-ERD.md`](02-ERD.md) tidak berlaku untuk tabel itu.
-> Tidak ada *backfill*: tidak ada data produksi sebelum 3.2 (V0 belum
-> dipasang di mana pun — D0 lokal), dan basis data pengembang dibuat ulang.
+> ✅ **Aturan 6 dan Sprint 2 (E-176) — ditutup 3.2.** Sprint 2 menulis
+> `goals` · `goal_milestones` · `habits` · `habit_completions` ·
+> `daily_checkins` · `mood_entries` sebelum tabel `events` ada (3.1). Sejak 3.2
+> tiap tulisan di peta di bawah menerbitkan eventnya di transaksi yang sama.
+> Tidak ada *backfill*: tidak ada data produksi sebelum 3.2 (V0 belum dipasang
+> di mana pun — D0 lokal), dan basis data pengembang dibuat ulang.
+
+### Peta aturan 6 — tulisan mana menerbitkan apa (tugas 3.2)
+
+| Tulisan ([`04`](04-API-CONTRACTS.md)) | Event | Kunci ([`03`](03-EVENT-CONTRACTS.md) aturan 1) |
+|---|---|---|
+| `POST /goals` | `goal.created` | `goal:<id>:created` |
+| `PATCH /goals/{id}` yang **mengubah** status menjadi `achieved` | `goal.completed` | `goal:<id>:completed:<achieved_at>` |
+| `POST /habits` | `habit.created` | `habit:<id>:created` |
+| `POST …/completions` yang **melahirkan baris** `done`/`partial` · `skipped` | `habit.completed` · `habit.skipped` | `habit-completion:<completion_id>` |
+| `DELETE …/completions/{for_date}` yang **menghapus baris** | `habit.completion_retracted` | `habit-completion:<completion_id>:retracted` |
+| `PUT /checkins/{for_date}` yang **mengubah** isi check-in (atau membuatnya) | `checkin.logged` | `checkin:<for_date>:<updated_at>` |
+| `POST /moods` | `mood.logged` | `mood:<mood_id>` |
+| `POST /journal` (3.4) | `journal.created` | `journal:<journal_id>` |
+
+**Tanpa event V0 — dan kenapa:** `PATCH /goals` selain perubahan menjadi
+`achieved`, hapus-lunak goal & habit, milestone, `PATCH /habits`, profil. Semuanya
+**konfigurasi**, bukan fakta perilaku: tabelnya sendiri sumber kebenarannya, dan
+aturan **D** [`02`](02-ERD.md) (*tabel domain adalah proyeksi event*) berlaku bagi
+fakta perilaku — yang dibaca Behavior Engine. ⚠️ Satu yang diakui: goal
+`achieved` yang dibuka lagi tidak menerbitkan apa pun, jadi `goal.completed`-nya
+tetap di riwayat. Event konfigurasi (mis. `goal.changed` di tabel padanan) bisa
+mulai diterbitkan kapan saja tanpa kehilangan apa pun — tabelnya menyimpan
+keadaannya.
+
+🔧 **Tiga tulisan yang semula tidak disebut di peta maupun di sini** (tinjauan
+kontrak Sprint 3, K6):
+
+| Tulisan | Kenapa tanpa event V0 |
+|---|---|
+| `POST /activities` (3.8) | ⚠️ **Fakta perilaku — dan diakui sebagai pengecualian.** Event padanannya (`workout.completed`, `meal.logged`, `learning.completed`, `meeting.completed`) ada di [`03`](03-EVENT-CONTRACTS.md) tetapi **belum ✅ V0**, dan bentuk payload-nya tidak memetakan kosakata `activities.kind` yang masih terbuka. Tabel `activities` menyimpan faktanya, jadi event bisa diterbitkan belakangan dengan `source='backfill'` tanpa kehilangan apa pun. Sampai itu aturan **D** tidak berlaku untuk `activities` — dinyatakan di sini, bukan diam-diam |
+| `PATCH /journal/{id}` | menyunting tulisan tidak melahirkan fakta perilaku baru: *menulis jurnal* terjadi pada `occurred_at`-nya, dan isinya tidak pernah masuk event |
+| `DELETE /journal/{id}` | hapus-lunak (`deleted_at`); `journal.created` (hanya `word_count`) tetap di riwayat. Apakah fakta *pernah menulis jurnal* ikut dicabut bersama tulisannya — bentuk E-178 untuk jurnal — terikat **C-31**, milik pemilik |
+
+> 🔧 **Aturan 6 dipersempit 24 Sep 2026 (E-179), saat 3.2 ditulis.** Kalimat
+> sebelumnya (*“setiap tulisan ke tabel yang punya event padanan”*) menuntut
+> event untuk tiap `PATCH` judul goal — padahal 23 event `03` tidak punya satu
+> pun jenis untuknya, dan menambah sepuluh event konfigurasi ke V0 gagal uji
+> [`../arch/07`](../arch/07-EVENT-CONTRACTS.md) §7. Yang dijaga kini persis yang
+> membuat aturan **D** benar: **tidak ada fakta perilaku yang lolos tanpa event** —
+> dengan satu pengecualian yang dinyatakan: `activities` V0 (tabel di atas).
 
 > Tiap kontrak di atas **terbukti sanggup gagal** — `tools/uji_mutasi_kode.py`
 > memiliki satu mutasi per id kontrak, dan `tests/unit/test_penegak.py`

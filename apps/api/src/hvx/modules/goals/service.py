@@ -22,6 +22,10 @@ Selesai bila: pohon goal 3 tingkat terbaca dalam satu query.
   milestone per goal — `GET …/tree` dan `GET /goals/{id}` membaca SEMUANYA dalam
   satu jawaban, jadi ukurannya dibatasi SAAT MENULIS (tinjauan keamanan Sprint 2:
   20 ribu goal = 86 MB dan event loop tertahan), sama seperti kedalaman.
+* **Event (spec/07 3.2, spec/06 aturan 6)** — `goal.created`, dan
+  `goal.completed` saat status BERUBAH menjadi `achieved`, di transaksi yang
+  sama dengan tulisannya. Perubahan lain adalah konfigurasi, bukan fakta
+  perilaku — peta lengkapnya spec/06.
 """
 
 from __future__ import annotations
@@ -33,7 +37,7 @@ from uuid import UUID
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine
 
-from hvx.modules import platform
+from hvx.modules import events, platform
 
 from . import repository
 from .schemas import (
@@ -114,7 +118,7 @@ async def buat(engine: AsyncEngine, user_id: UUID, badan: BuatGoal) -> Goal:
                         "goal_tree_too_deep",
                         f"Pohon goal paling dalam {MAKS_KEDALAMAN + 1} tingkat.",
                     )
-            return await repository.sisip(
+            goal = await repository.sisip(
                 conn,
                 user_id=user_id,
                 id_=badan.id,
@@ -124,6 +128,21 @@ async def buat(engine: AsyncEngine, user_id: UUID, badan: BuatGoal) -> Goal:
                 domain=badan.domain,
                 target_date=badan.target_date,
             )
+            await events.terbitkan(
+                conn,
+                user_id=user_id,
+                event_type="goal.created",
+                occurred_at=goal.created_at,
+                idempotency_key=f"goal:{goal.id}:created",
+                subject_type="goal",
+                subject_id=goal.id,
+                payload={
+                    "title": goal.title,
+                    "domain": goal.domain,
+                    "target_date": goal.target_date,
+                },
+            )
+            return goal
     except IntegrityError as galat:
         p = platform.rincian_pelanggaran(galat)
         if p.sqlstate == platform.UNIQUE_VIOLATION and p.constraint == "goals_pkey":
@@ -189,9 +208,27 @@ async def ubah(engine: AsyncEngine, user_id: UUID, goal_id: UUID, badan: UbahGoa
                 raise _tidak_ditemukan()
             return goal
         hasil = await repository.ubah(conn, goal_id, perubahan)
-    if hasil is None:
-        raise _tidak_ditemukan()
-    return hasil.goal
+        if hasil is None:
+            raise _tidak_ditemukan()
+        goal = hasil.goal
+        # Hanya PERUBAHAN menjadi achieved — PATCH achieved kedua bukan kejadian baru.
+        # `repository._UBAH` mengisi achieved_at bersama status achieved.
+        if (
+            goal.status == "achieved"
+            and hasil.status_lama != "achieved"
+            and goal.achieved_at is not None
+        ):
+            await events.terbitkan(
+                conn,
+                user_id=user_id,
+                event_type="goal.completed",
+                occurred_at=goal.achieved_at,
+                idempotency_key=f"goal:{goal.id}:completed:{goal.achieved_at.isoformat()}",
+                subject_type="goal",
+                subject_id=goal.id,
+                payload={"days_taken": (goal.achieved_at - goal.created_at).days},
+            )
+    return goal
 
 
 async def hapus(

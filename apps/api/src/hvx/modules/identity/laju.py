@@ -46,7 +46,13 @@ async def batasi_pengguna(request: Request, user_id: UUID) -> None:
 
 
 async def batasi_kredensial_ip(request: Request) -> None:
-    """Dependensi rute `/register` dan `/login`."""
+    """Dependensi rute `/register` dan `/login` — dan dipanggil tiap pintu SANDI ULANG
+    (`DELETE /me`, ekspor & hapus Privacy Center) tepat sebelum argon2.
+
+    🔴 Tinjauan keamanan S5–6 (S2): pintu sandi ulang semula hanya dibatasi per pengguna
+    (300/menit) dan per akun — yang dikosongkan tiap kali sandinya benar. Satu akun cukup
+    untuk memaksa ratusan argon2id (64 MiB, di thread) per menit dari satu IP: 100× batas
+    login. Satu jatah per IP untuk TIAP pencocokan sandi, di pintu mana pun."""
     settings = platform.settings_dari(request)
     batas = platform.BatasLaju.dari_teks("kredensial-ip", settings.rate_limit_auth_ip)
     hasil = await platform.pembatas_laju(request).ambil(batas, platform.sidik_jaringan(request))

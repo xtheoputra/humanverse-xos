@@ -22,6 +22,17 @@ from hvx.modules.platform import Settings
 # Rute tulis domain yang sengaja TANPA Idempotency-Key — satu alasan per baris.
 TANPA_IDEMPOTENSI: dict[tuple[str, str], str] = {
     ("PATCH", "/v1/me/profile"): "idempoten dengan sendirinya — spec/04",
+    ("POST", "/v1/recommendations/{rekomendasi_id}/shown"): (
+        "idempoten dengan sendirinya — menandai `shown` dua kali tetap `shown` (6.1)"
+    ),
+    ("POST", "/v1/me/restore"): "idempoten dengan sendirinya — restore dua kali tetap active (6.5)",
+    ("PATCH", "/v1/me/notifications"): (
+        "idempoten dengan sendirinya — menyetel jenis yang sama dua kali tetap satu nilai (6.3)"
+    ),
+    ("POST", "/v1/privacy/export"): (
+        "tidak menulis data domain — ulangan membuat catatan ekspor sekali-pakai lain; "
+        "badannya sandi, yang tidak boleh ikut diingat 24 jam (6.4, K-43)"
+    ),
 }
 # K-21: jawaban /auth/* memuat token; memutar ulangnya = menyimpan token mentah.
 AWALAN_AUTH = "/v1/auth/"

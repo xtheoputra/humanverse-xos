@@ -12,9 +12,11 @@ Kebijakan yang tahu apa itu pengguna atau login tinggal di `identity`.
   menghitung dengan satu jam — dan jam itu **tidak mundur per kunci**. Langkah
   mundur sampai `_MUNDUR_DISERAP_MS` dibaca sebagai "waktu yang sama": jam VM
   Docker Desktop di bawah beban melangkah mundur 0,76–1,18 dtk (diukur tinjauan
-  Sprint 2), dan permintaan di ujung ledakan yang kebetulan jatuh sesudahnya
-  ditolak `429` palsu. Langkah yang lebih besar dipakai apa adanya — menahan
-  jam sebuah kunci satu jam karena jam server disetel mundur satu jam lebih buruk.
+  Sprint 2) — dan **3,1 dtk** (diukur 28 Sep 2026, E-211: batas "2 gagal masuk per
+  hari" menolak tebakan kedua yang sah, uji Sprint 1 berkedip), jadi yang diserap kini
+  5 dtk. Permintaan di ujung ledakan yang jatuh sesudah langkah itu dulu ditolak `429`
+  palsu. Langkah yang lebih besar dipakai apa adanya — menahan jam sebuah kunci
+  satu jam karena jam server disetel mundur satu jam lebih buruk.
 * **IP tidak pernah disimpan mentah** — kuncinya HMAC dengan `HVX_IP_HASH_KEY`.
   **IPv6 dihitung per /64**: satu pelanggan biasa menerima satu /64 utuh, jadi
   batas per alamat dilewati cukup dengan berganti alamat di jaringannya sendiri.
@@ -44,7 +46,7 @@ _POLA_NAMA = re.compile(r"^[a-z][a-z0-9-]{0,39}$")
 _PESAN = "Terlalu banyak permintaan. Coba lagi nanti."
 
 # Langkah mundur jam Redis yang diserap per kunci — lihat docstring modul.
-_MUNDUR_DISERAP_MS = 2_000
+_MUNDUR_DISERAP_MS = 5_000
 
 # KEYS[1] kunci (hash: tat · t) · ARGV[1] interval emisi (ms) · ARGV[2] toleransi (ms)
 # · ARGV[3] langkah mundur yang diserap (ms) → {lolos 0/1, coba lagi dalam ms, sisa}

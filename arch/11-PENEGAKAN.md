@@ -398,7 +398,7 @@ P-5     MENUNGGU    —                                                D5 — mo
 P-6     MENUNGGU    —                                                T9 — V0 tidak punya data K3
 E-1     JALAN       periksa_dokumen:E-1
 E-2     JALAN       periksa_dokumen:E-2
-E-3     JALAN       periksa_dokumen:E-3                              separuh DDL; uji admisi saat terbit — tugas 3.1
+E-3     JALAN       periksa_dokumen:E-3                              DDL + uji admisi saat terbit (tugas 3.1, tests/integration/test_event.py)
 E-4     JALAN       periksa_dokumen:E-4
 E-5     JALAN       periksa_dokumen:E-5
 A-1     JALAN       periksa_dokumen:A-1                              skema manifest + DDL; manifest sungguhan — tugas 4.2

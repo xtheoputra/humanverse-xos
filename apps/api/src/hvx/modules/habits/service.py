@@ -21,6 +21,10 @@
   zona waktu pengguna, milik `profile`: `habits` tidak boleh mengimpornya
   (aturan 3) maupun membaca tabelnya (aturan 5), jadi titik rakit `hvx.main`
   menyerahkan pembacanya (**K-23**, pola pendengar pendaftaran K-17).
+* **Event (spec/07 3.2, spec/06 aturan 6)** — `habit.created`; penyelesaian yang
+  MELAHIRKAN baris → `habit.completed`/`habit.skipped`; penghapusan yang
+  MENGHAPUS baris → `habit.completion_retracted`. Kirim ulang tidak melahirkan
+  atau menghapus apa pun, jadi tidak menerbitkan apa pun.
 """
 
 from __future__ import annotations
@@ -34,10 +38,10 @@ from uuid import UUID
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine
 
-from hvx.modules import platform
+from hvx.modules import events, platform
 
 from . import repository
-from .rentetan import awal_riwayat, hitung_rentetan
+from .rentetan import Rentetan, awal_riwayat, hitung_rentetan
 from .schemas import (
     BuatHabit,
     CatatPenyelesaian,
@@ -139,7 +143,7 @@ async def buat(
                 raise platform.GalatApi(
                     422, "habit_limit_reached", f"Paling banyak {repository.DAFTAR_MAKS} habit."
                 )
-            return await repository.sisip(
+            habit = await repository.sisip(
                 conn,
                 user_id=user_id,
                 id_=badan.id,
@@ -150,6 +154,21 @@ async def buat(
                 schedule=badan.schedule.model_dump(exclude_none=True),
                 adaptive_tiers=[t.model_dump(exclude_none=True) for t in badan.adaptive_tiers],
             )
+            await events.terbitkan(
+                conn,
+                user_id=user_id,
+                event_type="habit.created",
+                occurred_at=habit.created_at,
+                idempotency_key=f"habit:{habit.id}:created",
+                subject_type="habit",
+                subject_id=habit.id,
+                payload={
+                    "title": habit.title,
+                    "period": habit.period,
+                    "target_count": habit.target_count,
+                },
+            )
+            return habit
     except IntegrityError as galat:
         dikenali = _galat_integritas(galat)
         if dikenali is None:
@@ -232,8 +251,16 @@ class HasilCatat:
 
 
 async def catat(
-    engine: AsyncEngine, user_id: UUID, habit_id: UUID, badan: CatatPenyelesaian
+    engine: AsyncEngine,
+    user_id: UUID,
+    habit_id: UUID,
+    badan: CatatPenyelesaian,
+    *,
+    sumber: events.Sumber = "app",
+    jejak: platform.JejakTulisan | None = None,
 ) -> HasilCatat:
+    """`sumber` = `source` event-nya (spec/03: `app` · `agent` …); `jejak` dijalankan di
+    transaksi ini bila baris BARU lahir — tulisan agent tercatat di `audit_logs` (E-205)."""
     async with platform.transaksi_pengguna(engine, user_id) as conn:
         habit = await repository.ambil_untuk_catat(conn, habit_id)
         if habit is None:
@@ -262,6 +289,9 @@ async def catat(
             note=badan.note,
         )
         if baru is not None:
+            await _terbitkan_penyelesaian(conn, user_id, baru, sumber)
+            if jejak is not None:
+                await jejak(conn)
             return HasilCatat(baru, baru=True)
         ada = await repository.selesai_pada(conn, habit_id, badan.for_date)
     if ada is None:  # pragma: no cover - habit terkunci, dan DO NOTHING berarti barisnya ada
@@ -275,10 +305,72 @@ async def hapus_catatan(engine: AsyncEngine, user_id: UUID, habit_id: UUID, for_
     async with platform.transaksi_pengguna(engine, user_id) as conn:
         if await repository.ambil_untuk_catat(conn, habit_id) is None:
             raise _tidak_ditemukan()
-        await repository.hapus_selesai(conn, habit_id, for_date)
+        dicabut = await repository.hapus_selesai(conn, habit_id, for_date)
+        if dicabut is not None:
+            await events.terbitkan(
+                conn,
+                user_id=user_id,
+                event_type="habit.completion_retracted",
+                occurred_at=dicabut.dicabut_pada,
+                idempotency_key=f"habit-completion:{dicabut.id}:retracted",
+                subject_type="habit",
+                subject_id=habit_id,
+                payload={"for_date": dicabut.for_date, "completion_id": dicabut.id},
+            )
+
+
+async def _terbitkan_penyelesaian(
+    conn: AsyncConnection, user_id: UUID, p: Penyelesaian, sumber: events.Sumber = "app"
+) -> None:
+    """`habit.completed` (done · partial) atau `habit.skipped` — kunci = baris yang lahir."""
+    if p.status == "skipped":
+        jenis = "habit.skipped"
+        payload: dict[str, Any] = {"reason": p.note}
+    else:
+        jenis = "habit.completed"
+        payload = {"status": p.status, "tier_used": p.tier_used, "note": p.note}
+    payload |= {"for_date": p.for_date, "completion_id": p.id}
+    await events.terbitkan(
+        conn,
+        user_id=user_id,
+        event_type=jenis,
+        occurred_at=p.completed_at,
+        idempotency_key=f"habit-completion:{p.id}",
+        subject_type="habit",
+        subject_id=p.habit_id,
+        source=sumber,
+        payload=payload,
+    )
 
 
 # ── spec/07 2.4 — rentetan ───────────────────────────────────────────────────
+
+
+async def habit_pada(conn: AsyncConnection, habit_id: UUID) -> Habit | None:
+    """Habit itu pada koneksi yang diberikan — pembaca lapisan atas (Behavior Engine, 5.2)
+    yang bekerja di transaksinya sendiri; `habits` ada di bawahnya (M-1)."""
+    return await repository.ambil(conn, habit_id)
+
+
+async def rentetan_pada(
+    conn: AsyncConnection, user_id: UUID, habit_id: UUID, zona: str
+) -> Rentetan | None:
+    """Rentetan dihitung pada koneksi & zona yang diberikan — satu sumber logika rentetan
+    untuk jalur tool (`rentetan`) dan Behavior Engine (5.2). `None` bila habit tak ada."""
+    habit = await repository.ambil(conn, habit_id)
+    if habit is None:
+        return None
+    hari_ini = await platform.hari_ini_di(conn, zona)
+    mulai = await repository.mulai_lokal(conn, habit_id, zona) or hari_ini
+    riwayat = await repository.riwayat(conn, habit_id, sejak=awal_riwayat(hari_ini))
+    return hitung_rentetan(
+        period=habit.period,
+        target_count=habit.target_count,
+        weekdays=habit.schedule.get("weekdays"),
+        mulai=mulai,
+        hari_ini=hari_ini,
+        penyelesaian=riwayat,
+    )
 
 
 async def rentetan(
@@ -289,21 +381,10 @@ async def rentetan(
     pembaca_zona_waktu: PembacaZonaWaktu,
 ) -> JawabanRentetan:
     async with platform.transaksi_pengguna(engine, user_id) as conn:
-        habit = await repository.ambil(conn, habit_id)
-        if habit is None:
-            raise _tidak_ditemukan()
         zona = await pembaca_zona_waktu(conn, user_id) or ZONA_BAWAAN
-        hari_ini = await platform.hari_ini_di(conn, zona)
-        mulai = await repository.mulai_lokal(conn, habit_id, zona) or hari_ini
-        riwayat = await repository.riwayat(conn, habit_id, sejak=awal_riwayat(hari_ini))
-    hasil = hitung_rentetan(
-        period=habit.period,
-        target_count=habit.target_count,
-        weekdays=habit.schedule.get("weekdays"),
-        mulai=mulai,
-        hari_ini=hari_ini,
-        penyelesaian=riwayat,
-    )
+        hasil = await rentetan_pada(conn, user_id, habit_id, zona)
+    if hasil is None:
+        raise _tidak_ditemukan()
     return JawabanRentetan(
         current=hasil.current,
         longest=hasil.longest,
