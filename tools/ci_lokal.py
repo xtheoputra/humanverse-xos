@@ -21,7 +21,8 @@ arch/11 §1 daftar enam kali. Karena itu `ci.yml` hanya memanggil berkas ini.
 `--locked` di perintah di atas bukan hiasan: `uv run` biasa MENULIS ULANG
 `uv.lock` yang basi sebelum berkas ini sempat memeriksanya.
 
-Tahap `test` butuh HVX_TEST_DATABASE_URL & HVX_TEST_REDIS_URL. Tahap `build`
+Tahap `test` butuh HVX_TEST_DATABASE_URL · HVX_TEST_REDIS_URL · HVX_TEST_QDRANT_URL
+(`docker compose up -d --wait postgres redis qdrant`). Tahap `build`
 dan `scan` butuh Docker; `scan` selalu didahului `build` di pemanggilan yang
 sama, supaya yang dipindai adalah citra yang baru dibangun dan diuji asap —
 bukan tag yang kebetulan sedang ada. Tahap pertama yang merah menghentikan
@@ -31,6 +32,7 @@ sisanya.
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import re
 import shutil
@@ -38,9 +40,12 @@ import subprocess
 import sys
 import tempfile
 import time
+import urllib.error
 import urllib.request
+import uuid
 from collections.abc import Callable
 from pathlib import Path
+from typing import Any
 
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8")
@@ -55,8 +60,18 @@ TRIVY = (
 )
 # `uv run` mengisi UV dengan jalur binernya sendiri; di luar itu cari di PATH.
 _UV = [os.environ.get("UV") or shutil.which("uv") or "uv"]
-# Direktori yang tidak dipindai rahasia: lingkungan terpasang & cache alat.
-_LEWATI_PINDAI = [".git", ".venv", "node_modules", ".mypy_cache", ".ruff_cache", ".pytest_cache"]
+# Aplikasi Flutter (ADR-001, spec/07 2.7). `HVX_FLUTTER` menunjuk biner `flutter`
+# kalau tidak ada di PATH. Tanpa Flutter tahapnya GAGAL — tidak dilewati.
+APLIKASI = AKAR / "apps" / "mobile"
+_FLUTTER = os.environ.get("HVX_FLUTTER") or shutil.which("flutter") or "flutter"
+# `dart` ikut Flutter (flutter/bin); `flutter format` sudah tidak ada.
+_DART = os.environ.get("HVX_DART") or shutil.which("dart") or "dart"
+# Direktori yang tidak dipindai rahasia: lingkungan terpasang, cache alat, dan
+# keluaran bangun Flutter.
+_LEWATI_PINDAI = [
+    ".git", ".venv", "node_modules", ".mypy_cache", ".ruff_cache", ".pytest_cache",
+    "apps/mobile/.dart_tool", "apps/mobile/build",
+]  # fmt: skip
 
 # Kecuali R-1: enam roadmap fase GAGAL R-1 hari ini, dan mengurutkannya ulang
 # adalah keputusan CAKUPAN milik pemilik (#99 #111 #116 #121 #131 #144).
@@ -70,7 +85,18 @@ Langkah = tuple[str, list[str] | Callable[[], int], bool]  # (nama, perintah, wa
 
 
 def _smoke_compose() -> int:
-    """Jalankan tumpukan compose penuh DARI CITRA CI, tuntut /health 200, lalu bongkar."""
+    """Jalankan tumpukan compose penuh DARI CITRA CI, tuntut /health 200, lalu bongkar.
+
+    Sesudah sehat, klien aplikasi Flutter yang SAMA dengan layar (spec/07 2.7)
+    menjalankan alur manusia — daftar, check-in, habit, tandai selesai, batal,
+    keluar — terhadap api dari citra itu (`apps/mobile/tool/ujung_ke_ujung.dart`);
+    lalu sebuah mood harus sampai ke Qdrant sebagai memori lewat wadah `pekerja`
+    (`_memori_ujung_ke_ujung`).
+    🔴 Dibuat karena layar pertama yang dicoba lawan tumpukan compose menemui
+    `500` yang tidak satu pun uji tangkap: uji api memakai basis data yang baru
+    dimigrasi, uji widget memakai layanan palsu — tidak ada yang mempertemukan
+    klien dengan api sungguhan.
+    """
     proyek = ["docker", "compose", "-p", "hvx-ci-smoke"]
     env = {
         **os.environ,
@@ -78,6 +104,7 @@ def _smoke_compose() -> int:
         "HVX_API_PORT": os.environ.get("HVX_CI_API_PORT", "18000"),
         "HVX_POSTGRES_PORT": os.environ.get("HVX_CI_POSTGRES_PORT", "15432"),
         "HVX_REDIS_PORT": os.environ.get("HVX_CI_REDIS_PORT", "16379"),
+        "HVX_QDRANT_PORT": os.environ.get("HVX_CI_QDRANT_PORT", "16333"),
     }
     try:
         r = subprocess.run(
@@ -95,13 +122,107 @@ def _smoke_compose() -> int:
                     badan = jawab.read().decode()
                     print(f"  {url} → {jawab.status} {badan}")
                     if jawab.status == 200 and '"status":"ok"' in badan.replace(" ", ""):
-                        return 0
+                        dasar = f"http://127.0.0.1:{env['HVX_API_PORT']}"
+                        return _ujung_ke_ujung(dasar) or _memori_ujung_ke_ujung(
+                            dasar, f"http://127.0.0.1:{env['HVX_QDRANT_PORT']}"
+                        )
             except OSError as galat:
                 print(f"  {url} → {galat}")
             time.sleep(2)
         return 1
     finally:
         subprocess.run([*proyek, "down", "-v", "--remove-orphans"], cwd=AKAR, env=env)
+
+
+def _ujung_ke_ujung(dasar: str) -> int:
+    """Alur manusia layar V0 pertama lawan api hidup — lihat `_smoke_compose`.
+
+    Dua bukti: klien asli TANPA layar (`tool/ujung_ke_ujung.dart`), lalu LAYAR
+    yang diketuk seperti manusia (`test/ujung/`, spec/07 2.7 — tinjauan kontrak
+    Sprint 2: tidak ada yang menjalankan layar terhadap api nyata).
+    """
+    print(f"  ujung ke ujung (apps/mobile) → {dasar}", flush=True)
+    klien = _flutter("run", "tool/ujung_ke_ujung.dart", dasar, biner=_DART)()
+    if klien != 0:
+        return klien
+    print(f"  layar diketuk lawan api hidup (apps/mobile/test/ujung) → {dasar}", flush=True)
+    return _flutter("test", "test/ujung", f"--dart-define=HVX_API_UJI={dasar}")()
+
+
+def _json_post(url: str, isi: dict[str, Any], token: str | None = None) -> dict[str, Any]:
+    kepala = {"Content-Type": "application/json"}
+    if token:
+        kepala["Authorization"] = f"Bearer {token}"
+    minta = urllib.request.Request(  # noqa: S310 - URL tumpukan lokal buatan sendiri
+        url, data=json.dumps(isi).encode(), headers=kepala, method="POST"
+    )
+    with urllib.request.urlopen(minta, timeout=10) as jawab:  # noqa: S310
+        hasil: dict[str, Any] = json.loads(jawab.read().decode())
+        return hasil
+
+
+def _memori_ujung_ke_ujung(dasar: str, qdrant: str) -> int:
+    """Mood lewat api hidup → relay → konsumen → memori → Qdrant, di WADAH `pekerja`.
+
+    🔴 `tests/integration/test_pekerja.py` menjalankan `pekerja.jalankan()` di
+    proses uji — wadah compose yang tidak pernah bekerja (perintah salah, Qdrant
+    tak terjangkau, `HVX_SEMATAN_KEY` hilang) tidak terlihat di sana. Tumpukan
+    compose penuh dari citra CI adalah satu-satunya tempat ketiganya bertemu.
+    """
+    print(f"  mood → pekerja → memori di Qdrant → {qdrant}", flush=True)
+    akun = _json_post(
+        f"{dasar}/v1/auth/register",
+        {
+            "email": f"ci-{uuid.uuid4().hex}@uji.id",
+            "password": uuid.uuid4().hex,
+            "display_name": "CI",
+            "timezone": "Asia/Jakarta",
+            "consents": {"policy_version": "ci", "terms": True, "privacy": True},
+        },
+    )
+    token = str(akun["tokens"]["access_token"])
+    uid = str(akun["user"]["id"])
+    _json_post(f"{dasar}/v1/moods", {"valence": 3, "note": "ujung ke ujung"}, token)
+    saring = {"filter": {"must": [{"key": "user_id", "match": {"value": uid}}]}, "exact": True}
+    for _ in range(60):
+        try:
+            jawab = _json_post(f"{qdrant}/collections/memories/points/count", saring)
+            jumlah = int(jawab["result"]["count"])
+        except urllib.error.HTTPError:
+            jumlah = 0  # koleksi belum dibuat penyelaras
+        if jumlah >= 1:
+            print(f"  memori tersemat: {jumlah} titik milik pengguna CI")
+            return 0
+        time.sleep(1)
+    print("🛑 mood tidak sampai ke Qdrant sebagai memori dalam 60 detik — wadah pekerja?")
+    return 1
+
+
+# Zona mesin untuk perintah Flutter (tinjauan penegak buta Sprint 2): `tanggalLokal`
+# hanya bisa dibedakan dari tanggal UTC di mesin yang TIDAK berzona UTC — di runner
+# UTC, mutasi `toUtc()` lolos seluruh uji. POSIX `WIB-7` = UTC+7, dibaca Dart di
+# Linux dan Windows. `tools/uji_mutasi_kode.py` memakai angka yang sama.
+TZ_FLUTTER = "WIB-7"
+
+
+def _flutter(*argumen: str, biner: str | None = None) -> Callable[[], int]:
+    """Satu perintah di `apps/mobile` — dependensi dari `pubspec.lock` apa adanya."""
+    program = biner or _FLUTTER
+
+    def jalankan() -> int:
+        for alat, variabel in ((_FLUTTER, "HVX_FLUTTER"), (program, "HVX_DART")):
+            if not (Path(alat).exists() or shutil.which(alat)):
+                print(f"🛑 {alat} tidak ditemukan — isi PATH atau {variabel}")
+                return 127
+        env = {**os.environ, "PYTHONIOENCODING": "utf-8", "TZ": TZ_FLUTTER}
+        # --enforce-lockfile: kunci yang tidak cocok lagi GAGAL, sama dengan `uv --locked`.
+        siap = subprocess.run([_FLUTTER, "pub", "get", "--enforce-lockfile"], cwd=APLIKASI, env=env)
+        if siap.returncode != 0:
+            return siap.returncode
+        return subprocess.run([program, *argumen], cwd=APLIKASI, env=env).returncode
+
+    jalankan.__name__ = f"{Path(program).stem} " + " ".join(argumen)
+    return jalankan
 
 
 def _pip_audit() -> int:
@@ -190,6 +311,14 @@ TAHAP: dict[str, list[Langkah]] = {
             True,
         ),
         (
+            "dart format (apps/mobile)",
+            _flutter(
+                "format", "--output=none", "--set-exit-if-changed", "lib", "test", biner=_DART
+            ),
+            True,
+        ),
+        ("flutter analyze (apps/mobile)", _flutter("analyze", "--fatal-infos"), True),
+        (
             "R-1 (dilaporkan, keputusan cakupan pemilik)",
             [PY, "tools/periksa_dokumen.py", "R-1"],
             False,
@@ -201,15 +330,23 @@ TAHAP: dict[str, list[Langkah]] = {
     "test": [
         ("pytest + cakupan ≥ 70 %", [PY, "-m", "pytest", "--cov", "--cov-report=term"], True),
         ("uji_mutasi kode — migrasi", [PY, "tools/uji_mutasi_kode.py", "--hanya-db"], True),
+        ("flutter test (apps/mobile)", _flutter("test"), True),
     ],
     "build": [
         (
             "docker build (citra CI)",
-            # --pull: patokan digest diperiksa ulang ke registry
+            # --pull: patokan digest diperiksa ulang ke registry.
+            # --no-cache-filter jalan (E-224): lapisan `apt-get upgrade` tahap akhir
+            # TIDAK boleh dipakai dari cache — ia membeku pada paket Debian saat pertama
+            # dibangun, sehingga `scan` memindai citra yang bukan lagi yang akan dibangun
+            # CI/produksi dan merah oleh CVE yang perbaikannya sudah terpasang di build
+            # segar (6 Okt 2026: perl-base, libpcre2). Lapisan dependensi tetap ber-cache.
             [
                 "docker",
                 "build",
                 "--pull",
+                "--no-cache-filter",
+                "jalan",
                 "-f",
                 "infrastructure/docker/api.Dockerfile",
                 "-t",

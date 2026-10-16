@@ -7,6 +7,7 @@ pemilik tabel akan lulus sambil membuktikan hal yang salah (B-40).
 
 from __future__ import annotations
 
+import asyncio
 import secrets
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
@@ -18,7 +19,7 @@ from _bantuan_db import BasisDataV0, dsn_ke, nama_db, psycopg_dsn
 from asgi_lifespan import LifespanManager
 from psycopg import sql
 
-from hvx import __version__
+from hvx import __version__, pekerja
 from hvx.main import create_app
 from hvx.modules.platform import PeranTidakAman, Settings
 
@@ -129,3 +130,44 @@ async def test_api_menolak_mulai_sebagai_pemilik_tabel_yang_bukan_superuser(
         finally:
             with psycopg.connect(psycopg_dsn(db.dsn_pemilik), autocommit=True) as k:
                 k.execute("ALTER TABLE journal_entries OWNER TO CURRENT_USER")
+
+
+async def test_api_menolak_mulai_sebagai_peran_pekerja(
+    basis_data_termigrasi: Callable[[str], BasisDataV0], url_redis_uji: str
+) -> None:
+    """S4 — api menghadap internet: peran yang bisa memanggil fungsi relay & penyelaras
+    (linimasa semua pengguna di luar RLS) tidak boleh menjadi perannya."""
+    db = basis_data_termigrasi("api-pekerja")
+
+    with pytest.raises(PeranTidakAman, match="hvx_pekerja"):
+        await _mulai(db.dsn_pekerja, url_redis_uji)
+
+
+@pytest.mark.parametrize(
+    ("peran", "alasan"),
+    [
+        # Kebalikan uji di atas: relay yang tidak bisa memanggil fungsinya gagal di
+        # tiap putaran, diam-diam di log — lebih baik pekerja menolak mulai.
+        ("dsn_aplikasi", "hvx_pekerja"),
+        # B-40 berlaku juga bagi pekerja: konsumen membaca event di bawah RLS pemiliknya.
+        ("dsn_pemilik", "superuser"),
+    ],
+)
+async def test_pekerja_menolak_mulai_dengan_peran_yang_salah(
+    basis_data_termigrasi: Callable[[str], BasisDataV0],
+    url_redis_uji: str,
+    peran: str,
+    alasan: str,
+) -> None:
+    db = basis_data_termigrasi("pekerja-peran")
+    settings = Settings(database_url=getattr(db, peran), redis_url=url_redis_uji, env="test")
+    berhenti = asyncio.Event()
+    # Pekerja yang TIDAK menolak berjalan terus. Ia dihentikan sesudah 10 dtk, jadi
+    # pemeriksaan yang hilang terbaca "DID NOT RAISE" — bukan uji yang menggantung
+    # (tinjauan Sprint 3: mutasinya menahan seluruh uji mutasi tanpa batas).
+    henti = asyncio.get_running_loop().call_later(10, berhenti.set)
+    try:
+        with pytest.raises(PeranTidakAman, match=alasan):
+            await pekerja.jalankan(settings, berhenti)
+    finally:
+        henti.cancel()
