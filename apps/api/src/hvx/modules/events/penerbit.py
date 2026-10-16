@@ -27,7 +27,7 @@ from sqlalchemy.ext.asyncio import AsyncConnection
 from . import repository
 from .kontrak import EventTidakSah, Sumber, admisi_sah, payload_sah
 
-# `habit-completion:<uuid>` · `goal:<uuid>:created` · `checkin:2026-09-24:<sidik>`
+# `habit-completion:<uuid>` · `goal:<uuid>:created` · `checkin:2026-09-24:<updated_at>`
 _POLA_KUNCI = re.compile(r"^[a-z][a-z0-9-]{0,39}:[A-Za-z0-9:._+-]{1,200}$")
 _POLA_SUBJEK = re.compile(r"^[a-z][a-z_]{0,39}$")
 

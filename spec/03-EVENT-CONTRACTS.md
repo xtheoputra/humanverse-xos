@@ -158,7 +158,11 @@ menuntutnya sama dengan registry dan dengan `events.ADMISI`:
   kalau ditunjukkan kepadanya. Kalimatnya tidak harus ditampilkan; ia bukti
   bahwa yang dicatat adalah *kejadian*, bukan *pengukuran*. Jenis yang tidak
   bisa ditulis kalimatnya bukan event.
-* **Kunci** — syarat 2: templat aturan 1 di atas.
+* **Kunci** — syarat 2: templat aturan 1 di atas, **utuh**; tiap isian
+  berbentuk: `<…_id>` tanpa `:` (pemisah bagian templat), `<for_date>` tanggal,
+  `<…_at>` waktu ISO 8601 berzona. 🔧 Tinjauan kontrak S7 (K1): isian yang boleh
+  memuat `:` menerima `habit-completion:<id>:retracted` untuk `habit.completed` —
+  kunci yang lalu menelan pembatalan sungguhan sebagai *“kirim ulang”*.
 * **Sumber sah** — syarat 3, **per jenis**: bagian dari `CHECK events.source`
   yang benar-benar menerbitkan jenis ini. Penerbit menolak sumber lain.
 

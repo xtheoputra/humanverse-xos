@@ -4782,6 +4782,47 @@ MUTASI: list[Mutasi] = [
         _pytest("tests/unit/test_admisi_event.py::test_kunci_atau_sumber_yang_tidak_sah_ditolak"),
         harus_memuat="DID NOT RAISE",
     ),
+    # Tinjauan kontrak S7 (K1): isian `<…>` yang boleh memuat `:` menelan bagian harfiah
+    # templat lain — `habit.completed` berkunci `…:retracted` lolos.
+    Mutasi(
+        "7.1",
+        "isian id templat kunci boleh memuat `:` (menelan `:retracted`)",
+        [
+            Sunting(
+                f"{MODUL}/events/kontrak.py",
+                '_IDENTITAS = "[A-Za-z0-9._+-]+"',
+                '_IDENTITAS = "[A-Za-z0-9:._+-]+"',
+            )
+        ],
+        _pytest("tests/unit/test_admisi_event.py::test_kunci_atau_sumber_yang_tidak_sah_ditolak"),
+        harus_memuat="DID NOT RAISE",
+    ),
+    Mutasi(
+        "7.1",
+        "isian waktu `<…_at>` templat kunci tanpa bentuk waktu",
+        [
+            Sunting(
+                f"{MODUL}/events/kontrak.py",
+                '    if nama.endswith("_at"):' + NL + "        return _WAKTU",
+                '    if nama.endswith("_at"):' + NL + "        return _IDENTITAS",
+            )
+        ],
+        _pytest("tests/unit/test_admisi_event.py::test_kunci_atau_sumber_yang_tidak_sah_ditolak"),
+        harus_memuat="DID NOT RAISE",
+    ),
+    Mutasi(
+        "7.1",
+        "isian templat kunci tanpa bentuk jatuh ke identitas sembarang",
+        [
+            Sunting(
+                f"{MODUL}/events/kontrak.py",
+                '    raise ValueError(f"isian templat kunci tanpa bentuk: <{nama}>")',
+                "    return _IDENTITAS",
+            )
+        ],
+        _pytest("tests/unit/test_admisi_event.py::test_isian_templat_tanpa_bentuk_ditolak"),
+        harus_memuat="DID NOT RAISE",
+    ),
     # ── spec/08 7.2 proyeksi terdaftar: perkabelan pekerja ⟷ PROYEKSI · BUKAN_PROYEKSI ──
     Mutasi(
         "7.2",

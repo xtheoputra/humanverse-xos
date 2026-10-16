@@ -20,7 +20,15 @@ from uuid import uuid4
 
 import pytest
 
-from hvx.modules.events import ADMISI, REGISTRY, SUMBER, EventTidakSah, admisi_sah, terbitkan
+from hvx.modules.events import (
+    ADMISI,
+    REGISTRY,
+    SUMBER,
+    Admisi,
+    EventTidakSah,
+    admisi_sah,
+    terbitkan,
+)
 
 SPEC03 = Path(__file__).resolve().parents[2] / "spec" / "03-EVENT-CONTRACTS.md"
 
@@ -129,6 +137,19 @@ def test_kunci_dan_sumber_yang_sah_diterima(jenis: str, kunci: str, sumber: str)
         ("habit.completion_retracted", f"habit-completion:{uuid4()}", "app", "idempotency_key"),
         ("mood.logged", f"mood:{uuid4()}/lain", "app", "idempotency_key"),  # templat UTUH
         ("habit.deleted", "habit:x:deleted", "app", "tanpa uji admisi"),
+        # Identitas `<…>` tidak boleh MENELAN bagian harfiah templat lain (tinjauan kontrak
+        # S7, K1): `habit.completed` berkunci pembatalan menelan pembatalan sungguhan nanti.
+        (
+            "habit.completed",
+            f"habit-completion:{uuid4()}:retracted",
+            "app",
+            "idempotency_key",
+        ),
+        ("mood.logged", f"mood:{uuid4()}:created", "app", "idempotency_key"),
+        ("goal.created", f"goal:{uuid4()}:completed:x:created", "app", "idempotency_key"),
+        # `<for_date>` tanggal, `<…_at>` waktu berzona — bukan identitas sembarang
+        ("checkin.logged", "checkin:kemarin:2026-09-24T06:30:00+00:00", "app", "idempotency_key"),
+        ("goal.completed", f"goal:{uuid4()}:completed:segera", "app", "idempotency_key"),
     ],
 )
 def test_kunci_atau_sumber_yang_tidak_sah_ditolak(
@@ -158,3 +179,9 @@ async def test_penerbit_menolak_sebelum_menyentuh_basis_data() -> None:
             payload={"valence": 3},
             source="agent",
         )
+
+
+def test_isian_templat_tanpa_bentuk_ditolak() -> None:
+    """Isian baru (`<nama>`) wajib diberi bentuk — bukan jatuh ke identitas sembarang."""
+    with pytest.raises(ValueError, match="tanpa bentuk"):
+        Admisi("sleep:<sesuatu>", frozenset({"app"}))

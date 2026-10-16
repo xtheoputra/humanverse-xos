@@ -130,15 +130,44 @@ class Admisi:
     def __post_init__(self) -> None:
         if not self.sumber or not self.sumber <= SUMBER:
             raise ValueError(f"sumber admisi di luar spec/03: {sorted(self.sumber)}")
+        for nama in re.findall(r"<([a-z_]+)>", self.kunci):
+            _isian(nama)  # isian tanpa bentuk → ValueError saat modul dimuat
 
     @property
     def pola(self) -> re.Pattern[str]:
-        """Templat → regex: bagian harfiah wajib sama, tiap `<…>` satu identitas."""
-        bagian = re.split(r"<[a-z_]+>", self.kunci)
-        return re.compile(_IDENTITAS.join(re.escape(b) for b in bagian))
+        """Templat → regex: bagian harfiah wajib sama, tiap `<…>` satu isian BERBENTUK.
+
+        🔴 Tinjauan kontrak S7 (K1): versi pertama memberi tiap `<…>` satu identitas yang
+        boleh memuat `:` — `habit-completion:<completion_id>` lalu menerima
+        `habit-completion:<id>:retracted` untuk `habit.completed`, dan kunci itu menelan
+        pembatalan sungguhan sesudahnya (kunci sama → *“kirim ulang”*). Isian `…_id` kini
+        tanpa `:`, `for_date` tanggal, `…_at` waktu berzona: bagian harfiah templat lain
+        tidak bisa lagi tertelan oleh isiannya."""
+        bagian = re.split(r"(<[a-z_]+>)", self.kunci)
+        return re.compile(
+            "".join(
+                _isian(b[1:-1]) if b.startswith("<") and b.endswith(">") else re.escape(b)
+                for b in bagian
+            )
+        )
 
 
-_IDENTITAS = "[A-Za-z0-9:._+-]+"
+# Bentuk tiap isian templat aturan 1 spec/03 — `[0-9]`, bukan `\d` (angka Unicode).
+_IDENTITAS = "[A-Za-z0-9._+-]+"  # id: tanpa `:`, pemisah bagian templat
+_TANGGAL = "[0-9]{4}-[0-9]{2}-[0-9]{2}"
+_WAKTU = _TANGGAL + "T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:[.][0-9]{1,6})?(?:Z|[+-][0-9]{2}:[0-9]{2})"
+
+
+def _isian(nama: str) -> str:
+    if nama.endswith("_id"):
+        return _IDENTITAS
+    if nama == "for_date":
+        return _TANGGAL
+    if nama.endswith("_at"):
+        return _WAKTU
+    raise ValueError(f"isian templat kunci tanpa bentuk: <{nama}>")
+
+
 _APP = frozenset({"app"})
 
 # event_type → uji admisi. Sama dengan aturan 1 + tabel *Uji admisi per event* spec/03.
