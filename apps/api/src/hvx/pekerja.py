@@ -63,7 +63,8 @@ def rakit_konsumen(
     return [
         # Behavior projector (5.1) — SEMUA event, wajib (spec/03). Proyektornya total
         # & idempoten: kegagalan hanya transien (basis data/Redis), yang diulang
-        # menyelesaikannya — bukan event yang dijatuhkan diam-diam.
+        # menyelesaikannya — bukan event yang dijatuhkan diam-diam: `wajib=True`, tanpa
+        # stream mati (K6).
         events.KonsumenStream(
             engine=engine,
             redis=redis,
@@ -72,10 +73,11 @@ def rakit_konsumen(
             nama=f"proyektor-{hos}",
             jenis=intelligence.JENIS_EVENT,
             tangani=intelligence.proyeksikan_perilaku,
+            wajib=True,
         ),
-        # Pola perilaku (5.2) — konsumen `habit.*` (spec/03 "Habit streak"): hitung
+        # Pola perilaku (5.2) — konsumen `habit.*` (spec/03 "Habit streak", wajib): hitung
         # ulang pola hari/waktu/konsistensi habit → memori behavioral. Idempoten
-        # (upsert per pola), jadi diulang aman.
+        # (upsert per pola), jadi diulang aman — dan diulang sampai berhasil (K6).
         events.KonsumenStream(
             engine=engine,
             redis=redis,
@@ -84,6 +86,7 @@ def rakit_konsumen(
             nama=f"pola-{hos}",
             jenis=intelligence.JENIS_POLA,
             tangani=intelligence.deteksi_pola_habit,
+            wajib=True,
         ),
         # Human State (5.3) — konsumen `checkin.logged`: metrik harian {value,
         # confidence, evidence_count} → human_states. Idempoten (upsert per hari).

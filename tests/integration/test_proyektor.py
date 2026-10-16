@@ -22,10 +22,10 @@ from uuid import UUID, uuid4
 
 import psycopg
 import pytest
-from _bantuan_db import ApiUji, psycopg_dsn
+from _bantuan_db import ApiUji, auth, psycopg_dsn
 
 from hvx import pekerja
-from hvx.modules import events, intelligence
+from hvx.modules import activities, events, intelligence
 from hvx.modules.platform import Settings, transaksi_pengguna
 
 pytestmark = pytest.mark.integration
@@ -42,6 +42,7 @@ async def _terbit_selesai(
     for_date: date,
     status: str = "done",
     tier_used: int | None = None,
+    note: str | None = None,
     occurred_at: datetime,
 ) -> None:
     async with transaksi_pengguna(api.app.state.engine, uid) as conn:
@@ -56,6 +57,7 @@ async def _terbit_selesai(
             payload={
                 "status": status,
                 "tier_used": tier_used,
+                "note": note,
                 "for_date": for_date,
                 "completion_id": completion_id,
             },
@@ -130,17 +132,33 @@ async def test_pekerja_memproyeksikan_habit_selesai_menjadi_aktivitas_inferred(
     async def terproyeksi() -> bool:
         return len(_inferred(api_bersama, uid)) == 1
 
+    async def tercabut() -> bool:
+        return _inferred(api_bersama, uid) == []
+
     try:
         await _tunggu(terproyeksi, "pekerja tidak memproyeksikan habit.completed jadi aktivitas")
+        (baris,) = _inferred(api_bersama, uid)
+        _id, kind, _waktu, payload = baris
+        assert kind == "habit"
+        assert payload == {"completion_id": str(cid), "for_date": "2026-09-01", "status": "done"}
+
+        # Aliran langsung juga MENCABUT: `habit.completion_retracted` sendiri (tanpa
+        # penyaluran ulang `completed`) wajib sampai ke projector dan membuang barisnya —
+        # konsumen spec/03 mendengar SEMUA jenis, bukan hanya yang melahirkan baris.
+        await _terbit_dicabut(
+            api_bersama,
+            uid,
+            completion_id=cid,
+            habit_id=hid,
+            for_date=date(2026, 9, 1),
+            occurred_at=_T0 + timedelta(hours=1),
+        )
+        await _tunggu(tercabut, "pencabutan lewat pekerja tidak membuang proyeksi penyelesaiannya")
     finally:
         berhenti.set()
         await asyncio.wait_for(tugas, timeout=15)
 
     assert tugas.exception() is None
-    (baris,) = _inferred(api_bersama, uid)
-    _id, kind, _waktu, payload = baris
-    assert kind == "habit"
-    assert payload == {"completion_id": str(cid), "for_date": "2026-09-01", "status": "done"}
 
 
 async def test_bangun_ulang_dari_nol_identik_dan_tanpa_duplikat(api_bersama: ApiUji) -> None:
@@ -157,6 +175,7 @@ async def test_bangun_ulang_dari_nol_identik_dan_tanpa_duplikat(api_bersama: Api
         for_date=date(2026, 9, 1),
         status="done",
         tier_used=2,
+        note="teks bebas pengguna yang tidak boleh menyebar",
         occurred_at=_T0,
     )
     await _terbit_selesai(
@@ -191,15 +210,18 @@ async def test_bangun_ulang_dari_nol_identik_dan_tanpa_duplikat(api_bersama: Api
     pertama = _inferred(api_bersama, uid)
 
     # Dua penyelesaian hidup; yang dicabut tidak ada.
-    assert len(pertama) == 2
+    assert len(pertama) == 2, "penyelesaian yang dicabut ikut terproyeksi"
     assert {p[3]["completion_id"] for p in pertama} == {str(a), str(b)}
     assert pertama[1][3] == {"completion_id": str(b), "for_date": "2026-09-02", "status": "partial"}
     assert pertama[0][3]["tier_used"] == 2
+    assert all("note" not in p[3] for p in pertama), (
+        "teks bebas `note` ikut ke proyeksi (C-33: proyeksi = kerangka perilaku)"
+    )
 
     # Bangun ulang LAGI (mengosongkan + memutar ulang) → identik, bukan tergandakan.
     await intelligence.bangun_ulang_proyeksi(api_bersama.app.state.engine, uid)
     kedua = _inferred(api_bersama, uid)
-    assert kedua == pertama
+    assert kedua == pertama, "bangun ulang kedua tidak identik dengan yang pertama"
 
 
 async def test_cabut_sesudah_proyeksi_menghapusnya_dan_putar_ulang_tak_menghidupkannya(
@@ -240,3 +262,178 @@ async def test_cabut_sesudah_proyeksi_menghapusnya_dan_putar_ulang_tak_menghidup
     assert _inferred(api_bersama, uid) == [], (
         "event completed yang disalurkan ulang menghidupkan baris dicabut"
     )
+
+
+def _aktivitas(api: ApiUji, aid: Any) -> tuple[Any, ...] | None:
+    with psycopg.connect(psycopg_dsn(api.db.dsn_pemilik)) as k:
+        return k.execute(
+            "SELECT source, payload FROM activities WHERE id = %s AND deleted_at IS NULL", (aid,)
+        ).fetchone()
+
+
+async def test_proyeksi_tidak_pernah_menyentuh_aktivitas_manual(api_bersama: ApiUji) -> None:
+    """Proyeksi hanya memiliki baris `inferred`. Membangun ulang dari nol, memproyeksikan
+    ulang, dan mencabut TIDAK BOLEH menghapus atau menimpa aktivitas yang dicatat manusia —
+    termasuk yang id-nya kebetulan sama dengan id proyeksi (klien memilih id aktivitasnya)."""
+    uid, token = await api_bersama.pengguna_baru()
+    r = await api_bersama.klien.post(
+        "/v1/activities",
+        json={"kind": "workout", "occurred_at": _T0.isoformat(), "payload": {"jenis": "lari"}},
+        headers=auth(token),
+    )
+    assert r.status_code == 201, r.text
+    manual_http = r.json()["id"]
+
+    cid, hid = uuid4(), uuid4()
+    await _terbit_selesai(
+        api_bersama,
+        uid,
+        completion_id=cid,
+        habit_id=hid,
+        for_date=date(2026, 9, 1),
+        occurred_at=_T0,
+    )
+    await intelligence.bangun_ulang_proyeksi(api_bersama.app.state.engine, uid)
+    ((kembar, *_),) = _inferred(api_bersama, uid)
+    # Baris ber-id proyeksi kini milik MANUSIA (mis. dicatat klien dengan id itu).
+    with psycopg.connect(psycopg_dsn(api_bersama.db.dsn_pemilik)) as k:
+        k.execute(
+            "UPDATE activities SET source = 'manual', payload = '{\"catatan\": \"manusia\"}' "
+            "WHERE id = %s",
+            (kembar,),
+        )
+        k.commit()
+
+    await intelligence.bangun_ulang_proyeksi(api_bersama.app.state.engine, uid)
+    assert _aktivitas(api_bersama, manual_http) == ("manual", {"jenis": "lari"}), (
+        "membangun ulang proyeksi menghapus aktivitas manual"
+    )
+    async with transaksi_pengguna(api_bersama.app.state.engine, uid) as conn:
+        completed = await events.cari_penyelesaian(
+            conn, uid, event_type="habit.completed", completion_id=cid
+        )
+        assert completed is not None
+        await intelligence.proyeksikan_perilaku(conn, completed)
+    assert _aktivitas(api_bersama, kembar) == ("manual", {"catatan": "manusia"}), (
+        "proyeksi menimpa aktivitas manual ber-id sama"
+    )
+
+    await _terbit_dicabut(
+        api_bersama,
+        uid,
+        completion_id=cid,
+        habit_id=hid,
+        for_date=date(2026, 9, 1),
+        occurred_at=_T0 + timedelta(hours=1),
+    )
+    async with transaksi_pengguna(api_bersama.app.state.engine, uid) as conn:
+        dicabut = await events.cari_penyelesaian(
+            conn, uid, event_type="habit.completion_retracted", completion_id=cid
+        )
+        assert dicabut is not None
+        await intelligence.proyeksikan_perilaku(conn, dicabut)
+    assert _aktivitas(api_bersama, kembar) == ("manual", {"catatan": "manusia"}), (
+        "pencabutan proyeksi menghapus aktivitas manual ber-id sama"
+    )
+
+
+async def test_bangun_ulang_dari_nol_membuang_proyeksi_basi(api_bersama: ApiUji) -> None:
+    """*Dari nol*, bukan "tambal di atas yang ada": baris `inferred` yang tidak lagi
+    diturunkan `events` — payload versi lama, atau tebakan yatim — hilang sesudah
+    membangun ulang. `ON CONFLICT DO NOTHING` saja akan mempertahankan payload basi."""
+    uid, _token = await api_bersama.pengguna_baru()
+    cid, hid = uuid4(), uuid4()
+    await _terbit_selesai(
+        api_bersama,
+        uid,
+        completion_id=cid,
+        habit_id=hid,
+        for_date=date(2026, 9, 1),
+        occurred_at=_T0,
+    )
+    await intelligence.bangun_ulang_proyeksi(api_bersama.app.state.engine, uid)
+    segar = _inferred(api_bersama, uid)
+    ((aid, *_),) = segar
+
+    with psycopg.connect(psycopg_dsn(api_bersama.db.dsn_pemilik)) as k:
+        k.execute('UPDATE activities SET payload = \'{"versi": "lama"}\' WHERE id = %s', (aid,))
+        k.commit()
+    async with transaksi_pengguna(api_bersama.app.state.engine, uid) as conn:
+        await activities.catat_disimpulkan(conn, uid, kind="habit", occurred_at=_T0)
+
+    await intelligence.bangun_ulang_proyeksi(api_bersama.app.state.engine, uid)
+    assert _inferred(api_bersama, uid) == segar, (
+        "bangun ulang tidak dari nol: proyeksi basi/yatim bertahan"
+    )
+
+
+# ── Tinjauan kontrak Sprint 5–6 (8 Okt 2026) ─────────────────────────────────
+
+
+async def test_konsumen_wajib_menahan_event_bukan_membuangnya_ke_stream_mati(
+    api_bersama: ApiUji,
+) -> None:
+    """spec/03 *Consumer V0*: Behavior projector *“✅ wajib — kegagalannya menahan event”*,
+    Habit streak *“✅ wajib”*. Konsumen yang *boleh gagal* memindahkan pesan ke stream mati
+    sesudah 5 kali diserahkan (K-25 (3)); konsumen WAJIB tidak boleh — event yang terbuang
+    di sana tidak pernah diproyeksikan, dan proyeksinya tidak lagi sama dengan yang dibangun
+    ulang dari `events` (5.1). Pesan yang sudah berkali-kali gagal (mis. basis data mati
+    beberapa menit) tetap diproses begitu penangannya bisa. Konsumennya diambil dari
+    perkabelan pekerja yang sungguh dipakai (`pekerja.rakit_konsumen`), dengan bawaannya."""
+    uid, _token = await api_bersama.pengguna_baru()
+    cid, hid = uuid4(), uuid4()
+    await _terbit_selesai(
+        api_bersama,
+        uid,
+        completion_id=cid,
+        habit_id=hid,
+        for_date=date(2026, 9, 1),
+        occurred_at=_T0,
+    )
+    with psycopg.connect(psycopg_dsn(api_bersama.db.dsn_pemilik)) as k:
+        (eid,) = k.execute(
+            "SELECT id FROM events WHERE user_id = %s AND idempotency_key = %s",
+            (uid, f"habit-completion:{cid}"),
+        ).fetchone()
+    awalan = f"uji-wajib-{uuid4().hex[:10]}"
+    r = api_bersama.app.state.redis
+    settings = Settings(
+        env="test",
+        database_url=api_bersama.db.dsn_pekerja,
+        redis_url="redis://tidak-dipakai",
+        redis_prefix=awalan,
+    )
+    konsumen = {k.grup: k for k in pekerja.rakit_konsumen(api_bersama.engine_pekerja, r, settings)}
+    await events.Relay(api_bersama.engine_pekerja, r, awalan).putaran()
+    stream = events.kunci_stream(awalan)
+
+    for grup in ("proyektor", "pola"):
+        k = konsumen[grup]
+        await k.siapkan()
+        # Grup sudah menyelesaikan semua pesan lain; pesan uji sudah diserahkan 10 kali dan
+        # gagal — menganggur sejam di daftar tunggu (PEL).
+        sasaran = None
+        for _s, pesan in await r.xreadgroup(grup, "gagal", {stream: ">"}, count=1_000_000):
+            for id_pesan, isi in pesan:
+                if isi.get("id") == str(eid):
+                    sasaran = id_pesan
+                else:
+                    await r.xack(stream, grup, id_pesan)
+        assert sasaran is not None, "relay tidak menyalin event uji"
+        await r.xclaim(stream, grup, "gagal", 0, [sasaran], idle=3_600_000, retrycount=10)
+
+        await k.putaran()
+
+        mati = [
+            isi.get("id")
+            for _i, isi in await r.xrange(events.kunci_mati(awalan))
+            if isi.get("grup") == grup
+        ]
+        assert str(eid) not in mati, (
+            f"konsumen wajib `{grup}` membuang event ke stream mati (spec/03 Consumer V0)"
+        )
+        assert int((await r.xpending(stream, grup))["pending"]) == 0, (
+            f"konsumen wajib `{grup}` tidak menyelesaikan event yang ditahannya"
+        )
+
+    assert len(_inferred(api_bersama, uid)) == 1, "event yang ditahan tidak pernah diproyeksikan"

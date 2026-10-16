@@ -11,7 +11,9 @@ check-in, goal yang hidup — dan `lepas_goal` saat goal dihapus.
 Berkas ini satu-satunya pintu keluar modul (spec/06 aturan 1).
 """
 
+from .privasi import BAGIAN_PRIVASI, PENGHAPUS_PRIVASI
 from .rentetan import Rentetan, hitung_rentetan
+from .repository import HabitDalamRentang, habit_rentang
 from .routes import router
 from .schemas import CatatPenyelesaian, Habit
 from .service import (
@@ -30,8 +32,11 @@ from .service import rentetan as rentetan_habit
 from .tier import tier_untuk_energi
 
 __all__ = [
+    "BAGIAN_PRIVASI",
+    "PENGHAPUS_PRIVASI",
     "CatatPenyelesaian",
     "Habit",
+    "HabitDalamRentang",
     "PembacaEnergi",
     "PembacaGoalHidup",
     "PembacaZonaWaktu",
@@ -39,6 +44,7 @@ __all__ = [
     "catat_penyelesaian",
     "daftar_habit",
     "habit_pada",
+    "habit_rentang",
     "hitung_rentetan",
     "lepas_goal",
     "rentetan_habit",

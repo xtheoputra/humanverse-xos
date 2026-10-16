@@ -35,6 +35,8 @@ from sqlalchemy.ext.asyncio import AsyncConnection
 
 from hvx.modules import events, habits, memory, profile
 
+from .keyakinan import cukup_untuk_menyatakan
+
 _NS = uuid.UUID("3f6b9d14-2a7c-5e80-9b1a-6c5d4e3f2a10")
 MODEL = "pola-perilaku@v1"
 SCOPE = "habits"  # pola tentang habit & penyelesaiannya (identity.SCOPE_RESMI)
@@ -119,8 +121,15 @@ def pola_waktu(title: str, jam_lokal: list[int]) -> Pola | None:
 def pola_konsistensi(
     title: str, period: str, rentetan: habits.Rentetan | None, total: int
 ) -> Pola | None:
-    """Konsistensi 30 hari + rentetan berjalan — ringkasan, bukan klaim sebab."""
+    """Konsistensi 30 hari + rentetan berjalan — ringkasan, bukan klaim sebab.
+
+    🔴 Tinjauan buta S5–6 (B1): periode yang jatuh tempo KOSONG memberi tingkat 0,0, bukan
+    `None` — tanpa penjaga bukti, habit yang belum (atau tak lagi) punya satu pun
+    penyelesaian menulis pola "dipenuhi 0%" ber-`evidence_count` 0, justru yang
+    Confidence Layer (5.4) larang di sisi tulis. Nol penyelesaian → diluruhkan."""
     if rentetan is None or rentetan.completion_rate_30d is None:
+        return None
+    if not cukup_untuk_menyatakan(total):
         return None
     pct = round(rentetan.completion_rate_30d * 100)
     periode = _PERIODE.get(period, "periode")

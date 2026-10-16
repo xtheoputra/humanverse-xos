@@ -5,7 +5,11 @@ import 'package:flutter/material.dart';
 import '../api/klien.dart';
 import '../api/luring.dart';
 import '../api/model.dart';
+import '../api/privasi.dart';
 import 'dasbor.dart';
+import 'notifikasi.dart';
+import 'privasi.dart';
+import 'tinjauan.dart';
 
 /// Layar V0 pertama — spec/07 2.7: daftar habit + tandai selesai.
 ///
@@ -15,18 +19,23 @@ import 'dasbor.dart';
 ///
 /// `luring` (opsional, 6.6): bila ada, layar menampilkan catatan yang menunggu
 /// sinkron dan tidak membuangnya diam-diam saat keluar.
+///
+/// `privasi` (opsional, 6.2–6.4): bila ada, menu *Lainnya* membuka tinjauan mingguan,
+/// notifikasi, dan Privacy Center.
 class LayarHabitHariIni extends StatefulWidget {
   const LayarHabitHariIni({
     super.key,
     required this.layanan,
     required this.sesudahKeluar,
     this.luring,
+    this.privasi,
     this.jam = DateTime.now,
   });
 
   final LayananHabit layanan;
   final VoidCallback sesudahKeluar;
   final StatusLuring? luring;
+  final LayananPrivasi? privasi;
   final DateTime Function() jam;
 
   @override
@@ -321,6 +330,40 @@ class _LayarHabitHariIniState extends State<LayarHabitHariIni> {
             onPressed: _keluar,
             icon: const Icon(Icons.logout),
           ),
+          if (widget.privasi case final privasi?)
+            PopupMenuButton<String>(
+              key: const Key('lainnya'),
+              tooltip: 'Lainnya',
+              onSelected: (pilihan) => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => switch (pilihan) {
+                    'tinjauan' => LayarTinjauanMingguan(layanan: privasi),
+                    'notifikasi' => LayarNotifikasi(layanan: privasi),
+                    _ => LayarPrivasi(
+                      layanan: privasi,
+                      sesudahHapusAkun: widget.sesudahKeluar,
+                    ),
+                  },
+                ),
+              ),
+              itemBuilder: (_) => const [
+                PopupMenuItem(
+                  key: Key('buka-tinjauan'),
+                  value: 'tinjauan',
+                  child: Text('Tinjauan mingguan'),
+                ),
+                PopupMenuItem(
+                  key: Key('buka-notifikasi'),
+                  value: 'notifikasi',
+                  child: Text('Notifikasi'),
+                ),
+                PopupMenuItem(
+                  key: Key('buka-privasi'),
+                  value: 'privasi',
+                  child: Text('Privasi'),
+                ),
+              ],
+            ),
         ],
       ),
       floatingActionButton: FloatingActionButton(

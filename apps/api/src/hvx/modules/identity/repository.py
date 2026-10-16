@@ -73,6 +73,16 @@ _PENGGUNA = text(
 )
 
 
+# Baris akun masih ADA — dan tetap ada sampai transaksi pemanggil selesai: `FOR KEY SHARE`
+# menahan `DELETE` sapuan hapus akun (tahap 3, `FOR UPDATE`), jadi jejak yang ditulis di
+# transaksi ini masih ikut dianonimkan sapuan; sapuan yang menang lebih dulu → `False`.
+_KUNCI_AKUN_ADA = text("SELECT 1 FROM users WHERE id = :id FOR KEY SHARE")
+
+
+async def kunci_akun_ada(conn: AsyncConnection, user_id: UUID) -> bool:
+    return (await conn.execute(_KUNCI_AKUN_ADA, {"id": user_id})).first() is not None
+
+
 async def ambil_pengguna(conn: AsyncConnection, user_id: UUID) -> PenggunaRingkas | None:
     baris = (await conn.execute(_PENGGUNA, {"user_id": user_id})).mappings().first()
     return PenggunaRingkas.model_validate(dict(baris)) if baris else None
@@ -235,9 +245,15 @@ class AkunUntukHapus:
     password_hash: str
     status: str
     deletion_scheduled_at: datetime | None
+    # Kunci jatah login gagal akun ini — email sebagaimana `citext` mengenalinya, sama
+    # dengan `_CARI_UNTUK_MASUK` (`lower()` PostgreSQL, bukan Python; laju.py).
+    kunci: str
 
 
-_AKUN_HAPUS = text("SELECT password_hash, status, deletion_scheduled_at FROM users WHERE id = :id")
+_AKUN_HAPUS = text(
+    "SELECT password_hash, status, deletion_scheduled_at, lower(CAST(email AS text)) AS kunci "
+    "FROM users WHERE id = :id"
+)
 # Tahap 1: hanya dari `active` (RETURNING kosong kalau sudah pending/suspended).
 _JADWALKAN_HAPUS = text(
     """
@@ -262,11 +278,11 @@ _STATUS_AKUN = text("SELECT status FROM users WHERE id = :id")
 
 
 async def akun_untuk_hapus(conn: AsyncConnection, user_id: UUID) -> AkunUntukHapus | None:
-    """Sandi + status + jadwal akun sendiri — untuk verifikasi `DELETE /me` (RLS own-row)."""
+    """Sandi + status + jadwal + kunci jatah akun sendiri — untuk sandi ulang (RLS own-row)."""
     b = (await conn.execute(_AKUN_HAPUS, {"id": user_id})).mappings().first()
-    return (
-        AkunUntukHapus(b["password_hash"], b["status"], b["deletion_scheduled_at"]) if b else None
-    )
+    if b is None:
+        return None
+    return AkunUntukHapus(b["password_hash"], b["status"], b["deletion_scheduled_at"], b["kunci"])
 
 
 async def jadwalkan_hapus(conn: AsyncConnection, user_id: UUID, hari: int) -> datetime | None:

@@ -16,7 +16,7 @@ from uuid import UUID, uuid4
 from zoneinfo import ZoneInfo
 
 import pytest
-from _bantuan_agent import REGISTRI, gerbang_model_uji, run, sql
+from _bantuan_agent import REGISTRI, gerbang_model_uji, izinkan_mood, run, sql
 from _bantuan_db import ApiUji, auth
 from test_habits import buat_habit
 from test_memori import _izin
@@ -78,6 +78,7 @@ async def test_coach_menjawab_dari_data_pengguna_tanpa_catatan_bebasnya(
     api_bersama: ApiUji,
 ) -> None:
     uid, token = await api_bersama.pengguna_baru()
+    await izinkan_mood(api_bersama, uid)
     h, k = auth(token), api_bersama.klien
     hari = _hari_ini()
     await buat_habit(api_bersama, token, title="Lari pagi")
@@ -108,6 +109,7 @@ async def test_coach_tanpa_data_bertanya_bukan_menyatakan(api_bersama: ApiUji) -
     """spec/07 5.4 (#34): nol bukti → coach BERTANYA (meminta data pertama), bukan
     menyatakan kesimpulan kosong. Tetap tanpa mengarang fakta (Pasal 8)."""
     uid, _token = await api_bersama.pengguna_baru()
+    await izinkan_mood(api_bersama, uid)
 
     hasil = await _giliran(api_bersama, uid, "bagaimana hariku?")
     b = hasil.keputusan
@@ -255,6 +257,7 @@ async def test_memory_agent_tanpa_ingatan_mengatakannya(api_bersama: ApiUji) -> 
 )
 async def test_tiap_balasan_membawa_keyakinan_dan_alasan(api_bersama: ApiUji, pesan: str) -> None:
     uid, _token = await api_bersama.pengguna_baru()
+    await izinkan_mood(api_bersama, uid)
 
     b = (await _giliran(api_bersama, uid, pesan)).keputusan
 
@@ -283,6 +286,7 @@ async def test_coach_tidak_tertahan_scope_ingatan_yang_belum_diputuskan(
     menanyakan tiap scope-nya menahan SETIAP jawaban coach pada `journal_raw` (sensitif,
     tidak pernah `allow` karena bawaan) — scope yang bahkan tidak diminta coach."""
     uid, _token = await api_bersama.pengguna_baru()
+    await izinkan_mood(api_bersama, uid)
     # coaching_notes hanya dibaca coach LEWAT memory.search — `ask` di sini menyisihkan
     # scope itu dari hasil pencarian, bukan menahan jawabannya.
     await _izin(api_bersama).tetapkan(uid, COACH, "coaching_notes", "read", "ask")
@@ -417,6 +421,7 @@ async def test_alasan_coach_dipotong_bukan_menggagalkan_jawaban(api_bersama: Api
     panjang — dua judul goal 200 karakter, satu ingatan 4.000 — dipotong DI ALASAN; tanpa itu
     satu data panjang menggagalkan SETIAP jawaban coach untuk pengguna itu."""
     uid, token = await api_bersama.pengguna_baru()
+    await izinkan_mood(api_bersama, uid)
     for huruf in "ab":
         r = await api_bersama.klien.post(
             "/v1/goals", json={"title": huruf * 200, "domain": "health"}, headers=auth(token)
@@ -476,6 +481,7 @@ async def test_coach_memilih_kelas_model_dari_niat(
     Satu habit dibuat lebih dulu: dengan sumber berisi, coach merangkai bahan ke model —
     bukan jalur nol-bukti yang BERTANYA tanpa model (5.4), yang tidak punya `model_used`."""
     uid, token = await api_bersama.pengguna_baru()
+    await izinkan_mood(api_bersama, uid)
     await buat_habit(api_bersama, token, title="Lari pagi")
 
     hasil = await _giliran(api_bersama, uid, pesan)

@@ -267,7 +267,17 @@ _CORS_BLOK = (
     + NL
     + '            allow_headers=["Authorization", "Content-Type", "Idempotency-Key", "X-Request-ID"],'
     + NL
-    + '            expose_headers=["Retry-After", "X-Request-ID", "Idempotent-Replayed"],'
+    + "            expose_headers=["
+    + NL
+    + '                "Retry-After",'
+    + NL
+    + '                "X-Request-ID",'
+    + NL
+    + '                "Idempotent-Replayed",'
+    + NL
+    + '                "Content-Disposition",  # nama berkas ekspor Privacy Center (6.4)'
+    + NL
+    + "            ],"
     + NL
     + "            allow_credentials=False,"
     + NL
@@ -3667,7 +3677,8 @@ MUTASI: list[Mutasi] = [
         [
             Sunting(
                 f"{MODUL}/events/stream.py",
-                "        if diklaim and await self._kali_diserahkan(id_pesan) > self._maks_kirim:",
+                # 🔧 K6 (tinjauan kontrak S5–6): syaratnya kini juga `not self.wajib`.
+                "        if diklaim and not self.wajib and await self._kali_diserahkan(id_pesan) > self._maks_kirim:",
                 "        if False:",
             )
         ],
@@ -3979,20 +3990,6 @@ MUTASI: list[Mutasi] = [
     ),
     Mutasi(
         "3.6",
-        "ekstraksi membaca jurnal yang sudah dihapus",
-        [
-            Sunting(
-                f"{MODUL}/journal/repository.py",
-                "    WHERE id = :id AND deleted_at IS NULL" + NL + "    FOR SHARE",
-                "    WHERE id = :id" + NL + "    FOR SHARE",
-            )
-        ],
-        _pytest(f"{UJI_MEMORI}::test_jurnal_yang_dihapus_sebelum_diekstrak_tidak_diingat"),
-        harus_memuat="jurnal terhapus tetap diingat",
-        kelompok="db",
-    ),
-    Mutasi(
-        "3.6",
         "ekstraksi tanpa kunci BAGI — PATCH serentak kalah, memori memuat isi lama",
         [
             Sunting(
@@ -4296,7 +4293,7 @@ MUTASI: list[Mutasi] = [
         [
             Sunting(
                 f"{MODUL}/identity/izin.py",
-                '        if bawaan == "allow" and SCOPE_RESMI[scope].sensitif:',
+                '        if bawaan == "allow" and SCOPE_RESMI[scope].sensitif and not delegasi:',
                 "        if False:",
             )
         ],
@@ -5051,33 +5048,15 @@ MUTASI: list[Mutasi] = [
     ),
     Mutasi(
         "3.4",
-        "PATCH menyunting jurnal yang sudah dihapus — isinya hidup lagi di memori",
-        [
-            Sunting(
-                f"{MODUL}/journal/repository.py",
-                "                         ELSE occurred_at END"
-                + NL
-                + "    WHERE id = :id AND deleted_at IS NULL"
-                + NL,
-                "                         ELSE occurred_at END" + NL + "    WHERE id = :id" + NL,
-            )
-        ],
-        _pytest(f"{UJI_JURNAL}::test_jurnal_yang_dihapus_tidak_bisa_diubah_atau_dihapus_lagi"),
-        harus_memuat="PATCH sesudah DELETE: 200",
-        kelompok="db",
-    ),
-    Mutasi(
-        "3.4",
         "DELETE kedua 204 — pendengarnya berjalan lagi",
         [
             Sunting(
                 f"{MODUL}/journal/repository.py",
-                # Tanpa kata kunci UPDATE di jangkar — S608 membaca potongan SQL sebagai kueri.
-                "journal_entries SET deleted_at = now()"
-                + NL
-                + "    WHERE id = :id AND deleted_at IS NULL"
+                # 🔧 C-31 (K-46): hapus kini KERAS — baris kedua tidak ada lagi, jadi mutasinya
+                # pindah ke jawaban repository: "terhapus" walau tak ada yang terhapus.
+                '    return (await conn.execute(_HAPUS, {"id": jurnal_id})).first() is not None'
                 + NL,
-                "journal_entries SET deleted_at = now()" + NL + "    WHERE id = :id" + NL,
+                '    await conn.execute(_HAPUS, {"id": jurnal_id})' + NL + "    return True" + NL,
             )
         ],
         _pytest(f"{UJI_JURNAL}::test_jurnal_yang_dihapus_tidak_bisa_diubah_atau_dihapus_lagi"),
@@ -9527,6 +9506,197 @@ MUTASI: list[Mutasi] = [
         harus_memuat="login pending_deletion ditolak",
         kelompok="db",
     ),
+    # ── Tinjauan keamanan Sprint 5–6 (8 Okt 2026) ──
+    Mutasi(
+        "S1",
+        "hapus `habits` tidak membuang proyeksi penyelesaian habit (aktivitas inferred)",
+        [
+            Sunting(
+                f"{MODUL}/activities/privasi.py",
+                "AND source = 'inferred' AND kind = :kind\"",
+                "AND source = 'inferred' AND kind = :kind AND false\"",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_privacy_center.py::"
+            "test_hapus_sumber_membuang_proyeksi_perilaku_turunannya[habits]"
+        ),
+        harus_memuat="hapus `habits` meninggalkan proyeksi penyelesaian habit di aktivitas",
+        kelompok="db",
+    ),
+    Mutasi(
+        "S1",
+        "hapus seluruh riwayat kejadian tidak membuang proyeksinya (aktivitas inferred)",
+        [
+            Sunting(
+                f"{MODUL}/activities/privasi.py",
+                "AND source = 'inferred'\",",
+                "AND source = 'inferred' AND false\",",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_privacy_center.py::"
+            "test_hapus_sumber_membuang_proyeksi_perilaku_turunannya[history]"
+        ),
+        harus_memuat="hapus `history` meninggalkan proyeksi penyelesaian habit di aktivitas",
+        kelompok="db",
+    ),
+    Mutasi(
+        "S2",
+        "hapus data Privacy Center mencocokkan sandi tanpa batas per IP (argon2 ×100 login)",
+        [
+            Sunting(
+                f"{MODUL}/identity/routes_privasi.py",
+                "    privasi.periksa_kategori_bisa_dihapus(category, penghapus)  # 404/409 sebelum "
+                "sandi ditebak\n    await batasi_kredensial_ip(request)",
+                "    privasi.periksa_kategori_bisa_dihapus(category, penghapus)  # 404/409 sebelum "
+                "sandi ditebak\n    pass",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_privacy_center.py::"
+            "test_sandi_ulang_dibatasi_per_ip_seperti_login[hapus-data]"
+        ),
+        harus_memuat="pencocokan sandi ke-4 dari IP yang sama (daftar + sandi ulang) tidak dibatasi",
+        kelompok="db",
+    ),
+    Mutasi(
+        "S2",
+        "ekspor Privacy Center mencocokkan sandi tanpa batas per IP",
+        [
+            Sunting(
+                f"{MODUL}/identity/routes_privasi.py",
+                "        raise platform.galat_terlalu_sering(hasil)\n"
+                "    await batasi_kredensial_ip(request)",
+                "        raise platform.galat_terlalu_sering(hasil)\n    pass",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_privacy_center.py::"
+            "test_sandi_ulang_dibatasi_per_ip_seperti_login[ekspor]"
+        ),
+        harus_memuat="pencocokan sandi ke-4 dari IP yang sama (daftar + sandi ulang) tidak dibatasi",
+        kelompok="db",
+    ),
+    Mutasi(
+        "S2",
+        "DELETE /me mencocokkan sandi tanpa batas per IP",
+        [
+            Sunting(
+                f"{MODUL}/identity/routes.py",
+                "    await batasi_kredensial_ip(request)  # argon2 per IP, sama dengan login (S2)\n",
+                "",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_privacy_center.py::"
+            "test_sandi_ulang_dibatasi_per_ip_seperti_login[hapus-akun]"
+        ),
+        harus_memuat="pencocokan sandi ke-4 dari IP yang sama (daftar + sandi ulang) tidak dibatasi",
+        kelompok="db",
+    ),
+    Mutasi(
+        "S3",
+        "hapus kategori tidak menunggu konsumen yang sedang menurunkan data — turunan lolos",
+        [
+            Sunting(
+                f"{MODUL}/identity/privasi.py",
+                "        await platform.kunci_turunan(conn, user_id, eksklusif=True)\n",
+                "",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_privacy_center.py::"
+            "test_hapus_kategori_tidak_balapan_dengan_konsumen_yang_menurunkan_datanya"
+        ),
+        harus_memuat="human state dari check-in yang sudah dihapus hidup terus",
+        kelompok="db",
+    ),
+    Mutasi(
+        "S3",
+        "konsumen pekerja menurunkan data tanpa kunci bersama — penghapus tidak menunggunya",
+        [
+            Sunting(
+                f"{MODUL}/events/stream.py",
+                '                await platform.kunci_turunan(conn, UUID(isi["user_id"]))\n',
+                "",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_privacy_center.py::"
+            "test_hapus_kategori_tidak_balapan_dengan_konsumen_yang_menurunkan_datanya"
+        ),
+        harus_memuat="human state dari check-in yang sudah dihapus hidup terus",
+        kelompok="db",
+    ),
+    Mutasi(
+        "S3",
+        "kunci turunan penghapus diambil BERSAMA — tidak menahan konsumen",
+        [
+            Sunting(
+                f"{MODUL}/platform/db.py",
+                "    kueri = _KUNCI_TURUNAN_EKSKLUSIF if eksklusif else _KUNCI_TURUNAN_BERSAMA\n",
+                "    kueri = _KUNCI_TURUNAN_BERSAMA\n",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_privacy_center.py::"
+            "test_hapus_kategori_tidak_balapan_dengan_konsumen_yang_menurunkan_datanya"
+        ),
+        harus_memuat="human state dari check-in yang sudah dihapus hidup terus",
+        kelompok="db",
+    ),
+    Mutasi(
+        "S4",
+        "token segar bekas sesudah akun dihapus menulis jejak atas id ASLI (K-39 · C-34)",
+        [
+            Sunting(
+                f"{MODUL}/identity/service.py",
+                "            if await repository.kunci_akun_ada(conn, curian.user_id):\n",
+                "            if True:\n",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_sapuan_hapus_akun.py::"
+            "test_token_segar_lama_sesudah_akun_dihapus_tidak_menghidupkan_id_aslinya"
+        ),
+        harus_memuat="token segar lama menulis id asli akun yang sudah dihapus ke audit_logs",
+        kelompok="db",
+    ),
+    Mutasi(
+        "S4",
+        "sesi yang lolos pencabutan sapuan menulis `session.revoked` atas id ASLI",
+        [
+            Sunting(
+                f"{MODUL}/identity/service.py",
+                "        if not aktif and await repository.kunci_akun_ada(conn, pemilik.user_id):\n",
+                "        if not aktif:\n",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_sapuan_hapus_akun.py::"
+            "test_sesi_yang_lolos_pencabutan_sapuan_tidak_menghidupkan_id_aslinya[refresh]"
+        ),
+        harus_memuat="refresh sesi yang lolos sapuan menulis id asli akun yang dihapus",
+        kelompok="db",
+    ),
+    Mutasi(
+        "S4",
+        "logout dengan token akses yang lolos sapuan menulis `session.logged_out` atas id ASLI",
+        [
+            Sunting(
+                f"{MODUL}/identity/service.py",
+                "        if await repository.kunci_akun_ada(conn, pengguna.user_id):\n",
+                "        if True:\n",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_sapuan_hapus_akun.py::"
+            "test_sesi_yang_lolos_pencabutan_sapuan_tidak_menghidupkan_id_aslinya[logout]"
+        ),
+        harus_memuat="logout sesi yang lolos sapuan menulis id asli akun yang dihapus",
+        kelompok="db",
+    ),
     # ── Sprint 6 · 6.5 hapus akun (Stage B): sapuan tahap 3–6 oleh proses pekerja ──
     Mutasi(
         "6.5b",
@@ -9639,7 +9809,7 @@ MUTASI: list[Mutasi] = [
         "anonimisasi audit melewatkan actor_id — id asli tetap terbaca di jejak",
         [
             Sunting(
-                f"{MIGRASI}/0011_sapuan_hapus_akun.up.sql",
+                f"{MIGRASI}/0013_privacy_center.up.sql",
                 "          actor_id = replace(a.actor_id, p_user_id::text, p_semu::text),\n",
                 "",
             )
@@ -9656,7 +9826,7 @@ MUTASI: list[Mutasi] = [
         "fungsi hapus tidak memeriksa jatuh tempo — pekerja yang dibajak menghapus akun aktif",
         [
             Sunting(
-                f"{MIGRASI}/0011_sapuan_hapus_akun.up.sql",
+                f"{MIGRASI}/0013_privacy_center.up.sql",
                 "      WHERE u.id = p_user_id\n"
                 "        AND u.status = 'pending_deletion' AND u.deletion_scheduled_at <= now()\n"
                 "      FOR UPDATE;",
@@ -9880,6 +10050,237 @@ MUTASI: list[Mutasi] = [
             "test_proses_pekerja_menjalankan_sapuan_sendiri_lalu_berhenti_bersih"
         ),
         harus_memuat="pekerja tidak membersihkan jejak idempotensi",
+        kelompok="db",
+    ),
+    # ── Tinjauan kontrak Sprint 5–6 (8 Okt 2026) ──
+    Mutasi(
+        "K1",
+        "check-in tanpa energi & fokus membiarkan human_state lama (versi pertama: return)",
+        [
+            Sunting(
+                f"{MODUL}/intelligence/keadaan.py",
+                "        await profile.hapus_human_state(conn, event.user_id, for_date=for_date, model_version=MODEL)\n",
+                "",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_human_state.py::"
+            "test_checkin_diganti_tanpa_energi_dan_fokus_tidak_meninggalkan_keadaan_lama"
+        ),
+        harus_memuat="human_state menyatakan energi/fokus yang sudah diganti pemiliknya",
+        kelompok="db",
+    ),
+    Mutasi(
+        "K1",
+        "hapus_human_state menyaring versi model yang salah — baris hari itu tidak terhapus",
+        [
+            Sunting(
+                f"{MODUL}/profile/repository.py",
+                '    "WHERE user_id = :user_id AND for_date = :for_date AND model_version = :model_version"',
+                '    "WHERE user_id = :user_id AND for_date = :for_date AND model_version <> :model_version"',
+            )
+        ],
+        _pytest(
+            "tests/integration/test_human_state.py::"
+            "test_checkin_diganti_tanpa_energi_dan_fokus_tidak_meninggalkan_keadaan_lama"
+        ),
+        harus_memuat="human_state menyatakan energi/fokus yang sudah diganti pemiliknya",
+        kelompok="db",
+    ),
+    Mutasi(
+        "K2",
+        "penyegaran konteks kembali memakai payload event — urutan tiba yang menang",
+        [
+            Sunting(
+                f"{MODUL}/intelligence/mesin.py",
+                "    checkin = await checkins.checkin_pada(conn, event.user_id, for_date)\n"
+                "    energi = checkin.energy if checkin else None\n",
+                '    energi = event.payload.get("energy")\n',
+            )
+        ],
+        _pytest(
+            "tests/integration/test_rekomendasi.py::"
+            "test_penyegaran_konteks_dari_checkin_otoritatif_bukan_urutan_tiba"
+        ),
+        harus_memuat="konteks rekomendasi diputar kembali ke energi yang sudah diganti",
+        kelompok="db",
+    ),
+    Mutasi(
+        "K3",
+        "penyegaran skor tidak menulis ulang rationale — alasan menyebut energi lama",
+        [
+            Sunting(
+                f"{MODUL}/intelligence/repository.py",
+                "        context_snapshot = CAST(:context_snapshot AS jsonb),\n"
+                "        body = :body,\n"
+                "        rationale = CAST(:rationale AS jsonb)\n",
+                "        context_snapshot = CAST(:context_snapshot AS jsonb),\n"
+                "        body = :body\n",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_rekomendasi.py::"
+            "test_penyegaran_menulis_ulang_alasan_dan_saran_sesuai_skornya"
+        ),
+        harus_memuat="alasan tidak menyebut energi yang dipakai skornya",
+        kelompok="db",
+    ),
+    Mutasi(
+        "K3",
+        "penyegaran skor tidak menulis ulang body — saran tier mengikuti energi lama",
+        [
+            Sunting(
+                f"{MODUL}/intelligence/repository.py",
+                "        context_snapshot = CAST(:context_snapshot AS jsonb),\n"
+                "        body = :body,\n",
+                "        context_snapshot = CAST(:context_snapshot AS jsonb),\n",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_rekomendasi.py::"
+            "test_penyegaran_menulis_ulang_alasan_dan_saran_sesuai_skornya"
+        ),
+        harus_memuat="saran tier tidak mengikuti energi yang dipakai skornya",
+        kelompok="db",
+    ),
+    Mutasi(
+        "E-232",
+        "turunan habits ikut menghapus aktivitas yang DICATAT pengguna (K4 tinjauan kontrak)",
+        [
+            Sunting(
+                f"{MODUL}/activities/privasi.py",
+                "\"DELETE FROM activities WHERE user_id = :u AND source = 'inferred' AND kind = :kind\",",
+                "\"DELETE FROM activities WHERE user_id = :u AND (source = 'inferred' AND kind = :kind"
+                " OR source = 'manual')\",",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_privacy_center.py::"
+            "test_hapus_sumber_membuang_proyeksi_perilaku_turunannya[habits]"
+        ),
+        harus_memuat="membuang aktivitas yang DICATAT pengguna",
+        kelompok="db",
+    ),
+    Mutasi(
+        "K5",
+        "GET /recommendations tak pernah memberi next_cursor — sisanya terpotong diam-diam",
+        [
+            Sunting(
+                f"{MODUL}/intelligence/rekomendasi.py",
+                '        lanjut = platform.kursor_waktu("recommendations", items[-1].created_at, items[-1].id)\n',
+                "        lanjut = None\n",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_dashboard.py::test_daftar_rekomendasi_tidak_dipotong_diam_diam"
+        ),
+        harus_memuat="GET /recommendations memotong diam-diam",
+        kelompok="db",
+    ),
+    Mutasi(
+        "K5",
+        "keyset rekomendasi memakai <= — baris batas halaman terulang di halaman berikutnya",
+        [
+            Sunting(
+                f"{MODUL}/intelligence/repository.py",
+                "           OR (created_at, id) < (CAST(:k_waktu AS timestamptz), CAST(:k_id AS uuid)))\n",
+                "           OR (created_at, id) <= (CAST(:k_waktu AS timestamptz), CAST(:k_id AS uuid)))\n",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_dashboard.py::test_daftar_rekomendasi_tidak_dipotong_diam_diam"
+        ),
+        harus_memuat="halaman rekomendasi mengulang baris",
+        kelompok="db",
+    ),
+    Mutasi(
+        "K6",
+        "KonsumenStream mengabaikan `wajib` — konsumen wajib membuang ke stream mati",
+        [
+            Sunting(
+                f"{MODUL}/events/stream.py",
+                "        if diklaim and not self.wajib and await self._kali_diserahkan(id_pesan) > self._maks_kirim:\n",
+                "        if diklaim and await self._kali_diserahkan(id_pesan) > self._maks_kirim:\n",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_proyektor.py::"
+            "test_konsumen_wajib_menahan_event_bukan_membuangnya_ke_stream_mati"
+        ),
+        harus_memuat="konsumen wajib `proyektor` membuang event ke stream mati",
+        kelompok="db",
+    ),
+    Mutasi(
+        "K6",
+        "pekerja memasang Behavior projector tanpa `wajib=True` (versi pertama)",
+        [
+            Sunting(
+                "apps/api/src/hvx/pekerja.py",
+                "            tangani=intelligence.proyeksikan_perilaku,\n            wajib=True,\n",
+                "            tangani=intelligence.proyeksikan_perilaku,\n",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_proyektor.py::"
+            "test_konsumen_wajib_menahan_event_bukan_membuangnya_ke_stream_mati"
+        ),
+        harus_memuat="konsumen wajib `proyektor` membuang event ke stream mati",
+        kelompok="db",
+    ),
+    Mutasi(
+        "K6",
+        "pekerja memasang Habit streak (pola) tanpa `wajib=True` (versi pertama)",
+        [
+            Sunting(
+                "apps/api/src/hvx/pekerja.py",
+                "            tangani=intelligence.deteksi_pola_habit,\n            wajib=True,\n",
+                "            tangani=intelligence.deteksi_pola_habit,\n",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_proyektor.py::"
+            "test_konsumen_wajib_menahan_event_bukan_membuangnya_ke_stream_mati"
+        ),
+        harus_memuat="konsumen wajib `pola` membuang event ke stream mati",
+        kelompok="db",
+    ),
+    Mutasi(
+        "K10",
+        "DELETE /me yang kalah balapan memakai bacaan sebelum sandi — 409 untuk akun terjadwal",
+        [
+            Sunting(
+                f"{MODUL}/identity/service.py",
+                "            kini = await repository.akun_untuk_hapus(conn, pengguna.user_id)\n"
+                "            dijadwalkan = kini.deletion_scheduled_at if kini is not None else None\n",
+                "            dijadwalkan = None\n",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_hapus_akun.py::"
+            "test_hapus_serentak_dua_kali_keduanya_202_dengan_jadwal_yang_sama"
+        ),
+        harus_memuat="DELETE /me serentak tidak idempoten",
+        kelompok="db",
+    ),
+    Mutasi(
+        "E-245",
+        "restore menjawab 200 active untuk akun suspended/terhapus (versi pertama)",
+        [
+            Sunting(
+                f"{MODUL}/identity/service.py",
+                '                "Masa tenggang penghapusan sudah berakhir; akun tidak bisa dipulihkan.",\n'
+                "            )\n"
+                '        if status != "active":\n'
+                '            raise _galat(403, "account_not_active", "Akun tidak aktif.")\n',
+                '                "Masa tenggang penghapusan sudah berakhir; akun tidak bisa dipulihkan.",\n'
+                "            )\n",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_hapus_akun.py::"
+            "test_restore_tidak_mengaku_aktif_untuk_akun_yang_tidak_aktif[suspended]"
+        ),
+        harus_memuat="restore mengaku memulihkan akun suspended",
         kelompok="db",
     ),
     # ── Sprint 6 · 6.6 luring dasar: antrean penyelesaian habit (Flutter, K-40) ──
@@ -10379,6 +10780,737 @@ MUTASI: list[Mutasi] = [
         harus_memuat="versi baris yang lebih baru mendapat updated_at yang lebih lama",
         kelompok="db",
     ),
+    # ── Sprint 6 · 6.2 / 6.3 / 6.4 + E-226 · E-227 · K-46 (E-230) ──
+    # Commit 6.2–6.4 (7 Okt 2026) menambah fitur dan penegak (`test_cakupan_privasi`) tanpa
+    # SATU pun mutasi baru — tiap mutasi di bawah dibuktikan berbunyi 8 Okt 2026, beberapa
+    # sesudah asersinya diberi pesan atau kasusnya dipisahkan (registry aturan 6).
+    # ── 6.4 Privacy Center (K-41 · K-42 · K-43) ──
+    Mutasi(
+        "6.4",
+        "ringkasan menghitung baris turunan sebagai catatan pengguna",
+        [
+            Sunting(
+                f"{MODUL}/identity/privasi.py",
+                '            k["derived_count" if b.turunan else "count"] += n',
+                '            k["count"] += n',
+            )
+        ],
+        _pytest(
+            "tests/integration/test_privacy_center.py::"
+            "test_ringkasan_menghitung_semua_kategori_tanpa_isi"
+        ),
+        harus_memuat="baris turunan terhitung sebagai catatan pengguna",
+        kelompok="db",
+    ),
+    Mutasi(
+        "6.4",
+        "ringkasan menawarkan hapus untuk kategori yang tak bisa dihapus",
+        [
+            Sunting(
+                f"{MODUL}/identity/privasi.py",
+                '                "deletable": kunci in bisa_dihapus and kat.tidak_bisa_dihapus is None,',
+                '                "deletable": True,',
+            )
+        ],
+        _pytest(
+            "tests/integration/test_privacy_center.py::"
+            "test_ringkasan_menghitung_semua_kategori_tanpa_isi"
+        ),
+        harus_memuat="kategori yang tak bisa dihapus tampil bisa dihapus",
+        kelompok="db",
+    ),
+    Mutasi(
+        "6.4",
+        "hapus kategori tanpa turunannya — event jurnal tetap di riwayat",
+        [
+            Sunting(
+                f"{MODUL}/identity/privasi.py",
+                "    urut = [p for p in langkah if not p.turunan] + [p for p in langkah if p.turunan]",
+                "    urut = [p for p in langkah if not p.turunan]",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_privacy_center.py::"
+            "test_hapus_jurnal_membawa_event_dan_memorinya_bukan_milik_mood"
+        ),
+        harus_memuat="event jurnal yang dihapus tetap di riwayat",
+        kelompok="db",
+    ),
+    Mutasi(
+        "6.4",
+        "kategori yang tak bisa dihapus baru ditolak SESUDAH sandi ditebak",
+        [
+            Sunting(
+                f"{MODUL}/identity/routes_privasi.py",
+                "    privasi.periksa_kategori_bisa_dihapus(category, penghapus)"
+                "  # 404/409 sebelum sandi ditebak\n",
+                "",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_privacy_center.py::"
+            "test_kategori_yang_tidak_bisa_dihapus_ditolak_sebelum_sandi"
+            "[account-409-category_not_deletable]"
+        ),
+        harus_memuat="`account` menebak sandi sebelum ditolak",
+        kelompok="db",
+    ),
+    Mutasi(
+        "6.4",
+        "tautan ekspor bisa dipakai dua kali — skrip Lua tak memeriksa status",
+        [
+            Sunting(
+                f"{MODUL}/identity/privasi.py",
+                "if s ~= ARGV[1] then\n  return 2\nend\n",
+                "",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_privacy_center.py::"
+            "test_ekspor_sekali_pakai_memuat_isi_tanpa_hash_sandi"
+        ),
+        harus_memuat="tautan ekspor bisa dipakai dua kali",
+        kelompok="db",
+    ),
+    Mutasi(
+        "6.4",
+        "ekspor menyalin seluruh baris users — hash sandi ikut terunduh",
+        [
+            Sunting(
+                f"{MODUL}/identity/privasi.py",
+                "    SELECT id, email, status, email_verified_at, last_login_at, created_at, "
+                "updated_at,\n           deleted_at, deletion_scheduled_at\n",
+                "    SELECT *\n",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_privacy_center.py::"
+            "test_ekspor_sekali_pakai_memuat_isi_tanpa_hash_sandi"
+        ),
+        harus_memuat="ekspor memuat hash sandi",
+        kelompok="db",
+    ),
+    Mutasi(
+        "6.4",
+        "kunci catatan ekspor tanpa id pengguna — ekspor A terbaca dan terunduh B",
+        [
+            Sunting(
+                f"{MODUL}/identity/privasi.py",
+                '    return f"{awalan}:ekspor:{user_id}:{ekspor_id}"',
+                '    return f"{awalan}:ekspor:{ekspor_id}"',
+            )
+        ],
+        _pytest(
+            "tests/integration/test_privacy_center.py::"
+            "test_ekspor_milik_a_tidak_terlihat_dan_tidak_terunduh_oleh_b"
+        ),
+        harus_memuat="milik A terbuka bagi B",
+        kelompok="db",
+    ),
+    Mutasi(
+        "6.4",
+        "permintaan ekspor tanpa batas per jam",
+        [
+            Sunting(
+                f"{MODUL}/identity/routes_privasi.py",
+                "    if not hasil.lolos:\n        raise platform.galat_terlalu_sering(hasil)\n",
+                "",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_privacy_center.py::test_ekspor_butuh_sandi_dan_dibatasi_per_jam"
+        ),
+        harus_memuat="permintaan ekspor tanpa batas",
+        kelompok="db",
+    ),
+    Mutasi(
+        "6.4",
+        "unduhan ekspor tanpa jejak `data.exported`",
+        [
+            Sunting(
+                f"{MODUL}/identity/privasi.py",
+                '                aksi="data.exported",',
+                '                aksi="data.export_requested",',
+            )
+        ],
+        _pytest(
+            "tests/integration/test_privacy_center.py::"
+            "test_ekspor_sekali_pakai_memuat_isi_tanpa_hash_sandi"
+        ),
+        harus_memuat="ekspor tanpa jejak",
+        kelompok="db",
+    ),
+    Mutasi(
+        "6.4",
+        "jawaban POST ekspor `ready` tanpa jalur unduh (perbaikan 8 Okt 2026)",
+        [
+            Sunting(
+                f"{MODUL}/identity/privasi.py",
+                '        "download_url": _jalur_unduh(ekspor_id),\n',
+                "",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_privacy_center.py::"
+            "test_ekspor_sekali_pakai_memuat_isi_tanpa_hash_sandi"
+        ),
+        harus_memuat="jawaban POST `ready` tanpa jalur unduh",
+        kelompok="db",
+    ),
+    Mutasi(
+        "6.4",
+        "unduhan ekspor tanpa `Cache-Control: no-store` — salinan hidup di cache perantara",
+        [
+            Sunting(
+                f"{MODUL}/identity/routes_privasi.py",
+                '            "Cache-Control": "no-store",\n',
+                "",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_privacy_center.py::"
+            "test_ekspor_sekali_pakai_memuat_isi_tanpa_hash_sandi"
+        ),
+        harus_memuat="unduhan ekspor boleh disimpan cache",
+        kelompok="db",
+    ),
+    Mutasi(
+        "6.4",
+        "PUT izin menyimpan (agent, scope, aksi) yang tidak diminta agent mana pun",
+        [Sunting(f"{MODUL}/identity/privasi.py", "    if not diminta:\n", "    if False:\n")],
+        _pytest(
+            "tests/integration/test_privacy_center.py::"
+            "test_izin_yang_tidak_diminta_atau_cacat_ditolak"
+        ),
+        harus_memuat="izin yang tidak diminta/cacat diterima",
+        kelompok="db",
+    ),
+    Mutasi(
+        "6.4",
+        "layar izin menampilkan bawaan `allow` untuk scope sensitif",
+        [
+            Sunting(
+                f"{MODUL}/identity/privasi.py",
+                '        if diminta.bawaan == "allow" and SCOPE_RESMI[diminta.scope].sensitif',
+                "        if False",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_privacy_center.py::"
+            "test_izin_per_agent_menampilkan_bawaan_gerbang"
+        ),
+        harus_memuat="layar menjanjikan `allow` atas scope sensitif",
+        kelompok="db",
+    ),
+    Mutasi(
+        "6.4",
+        "tabel milik pengguna tak dinyatakan di Privacy Center (audit_logs)",
+        [
+            Sunting(
+                f"{MODUL}/identity/privasi.py",
+                '    BagianData("audit", "audit_logs", _penghitung(_HITUNG_AUDIT), '
+                "_pengekspor(_EKSPOR_AUDIT)),\n",
+                "",
+            )
+        ],
+        _pytest(
+            "tests/unit/test_cakupan_privasi.py::"
+            "test_tiap_tabel_milik_pengguna_dinyatakan_tepat_sekali"
+        ),
+        harus_memuat="tabel milik pengguna yang TIDAK terlihat di Privacy Center",
+    ),
+    Mutasi(
+        "6.4",
+        "titik rakit lupa merakit penghapus satu modul",
+        [Sunting("apps/api/src/hvx/main.py", "        *agents.PENGHAPUS_PRIVASI,\n", "")],
+        _pytest(
+            "tests/unit/test_cakupan_privasi.py::"
+            "test_titik_rakit_memasang_bagian_dan_penghapus_semua_modul"
+        ),
+        harus_memuat="tidak dirakit",
+    ),
+    Mutasi(
+        "6.4",
+        "domain event tanpa kategori sumber — event jurnal tak ikut terhapus",
+        [Sunting(f"{MODUL}/events/privasi.py", '        "journal": "journal",\n', "")],
+        _pytest(
+            "tests/unit/test_cakupan_privasi.py::"
+            "test_tiap_jenis_event_ikut_terhapus_bersama_kategori_sumbernya"
+        ),
+        harus_memuat="tanpa kategori Privacy Center",
+    ),
+    Mutasi(
+        "6.4",
+        "hapus jurnal tidak melupakan memori episodiknya",
+        [Sunting(f"{MODUL}/memory/privasi.py", '        "journal": "journal_raw",\n', "")],
+        _pytest(
+            "tests/integration/test_privacy_center.py::"
+            "test_hapus_jurnal_membawa_event_dan_memorinya_bukan_milik_mood"
+        ),
+        harus_memuat="memori jurnal tetap hidup sesudah jurnalnya dihapus",
+        kelompok="db",
+    ),
+    Mutasi(
+        "6.4",
+        "hapus mood meninggalkan rekomendasi agent yang mungkin mengutipnya",
+        [
+            Sunting(
+                f"{MODUL}/intelligence/privasi.py",
+                '"DELETE FROM recommendations WHERE user_id = :u AND agent_id IS NOT NULL",',
+                '"DELETE FROM recommendations WHERE user_id = :u AND false",',
+            )
+        ],
+        _pytest(
+            "tests/integration/test_privacy_center.py::"
+            "test_hapus_mood_membuang_rekomendasi_agent_bukan_milik_mesin"
+        ),
+        harus_memuat="rekomendasi agent (yang mungkin mengutip mood) tetap tersimpan",
+        kelompok="db",
+    ),
+    Mutasi(
+        "6.4",
+        "hapus_event_pengguna tanpa saringan pemilik — hapus milik A membuang event B",
+        [
+            Sunting(
+                f"{MIGRASI}/0013_privacy_center.up.sql",
+                "      WHERE e.user_id = v_pengguna\n        AND e.event_type = ANY(p_jenis)\n",
+                "      WHERE e.event_type = ANY(p_jenis)\n",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_privacy_center.py::"
+            "test_hapus_kategori_membuang_tabelnya_dan_turunannya_saja[journal]"
+        ),
+        harus_memuat="milik A mengubah data B (H-27)",
+        kelompok="db",
+    ),
+    # ── E-226 · E-227 ──
+    Mutasi(
+        "E-226",
+        "sandi ulang tanpa jatah login gagal — token curian menebak sandi tanpa batas",
+        [
+            Sunting(
+                f"{MODUL}/identity/service.py",
+                "    await penjaga.pakai(akun.kunci)\n"
+                "    if not await sandi.cocokkan_async(akun.password_hash, kata_sandi):\n",
+                "    if not await sandi.cocokkan_async(akun.password_hash, kata_sandi):\n",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_privacy_center.py::"
+            "test_tebakan_sandi_ulang_berbagi_jatah_dengan_login_gagal[hapus-data]"
+        ),
+        harus_memuat="tidak dibatasi",
+        kelompok="db",
+    ),
+    Mutasi(
+        "E-227",
+        "delegasi dipaksa `ask` di scope sensitif yang tidak dibacanya",
+        [
+            Sunting(
+                f"{MODUL}/identity/izin.py",
+                '        if bawaan == "allow" and SCOPE_RESMI[scope].sensitif and not delegasi:',
+                '        if bawaan == "allow" and SCOPE_RESMI[scope].sensitif:',
+            )
+        ],
+        _pytest(
+            "tests/integration/test_izin.py::test_scope_sensitif_tidak_pernah_allow_karena_bawaan"
+        ),
+        harus_memuat="delegasi ditanya untuk scope sensitif yang tidak dibacanya (E-227)",
+        kelompok="db",
+    ),
+    Mutasi(
+        "E-227",
+        "layar izin menampilkan izin delegasi atas scope sensitif",
+        [
+            Sunting(
+                f"{MODUL}/agents/privasi.py",
+                "                scopes = [s for s in scopes if not identity.SCOPE_RESMI[s].sensitif]\n",
+                "                pass\n",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_privacy_center.py::"
+            "test_izin_per_agent_menampilkan_bawaan_gerbang"
+        ),
+        harus_memuat="layar menampilkan izin delegasi atas scope sensitif",
+        kelompok="db",
+    ),
+    # ── K-46: C-31 · C-32 · C-34 atas delegasi pemilik (H-28) ──
+    Mutasi(
+        "K-46",
+        "C-31: hapus jurnal meninggalkan event `journal.created`-nya",
+        [
+            Sunting(
+                f"{MODUL}/journal/service.py",
+                '        await events.hapus_riwayat_subjek(conn, ["journal.created"], '
+                '"journal", jurnal_id)\n',
+                "",
+            )
+        ],
+        _pytest(f"{UJI_JURNAL}::test_hapus_keras_dan_jurnal_orang_lain_tidak_terlihat"),
+        harus_memuat="event jurnal yang dihapus tetap di riwayat (C-31)",
+        kelompok="db",
+    ),
+    Mutasi(
+        "K-46",
+        "C-32: mood tidak sensitif — bawaan risk 0 membukanya",
+        [
+            Sunting(
+                f"{MODUL}/identity/scope.py",
+                '"mood": Scope("mood yang dilaporkan, dan memori episodiknya (3.6)", sensitif=True),',
+                '"mood": Scope("mood yang dilaporkan, dan memori episodiknya (3.6)", sensitif=False),',
+            )
+        ],
+        _pytest(
+            "tests/integration/test_izin.py::test_scope_sensitif_tidak_pernah_allow_karena_bawaan"
+        ),
+        harus_memuat="mood terbuka karena bawaan (C-32)",
+        kelompok="db",
+    ),
+    Mutasi(
+        "K-46",
+        "C-32: agent pihak ketiga boleh meminta mood (aturan 6)",
+        [
+            Sunting(
+                f"{MODUL}/agents/registri.py",
+                'SCOPE_TERLARANG_PIHAK_KETIGA_6 = frozenset({"journal", "journal_raw", "mood", '
+                '"finance", "health"})',
+                'SCOPE_TERLARANG_PIHAK_KETIGA_6 = frozenset({"journal", "journal_raw", "finance", '
+                '"health"})',
+            )
+        ],
+        _pytest(UJI_REGISTRI),
+        harus_memuat="aturan 6 tidak ditegakkan — pihak ketiga meminta mood",
+    ),
+    Mutasi(
+        "K-46",
+        "C-34: ip_hash tertinggal di jejak audit akun yang dihapus",
+        [
+            Sunting(
+                f"{MIGRASI}/0013_privacy_center.up.sql",
+                "          metadata = replace(a.metadata::text, p_user_id::text, "
+                "p_semu::text)::jsonb,\n          ip_hash = NULL\n",
+                "          metadata = replace(a.metadata::text, p_user_id::text, "
+                "p_semu::text)::jsonb\n",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_sapuan_hapus_akun.py::"
+            "test_sapuan_menghapus_semua_jejak_akun_dan_hanya_akun_itu"
+        ),
+        harus_memuat="ip_hash tertinggal di jejak audit akun yang dihapus (C-34)",
+        kelompok="db",
+    ),
+    # ── 6.3 notifikasi (K-44) ──
+    Mutasi(
+        "6.3",
+        "notifikasi keamanan akun bisa dimatikan lewat PATCH",
+        [
+            Sunting(
+                f"{MODUL}/profile/notifikasi.py",
+                "        if j.wajib and not nyala:",
+                "        if False:",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_notifikasi_dan_tinjauan.py::"
+            "test_preferensi_notifikasi_cacat_ditolak[badan0-422-notification_required]"
+        ),
+        harus_memuat="preferensi cacat diterima",
+        kelompok="db",
+    ),
+    Mutasi(
+        "6.3",
+        "gerbang kirim membungkam keamanan akun (pilihan, jam tenang, pagu)",
+        [
+            Sunting(
+                f"{MODUL}/profile/notifikasi.py",
+                '    if j.wajib:\n        return "now"\n',
+                "",
+            )
+        ],
+        _pytest(
+            "tests/unit/test_notifikasi_murni.py::"
+            "test_keamanan_akun_tidak_bisa_dibungkam_dan_melewati_jam_tenang_juga_pagu"
+        ),
+        harus_memuat="keamanan akun dibungkam",
+    ),
+    Mutasi(
+        "6.3",
+        "jenis yang dimatikan hanya ditunda, tetap dikirim",
+        [
+            Sunting(
+                f"{MODUL}/profile/notifikasi.py",
+                '    if not pref["types"][jenis]:\n        return "silent"\n',
+                '    if not pref["types"][jenis]:\n        return "later"\n',
+            )
+        ],
+        _pytest("tests/unit/test_notifikasi_murni.py::test_tiap_jenis_bisa_dimatikan_sendiri"),
+        harus_memuat="yang dimatikan tetap dikirim",
+    ),
+    Mutasi(
+        "6.3",
+        "pagu harian lewat satu — notifikasi ke-11 tetap dikirim",
+        [
+            Sunting(
+                f"{MODUL}/profile/notifikasi.py",
+                "    if terkirim_hari_ini >= PAGU_HARIAN:",
+                "    if terkirim_hari_ini > PAGU_HARIAN:",
+            )
+        ],
+        _pytest(
+            "tests/unit/test_notifikasi_murni.py::test_pagu_harian_naskah_berhenti_bukan_menunda"
+        ),
+        harus_memuat="pagu harian tidak menghentikan pengiriman",
+    ),
+    Mutasi(
+        "6.3",
+        "jam tenang yang melintasi tengah malam tidak pernah menunda",
+        [
+            Sunting(
+                f"{MODUL}/profile/notifikasi.py",
+                "    return kini >= mulai or kini < akhir",
+                "    return kini >= mulai and kini < akhir",
+            )
+        ],
+        _pytest(
+            "tests/unit/test_notifikasi_murni.py::test_jam_tenang_melintasi_tengah_malam_menunda"
+        ),
+        harus_memuat="jam tenang melintasi tengah malam salah",
+    ),
+    Mutasi(
+        "6.3",
+        "PATCH /me/profile mengganti preferences utuh — pilihan notifikasi terhapus",
+        [
+            Sunting(
+                f"{MODUL}/profile/repository.py",
+                "                          THEN CAST(:preferences AS jsonb)\n"
+                "                               || jsonb_strip_nulls(jsonb_build_object(\n"
+                "                                    'notifications', "
+                "preferences -> 'notifications'))\n",
+                "                          THEN CAST(:preferences AS jsonb)\n",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_notifikasi_dan_tinjauan.py::"
+            "test_profil_tidak_menimpa_pilihan_notifikasi"
+        ),
+        harus_memuat="PATCH /me/profile menghapus pilihan notifikasi",
+        kelompok="db",
+    ),
+    Mutasi(
+        "6.3",
+        "dua penulis untuk satu kunci — PATCH /me/profile menerima preferences.notifications",
+        [
+            Sunting(
+                f"{MODUL}/profile/schemas.py",
+                "    if KUNCI_NOTIFIKASI in nilai:",
+                "    if False:",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_notifikasi_dan_tinjauan.py::"
+            "test_profil_tidak_menimpa_pilihan_notifikasi"
+        ),
+        harus_memuat="dua penulis untuk satu kunci preferensi",
+        kelompok="db",
+    ),
+    # ── 6.2 tinjauan mingguan (K-45) ──
+    Mutasi(
+        "6.2",
+        "sistem menjawab “Kenapa?” atas nama pengguna",
+        [
+            Sunting(
+                f"{MODUL}/intelligence/tinjauan.py",
+                '"stance": "state" if butir[kunci] and kunci != "why" else "ask",',
+                '"stance": "state" if butir[kunci] else "ask",',
+            )
+        ],
+        _pytest(
+            "tests/unit/test_tinjauan_murni.py::"
+            "test_lima_pertanyaan_dijawab_dari_bukti_dan_kenapa_tetap_bertanya"
+        ),
+        harus_memuat="sistem menjawab “Kenapa?” atas nama pengguna",
+    ),
+    Mutasi(
+        "6.2",
+        "tanpa bukti sistem tetap menyatakan (Confidence Layer 5.4)",
+        [
+            Sunting(
+                f"{MODUL}/intelligence/tinjauan.py",
+                '"stance": "state" if butir[kunci] and kunci != "why" else "ask",',
+                '"stance": "state" if kunci != "why" else "ask",',
+            )
+        ],
+        _pytest(
+            "tests/unit/test_tinjauan_murni.py::"
+            "test_minggu_kosong_bertanya_di_kelima_pertanyaan_tanpa_angka"
+        ),
+        harus_memuat="tanpa data sistem menyatakan sesuatu",
+    ),
+    Mutasi(
+        "6.2",
+        "hari yang dilewati sengaja dihitung gagal (aturan rentetan 2.4)",
+        [
+            Sunting(
+                f"{MODUL}/intelligence/tinjauan.py",
+                '            elif status == "skipped":\n                maaf += 1\n',
+                "",
+            )
+        ],
+        _pytest("tests/unit/test_tinjauan_murni.py::test_periode_harian_mengikuti_aturan_rentetan"),
+        harus_memuat="periode tidak dihitung seperti rentetan 2.4",
+    ),
+    Mutasi(
+        "6.2",
+        "`partial` tidak memenuhi periode (naskah 4 §34)",
+        [
+            Sunting(
+                f"{MODUL}/intelligence/tinjauan.py",
+                '_MEMENUHI = frozenset({"done", "partial"})',
+                '_MEMENUHI = frozenset({"done"})',
+            )
+        ],
+        _pytest("tests/unit/test_tinjauan_murni.py::test_periode_harian_mengikuti_aturan_rentetan"),
+        harus_memuat="periode tidak dihitung seperti rentetan 2.4",
+    ),
+    Mutasi(
+        "6.2",
+        "hari yang belum berakhir dihitung gagal",
+        [
+            Sunting(
+                f"{MODUL}/intelligence/tinjauan.py",
+                "            elif d < hari_ini:\n                lewat.append(d)\n"
+                "            else:\n                jalan += 1\n",
+                "            else:\n                lewat.append(d)\n",
+            )
+        ],
+        _pytest("tests/unit/test_tinjauan_murni.py::test_minggu_berjalan_belum_gagal"),
+        harus_memuat="periode yang belum berakhir dihitung gagal",
+    ),
+    Mutasi(
+        "6.2",
+        "saran minggu depan mengklaim sebab (naskah 4 §7)",
+        [
+            Sunting(
+                f"{MODUL}/intelligence/tinjauan.py",
+                '                        "di hari energimu rendah.",',
+                '                        "karena energimu rendah.",',
+            )
+        ],
+        _pytest("tests/unit/test_tinjauan_murni.py::test_kalimat_sistem_tidak_mengklaim_sebab"),
+        harus_memuat="kalimat sistem yang mengklaim sebab",
+    ),
+    Mutasi(
+        "6.2",
+        "minggu di luar 1900–2999 diterima — `0001-W01` menjadi 500 (perbaikan 8 Okt 2026)",
+        [
+            Sunting(
+                f"{MODUL}/intelligence/tinjauan.py",
+                "    if not platform.TANGGAL_MIN <= senin <= platform.TANGGAL_MAKS - "
+                "timedelta(days=6):",
+                "    if False:",
+            )
+        ],
+        _pytest("tests/unit/test_tinjauan_murni.py::test_minggu_di_luar_rentang_tanggal_ditolak"),
+        harus_memuat="DID NOT RAISE",
+    ),
+    Mutasi(
+        "6.2",
+        "tinjauan minggu yang belum dimulai dijawab",
+        [
+            Sunting(
+                f"{MODUL}/intelligence/tinjauan.py",
+                "            if senin > hari_ini:",
+                "            if False:",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_notifikasi_dan_tinjauan.py::"
+            "test_minggu_cacat_atau_belum_dimulai_ditolak[2999-W01-422-week_in_future]"
+        ),
+        harus_memuat="tidak ditolak semestinya",
+        kelompok="db",
+    ),
+    # ── layar 6.2–6.4 (Flutter) ──
+    Mutasi(
+        "6.4",
+        "layar: hapus kategori tanpa dialog sandi ulang",
+        [
+            Sunting(
+                f"{APLIKASI}/lib/layar/privasi.dart",
+                "  Future<String?> _mintaSandi(String judul, String penjelasan, String tombol) =>\n"
+                "      showDialog<String>(\n",
+                "  Future<String?> _mintaSandi(String judul, String penjelasan, String tombol)"
+                " async =>\n"
+                "      'sandi-tersimpan';\n"
+                "  // ignore: unused_element\n"
+                "  Future<String?> _mintaSandiAsli(String judul, String penjelasan, String tombol)"
+                " =>\n"
+                "      showDialog<String>(\n",
+            )
+        ],
+        _flutter_uji("test/layar/privasi_test.dart", "hapus kategori meminta sandi"),
+        harus_memuat="hapus tanpa dialog sandi ulang",
+        cwd=APLIKASI,
+    ),
+    Mutasi(
+        "6.4",
+        "layar: kategori yang tak bisa dihapus punya tombol hapus",
+        [
+            Sunting(
+                f"{APLIKASI}/lib/layar/privasi.dart",
+                "      trailing: k.bisaDihapus\n",
+                "      trailing: true\n",
+            )
+        ],
+        _flutter_uji("test/layar/privasi_test.dart", "menampilkan jumlah per kategori"),
+        harus_memuat="kategori yang tak bisa dihapus punya tombol hapus",
+        cwd=APLIKASI,
+    ),
+    Mutasi(
+        "6.3",
+        "layar: notifikasi keamanan akun bisa dimatikan",
+        [
+            Sunting(
+                f"{APLIKASI}/lib/layar/notifikasi.dart",
+                "                      onChanged: j.wajib\n",
+                "                      onChanged: false\n",
+            )
+        ],
+        _flutter_uji("test/layar/notifikasi_test.dart", "yang wajib tidak bisa disentuh"),
+        harus_memuat="keamanan akun bisa dimatikan",
+        cwd=APLIKASI,
+    ),
+    Mutasi(
+        "6.3",
+        "layar: mematikan satu jenis mengirim semua jenis",
+        [
+            Sunting(
+                f"{APLIKASI}/lib/layar/notifikasi.dart",
+                "                                jenis: {j.key: v},\n",
+                "                                jenis: {for (final x in pref.jenis) x.key: v},\n",
+            )
+        ],
+        _flutter_uji("test/layar/notifikasi_test.dart", "mematikan satu jenis"),
+        harus_memuat="mematikan satu jenis mengirim jenis lain",
+        cwd=APLIKASI,
+    ),
+    Mutasi(
+        "6.2",
+        "layar: tombol minggu berikutnya melompat ke minggu yang belum dimulai",
+        [
+            Sunting(
+                f"{APLIKASI}/lib/layar/tinjauan.dart",
+                "                      onPressed: _memuat || !t.lengkap\n",
+                "                      onPressed: _memuat\n",
+            )
+        ],
+        _flutter_uji("test/layar/tinjauan_test.dart", "minggu berjalan"),
+        harus_memuat="bisa melompat ke minggu yang belum dimulai",
+        cwd=APLIKASI,
+    ),
     # ── alat ini sendiri: mutasi yang menunjuk uji yang sudah diganti namanya (E-222) ──
     Mutasi(
         "alat",
@@ -10421,6 +11553,884 @@ MUTASI: list[Mutasi] = [
             "test_proses_turunan_yang_menggantung_ikut_dihentikan"
         ),
         harus_memuat="pohon prosesnya tidak dihentikan",
+    ),
+    # ── Tinjauan penegak buta Sprint 5–6 (8 Okt 2026) ──
+    # Kerusakan yang dirancang tanpa melihat ujinya lebih dulu; yang LOLOS seluruh suite
+    # pada 65ce010 kini merah oleh uji yang ditambah/dikuatkan bersama blok ini.
+    # ── 5.1 Behavior projector ──
+    Mutasi(
+        "5.1",
+        "membangun ulang proyeksi menghapus aktivitas MANUAL (kosongkan tanpa saring source)",
+        [
+            Sunting(
+                f"{MODUL}/activities/repository.py",
+                "\"DELETE FROM activities WHERE user_id = :user_id AND source = 'inferred'\"",
+                '"DELETE FROM activities WHERE user_id = :user_id"',
+            )
+        ],
+        _pytest(
+            "tests/integration/test_proyektor.py::"
+            "test_proyeksi_tidak_pernah_menyentuh_aktivitas_manual"
+        ),
+        harus_memuat="membangun ulang proyeksi menghapus aktivitas manual",
+        kelompok="db",
+    ),
+    Mutasi(
+        "5.1",
+        "pencabutan proyeksi menghapus aktivitas manual ber-id sama",
+        [
+            Sunting(
+                f"{MODUL}/activities/repository.py",
+                "    WHERE id = :id AND user_id = :user_id AND source = 'inferred'\n",
+                "    WHERE id = :id AND user_id = :user_id\n",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_proyektor.py::"
+            "test_proyeksi_tidak_pernah_menyentuh_aktivitas_manual"
+        ),
+        harus_memuat="pencabutan proyeksi menghapus aktivitas manual ber-id sama",
+        kelompok="db",
+    ),
+    Mutasi(
+        "5.1",
+        "sisip proyeksi menimpa (DO UPDATE) aktivitas manual ber-id sama",
+        [
+            Sunting(
+                f"{MODUL}/activities/repository.py",
+                "'inferred', CAST(:payload AS jsonb))\n    ON CONFLICT (id) DO NOTHING\n",
+                "'inferred', CAST(:payload AS jsonb))\n"
+                "    ON CONFLICT (id) DO UPDATE SET source = 'inferred', payload = EXCLUDED.payload\n",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_proyektor.py::"
+            "test_proyeksi_tidak_pernah_menyentuh_aktivitas_manual"
+        ),
+        harus_memuat="proyeksi menimpa aktivitas manual ber-id sama",
+        kelompok="db",
+    ),
+    Mutasi(
+        "5.1",
+        "bangun ulang tidak mengosongkan dulu — proyeksi basi/yatim bertahan",
+        [
+            Sunting(
+                f"{MODUL}/intelligence/proyektor.py",
+                "        await activities.kosongkan_proyeksi(conn, user_id)\n",
+                "",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_proyektor.py::test_bangun_ulang_dari_nol_membuang_proyeksi_basi"
+        ),
+        harus_memuat="bangun ulang tidak dari nol",
+        kelompok="db",
+    ),
+    Mutasi(
+        "5.1",
+        "habit.completion_retracted tidak memicu projector (aliran langsung tak mencabut)",
+        [
+            Sunting(
+                f"{MODUL}/intelligence/proyektor.py",
+                '    "habit.completion_retracted": _proyeksikan_habit,\n',
+                "",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_proyektor.py::"
+            "test_pekerja_memproyeksikan_habit_selesai_menjadi_aktivitas_inferred"
+        ),
+        harus_memuat="pencabutan lewat pekerja tidak membuang proyeksi",
+        kelompok="db",
+    ),
+    Mutasi(
+        "5.1",
+        "konsumen projector hanya mendengar habit.completed (spec/03: SEMUA jenis)",
+        [
+            Sunting(
+                f"{MODUL}/intelligence/proyektor.py",
+                "JENIS_EVENT: frozenset[str] = frozenset(events.REGISTRY)",
+                'JENIS_EVENT: frozenset[str] = frozenset({"habit.completed"})',
+            )
+        ],
+        _pytest(
+            "tests/integration/test_proyektor.py::"
+            "test_pekerja_memproyeksikan_habit_selesai_menjadi_aktivitas_inferred"
+        ),
+        harus_memuat="pencabutan lewat pekerja tidak membuang proyeksi",
+        kelompok="db",
+    ),
+    Mutasi(
+        "5.1",
+        "teks bebas `note` ikut ke payload proyeksi (C-33)",
+        [
+            Sunting(
+                f"{MODUL}/intelligence/proyektor.py",
+                '_MEDAN_HABIT = ("completion_id", "for_date", "status", "tier_used")',
+                '_MEDAN_HABIT = ("completion_id", "for_date", "status", "tier_used", "note")',
+            )
+        ],
+        _pytest(
+            "tests/integration/test_proyektor.py::"
+            "test_bangun_ulang_dari_nol_identik_dan_tanpa_duplikat"
+        ),
+        harus_memuat="teks bebas `note` ikut ke proyeksi",
+        kelompok="db",
+    ),
+    Mutasi(
+        "5.1",
+        "pencabutan diabaikan: ada `completed` saja sudah terproyeksi",
+        [
+            Sunting(
+                f"{MODUL}/intelligence/proyektor.py",
+                "    if selesai is not None and dicabut is None:",
+                "    if selesai is not None:",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_proyektor.py::"
+            "test_bangun_ulang_dari_nol_identik_dan_tanpa_duplikat"
+        ),
+        harus_memuat="penyelesaian yang dicabut ikut terproyeksi",
+        kelompok="db",
+    ),
+    Mutasi(
+        "5.1",
+        "id proyeksi acak — bangun ulang tidak identik",
+        [
+            Sunting(
+                f"{MODUL}/intelligence/proyektor.py",
+                '    return uuid.uuid5(_NS, f"habit-completion:{completion_id}")',
+                "    return uuid.uuid4()",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_proyektor.py::"
+            "test_bangun_ulang_dari_nol_identik_dan_tanpa_duplikat"
+        ),
+        harus_memuat="bangun ulang kedua tidak identik",
+        kelompok="db",
+    ),
+    # ── 5.2 pola perilaku ──
+    Mutasi(
+        "5.2",
+        "pola yang didukung data lagi tetap luruh (upsert tak mengosongkan valid_until)",
+        [Sunting(f"{MODUL}/memory/repository.py", "      valid_until = NULL,\n", "")],
+        _pytest(
+            "tests/integration/test_pola.py::test_pola_luruh_sekali_lalu_hidup_lagi_saat_dikuatkan"
+        ),
+        harus_memuat="pola yang dikuatkan lagi tetap luruh",
+        kelompok="db",
+    ),
+    Mutasi(
+        "5.2",
+        "luruh berulang menggeser valid_until — sejarah 'dulu begini' bergeser",
+        [
+            Sunting(
+                f"{MODUL}/memory/repository.py",
+                "      AND deleted_at IS NULL AND valid_until IS NULL\n",
+                "      AND deleted_at IS NULL\n",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_pola.py::test_pola_luruh_sekali_lalu_hidup_lagi_saat_dikuatkan"
+        ),
+        harus_memuat="luruh berulang menggeser valid_until",
+        kelompok="db",
+    ),
+    Mutasi(
+        "5.2",
+        "upsert pola mengisi ulang isi memori yang sudah dilupakan (Privacy Center)",
+        [
+            Sunting(
+                f"{MODUL}/memory/repository.py",
+                "THEN NULL ELSE memories.embedding_model END\n    WHERE memories.deleted_at IS NULL\n",
+                "THEN NULL ELSE memories.embedding_model END\n",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_pola.py::test_pola_tidak_mengisi_ulang_memori_yang_dilupakan"
+        ),
+        harus_memuat="pola mengisi ulang memori yang sudah dilupakan",
+        kelompok="db",
+    ),
+    Mutasi(
+        "5.2",
+        "jam pola waktu dibaca dalam UTC, bukan zona profil",
+        [
+            Sunting(
+                f"{MODUL}/intelligence/pola.py",
+                "    jam = [e.occurred_at.astimezone(zi).hour for e in riwayat]",
+                "    jam = [e.occurred_at.hour for e in riwayat]",
+            )
+        ],
+        _pytest("tests/integration/test_pola.py::test_pola_waktu_dihitung_di_zona_profil"),
+        harus_memuat="pola waktu tidak memakai zona profil",
+        kelompok="db",
+    ),
+    Mutasi(
+        "5.2",
+        "habit dihapus: ketiga polanya tetap berlaku",
+        [
+            Sunting(
+                f"{MODUL}/intelligence/pola.py",
+                "        for mid in (id_hari, id_waktu, id_konsisten):\n"
+                "            await memory.luruhkan_pola(conn, uid, mid)\n"
+                "        return\n",
+                "        return\n",
+            )
+        ],
+        _pytest("tests/integration/test_pola.py::test_habit_dihapus_meluruhkan_semua_polanya"),
+        harus_memuat="habit dihapus, polanya masih berlaku",
+        kelompok="db",
+    ),
+    Mutasi(
+        "5.2",
+        "id pola tidak per habit — pola dua habit saling menimpa",
+        [
+            Sunting(
+                f"{MODUL}/intelligence/pola.py",
+                '    return uuid.uuid5(_NS, f"{user_id}:{habit_id}:{jenis}")',
+                '    return uuid.uuid5(_NS, f"{user_id}:{jenis}")',
+            )
+        ],
+        _pytest("tests/integration/test_pola.py::test_pola_dua_habit_tidak_saling_menimpa"),
+        harus_memuat="pola satu habit menimpa pola habit lain",
+        kelompok="db",
+    ),
+    Mutasi(
+        "5.2",
+        "B1: konsistensi '0%' dinyatakan dari nol penyelesaian (evidence_count 0)",
+        [
+            Sunting(
+                f"{MODUL}/intelligence/pola.py",
+                "    if not cukup_untuk_menyatakan(total):\n        return None\n",
+                "",
+            )
+        ],
+        _pytest(
+            "tests/unit/test_pola_murni.py::test_konsistensi_tanpa_penyelesaian_tidak_dinyatakan"
+        ),
+        harus_memuat="pola konsistensi dinyatakan dari nol penyelesaian",
+    ),
+    Mutasi(
+        "5.2",
+        "batas bagian hari bergeser (jam 11 masih pagi)",
+        [
+            Sunting(
+                f"{MODUL}/intelligence/pola.py", "    if 5 <= jam < 11:", "    if 5 <= jam <= 11:"
+            )
+        ],
+        _pytest("tests/unit/test_pola_murni.py::test_pola_waktu_batas_bagian_hari"),
+        harus_memuat="jam 11 bukan siang",
+    ),
+    Mutasi(
+        "5.2",
+        "kata kausal 'membuat' tidak dijaga (naskah 4 §7)",
+        [Sunting(f"{MODUL}/intelligence/pola.py", '    "membuat",\n', "")],
+        _pytest("tests/unit/test_pola_murni.py::test_tanpa_klaim_kausal_menolak_tiap_kata_sebab"),
+        harus_memuat="klaim sebab lolos penjaga: 'olahraga membuat",
+    ),
+    Mutasi(
+        "5.2",
+        "penjaga kausal peka huruf besar ('Karena …' lolos)",
+        [
+            Sunting(
+                f"{MODUL}/intelligence/pola.py", "    rendah = teks.lower()", "    rendah = teks"
+            )
+        ],
+        _pytest("tests/unit/test_pola_murni.py::test_tanpa_klaim_kausal_menolak_tiap_kata_sebab"),
+        harus_memuat="klaim sebab lolos penjaga: 'Karena",
+    ),
+    Mutasi(
+        "5.2",
+        "keyakinan pola tak divalidasi 0–1 sebelum ditulis",
+        [
+            Sunting(
+                f"{MODUL}/memory/perilaku.py",
+                "    if not confidence.is_finite() or not Decimal(0) <= confidence <= Decimal(1):\n"
+                '        raise ValueError("confidence wajib 0–1")\n',
+                "",
+            )
+        ],
+        _pytest(
+            "tests/unit/test_pola_murni.py::test_catat_pola_menolak_keyakinan_di_luar_0_sampai_1"
+        ),
+        harus_memuat="sampai ke basis data",
+    ),
+    Mutasi(
+        "5.2",
+        "scope pola tak diperiksa terhadap daftar resmi spec/05",
+        [
+            Sunting(
+                f"{MODUL}/memory/perilaku.py",
+                "    if scope not in identity.SCOPE_RESMI:\n"
+                '        raise ValueError("scope di luar daftar resmi spec/05")\n',
+                "",
+            )
+        ],
+        _pytest(
+            "tests/unit/test_pola_murni.py::test_catat_pola_menolak_scope_di_luar_daftar_resmi"
+        ),
+        harus_memuat="pola ber-scope tak resmi sampai ke basis data",
+    ),
+    # ── 5.3 human state ──
+    Mutasi(
+        "5.3",
+        "human_state ditulis tanpa memeriksa bentuk {value, confidence, evidence_count}",
+        [
+            Sunting(
+                f"{MODUL}/profile/repository.py",
+                "    for nama, m in metrics.items():\n"
+                "        if set(m) != _MEDAN_METRIK:\n"
+                '            raise ValueError(f"metrik {nama!r} wajib tepat {sorted(_MEDAN_METRIK)}")\n',
+                "",
+            )
+        ],
+        _pytest(
+            "tests/unit/test_human_state_murni.py::"
+            "test_simpan_human_state_menolak_metrik_tanpa_bentuk_lengkap"
+        ),
+        harus_memuat="metrik tanpa {value,confidence,evidence_count} ditulis",
+    ),
+    Mutasi(
+        "5.3",
+        "human_state tanpa satu pun metrik tidak ditolak",
+        [
+            Sunting(
+                f"{MODUL}/profile/repository.py",
+                "    if not metrics:\n"
+                '        raise ValueError("human_state tanpa metrik tidak ditulis")\n',
+                "",
+            )
+        ],
+        _pytest(
+            "tests/unit/test_human_state_murni.py::test_simpan_human_state_menolak_tanpa_metrik"
+        ),
+        harus_memuat="human_state tanpa metrik ditulis",
+    ),
+    Mutasi(
+        "5.3",
+        "check-in hanya-tidur menggagalkan penangan (konsumen mengulang tanpa henti)",
+        [Sunting(f"{MODUL}/intelligence/keadaan.py", "    if not metrik:\n", "    if False:\n")],
+        _pytest(
+            "tests/integration/test_human_state.py::"
+            "test_checkin_tanpa_energi_dan_fokus_tidak_menyatakan_keadaan"
+        ),
+        harus_memuat="human_state tanpa metrik tidak ditulis",
+        kelompok="db",
+    ),
+    Mutasi(
+        "5.3",
+        "human_state dihitung dari payload event (bisa basi), bukan check-in otoritatif",
+        [
+            Sunting(
+                f"{MODUL}/intelligence/keadaan.py",
+                "    metrik = metrik_harian(energy=checkin.energy, focus=checkin.focus)",
+                '    metrik = metrik_harian(energy=event.payload.get("energy"), '
+                'focus=event.payload.get("focus"))',
+            )
+        ],
+        _pytest(
+            "tests/integration/test_human_state.py::test_event_basi_tidak_memundurkan_human_state"
+        ),
+        harus_memuat="human_state dihitung dari payload event basi",
+        kelompok="db",
+    ),
+    Mutasi(
+        "5.3",
+        "hitung ulang human_state tidak memperbarui computed_at (pemecah seri terkini)",
+        [
+            Sunting(
+                f"{MODUL}/profile/repository.py",
+                "      metrics = EXCLUDED.metrics,\n      computed_at = now()\n",
+                "      metrics = EXCLUDED.metrics\n",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_human_state.py::test_event_basi_tidak_memundurkan_human_state"
+        ),
+        harus_memuat="tidak memperbarui computed_at",
+        kelompok="db",
+    ),
+    Mutasi(
+        "5.3",
+        "B2: check-in dikoreksi jadi tanpa metrik — human_state lama bertahan basi",
+        [
+            Sunting(
+                f"{MODUL}/intelligence/keadaan.py",
+                "        await profile.hapus_human_state("
+                "conn, event.user_id, for_date=for_date, model_version=MODEL)\n",
+                "",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_human_state.py::"
+            "test_koreksi_checkin_tanpa_metrik_tidak_meninggalkan_keadaan_basi"
+        ),
+        harus_memuat="human_state basi bertahan sesudah check-in dikoreksi",
+        kelompok="db",
+    ),
+    Mutasi(
+        "6.1",
+        "dashboard menyajikan human_state TERLAMA (urut for_date naik)",
+        [
+            Sunting(
+                f"{MODUL}/profile/repository.py",
+                "    ORDER BY for_date DESC, computed_at DESC\n",
+                "    ORDER BY for_date ASC, computed_at DESC\n",
+            )
+        ],
+        _pytest("tests/integration/test_human_state.py::test_dashboard_menyajikan_hari_terbaru"),
+        harus_memuat="dashboard tidak menyajikan hari terbaru",
+        kelompok="db",
+    ),
+    # ── 5.4 Confidence Layer — enam kerusakan dicoba, semuanya tertangkap; dua jadi bukti ──
+    Mutasi(
+        "5.4",
+        "satu bukti tidak lagi cukup (>= jadi >) — ambang bergeser diam-diam",
+        [
+            Sunting(
+                f"{MODUL}/intelligence/keyakinan.py",
+                "evidence_count >= BUKTI_MINIMUM",
+                "evidence_count > BUKTI_MINIMUM",
+            )
+        ],
+        _pytest("tests/unit/test_keyakinan.py::test_satu_bukti_cukup_untuk_menyatakan"),
+        harus_memuat="satu bukti harus boleh MENYATAKAN",
+    ),
+    Mutasi(
+        "5.4",
+        "bukti negatif (mustahil) dianggap cukup untuk menyatakan",
+        [
+            Sunting(
+                f"{MODUL}/intelligence/keyakinan.py",
+                "evidence_count >= BUKTI_MINIMUM",
+                "abs(evidence_count) >= BUKTI_MINIMUM",
+            )
+        ],
+        _pytest("tests/unit/test_keyakinan.py::test_negatif_yang_mustahil_tetap_bertanya"),
+        harus_memuat="bukti negatif harus BERTANYA",
+    ),
+    # ── 5.5 mesin rekomendasi ──
+    Mutasi(
+        "5.5",
+        "id rekomendasi mesin acak (bukan uuid5) — skip yang disalurkan ulang menggandakan",
+        [
+            Sunting(
+                f"{MODUL}/intelligence/mesin.py",
+                '        id_=uuid.uuid5(_NS, f"habit-reengage:{habit_id}:{for_date.isoformat()}"),',
+                "        id_=uuid.uuid4(),",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_rekomendasi.py::"
+            "test_skip_disalurkan_ulang_tidak_menggandakan_dan_tidak_menimpa_status"
+        ),
+        harus_memuat="skip yang disalurkan ulang menggandakan rekomendasi",
+        kelompok="db",
+    ),
+    Mutasi(
+        "5.5",
+        "sisip mesin tanpa ON CONFLICT DO NOTHING — penyaluran ulang gagal (konsumen macet)",
+        [
+            Sunting(
+                f"{MODUL}/intelligence/repository.py",
+                "CAST(:context_snapshot AS jsonb))\n    ON CONFLICT (id) DO NOTHING\n",
+                "CAST(:context_snapshot AS jsonb))\n",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_rekomendasi.py::"
+            "test_skip_disalurkan_ulang_tidak_menggandakan_dan_tidak_menimpa_status"
+        ),
+        harus_memuat="recommendations_pkey",
+        kelompok="db",
+    ),
+    Mutasi(
+        "5.5",
+        "penyaluran ulang mengembalikan pilihan pengguna ke pending (DO UPDATE)",
+        [
+            Sunting(
+                f"{MODUL}/intelligence/repository.py",
+                "    ON CONFLICT (id) DO NOTHING\n    RETURNING id\n",
+                "    ON CONFLICT (id) DO UPDATE SET status = 'pending', score = EXCLUDED.score\n"
+                "    RETURNING id\n",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_rekomendasi.py::"
+            "test_skip_disalurkan_ulang_tidak_menggandakan_dan_tidak_menimpa_status"
+        ),
+        harus_memuat="penyaluran ulang menimpa status pilihan pengguna",
+        kelompok="db",
+    ),
+    Mutasi(
+        "5.5",
+        "check-in satu hari menyegarkan rekomendasi hari lain",
+        [
+            Sunting(
+                f"{MODUL}/intelligence/repository.py",
+                "      AND context_snapshot->>'for_date' = :for_date\n",
+                "",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_rekomendasi.py::"
+            "test_checkin_hanya_menyegarkan_rekomendasi_hari_itu"
+        ),
+        harus_memuat="check-in satu hari menyegarkan rekomendasi hari lain",
+        kelompok="db",
+    ),
+    Mutasi(
+        "5.5",
+        "penyegaran skor tidak memperbarui context_snapshot",
+        [
+            Sunting(
+                f"{MODUL}/intelligence/mesin.py",
+                '            context_snapshot={"for_date": for_date.isoformat(), **komponen},\n'
+                "            body=body,\n",
+                "            context_snapshot=snap,\n            body=body,\n",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_rekomendasi.py::"
+            "test_checkin_hanya_menyegarkan_rekomendasi_hari_itu"
+        ),
+        harus_memuat="context_snapshot tidak mengikuti energi terbaru",
+        kelompok="db",
+    ),
+    Mutasi(
+        "5.5",
+        "komponen history (penyelesaian 30 hari) tidak ikut dalam skor",
+        [
+            Sunting(
+                f"{MODUL}/intelligence/mesin.py",
+                "    if rentetan is not None and rentetan.completion_rate_30d is not None:\n"
+                '        komponen["history"]',
+                '    if False:\n        komponen["history"]',
+            )
+        ],
+        _pytest(
+            "tests/integration/test_rekomendasi.py::"
+            "test_history_ikut_dan_bertahan_saat_konteks_disegarkan"
+        ),
+        harus_memuat="komponen history tidak ikut dalam skor",
+        kelompok="db",
+    ),
+    Mutasi(
+        "5.5",
+        "penyegaran check-in membuang komponen history yang tersimpan",
+        [
+            Sunting(
+                f"{MODUL}/intelligence/mesin.py",
+                '        if "history" in snap:\n            komponen["history"] = float(snap["history"])\n',
+                "",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_rekomendasi.py::"
+            "test_history_ikut_dan_bertahan_saat_konteks_disegarkan"
+        ),
+        harus_memuat="penyegaran check-in membuang komponen history",
+        kelompok="db",
+    ),
+    # ── 5.6 umpan balik ──
+    Mutasi(
+        "5.6",
+        "outcome umpan balik (apa yang dipilih sebagai ganti) tidak disimpan",
+        [
+            Sunting(
+                f"{MODUL}/intelligence/umpan_balik.py",
+                "            outcome=badan.outcome,\n",
+                "            outcome={},\n",
+            )
+        ],
+        _pytest("tests/integration/test_umpan_balik.py::test_outcome_umpan_balik_tersimpan"),
+        harus_memuat="outcome umpan balik tidak disimpan",
+        kelompok="db",
+    ),
+    Mutasi(
+        "5.6",
+        "status diubah di transaksi KEDUA — umpan balik tertinggal saat status gagal (K-37)",
+        [
+            Sunting(
+                f"{MODUL}/intelligence/umpan_balik.py",
+                "        baru = status_sesudah(status_kini, badan.action)\n"
+                "        if baru != status_kini:\n"
+                "            await repository.set_status_rekomendasi(conn, rekomendasi_id, user_id, baru)\n"
+                "        return hasil\n",
+                "    baru = status_sesudah(status_kini, badan.action)\n"
+                "    if baru != status_kini:\n"
+                "        async with platform.transaksi_pengguna(engine, user_id) as conn2:\n"
+                "            await repository.set_status_rekomendasi(conn2, rekomendasi_id, user_id, baru)\n"
+                "    return hasil\n",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_umpan_balik.py::test_umpan_balik_dan_status_satu_transaksi"
+        ),
+        harus_memuat="bukan satu transaksi (K-37)",
+        kelompok="db",
+    ),
+    # ── 6.1 dashboard & daftar rekomendasi ──
+    Mutasi(
+        "6.1",
+        "daftar rekomendasi urut terlama dulu (spec/04: terbaru dulu)",
+        [
+            Sunting(
+                f"{MODUL}/intelligence/repository.py",
+                "    ORDER BY created_at DESC, id DESC\n    LIMIT :batas\n",
+                "    ORDER BY created_at ASC, id ASC\n    LIMIT :batas\n",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_dashboard.py::test_daftar_rekomendasi_terbaru_dulu_dan_terbatas"
+        ),
+        harus_memuat="daftar rekomendasi bukan terbaru dulu",
+        kelompok="db",
+    ),
+    Mutasi(
+        "6.1",
+        "daftar rekomendasi tanpa batas (halaman tidak dipotong; LIMIT ALL di SQL ekuivalen sejak E-239)",
+        [
+            Sunting(
+                f"{MODUL}/intelligence/rekomendasi.py",
+                "        items = items[:batas]\n",
+                "        pass\n",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_dashboard.py::test_daftar_rekomendasi_terbaru_dulu_dan_terbatas"
+        ),
+        harus_memuat="daftar rekomendasi tidak dibatasi 50",
+        kelompok="db",
+    ),
+    Mutasi(
+        "6.1",
+        "saring ?domain= diabaikan",
+        [
+            Sunting(
+                f"{MODUL}/intelligence/repository.py",
+                "      AND (CAST(:domain AS text) IS NULL OR domain = :domain)\n",
+                "",
+            )
+        ],
+        _pytest("tests/integration/test_dashboard.py::test_daftar_rekomendasi_menyaring_domain"),
+        harus_memuat="saring domain diabaikan",
+        kelompok="db",
+    ),
+    Mutasi(
+        "6.1",
+        "tandai shown menarik mundur rekomendasi yang sudah diterima",
+        [
+            Sunting(
+                f"{MODUL}/intelligence/repository.py",
+                "    UPDATE recommendations SET status = 'shown', shown_at = now()\n"
+                "    WHERE id = :id AND user_id = :user_id AND status = 'pending'\n",
+                "    UPDATE recommendations SET status = 'shown', shown_at = now()\n"
+                "    WHERE id = :id AND user_id = :user_id\n",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_dashboard.py::"
+            "test_tandai_shown_tidak_menarik_mundur_keputusan_dan_mengisi_shown_at"
+        ),
+        harus_memuat="tandai shown menarik mundur rekomendasi yang sudah diterima",
+        kelompok="db",
+    ),
+    Mutasi(
+        "6.1",
+        "tandai shown tidak mengisi shown_at",
+        [
+            Sunting(
+                f"{MODUL}/intelligence/repository.py",
+                "    UPDATE recommendations SET status = 'shown', shown_at = now()\n",
+                "    UPDATE recommendations SET status = 'shown'\n",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_dashboard.py::"
+            "test_tandai_shown_tidak_menarik_mundur_keputusan_dan_mengisi_shown_at"
+        ),
+        harus_memuat="tandai shown tidak mengisi shown_at",
+        kelompok="db",
+    ),
+    Mutasi(
+        "6.1",
+        "Why dimensi memakai key mentah, bukan label manusiawi",
+        [
+            Sunting(
+                f"{MODUL}/intelligence/dasbor.py",
+                '_LABEL: dict[str, str] = {"energy": "Energi", "focus": "Fokus"}',
+                "_LABEL: dict[str, str] = {}",
+            )
+        ],
+        _pytest("tests/unit/test_dasbor_murni.py::test_why_memakai_label_manusiawi"),
+        harus_memuat="Why memakai key mentah",
+    ),
+    # ── 6.5 Stage A: DELETE /me · POST /me/restore · login pending_deletion · migrasi 0010 ──
+    Mutasi(
+        "6.5",
+        "tenggang hapus akun bukan 30 hari (spec/01 tahap 2)",
+        [
+            Sunting(
+                f"{MODUL}/identity/service.py",
+                "TENGGANG_HAPUS_HARI = 30",
+                "TENGGANG_HAPUS_HARI = 3",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_hapus_akun.py::test_jadwal_hapus_tepat_30_hari_dan_berjejak"
+        ),
+        harus_memuat="tenggang hapus bukan 30 hari",
+        kelompok="db",
+    ),
+    Mutasi(
+        "6.5",
+        "penjadwalan hapus akun tanpa jejak audit",
+        [
+            Sunting(
+                f"{MODUL}/identity/service.py",
+                '                aksi="account.deletion_scheduled",',
+                '                aksi="account.deletion_scheduled_x",',
+            )
+        ],
+        _pytest(
+            "tests/integration/test_hapus_akun.py::test_jadwal_hapus_tepat_30_hari_dan_berjejak"
+        ),
+        harus_memuat="jadwal hapus tanpa jejak audit",
+        kelompok="db",
+    ),
+    Mutasi(
+        "6.5",
+        "DELETE /me berulang menyetel ulang jam tenggang",
+        [
+            Sunting(
+                f"{MODUL}/identity/repository.py",
+                "    WHERE id = :id AND status = 'active'\n    RETURNING deletion_scheduled_at\n",
+                "    WHERE id = :id AND status IN ('active', 'pending_deletion')\n"
+                "    RETURNING deletion_scheduled_at\n",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_hapus_akun.py::"
+            "test_delete_berulang_tidak_menyetel_ulang_jam_tenggang"
+        ),
+        harus_memuat="DELETE berulang mengembalikan jadwal berbeda",
+        kelompok="db",
+    ),
+    Mutasi(
+        "6.5",
+        "DELETE /me berulang dalam tenggang ditolak 409 (jadwal lama tak dikembalikan)",
+        [
+            Sunting(
+                f"{MODUL}/identity/service.py",
+                "            dijadwalkan = kini.deletion_scheduled_at if kini is not None else None\n",
+                "            dijadwalkan = None\n",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_hapus_akun.py::"
+            "test_delete_berulang_tidak_menyetel_ulang_jam_tenggang"
+        ),
+        harus_memuat="DELETE /me berulang ditolak",
+        kelompok="db",
+    ),
+    Mutasi(
+        "6.5",
+        "restore tanpa jejak audit",
+        [
+            Sunting(
+                f"{MODUL}/identity/service.py",
+                '                aksi="account.deletion_cancelled",',
+                '                aksi="account.deletion_cancelled_x",',
+            )
+        ],
+        _pytest("tests/integration/test_hapus_akun.py::test_restore_berjejak_sekali"),
+        harus_memuat="restore tanpa jejak audit",
+        kelompok="db",
+    ),
+    Mutasi(
+        "6.5",
+        "tebakan sandi di DELETE /me tidak berjejak",
+        [
+            Sunting(
+                f"{MODUL}/identity/service.py",
+                '        aksi_ditolak="account.deletion_rejected",',
+                '        aksi_ditolak="account.deletion_rejected_x",',
+            )
+        ],
+        _pytest("tests/integration/test_hapus_akun.py::test_sandi_salah_saat_hapus_berjejak"),
+        harus_memuat="tebakan sandi di DELETE /me tidak berjejak",
+        kelompok="db",
+    ),
+    Mutasi(
+        "6.5",
+        "penyegaran token akun pending_deletion ditolak — restore hanya selama token akses hidup",
+        [
+            Sunting(
+                f"{MODUL}/identity/service.py",
+                "        aktif = akun is not None and akun.status in _STATUS_SESI_SAH",
+                '        aktif = akun is not None and akun.status == "active"',
+            )
+        ],
+        _pytest("tests/integration/test_hapus_akun.py::test_sesi_pending_deletion_bisa_disegarkan"),
+        harus_memuat="penyegaran sesi pending_deletion ditolak",
+        kelompok="db",
+    ),
+    Mutasi(
+        "6.5",
+        "migrasi 0010: deletion_scheduled_at tanpa zona waktu (≠ spec/01)",
+        [
+            Sunting(
+                f"{MIGRASI}/0010_jadwal_hapus_akun.up.sql",
+                "  ADD COLUMN deletion_scheduled_at timestamptz;",
+                "  ADD COLUMN deletion_scheduled_at timestamp;",
+            )
+        ],
+        _pytest(f"{UJI_MIGRASI}::test_migrasi_menghasilkan_skema_yang_sama_persis_dengan_spec01"),
+        harus_memuat="deletion_scheduled_at', 'timestamp without time zone'",
+        kelompok="db",
+    ),
+    # ── 5.2 (lanjutan): riwayat penyelesaian hidup yang menjadi bahan pola ──
+    Mutasi(
+        "5.2",
+        "riwayat pola tanpa saring habit — penyelesaian habit lain ikut terhitung",
+        [Sunting(f"{MODUL}/events/proyeksi.py", "      AND c.subject_id = :habit_id\n", "")],
+        _pytest("tests/integration/test_pola.py::test_pola_dua_habit_tidak_saling_menimpa"),
+        harus_memuat="pola satu habit menghitung penyelesaian habit lain",
+        kelompok="db",
+    ),
+    Mutasi(
+        "5.2",
+        "riwayat pola menghitung habit.skipped sebagai penyelesaian",
+        [
+            Sunting(
+                f"{MODUL}/events/proyeksi.py",
+                "      AND c.event_type = 'habit.completed'\n",
+                "      AND c.event_type IN ('habit.completed', 'habit.skipped')\n",
+            )
+        ],
+        _pytest("tests/integration/test_pola.py::test_lewati_bukan_penyelesaian_dalam_pola"),
+        harus_memuat="hari yang dilewati dihitung sebagai penyelesaian",
+        kelompok="db",
+    ),
+    Mutasi(
+        "5.2",
+        "pencabutan dicocokkan tanpa completion_id — satu pencabutan menyembunyikan semua",
+        [
+            Sunting(
+                f"{MODUL}/events/proyeksi.py",
+                "          AND r.payload ->> 'completion_id' = c.payload ->> 'completion_id'\n",
+                "",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_pola.py::test_pola_luruh_sekali_lalu_hidup_lagi_saat_dikuatkan"
+        ),
+        harus_memuat="pola yang dikuatkan lagi tetap luruh",
+        kelompok="db",
     ),
 ]
 

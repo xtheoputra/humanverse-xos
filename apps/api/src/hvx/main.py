@@ -24,6 +24,7 @@ from hvx.modules import (
     activities,
     agents,
     checkins,
+    events,
     goals,
     habits,
     identity,
@@ -139,6 +140,37 @@ def create_app(settings: platform.Settings | None = None) -> FastAPI:
     # Jurnal diubah/dihapus → memori episodiknya mengikuti, di transaksi yang sama
     # (spec/07 3.6): kalimat yang dihapus pemiliknya tidak hidup terus di memori.
     app.state.pendengar_jurnal_berubah = (memory.selaraskan_jurnal,)
+    # Privacy Center (spec/07 6.4, K-41 · K-42): tiap modul menyatakan tabelnya sendiri dan
+    # turunan yang ikut terhapus bersama sumbernya; `identity` meringkas, mengekspor, dan
+    # menghapus tanpa mengimpor satu pun. Tiap tabel ber-`user_id` spec/01 tepat sekali —
+    # `tests/unit/test_cakupan_privasi.py`.
+    app.state.bagian_privasi = (
+        *identity.BAGIAN_PRIVASI,
+        *profile.BAGIAN_PRIVASI,
+        *goals.BAGIAN_PRIVASI,
+        *habits.BAGIAN_PRIVASI,
+        *checkins.BAGIAN_PRIVASI,
+        *journal.BAGIAN_PRIVASI,
+        *activities.BAGIAN_PRIVASI,
+        *events.BAGIAN_PRIVASI,
+        *memory.BAGIAN_PRIVASI,
+        *intelligence.BAGIAN_PRIVASI,
+        *agents.BAGIAN_PRIVASI,
+    )
+    app.state.penghapus_privasi = (
+        *goals.PENGHAPUS_PRIVASI,
+        *habits.PENGHAPUS_PRIVASI,
+        *checkins.PENGHAPUS_PRIVASI,
+        *journal.PENGHAPUS_PRIVASI,
+        *activities.PENGHAPUS_PRIVASI,
+        *profile.PENGHAPUS_PRIVASI,
+        *events.PENGHAPUS_PRIVASI,
+        *memory.PENGHAPUS_PRIVASI,
+        *intelligence.PENGHAPUS_PRIVASI,
+        *agents.PENGHAPUS_PRIVASI,
+    )
+    # …dan izin per agent dari registry yang SAMA dengan yang ditegakkan gerbang risiko.
+    app.state.katalog_izin_agent = agents.izin_diminta(registri)
     platform.pasang_penangan_galat(app)
     # Yang ditambahkan TERAKHIR paling luar: 429 batas laju tetap membawa
     # X-Request-ID dan tercatat di baris `request.completed`. Batas ukuran badan
@@ -155,13 +187,19 @@ def create_app(settings: platform.Settings | None = None) -> FastAPI:
             allow_origins=list(settings.asal_cors),
             allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
             allow_headers=["Authorization", "Content-Type", "Idempotency-Key", "X-Request-ID"],
-            expose_headers=["Retry-After", "X-Request-ID", "Idempotent-Replayed"],
+            expose_headers=[
+                "Retry-After",
+                "X-Request-ID",
+                "Idempotent-Replayed",
+                "Content-Disposition",  # nama berkas ekspor Privacy Center (6.4)
+            ],
             allow_credentials=False,
             max_age=600,
         )
     app.include_router(platform.router)
     app.include_router(identity.router)
     app.include_router(identity.router_akun)
+    app.include_router(identity.router_privasi)
     app.include_router(profile.router)
     app.include_router(goals.router)
     app.include_router(habits.router)

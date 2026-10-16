@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Annotated
+from typing import Annotated, Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, SecretStr, model_validator
@@ -115,3 +115,80 @@ class JawabanHapusDijadwalkan(BaseModel):
 
 class JawabanRestore(BaseModel):
     status: str = "active"
+
+
+# ── spec/07 6.4 — Privacy Center (`/v1/privacy/*`, K-41…K-43) ─────────────────
+
+
+class PermintaanSandiUlang(BaseModel):
+    """Ekspor dan hapus data — sandi diminta ulang (OWASP ASVS V3.7.1), seperti `DELETE /me`."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    password: SecretStr = Field(min_length=1, max_length=PANJANG_MAKS)
+
+
+class TabelKategori(BaseModel):
+    """Satu baris layar Privacy Center — jumlah, bukan isi (spec/04)."""
+
+    key: str
+    label: str
+    count: int  # baris yang kamu catat
+    derived_count: int  # baris yang sistem turunkan darinya
+    tables: dict[str, int]
+    deletable: bool
+    retention: str
+    why_not_deletable: str | None
+
+
+class TakDikumpulkan(BaseModel):
+    key: str
+    label: str
+
+
+class RingkasanPrivasi(BaseModel):
+    categories: list[TabelKategori]
+    not_collected: list[TakDikumpulkan]
+
+
+class IzinBerlaku(BaseModel):
+    scope: str
+    action: str
+    decision: Literal["allow", "deny", "ask"]
+    source: Literal["user", "default"]
+    expires_at: datetime | None
+    sensitive: bool
+    confirm_each_time: bool
+
+
+class IzinAgent(BaseModel):
+    subject_type: Literal["agent"]
+    subject_id: str
+    purpose: list[str]
+    permissions: list[IzinBerlaku]
+
+
+class DaftarIzinAgent(BaseModel):
+    agents: list[IzinAgent]
+
+
+class PermintaanIzin(BaseModel):
+    """`PUT /privacy/permissions/{subject_type}/{subject_id}/{scope}` — `ask` = tanya lagi."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    action: Literal["read", "write", "execute", "share", "delete"]
+    decision: Literal["allow", "deny", "ask"]
+    expires_at: platform.WaktuBerzona | None = None
+
+
+class JawabanEkspor(BaseModel):
+    export_id: UUID
+    status: Literal["ready", "downloaded"]
+    expires_at: datetime
+    download_url: str | None = None
+
+
+class JawabanHapusData(BaseModel):
+    category: str
+    deleted: dict[str, int]  # tabel → baris yang dihapus, termasuk turunan

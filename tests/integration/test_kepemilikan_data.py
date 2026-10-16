@@ -213,6 +213,8 @@ DEFINER_DIIZINKAN = {
     "akun_jatuh_tempo": "hvx_pekerja",  # SIAPA yang tenggang 30 harinya habis (hanya baca)
     "kunci_akun_jatuh_tempo": "hvx_pekerja",  # kunci barisnya sementara Qdrant dibersihkan
     "hapus_akun_jatuh_tempo": "hvx_pekerja",  # tahap 5 · 3 · 6 dalam satu transaksi
+    # Privacy Center 6.4 (K-42): HAPUS event milik pengguna yang sedang dilayani saja.
+    "hapus_event_pengguna": "hvx_app",
 }
 NL = chr(10)
 

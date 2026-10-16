@@ -13,7 +13,7 @@ Belum ada rilis. `master` adalah satu-satunya garis yang dipelihara.
 
 ---
 
-## Yang dijaga sejak Sprint 0–3 — dan penegaknya
+## Yang dijaga sejak Sprint 0–6 — dan penegaknya
 
 Setiap baris di bawah punya penegak yang **terbukti sanggup gagal**
 (`tools/uji_mutasi.py` · `tools/uji_mutasi_kode.py`). Baris yang penegaknya
@@ -63,6 +63,12 @@ hanya sebagian ditulis dengan batasnya.
 | hapus & sunting jurnal menjangkau turunannya (K-27) | isi memori dikosongkan di transaksi hapus jurnalnya; titik vektor dan barisnya dibuang penyelaras; sunting → vektor disemat ulang | `test_memori.py` · mutasi *pendengar tak dipanggil*, *titik tertinggal* |
 | `jsonb` dari klien (S5) | ≤ 32 tingkat bersarang — `payload` aktivitas dan `preferences` profil; badan yang terlalu dalam untuk pengurai JSON → `400` | `test_aktivitas.py` · `test_profil.py` · mutasi |
 | satu pengguna tidak membekukan pekerja (S2) | penyematan di thread, ≤ 20.000 karakter per memori, 50 memori per gelombang; Qdrant tidak pernah dipanggil sambil memegang kunci baris (K3) | `test_memori.py` · mutasi |
+| Privacy Center (6.4, **K-41 … K-43**) | `summary` hanya **jumlah** per kategori, satu potret; ekspor: sandi ulang, ≤ 5 per jam, dibangun saat diunduh, **sekali pakai** (satu skrip Lua), tanpa rahasia di URL, tanpa `password_hash`, `Cache-Control: no-store`, tercatat `data.export_requested` · `data.exported`; hapus per kategori **keras** beserta turunannya (event · memori · human state · rekomendasi · **proyeksi `inferred`** — E-232) lewat fungsi sempit `hapus_event_pengguna`; tiap tabel ber-`user_id` masuk tepat satu kategori | `test_privacy_center.py` · `test_cakupan_privasi.py` · mutasi `6.4` |
+| sandi ulang sebelum tindakan tak terbatalkan (`DELETE /me` · ekspor · hapus data) | memakai jatah login gagal **per akun** (E-226) **dan** jatah **per IP** login (E-233), keduanya **sebelum** argon2 — token akses curian bukan jalan menebak sandi, dan satu akun tidak bisa memaksa argon2 64 MiB lebih sering daripada pintu login | `test_privacy_center.py` (`…berbagi_jatah_dengan_login_gagal` · `…dibatasi_per_ip_seperti_login`) · mutasi |
+| turunan tidak lolos hapus kategori (E-234) | konsumen pekerja yang menurunkan data mengambil `platform.kunci_turunan` **bersama**; hapus kategori mengambilnya **eksklusif** sebagai pernyataan pertama — turunan yang sedang ditulis selesai lebih dulu lalu ikut terhapus, yang berikutnya tidak lagi menemukan event sumbernya | `test_privacy_center.py::test_hapus_kategori_tidak_balapan_dengan_konsumen_yang_menurunkan_datanya` · mutasi |
+| akun yang dihapus tidak hidup lagi di jejak audit (**K-39** · **K-46**) | id asli diganti id semu di semua kolom; `ip_hash` **dikosongkan** (C-34, migrasi 0013); token segar atau sesi lama sesudah sapuan **tidak** menulis jejak atas id aslinya — penulisannya memegang baris akun `FOR KEY SHARE` dan berhenti bila akunnya sudah tiada (E-235) | `test_sapuan_hapus_akun.py` · mutasi `6.5b` · `K-46` |
+| `mood` = data kesehatan jiwa (**C-32**, K-46) | scope **sensitif**: tak ada agent yang membacanya tanpa `allow` yang disimpan pengguna; terlarang bagi agent pihak ketiga (aturan 6); delegasi yang tak membacanya tidak ditanya (E-227) | `test_izin.py` · `test_gerbang_risiko.py` · `test_registri_agent.py` · mutasi `K-46` · `E-227` |
+| hapus jurnal = hapus **keras** (**C-31**, K-46) | baris, event `journal.created`-nya, dan memori turunannya di satu transaksi; jurnal hapus-lunak lama dibersihkan migrasi 0013 | `test_jurnal.py` · `test_privacy_center.py` · mutasi `K-46` |
 
 ## 🛑 Yang BELUM dijaga — dan diketahui
 
@@ -75,8 +81,6 @@ hanya sebagian ditulis dengan batasnya.
 | **galat yang bukan galat basis data** dicatat apa adanya | pesan galat kode sendiri yang mengutip nilai pengguna akan sampai ke log | konvensi `AGENTS.md` — pesan galat tidak mengutip nilai; belum ada penegak |
 | **batas per IP di balik penyeimbang beban** | uvicorn membaca `X-Forwarded-For` hanya dari `FORWARDED_ALLOW_IPS` (bawaan `127.0.0.1`); di belakang proksi lain, **semua klien berbagi IP proksi** — satu jatah untuk semua | D1+: isi `FORWARDED_ALLOW_IPS` dengan alamat proksi (arch/09) |
 | **daftar tolak sandi berbasis aturan**, bukan daftar sandi bocor | pola dan kata konteks tertangkap; sandi 15+ karakter yang pernah bocor di layanan lain **tidak** | pemeriksaan sandi bocor butuh daftar besar atau layanan luar (B-2) — belum diputuskan |
-| ekspor belum tercatat di audit | fiturnya belum ada (hapus akun sudah tercatat: `account.deletion_scheduled` · `account.deletion_cancelled` · `account.deletion_rejected` · `account.deleted`) | tugas 6.4 |
-| **`ip_hash` tetap di baris audit yang dipertahankan sesudah akun dihapus** (**C-34**) | `user_id` dan id lain diganti id semu, tetapi HMAC jaringan klien tetap — ia menghubungkan baris-baris audit antar-akun, dan siapa pun yang memegang `HVX_IP_HASH_KEY` dapat mencocokkan alamat yang ditebak | pemilik — butir C (arti *“hapus”* dan retensi audit) |
 | **sandi peran login api di D0** tertulis di `.env` / bawaan compose | kredensial lokal `*-dev-only` | D1+: peran dibuat infrastruktur dengan sandi dari pengelola rahasia (arch/09 §5 aturan 3) |
 | **PR merah tidak terhalang digabung** | merah-hijaunya kini **terlihat** sebagai status `ci-lokal` (gerbang lokal, **H-26** tanpa tagihan — Actions dimatikan, [#160](../../issues/160)), tetapi perlindungan branch & ruleset tidak tersedia untuk repo privat pada paket akun ini (HTTP 403). Status `ci-lokal` bukti kejujuran, bukan penghalang: siapa pun yang punya akses tulis bisa menempelkannya | pemilik — paket akun. Sampai itu: gerbangnya HUMAN REVIEW (H-25) |
 | B-1 *kode agent tidak mengimpor `security/`* | belum bisa dinyatakan: V0 belum punya `security/` | tugas 4.5 |
@@ -84,9 +88,12 @@ hanya sebagian ditulis dengan batasnya.
 | eskalasi krisis untuk jurnal | `journal_entries.safety_flag` ada, jalurnya tidak | [#21](../../issues/21) — pemilik |
 | **Qdrant tanpa kunci API di D0** | port hanya `127.0.0.1`; siapa pun di mesin itu membaca koleksi — vektor berkunci per pengguna, tanpa isi | D1+: `HVX_QDRANT_API_KEY` dari pengelola rahasia |
 | **sematan tidak terenkripsi** (catatan naskah 145) | vektor turunan jurnal tersimpan di Qdrant berkunci, bukan terenkripsi | pemilik — butir C |
-| **hapus jurnal = hapus-lunak** (**C-31**) | isi jurnal tersimpan sampai akun dihapus; memori turunannya sudah dikosongkan seketika | pemilik |
 | **teks bebas di payload event** (**C-33**) | catatan penyelesaian, alasan lewat, judul habit/goal, label mood tetap di `events` sesudah pemiliknya mencabutnya | pemilik |
 | rujukan stream milik akun yang dihapus | stream Redis membawa id · pemilik · jenis event (tanpa isi) — tidak dibuang per akun; hilang saat dipangkas menurut kursor relay, dan di stream mati sesudah 7 hari. Titik Qdrant-nya sudah dibuang sapuan (6.5) | diterima V0 (**K-25**, **K-39**) — butir C bila pemilik menuntut lebih |
+| **kunci Redis milik akun yang dihapus** hidup sampai TTL-nya | ekspor `ready` (≤ 1 jam), cache & generasi izin (≤ 24 jam), kunci laju, dan penanda token segar `bekas` (**30 hari**, membawa `user_id` asli) — sesudah E-235 penanda itu tak lagi bisa menulis jejak, tetapi id aslinya tetap tersimpan | pemilik — **C-38** (retensi) |
+| **memori `coaching_notes` dari percakapan** tidak ikut terhapus bersama percakapannya | K-42 tidak memetakan turunan untuk kategori `conversations` | pemilik — **C-37** |
+| **pekerja O(N) per event** | proyektor mencari `payload ->> 'completion_id'` (tak terjangkau indeks GIN `jsonb_path_ops`) dan pola memuat seluruh riwayat satu habit per event — satu akun yang menulis cepat memperlambat grup konsumen bersama | **B-43** — indeks/jendela, sebelum D1 |
+| jatah per IP sandi ulang **dibagi** dengan login (E-233) | pengguna di balik NAT operator berbagi 30 percobaan / 10 menit untuk login **dan** sandi ulang | diterima V0 — sama dengan login |
 | kursor relay hidup di Redis | Redis yang kehilangan datanya memutar ulang riwayat event — konsumen wajib idempoten (spec/03) | diterima V0 (**K-25**) |
 | pembangunan citra tidak sepenuhnya reprodusibel | `apt-get upgrade` saat membangun menarik tambalan Debian hari itu | dipilih sadar: citra dasar yang dipatok digest tidak pernah menerima tambalan sendiri |
 
