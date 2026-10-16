@@ -529,7 +529,7 @@ DELETE /privacy/data/{category}  { password }   → 202 { category, deleted: { <
 >   | `activities` | `activities` |
 >   | `memories` | seluruh memori — *“lupakan semua yang kamu ingat tentangku”*; sumbernya tetap |
 >   | `conversations` | percakapan dan pesannya |
->   | `recommendations` | rekomendasi dan umpan baliknya |
+>   | `recommendations` | rekomendasi dan umpan baliknya · 🔧 jejak tugas terjadwal `scheduled_runs` (V1, [`08`](08-BACKLOG-V1.md) 7.3, **K-48**) — tugas malamnya lalu berjalan lagi untuk hari yang masih dalam jangkauan (hari ini · kemarin) |
 >   | `history` | seluruh riwayat event (sisa teks bebas C-33) · memori pola perilaku (`kind='behavioral'`) · 🔧 seluruh proyeksi `activities` `source='inferred'` — tanpa riwayatnya, membangun ulang pun tak melahirkannya lagi (E-232) |
 >
 >   `account` · `profile` · `audit` **tidak** bisa dihapus di sini (`409
