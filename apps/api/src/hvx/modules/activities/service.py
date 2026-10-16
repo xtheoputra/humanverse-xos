@@ -90,6 +90,37 @@ async def catat_disimpulkan(
     )
 
 
+async def catat_proyeksi(
+    conn: AsyncConnection,
+    user_id: UUID,
+    *,
+    id_: UUID,
+    kind: str,
+    occurred_at: datetime,
+    payload: dict[str, Any] | None = None,
+) -> None:
+    """Satu baris proyeksi Behavior projector (spec/07 5.1) — `source='inferred'`, `id`
+    DETERMINISTIK dari event sumber, idempoten (kirim/putar ulang tidak menggandakan)."""
+    await repository.sisip_proyeksi(
+        conn,
+        id_=id_,
+        user_id=user_id,
+        kind=kind,
+        occurred_at=occurred_at,
+        payload=payload or {},
+    )
+
+
+async def hapus_proyeksi(conn: AsyncConnection, user_id: UUID, id_: UUID) -> None:
+    """Buang satu baris proyeksi `inferred` (penyelesaian yang dicabut) — idempoten."""
+    await repository.hapus_proyeksi(conn, id_=id_, user_id=user_id)
+
+
+async def kosongkan_proyeksi(conn: AsyncConnection, user_id: UUID) -> int:
+    """Buang seluruh proyeksi `inferred` pengguna — langkah "dari nol" membangun ulang."""
+    return await repository.kosongkan_proyeksi(conn, user_id=user_id)
+
+
 async def daftar(
     engine: AsyncEngine,
     user_id: UUID,

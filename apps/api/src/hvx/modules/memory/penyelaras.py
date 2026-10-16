@@ -56,6 +56,17 @@ MAKS_TEKS_SEMAT = 20_000
 _MAKS_GELOMBANG = 10
 
 
+async def buang_titik_pengguna(vektor: platform.KlienVektor, koleksi: str, user_id: UUID) -> None:
+    """Semua titik memori satu pengguna — tahap 4 hapus akun (spec/01, spec/07 6.5).
+
+    Menurut saringan `user_id` payload, bukan daftar id: titik yatim (disemat, lalu barisnya
+    gagal ditandai) ikut terbuang. Idempoten. Dipasang titik rakit pekerja sebagai
+    `identity.PenghapusTitik` — identity tidak mengenal Qdrant, dan koleksi memori milik
+    modul ini.
+    """
+    await vektor.hapus_milik(koleksi, user_id)
+
+
 class PenyelarasVektor:
     def __init__(
         self,

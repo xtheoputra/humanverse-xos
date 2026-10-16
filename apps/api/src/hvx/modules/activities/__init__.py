@@ -10,8 +10,18 @@ belajar dari tebakannya sendiri: klien hanya bisa mencatat `manual`, dan
 Berkas ini satu-satunya pintu keluar modul (spec/06 aturan 1).
 """
 
+from .privasi import BAGIAN_PRIVASI, PENGHAPUS_PRIVASI
 from .routes import router
 from .schemas import Aktivitas
-from .service import catat_disimpulkan
+from .service import catat_disimpulkan, catat_proyeksi, hapus_proyeksi, kosongkan_proyeksi
 
-__all__ = ["Aktivitas", "catat_disimpulkan", "router"]
+__all__ = [
+    "BAGIAN_PRIVASI",
+    "PENGHAPUS_PRIVASI",
+    "Aktivitas",
+    "catat_disimpulkan",
+    "catat_proyeksi",
+    "hapus_proyeksi",
+    "kosongkan_proyeksi",
+    "router",
+]

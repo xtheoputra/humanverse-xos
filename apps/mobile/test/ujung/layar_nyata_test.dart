@@ -18,6 +18,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 
 import 'package:hvx_app/api/klien.dart';
+import 'package:hvx_app/api/luring.dart';
 import 'package:hvx_app/api/model.dart';
 import 'package:hvx_app/main.dart';
 
@@ -59,8 +60,10 @@ void main() {
       final sandi = 'kopi-sore-${hex(20)}';
       final jaringan = http.Client();
       final klien = KlienApi(dasar: Uri.parse(_api), klien: jaringan);
+      // Dirakit seperti `main()`: layar memegang antrean luring di atas klien nyata.
+      final luring = LayananLuring(klien);
 
-      await t.pumpWidget(AplikasiHvx(layanan: klien));
+      await t.pumpWidget(AplikasiHvx(layanan: luring, luring: luring));
       await t.tap(find.text('Daftar').first);
       await t.pump();
       await t.enterText(find.byKey(const Key('email')), email);

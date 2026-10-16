@@ -8,6 +8,8 @@
   kunci. Menyunting jurnal bukan fakta perilaku baru (peta aturan 6 spec/06).
 * `safety_flag` tetap NULL: jalur eskalasi keselamatan (issue #21) milik
   pemilik — kolomnya hanya memastikan tempatnya sudah ada (spec/01).
+* **Hapus = hapus KERAS** (C-31, K-46): barisnya, event `journal.created`-nya, dan memori
+  turunannya — bukan arsip yang menyimpan isi sampai akun dihapus.
 * **Menyunting atau menghapus jurnal menyelaraskan TURUNANNYA di transaksi yang
   sama** — pendengar yang dipasang titik rakit `hvx.main` (K-23): memori
   episodik jurnal (3.6) mengikuti isi barunya, atau dikosongkan saat jurnalnya
@@ -158,11 +160,15 @@ async def hapus(
     jurnal_id: UUID,
     pendengar: Sequence[PendengarJurnalBerubah],
 ) -> None:
+    """Hapus KERAS (C-31, K-46) — baris, memori turunannya (pendengar), dan event
+    `journal.created`-nya, satu transaksi. Fakta *pernah menulis jurnal* ikut dicabut
+    bersama tulisannya (naskah 11 §7.25: event boleh dihapus atas permintaan pemiliknya)."""
     async with platform.transaksi_pengguna(engine, user_id) as conn:
         if not await repository.hapus(conn, jurnal_id):
             raise _tidak_ditemukan()
         for p in pendengar:
             await p(conn, jurnal_id)
+        await events.hapus_riwayat_subjek(conn, ["journal.created"], "journal", jurnal_id)
 
 
 async def isi_untuk_ekstraksi(conn: AsyncConnection, jurnal_id: UUID) -> Jurnal | None:

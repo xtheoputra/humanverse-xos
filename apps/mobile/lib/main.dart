@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import 'api/klien.dart';
+import 'api/luring.dart';
+import 'api/privasi.dart';
 import 'layar/habit_hari_ini.dart';
 import 'layar/masuk.dart';
 
@@ -12,13 +14,29 @@ const alamatApi = String.fromEnvironment(
 );
 
 void main() {
-  runApp(AplikasiHvx(layanan: KlienApi(dasar: Uri.parse(alamatApi))));
+  // Luring dasar (spec/07 6.6): catatan habit menunggu di antrean selagi jaringan putus.
+  final klien = KlienApi(dasar: Uri.parse(alamatApi));
+  final luring = LayananLuring(klien);
+  // Privacy Center, notifikasi, tinjauan (6.2–6.4): langsung ke klien — hapus data dan
+  // ekspor tidak boleh menunggu di antrean luring.
+  runApp(AplikasiHvx(layanan: luring, luring: luring, privasi: klien));
 }
 
 class AplikasiHvx extends StatefulWidget {
-  const AplikasiHvx({super.key, required this.layanan});
+  const AplikasiHvx({
+    super.key,
+    required this.layanan,
+    this.luring,
+    this.privasi,
+  });
 
   final LayananHabit layanan;
+
+  /// Antrean luring milik [layanan], bila ada — layar habit menampilkannya.
+  final StatusLuring? luring;
+
+  /// Privacy Center · notifikasi · tinjauan mingguan (6.2–6.4), bila ada.
+  final LayananPrivasi? privasi;
 
   @override
   State<AplikasiHvx> createState() => _AplikasiHvxState();
@@ -38,6 +56,8 @@ class _AplikasiHvxState extends State<AplikasiHvx> {
       home: _masuk
           ? LayarHabitHariIni(
               layanan: widget.layanan,
+              luring: widget.luring,
+              privasi: widget.privasi,
               sesudahKeluar: () => setState(() => _masuk = false),
             )
           : LayarMasuk(

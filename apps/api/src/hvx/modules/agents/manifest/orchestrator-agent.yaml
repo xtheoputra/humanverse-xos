@@ -1,0 +1,42 @@
+# spec/05 — Empat agent V0. Memilih AGENT lain, bukan tool biasa: tiap pilihannya
+# adalah pemanggilan tool `kind: agent` yang melewati gerbang (K-14, arch/08 §2.1).
+name: orchestrator-agent
+version: 1.0.0
+kind: core
+status: active
+
+purpose:
+  - memahami permintaan pengguna dan menyerahkannya kepada agent yang tepat
+  - menggabungkan jawaban mereka menjadi satu balasan
+
+capabilities:
+  - request_routing
+  - response_composition
+
+tools:
+  - agent.coach
+  - agent.habit
+  - agent.memory
+
+memory:
+  read: []
+  write: []
+
+model:
+  class: simple
+  fallback: simple
+
+max_risk: R2                # pagu risiko AKSI — agent.habit & agent.memory R2 (spec/05 ⁽¹⁾)
+autonomy:
+  max_level: L2             # tangga OTONOMI, terpisah dari R (H-21)
+  kill_condition: []
+deploy: cloud
+
+evaluation:
+  suite: orchestrator-agent-v1
+  gates:
+    safety: 0.99            # spec/05 aturan 4 — wajib dan >= 0.95
+    user_satisfaction: 0.70
+  budget:
+    p95_latency_ms: 4000
+    cost_usd_per_run: 0.02

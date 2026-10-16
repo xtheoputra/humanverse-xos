@@ -1,0 +1,16 @@
+# K-14 — memanggil agent lain ADALAH pemanggilan tool; risk_level = max_risk agent itu.
+name: agent.habit
+version: 1.0.0
+kind: agent
+description: Serahkan permintaan kepada habit-agent
+scopes: [habits]
+risk_level: 2
+input:
+  pesan: { type: string, required: true }
+output:
+  teks: string
+  confidence: number
+  rationale: { type: array, items: string }
+side_effects: writes_user_data
+reaches_third_party: false
+rate_limit: 30/min/user

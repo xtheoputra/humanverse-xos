@@ -11,6 +11,13 @@ transaksinya commit; sampai itu ia tinggal di daftar tunggu (PEL) grup:
   putaran berikutnya yang lewat `min_idle_ms`. Sesudah `maks_kirim` kali
   diserahkan, ia pindah ke stream **mati** (dead letter) dan di-ACK: satu
   event yang selalu gagal tidak menahan grupnya selamanya.
+* **Konsumen WAJIB** (`wajib=True` — spec/03 *Consumer V0*: Behavior projector,
+  Habit streak, *“kegagalannya menahan event”*) tidak pernah membuang ke stream
+  mati: pesannya tetap di PEL dan dicoba tiap `min_idle_ms` sampai berhasil.
+  Pesan lain grup itu tetap mengalir — yang tertahan hanya event itu. 🔴 Versi
+  pertama memberi konsumen wajib bawaan yang sama: basis data yang mati ±3 menit
+  membuang event ke stream mati, dan proyeksinya diam-diam tidak lagi sama dengan
+  yang dibangun ulang dari `events` (tinjauan kontrak S5–6, K6).
 * **Isi event dibaca dari PostgreSQL, di bawah RLS pemiliknya** — stream hanya
   membawa rujukan (`relay.py`). Penangan menerima koneksi transaksi itu:
   tulisan penangan dan pembacaan event commit bersama, atau batal bersama.
@@ -101,6 +108,7 @@ class KonsumenStream:
         maks_kirim: int = 5,
         blok_ms: int = 2_000,
         jumlah: int = 50,
+        wajib: bool = False,
     ) -> None:
         self._engine = engine
         self._r = redis
@@ -113,6 +121,7 @@ class KonsumenStream:
         self._maks_kirim = maks_kirim
         self._blok_ms = blok_ms
         self._jumlah = jumlah
+        self.wajib = wajib
 
     @property
     def stream(self) -> str:
@@ -162,7 +171,7 @@ class KonsumenStream:
         return int(rinci[0]["times_delivered"]) if rinci else 0
 
     async def _proses(self, id_pesan: str, isi: dict[str, Any], *, diklaim: bool) -> int:
-        if diklaim and await self._kali_diserahkan(id_pesan) > self._maks_kirim:
+        if diklaim and not self.wajib and await self._kali_diserahkan(id_pesan) > self._maks_kirim:
             await self._r.xadd(
                 kunci_mati(self._awalan),
                 {"grup": self.grup, "pesan": id_pesan, **{k: isi[k] for k in isi}},
@@ -175,6 +184,8 @@ class KonsumenStream:
             return 0
         try:
             async with platform.transaksi_pengguna(self._engine, UUID(isi["user_id"])) as conn:
+                # Penangan MENURUNKAN data: hapus kategori menunggu commit-nya (S3).
+                await platform.kunci_turunan(conn, UUID(isi["user_id"]))
                 baris = (await conn.execute(_MENURUT_ID, {"id": UUID(isi["id"])})).first()
                 if baris is not None:
                     await self._tangani(conn, EventMasuk(**baris._asdict()))

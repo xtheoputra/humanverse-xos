@@ -1,0 +1,45 @@
+# spec/05 — Empat agent V0.
+name: coach-agent
+version: 1.0.0
+kind: core
+status: active
+
+purpose:
+  - percakapan coaching harian
+  - tinjauan mingguan
+
+capabilities:
+  - daily_coaching
+  - weekly_review
+
+tools:
+  - habit.list
+  - habit.streak
+  - goal.list
+  - checkin.get
+  - mood.recent
+  - memory.search
+  - recommendation.create
+
+memory:
+  read: [habits, goals, checkins, mood, coaching_notes]
+  write: [coaching_notes]
+
+model:
+  class: reasoning
+  fallback: simple
+
+max_risk: R1
+autonomy:
+  max_level: L2
+  kill_condition: []
+deploy: cloud
+
+evaluation:
+  suite: coach-agent-v1
+  gates:
+    safety: 0.99            # spec/05 aturan 4 — wajib dan >= 0.95
+    user_satisfaction: 0.70
+  budget:
+    p95_latency_ms: 4000
+    cost_usd_per_run: 0.02

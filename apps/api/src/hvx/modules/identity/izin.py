@@ -50,6 +50,8 @@ from __future__ import annotations
 
 import re
 import secrets
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Literal, cast
@@ -58,7 +60,7 @@ from uuid import UUID
 from fastapi import Request
 from redis.asyncio import Redis
 from sqlalchemy import text
-from sqlalchemy.ext.asyncio import AsyncEngine
+from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine
 
 from hvx.modules import platform
 
@@ -220,16 +222,24 @@ class MesinIzin:
         aksi: Aksi,
         *,
         bawaan: Keputusan = "ask",
+        delegasi: bool = False,
     ) -> Keputusan:
         """`allow` · `deny` · `ask` untuk `subjek` yang ingin `aksi` atas `scope` milik pengguna.
 
         `bawaan` hanya untuk yang tanpa keputusan tersimpan (atau kedaluwarsa) —
         keputusan pengguna, termasuk `ask` eksplisit, selalu menang.
+
+        `delegasi=True` — pemanggilan agent lain (gerbang risiko, K-14): bawaan `allow`
+        TIDAK dipaksa `ask` untuk scope sensitif, sebab delegasi tidak membaca data apa pun;
+        agent yang membacanya ditanya di run-nya sendiri. Tanpa ini, begitu `mood` sensitif
+        (C-32), tiap delegasi orkestrator → coach ditanya izin `mood`, lalu tool coach di
+        dalamnya ditanya LAGI (**E-227**, pola E-192). Keputusan yang DISIMPAN pengguna
+        untuk delegasinya — `deny`, `ask` — tetap menang.
         """
         _periksa(user_id, scope, aksi)
         if bawaan not in _KEPUTUSAN:
             raise IzinTidakSah(f"bawaan tak dikenal: {bawaan!r}")
-        if bawaan == "allow" and SCOPE_RESMI[scope].sensitif:
+        if bawaan == "allow" and SCOPE_RESMI[scope].sensitif and not delegasi:
             bawaan = "ask"  # hanya `allow` yang DISIMPAN pengguna membuka scope sensitif
         generasi = await self._generasi(user_id)
         kunci = self._k_keputusan(user_id, generasi, subjek, scope, aksi)
@@ -256,40 +266,76 @@ class MesinIzin:
         ip_hash: str | None = None,
     ) -> None:
         """Simpan keputusan pengguna. `expires_at=None` = sampai diubah; `ask` = tanya lagi."""
-        _periksa(user_id, scope, aksi)
-        if keputusan not in _KEPUTUSAN:
-            raise IzinTidakSah(f"keputusan tak dikenal: {keputusan!r}")
-        if expires_at is not None and expires_at.utcoffset() is None:
-            raise IzinTidakSah("expires_at wajib berzona waktu")
+        _periksa_keputusan(user_id, scope, aksi, keputusan, expires_at)  # sebelum Redis disentuh
+        async with self.ubah(user_id) as u:
+            await u.tetapkan(subjek, scope, aksi, keputusan, expires_at=expires_at, ip_hash=ip_hash)
 
+    @asynccontextmanager
+    async def ubah(self, user_id: UUID) -> AsyncIterator[UbahanIzin]:
+        """Satu transaksi yang MENGUBAH keputusan izin pengguna — satu-satunya jalan ke
+        `UbahanIzin.tetapkan`, jadi generasi cache selalu diganti sebelum DAN sesudah
+        commit (docstring modul). Pemanggil menulis perubahannya sendiri di `u.conn` yang
+        sama: jawaban konfirmasi `allow_always` (4.5) dan izin yang disimpannya tercatat
+        bersama, atau tidak sama sekali (E-199)."""
         await self._ganti_generasi(user_id)
         async with platform.transaksi_pengguna(self._engine, user_id) as conn:
-            await conn.execute(
-                _TETAPKAN,
-                {
-                    "user_id": user_id,
-                    "tipe": subjek.tipe,
-                    "subjek": subjek.id,
-                    "scope": scope,
-                    "aksi": aksi,
-                    "keputusan": keputusan,
-                    "expires_at": expires_at,
-                },
-            )
-            await audit(
-                conn,
-                aksi=_AKSI_AUDIT[keputusan],
-                aktor_tipe="user",
-                aktor_id=str(user_id),
-                user_id=user_id,
-                subjek_tipe=subjek.tipe,
-                subjek_id=subjek.id,
-                ip_hash=ip_hash,
-                metadata={"scope": scope, "action": aksi, "sementara": expires_at is not None},
-            )
+            yield UbahanIzin(conn, user_id)
         # Sesudah commit: pembaca yang membaca nilai lama di tengah transaksi di
         # atas menulis ke generasi yang kini ditinggalkan.
         await self._ganti_generasi(user_id)
+
+
+def _periksa_keputusan(
+    user_id: UUID, scope: str, aksi: str, keputusan: str, expires_at: datetime | None
+) -> None:
+    _periksa(user_id, scope, aksi)
+    if keputusan not in _KEPUTUSAN:
+        raise IzinTidakSah(f"keputusan tak dikenal: {keputusan!r}")
+    if expires_at is not None and expires_at.utcoffset() is None:
+        raise IzinTidakSah("expires_at wajib berzona waktu")
+
+
+@dataclass(frozen=True)
+class UbahanIzin:
+    """Transaksi `MesinIzin.ubah` — `conn` untuk tulisan pemanggil di transaksi yang sama."""
+
+    conn: AsyncConnection
+    user_id: UUID
+
+    async def tetapkan(
+        self,
+        subjek: Subjek,
+        scope: str,
+        aksi: Aksi,
+        keputusan: Keputusan,
+        *,
+        expires_at: datetime | None = None,
+        ip_hash: str | None = None,
+    ) -> None:
+        _periksa_keputusan(self.user_id, scope, aksi, keputusan, expires_at)
+        await self.conn.execute(
+            _TETAPKAN,
+            {
+                "user_id": self.user_id,
+                "tipe": subjek.tipe,
+                "subjek": subjek.id,
+                "scope": scope,
+                "aksi": aksi,
+                "keputusan": keputusan,
+                "expires_at": expires_at,
+            },
+        )
+        await audit(
+            self.conn,
+            aksi=_AKSI_AUDIT[keputusan],
+            aktor_tipe="user",
+            aktor_id=str(self.user_id),
+            user_id=self.user_id,
+            subjek_tipe=subjek.tipe,
+            subjek_id=subjek.id,
+            ip_hash=ip_hash,
+            metadata={"scope": scope, "action": aksi, "sementara": expires_at is not None},
+        )
 
 
 def mesin_izin(request: Request) -> MesinIzin:

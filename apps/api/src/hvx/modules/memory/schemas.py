@@ -33,7 +33,7 @@ class Memori:
 @dataclass(frozen=True)
 class MemoriDitemukan:
     memori: Memori
-    # Kosinus penyemat `memori.model_version` — hanya bermakna di antara hasil satu kueri.
+    # Kosinus penyemat `memories.embedding_model` — hanya bermakna di antara hasil satu kueri.
     skor: float
 
 

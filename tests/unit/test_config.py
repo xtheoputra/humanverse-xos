@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from decimal import Decimal
+
 import pytest
 from pydantic import ValidationError
 
@@ -148,3 +150,82 @@ def test_qdrant_tanpa_kunci_penyemat_ditolak_saat_mulai(monkeypatch: pytest.Monk
 
     monkeypatch.setenv("HVX_SEMATAN_KEY", "s" * 32)
     assert Settings().qdrant_url == "http://qdrant:6333"
+
+
+def test_harga_model_dibaca_dari_json_dan_yang_salah_ditolak(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """spec/07 4.1 · K-28 — harga per sejuta token (masuk, keluar); gerbang model
+    menghitung biaya tiap panggilan dari sini (4.9)."""
+    _isi(monkeypatch)
+    monkeypatch.setenv("HVX_MODEL_HARGA", '{"lokal/hvx-nalar-v1": [3, 15.5]}')
+
+    assert Settings().model_harga == {"lokal/hvx-nalar-v1": (Decimal(3), Decimal("15.5"))}
+
+    for salah in ('{"lokal/hvx-nalar-v1": [-1, 0]}', '{"tanpa-penyedia": [1, 1]}'):
+        monkeypatch.setenv("HVX_MODEL_HARGA", salah)
+        with pytest.raises(ValidationError, match="HVX_MODEL_HARGA"):
+            Settings()
+    monkeypatch.delenv("HVX_MODEL_HARGA")
+    monkeypatch.setenv("HVX_MODEL_REASONING", "Bukan Id Model")
+    with pytest.raises(ValidationError, match="model_reasoning"):
+        Settings()
+
+
+@pytest.mark.parametrize(
+    ("harga", "maksud"),
+    [
+        ("[1, -1]", "harga keluar negatif"),
+        ('["Infinity", 1]', "harga masuk tak hingga"),
+        ('[1, "-Infinity"]', "harga keluar tak hingga"),
+        ('[1, "NaN"]', "harga keluar NaN"),
+    ],
+    ids=["keluar-negatif", "masuk-tak-hingga", "keluar-tak-hingga", "keluar-nan"],
+)
+def test_harga_model_keluar_negatif_atau_tak_hingga_ditolak_saat_mulai(
+    monkeypatch: pytest.MonkeyPatch, harga: str, maksud: str
+) -> None:
+    """Tinjauan penegak buta Sprint 4: uji di atas hanya mengirim harga MASUK negatif.
+    Harga keluar negatif membuat jawaban panjang MENGURANGI biaya run, jadi anggaran
+    harian (4.9) tidak pernah habis; harga tak hingga lolos mulai lalu meledak di
+    `quantize` pada SETIAP panggilan model — gerbangnya mati, bukan menolak mulai."""
+    _isi(monkeypatch)
+    monkeypatch.setenv("HVX_MODEL_HARGA", '{"lokal/hvx-nalar-v1": ' + harga + "}")
+
+    try:
+        diterima = Settings().model_harga
+    except ValidationError:
+        return
+    raise AssertionError(f"HVX_MODEL_HARGA {maksud} diterima: {diterima}")
+
+
+def test_bawaan_model_simple_dan_reasoning_berbeda(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Model Router menurunkan `reasoning` ke `simple` saat anggaran habis (4.9, K-32).
+    Bawaan yang sama untuk kedua kelas membuat penurunan itu tidak menurunkan apa pun,
+    dan `agent_runs.model_used` tidak lagi membedakan kelas yang dipakai run."""
+    _isi(monkeypatch)
+    monkeypatch.delenv("HVX_MODEL_SIMPLE", raising=False)
+    monkeypatch.delenv("HVX_MODEL_REASONING", raising=False)
+
+    s = Settings()
+
+    assert s.model_simple != s.model_reasoning, (
+        f"bawaan kelas simple dan reasoning memakai model yang sama: {s.model_simple}"
+    )
+
+
+def test_anggaran_harian_negatif_ditolak() -> None:
+    """4.9 — anggaran negatif = setiap panggilan model di atas anggaran, diam-diam."""
+    from decimal import Decimal
+
+    from pydantic import ValidationError
+
+    from hvx.modules.platform import Settings
+
+    dasar = {"database_url": "postgresql://x", "redis_url": "redis://x", "env": "test"}
+    assert Settings(**dasar).ai_anggaran_harian_usd == Decimal("0.50")
+    try:
+        Settings(**dasar, ai_anggaran_harian_usd=-1)
+    except ValidationError:
+        return
+    raise AssertionError("anggaran harian negatif diterima")
