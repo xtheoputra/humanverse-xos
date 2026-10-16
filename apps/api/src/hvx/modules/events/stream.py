@@ -259,13 +259,20 @@ async def putar_ulang_mati(
     k = konsumen.get(str(isi.get("grup")))
     if k is None:
         return "grup_tak_dikenal"
+    # Rujukan dibaca SEBELUM klaim: yang tak terbaca dibiarkan di stream mati untuk diperiksa.
+    # 🔴 Tinjauan kontrak S7 (K7): versi pertama membacanya sesudah `XDEL`, di luar `try`
+    # yang mengembalikan entri — galatnya membuang entri yang dijanjikan tak hilang.
+    try:
+        user_id, event_id = UUID(isi["user_id"]), UUID(isi["id"])
+    except (KeyError, ValueError):
+        log.error("konsumen.putar_ulang_rujukan_rusak", grup=k.grup, mati=id_mati)
+        return "gagal"
     if not await redis.xdel(kunci, id_mati):
         return "tidak_ada"  # pemutar lain lebih dulu
-    user_id = UUID(isi["user_id"])
     try:
         async with platform.transaksi_pengguna(engine, user_id) as conn:
             await platform.kunci_turunan(conn, user_id)
-            baris = (await conn.execute(_MENURUT_ID, {"id": UUID(isi["id"])})).first()
+            baris = (await conn.execute(_MENURUT_ID, {"id": event_id})).first()
             if baris is None:
                 return "event_hilang"
             if baris.event_type in k.jenis:

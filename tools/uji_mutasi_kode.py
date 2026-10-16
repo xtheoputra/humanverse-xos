@@ -5101,6 +5101,22 @@ MUTASI: list[Mutasi] = [
         harus_memuat="grup_tak_dikenal",
         kelompok="db",
     ),
+    # Tinjauan kontrak S7 (K7): rujukan dibaca sesudah `XDEL`, di luar `try` — entri yang
+    # rujukannya rusak terbuang.
+    Mutasi(
+        "7.4",
+        "rujukan entri dibaca sesudah klaim XDEL — entri rusak terbuang",
+        [
+            Sunting(
+                f"{MODUL}/events/stream.py",
+                '    except (KeyError, ValueError):\n        log.error("konsumen.putar_ulang_rujukan_rusak", grup=k.grup, mati=id_mati)\n        return "gagal"\n    if not await redis.xdel(kunci, id_mati):\n        return "tidak_ada"  # pemutar lain lebih dulu\n',
+                '    except (KeyError, ValueError):\n        await redis.xdel(kunci, id_mati)\n        raise\n    if not await redis.xdel(kunci, id_mati):\n        return "tidak_ada"  # pemutar lain lebih dulu\n',
+            )
+        ],
+        _pytest("tests/integration/test_stream_mati.py::test_entri_berujukan_rusak_tidak_dibuang"),
+        harus_memuat="ValueError",
+        kelompok="db",
+    ),
     Mutasi(
         "3.1",
         "recorded_at = now() — membeku di awal transaksi, relay melompatinya",

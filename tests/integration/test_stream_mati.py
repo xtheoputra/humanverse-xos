@@ -224,3 +224,29 @@ async def test_alat_operator_memutar_ulang_dengan_konsumen_pekerja(
     assert await stream_mati.jalankan(settings, "putar", [str(id_mati)], 100) == 1, (
         "entri yang sudah diputar tidak dilaporkan `tidak_ada`"
     )
+
+
+async def test_entri_berujukan_rusak_tidak_dibuang(api_bersama: ApiUji) -> None:
+    """Rujukan yang tak terbaca (id/pemilik bukan uuid) — entrinya TETAP di stream mati.
+    🔴 Tinjauan kontrak S7 (K7): versi pertama membaca `user_id` SESUDAH `XDEL`, di luar
+    `try` yang mengembalikan entri — galatnya membuang entri yang dijanjikan tak hilang."""
+    awalan, penangan = _awalan(), _Penangan()
+    redis: Any = api_bersama.app.state.redis
+    id_mati = str(
+        await redis.xadd(
+            events.kunci_mati(awalan),
+            {
+                "grup": "uji",
+                "pesan": "0-1",
+                "id": str(uuid.uuid4()),
+                "user_id": "bukan-uuid",
+                "event_type": "mood.logged",
+            },
+        )
+    )
+
+    hasil = await _putar(api_bersama, awalan, id_mati, penangan)
+
+    assert hasil == "gagal"
+    sisa = [i for i, _isi in await events.daftar_mati(redis, awalan)]
+    assert sisa == [id_mati], "entri berujukan rusak dibuang dari stream mati"
