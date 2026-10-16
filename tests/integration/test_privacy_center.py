@@ -13,6 +13,7 @@ ditulis lewat HTTP seperti pengguna menulisnya, dan diperiksa PEMILIK skema:
 from __future__ import annotations
 
 import asyncio
+import dataclasses
 import uuid
 from collections.abc import AsyncIterator, Callable
 from datetime import UTC, datetime, timedelta
@@ -936,4 +937,54 @@ async def test_hapus_kategori_tidak_balapan_dengan_tugas_terjadwal_yang_menurunk
     assert _satu(api, "SELECT count(*) FROM daily_checkins WHERE user_id = %s", uid) == 0
     assert _satu(api, "SELECT count(*) FROM human_states WHERE user_id = %s", uid) == 0, (
         "turunan tugas terjadwal dari check-in yang sudah dihapus hidup terus"
+    )
+
+
+async def test_hapus_kategori_tidak_balapan_dengan_bangun_ulang_proyeksi(
+    api_privasi_sendiri: ApiUji, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Tinjauan keamanan S7 (S2): `intelligence.bangun_ulang` (spec/08 7.2) memutar ulang
+    penangan proyeksi dalam SATU transaksi panjang — ia menurunkan data seperti konsumen
+    pekerja, tetapi tanpa kunci turunan bersama. Hapus kategori yang berjalan di tengahnya
+    tidak menunggu: begitu bangun ulang commit, human state dari check-in yang SUDAH
+    dihapus hidup lagi."""
+    api = api_privasi_sendiri
+    uid, token = await _daftar(api)
+    r = await api.klien.put(
+        f"/v1/checkins/{TANGGAL}", json={"energy": 2, "focus": 3}, headers=auth(token)
+    )
+    assert r.status_code == 201, r.text
+
+    menurunkan, lanjutkan = asyncio.Event(), asyncio.Event()
+    asli = intelligence.PROYEKSI["human-state"]
+
+    async def tahan_sebelum_commit(conn: Any, event: events.EventMasuk) -> None:
+        await asli.tangani(conn, event)
+        menurunkan.set()
+        await lanjutkan.wait()
+
+    monkeypatch.setitem(
+        intelligence.PROYEKSI,
+        "human-state",
+        dataclasses.replace(asli, tangani=tahan_sebelum_commit),
+    )
+    bangun = asyncio.create_task(
+        intelligence.bangun_ulang(api.engine_pekerja, uuid.UUID(uid), "human-state")
+    )
+    try:
+        await asyncio.wait_for(menurunkan.wait(), timeout=15)
+        hapus = asyncio.create_task(_hapus(api, token, "checkins"))
+        for _ in range(300):
+            if hapus.done() or _ada_yang_menunggu_kunci(api):
+                break
+            await asyncio.sleep(0.02)
+    finally:
+        lanjutkan.set()
+    assert await asyncio.wait_for(bangun, timeout=15) == 1
+    r = await asyncio.wait_for(hapus, timeout=15)
+    assert r.status_code == 202, r.text
+
+    assert _satu(api, "SELECT count(*) FROM daily_checkins WHERE user_id = %s", uid) == 0
+    assert _satu(api, "SELECT count(*) FROM human_states WHERE user_id = %s", uid) == 0, (
+        "bangun ulang menghidupkan human state dari check-in yang sudah dihapus"
     )

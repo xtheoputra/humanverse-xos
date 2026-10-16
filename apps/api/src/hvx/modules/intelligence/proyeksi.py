@@ -91,9 +91,15 @@ async def bangun_ulang(engine: AsyncEngine, user_id: UUID, nama: str) -> int:
     Mengosongkan, lalu memutar ulang tiap event yang didengar proyeksinya urut tiba — satu
     transaksi, jadi tidak ada jendela saat proyeksinya kosong. Mengembalikan jumlah event
     yang diputar ulang.
+
+    🔴 Tinjauan keamanan S7 (S2): versi pertama menurunkan data tanpa kunci turunan — hapus
+    kategori Privacy Center di tengah transaksi panjang ini tidak menunggunya, dan proyeksi
+    dari sumber yang sudah dihapus hidup lagi sesudah commit. Kunci BERSAMA diambil
+    pertama, sebelum `events` dibaca, seperti konsumen pekerja.
     """
     proyeksi = PROYEKSI[nama]
     async with platform.transaksi_pengguna(engine, user_id) as conn:
+        await platform.kunci_turunan(conn, user_id)
         await proyeksi.kosongkan(conn, user_id)
         riwayat = [
             e for e in await events.untuk_proyeksi(conn, user_id) if e.event_type in proyeksi.jenis

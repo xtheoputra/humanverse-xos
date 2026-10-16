@@ -5027,6 +5027,23 @@ MUTASI: list[Mutasi] = [
         kelompok="db",
     ),
     Mutasi(
+        "S2",
+        "bangun ulang proyeksi tanpa kunci turunan — hapus kategori tak menunggu",
+        [
+            Sunting(
+                f"{MODUL}/intelligence/proyeksi.py",
+                "        await platform.kunci_turunan(conn, user_id)\n",
+                "",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_privacy_center.py::"
+            "test_hapus_kategori_tidak_balapan_dengan_bangun_ulang_proyeksi"
+        ),
+        harus_memuat="bangun ulang menghidupkan human state dari check-in yang sudah dihapus",
+        kelompok="db",
+    ),
+    Mutasi(
         "3.1",
         "recorded_at = now() — membeku di awal transaksi, relay melompatinya",
         [
