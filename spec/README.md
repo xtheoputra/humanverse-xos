@@ -31,7 +31,7 @@ sini kecuali dibutuhkan V0 — menulisnya sekarang berarti menebak.
 | [`05-AGENT-CONTRACTS.md`](05-AGENT-CONTRACTS.md) | Manifest schema, tool registry, permission & risk |
 | [`06-MODULE-BOUNDARIES.md`](06-MODULE-BOUNDARIES.md) | Batas modul di dalam modular monolith + aturan ketergantungan |
 | [`07-BACKLOG-V0.md`](07-BACKLOG-V0.md) | Backlog 7 sprint, satu tugas per baris untuk AI coding agent |
-| [`08-BACKLOG-V1.md`](08-BACKLOG-V1.md) | 🟡 **DRAF, belum disetujui** (**A-39**) — backlog V1 (T1 Behavior Intelligence), Sprint 7–11 |
+| [`08-BACKLOG-V1.md`](08-BACKLOG-V1.md) | Backlog V1 (T1 Behavior Intelligence), Sprint 7–11 — cakupan disetujui pemilik (**H-30**) |
 
 > 🔧 **Bahasa backend: Python + FastAPI** (K-13, 10 Sep 2026). Versi pertama
 > `06` dan `07` ditulis untuk TypeScript/Node **tanpa pernah menyatakannya**,

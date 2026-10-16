@@ -26,13 +26,15 @@
 
 ## 2 · Apa yang dikerjakan, dan urutannya
 
-Satu-satunya daftar pekerjaan kode: [`spec/07-BACKLOG-V0.md`](spec/07-BACKLOG-V0.md)
-— 51 tugas, 7 sprint. Urutan tahap sesudahnya: [`arch/10`](arch/10-URUTAN-IMPLEMENTASI.md).
+Daftar pekerjaan kode: [`spec/07-BACKLOG-V0.md`](spec/07-BACKLOG-V0.md) — V0, 51 tugas,
+Sprint 0–6, **selesai di `master`** — lalu [`spec/08-BACKLOG-V1.md`](spec/08-BACKLOG-V1.md)
+— V1, 23 tugas, Sprint 7–11 (**H-30**). Urutan tahap sesudahnya:
+[`arch/10`](arch/10-URUTAN-IMPLEMENTASI.md).
 
 - Satu tugas = satu kolom **“Selesai bila”**. Tugas belum selesai sampai
   kalimat itu bisa dibuktikan **mesin** (uji, pemeriksa, atau perintah).
 - **Jangan menambah cakupan.** Bagian *“Yang TIDAK ada di backlog ini”*
-  `spec/07` mengikat: Neo4j, Kafka, Kubernetes, marketplace, SDK, voice,
+  `spec/07` dan `spec/08` mengikat: Neo4j, Kafka, Kubernetes, marketplace, SDK, voice,
   vision — tidak satu pun masuk V0.
 - **Gerbang lebih dulu daripada yang dijaganya** (arch/10 §1, diperiksa R-1).
 

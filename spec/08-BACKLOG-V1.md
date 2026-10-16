@@ -1,8 +1,8 @@
-# 08 — Backlog V1 untuk AI coding agent · 🟡 DRAF
+# 08 — Backlog V1 untuk AI coding agent
 
-> ⚠️ **Bukan kata pemilik**, dan **belum disetujui pemilik** (**A-39**). Sampai
-> disetujui, satu-satunya daftar pekerjaan kode tetap [`07`](07-BACKLOG-V0.md)
-> ([`../AGENTS.md`](../AGENTS.md) §2), dan **tidak satu baris kode V1 pun ditulis.**
+> ⚠️ **Bukan kata pemilik** — tetapi **cakupannya disetujui pemilik** 16 Okt 2026
+> (**H-30**: PR [#172](../../pull/172) digabung tanpa perubahan). Bersama
+> [`07`](07-BACKLOG-V0.md), ia daftar pekerjaan kode ([`../AGENTS.md`](../AGENTS.md) §2).
 >
 > Draf ini menurunkan **T1 Behavior Intelligence (V1)**
 > ([`../arch/10`](../arch/10-URUTAN-IMPLEMENTASI.md) §2) menjadi tugas yang bisa
@@ -123,7 +123,7 @@ yang tidak mendahului jawabannya:
 
 | Butir | Yang ditanyakan | Bentuk V1 tanpa jawabannya |
 |---|---|---|
-| **A-39** | draf backlog ini disetujui sebagai cakupan V1? | tidak ada kode V1 |
+| ~~**A-39**~~ → **H-30** ✅ | ~~draf backlog ini disetujui sebagai cakupan V1?~~ disetujui 16 Okt 2026 | — |
 | **#34** | ambang High/Med/Low Confidence Layer | hanya *nol/sedikit bukti → bertanya*, seperti V0 5.4; tidak ada label High/Med/Low |
 | **A-28** | sistem proaktif, sejak versi berapa | tidak ada notifikasi atau nudge; tinjauan menunggu dibuka |
 | **C-39** | hak menolak/mematikan inferensi perilaku dan prediksi · retensi `behavior_daily` · `patterns` · `predictions` | 9.4 hapus per pola saja; anotasi `@retention` diusulkan, ditandai **menunggu C-39** |
