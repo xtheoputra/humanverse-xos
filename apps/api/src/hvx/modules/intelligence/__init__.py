@@ -1,6 +1,6 @@
 """`intelligence` — apa yang disimpulkan dan disarankan.
 
-Memiliki tabel: recommendations · recommendation_feedback (spec/06).
+Memiliki tabel: recommendations · recommendation_feedback · scheduled_runs (spec/06).
 Dikerjakan: Sprint 5 (5.1–5.6) — spec/07.
 
 Sejak spec/07 4.3: `buat_rekomendasi` — jalur tool `recommendation.create`.
@@ -39,6 +39,7 @@ from .schemas import (
     RekomendasiRingkas,
     UmpanBalik,
 )
+from .terjadwal import TUGAS_TERJADWAL, TugasTerjadwal, jalankan_jatuh_tempo
 from .tinjauan import VERSI as VERSI_TINJAUAN
 from .tinjauan import awal_minggu, nilai_habit, susun_tinjauan, tinjauan_mingguan
 from .umpan_balik import baca_umpan_balik, catat_umpan_balik, status_sesudah
@@ -55,6 +56,7 @@ __all__ = [
     "PENGHAPUS_PRIVASI",
     "PROYEKSI",
     "SKOR_VERSI",
+    "TUGAS_TERJADWAL",
     "VERSI_TINJAUAN",
     "CatatUmpanBalik",
     "DaftarRekomendasi",
@@ -64,6 +66,7 @@ __all__ = [
     "RekomendasiRingkas",
     "Sikap",
     "Skor",
+    "TugasTerjadwal",
     "UmpanBalik",
     "awal_minggu",
     "baca_umpan_balik",
@@ -77,6 +80,7 @@ __all__ = [
     "deteksi_pola_habit",
     "dimensi_dari_metrik",
     "hitung_human_state",
+    "jalankan_jatuh_tempo",
     "metrik_harian",
     "nilai_habit",
     "nilai_rekomendasi",

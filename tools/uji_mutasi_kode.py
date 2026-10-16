@@ -4830,6 +4830,119 @@ MUTASI: list[Mutasi] = [
         harus_memuat="baris basi selamat dari pengosongan",
         kelompok="db",
     ),
+    # ── spec/08 7.3 tugas terjadwal per jam lokal, tepat sekali per hari lokal ──
+    Mutasi(
+        "7.3",
+        "klaim yang sudah diambil pekerja lain diabaikan — kerja ganda",
+        [
+            Sunting(
+                f"{MODUL}/intelligence/terjadwal.py",
+                "                if klaim.first() is None:",
+                "                if klaim.first() is None and False:",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_tugas_terjadwal.py::test_dua_pekerja_serentak_tidak_menggandakan"
+        ),
+        harus_memuat="dikerjakan lebih dari sekali",
+        kelompok="db",
+    ),
+    Mutasi(
+        "7.3",
+        "kerja yang gagal ditelan di dalam transaksinya — klaimnya tertinggal",
+        [
+            Sunting(
+                f"{MODUL}/intelligence/terjadwal.py",
+                "                await tugas.kerjakan(conn, user_id, for_date)\n",
+                "                try:\n                    await tugas.kerjakan(conn, user_id, for_date)\n                except Exception:\n                    pass\n",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_tugas_terjadwal.py::test_kerja_yang_gagal_membatalkan_klaimnya_dan_dicoba_lagi"
+        ),
+        harus_memuat="klaim kerja yang gagal tertinggal",
+        kelompok="db",
+    ),
+    Mutasi(
+        "7.3",
+        "hanya hari ini — kemarin yang belum dikerjakan terlewat",
+        [
+            Sunting(
+                "data/migrations/versions/0014_tugas_terjadwal.up.sql",
+                "generate_series(0, 1)",
+                "generate_series(0, 0)",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_tugas_terjadwal.py::test_tepat_sekali_per_hari_lokal_dan_tidak_sebelum_akun_dibuat"
+        ),
+        harus_memuat="bukan tepat sekali",
+        kelompok="db",
+    ),
+    Mutasi(
+        "7.3",
+        "hari sebelum akun dibuat ikut dikerjakan",
+        [
+            Sunting(
+                "data/migrations/versions/0014_tugas_terjadwal.up.sql",
+                "      AND h.for_date >= (u.created_at AT TIME ZONE z.name)::date\n",
+                "",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_tugas_terjadwal.py::test_tepat_sekali_per_hari_lokal_dan_tidak_sebelum_akun_dibuat"
+        ),
+        harus_memuat="hari sebelum akunnya dibuat",
+        kelompok="db",
+    ),
+    Mutasi(
+        "7.3",
+        "jatuh tempo menurut jam UTC, bukan jam lokal pengguna",
+        [
+            Sunting(
+                "data/migrations/versions/0014_tugas_terjadwal.up.sql",
+                "      AND w.lokal >= h.for_date + make_interval(mins => p_menit)",
+                "      AND (now() AT TIME ZONE 'UTC') >= h.for_date + make_interval(mins => p_menit)",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_tugas_terjadwal.py::test_dua_zona_diproses_pada_jam_lokal_masing_masing"
+        ),
+        harus_memuat="jam lokal",
+        kelompok="db",
+    ),
+    Mutasi(
+        "7.3",
+        "akun yang menunggu dihapus ikut dikerjakan",
+        [
+            Sunting(
+                "data/migrations/versions/0014_tugas_terjadwal.up.sql",
+                "    WHERE u.status = 'active'",
+                "    WHERE u.status IN ('active', 'pending_deletion')",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_tugas_terjadwal.py::test_akun_menunggu_dihapus_dan_zona_tak_dikenal_dilewati"
+        ),
+        harus_memuat="akun yang menunggu dihapus ikut dikerjakan",
+        kelompok="db",
+    ),
+    Mutasi(
+        "7.3",
+        "zona waktu tak dikenal menggagalkan seluruh putaran",
+        [
+            Sunting(
+                "data/migrations/versions/0014_tugas_terjadwal.up.sql",
+                "(SELECT now() AT TIME ZONE z.name AS lokal)",
+                "(SELECT now() AT TIME ZONE p.timezone AS lokal)",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_tugas_terjadwal.py::test_akun_menunggu_dihapus_dan_zona_tak_dikenal_dilewati"
+        ),
+        harus_memuat="Bukan/Zona",
+        kelompok="db",
+    ),
     Mutasi(
         "3.1",
         "recorded_at = now() — membeku di awal transaksi, relay melompatinya",

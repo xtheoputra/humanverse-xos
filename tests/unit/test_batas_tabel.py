@@ -70,8 +70,8 @@ def test_tabel_kepemilikan_spec06_terbaca_utuh() -> None:
     semua = [t for tabel in milik.values() for t in tabel]
 
     assert len(milik) == 11, f"modul pemilik tabel di spec/06: {sorted(milik)}"
-    assert len(semua) == 23, f"tabel V0 di tabel kepemilikan spec/06: {len(semua)}"
-    assert len(set(semua)) == 23, "satu tabel dimiliki lebih dari satu modul"
+    assert len(semua) == 24, f"tabel V0 + V1 di tabel kepemilikan spec/06: {len(semua)}"
+    assert len(set(semua)) == 24, "satu tabel dimiliki lebih dari satu modul"
 
 
 def test_sql_tiap_modul_hanya_menyebut_tabel_miliknya() -> None:

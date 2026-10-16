@@ -892,6 +892,27 @@ sesudahnya.
 
 ---
 
+## K-48 · Tugas terjadwal: jam lokal pengguna, tepat sekali lewat klaim di transaksi kerjanya
+
+> Diputuskan 16 Oktober 2026, saat spec/08 7.3 ditulis. (Nomor K-47 sengaja dilewati — ia
+> pernah dirujuk tanpa pernah ada, lalu dialihkan ke C-35; memakainya sekarang membuat rujukan
+> lama itu tampak benar.)
+>
+> Yang dipertanyakan: *“tugas malam berjalan tepat sekali per pengguna per hari lokal; dua
+> pekerja serentak tidak menggandakan; pengguna di dua zona waktu diproses pada jam lokal
+> masing-masing; ganti zona waktu tidak melewatkan atau menggandakan hari”* — dengan proses
+> pekerja yang bisa berjalan lebih dari satu, dan bisa mati di tengah kerja.
+
+| | |
+|---|---|
+| **Keputusan** | **(1)** Tabel **`scheduled_runs`** `(user_id, task, for_date)` — kunci primer = janji *tepat sekali*. Klaim `INSERT … ON CONFLICT DO NOTHING` ditulis di transaksi pengguna yang **sama** dengan kerjanya: kerja gagal → klaim batal → dicoba lagi; pekerja kedua tertahan indeks unik lalu mendapati klaim sudah ada. **(2)** Siapa yang jatuh tempo dibaca **`tugas_jatuh_tempo`** — fungsi `SECURITY DEFINER` sempit untuk `hvx_pekerja` (spec/01 §12): jam lokal dari `profiles.timezone`, **hari ini dan kemarin**, tidak pernah sebelum hari akun dibuat, hanya akun `active`; zona yang tak dikenal PostgreSQL melewati pengguna itu, bukan menggagalkan semua. **(3)** Milik **`intelligence`** — semua tugas terjadwal V1 milik modul itu (8.x · 10.1 · 11.4). **(4)** Terlihat di Privacy Center sebagai turunan **Rekomendasi**, dan terhapus bersamanya (tugasnya lalu berjalan lagi untuk hari yang masih dalam jangkauan). **(5)** Satu pengguna yang gagal tidak menahan yang lain. **(6)** Sprint 7 hanya memasang gerbangnya — `TUGAS_TERJADWAL` kosong sampai 8.1 / 10.1 / 11.4. |
+| **Bukti** | arch/10 §1 (gerbang lebih dulu) · naskah `138` §7.21 (*“setiap malam … Sunday 20:00 → Weekly Review”*) · AGENTS.md §5 (`SECURITY DEFINER` satu per kebutuhan; RLS di tiap tabel milik pengguna). Uji: `test_tugas_terjadwal.py` — tepat sekali & tidak sebelum akun dibuat · tiga pekerja serentak · kerja gagal membatalkan klaim · dua zona (UTC+14 / UTC−11) · ganti zona tiga kali tanpa hari terlewat/ganda · akun menunggu dihapus & zona asing dilewati · RLS klaim. 7 mutasi 7.3 berbunyi. |
+| **Bacaan yang DITOLAK** | **(a)** *“Klaim di Redis (`SET NX`)”* — ditolak: klaim dan kerja tidak bisa satu transaksi; pekerja yang mati sesudah klaim menghilangkan hari itu. **(b)** *“Jadwal per jam server”* — ditolak: *“setiap malam”* pengguna di Jakarta dan di Honolulu bukan jam yang sama. **(c)** *“Kebijakan RLS longgar untuk pekerja”* — ditolak: AGENTS.md §5, fungsi sempit satu per kebutuhan. **(d)** *“Tanpa jangkauan kemarin”* — ditolak: pindah zona ke timur, atau pekerja yang berhenti melewati tengah malam, melewatkan hari. |
+| **Harga yang diakui** | Jangkauan **dua hari**: pekerja yang mati lebih lama dari itu tidak menyusulkan hari yang lebih tua — tugas malam untuk hari yang sudah jauh lewat dianggap tak bernilai lagi. Satu baris per pengguna per tugas per hari, sampai akun dihapus (bukan inferensi — tidak menyentuh **C-39**). Resolusi satu menit (`JEDA_TERJADWAL_S`). |
+| **Cara membalikkan** | `intelligence/terjadwal.py` · `hvx/pekerja.py` (`JEDA_TERJADWAL_S`) · migrasi baru yang mengganti `tugas_jatuh_tempo` (mis. `generate_series(0, 1)` untuk jangkauan); spec/01 §7 · §10 · §11 · §12 bersama migrasinya. |
+
+---
+
 ## Yang sengaja **tidak** saya putuskan
 
 | Butir | Kenapa |

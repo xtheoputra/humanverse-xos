@@ -38,6 +38,8 @@ HANYA_TAMBAH = frozenset(
 )
 # Dihapus lewat prosedur hapus akun / audit AI, bukan oleh aplikasi.
 TANPA_HAPUS = frozenset({"users", "profiles", "agent_runs"})
+# Klaim yang tidak pernah diubah: ditambah pekerja, dihapus Privacy Center (spec/08 7.3).
+TANPA_UBAH = frozenset({"scheduled_runs"})
 
 
 def _katalog(dsn: str, kueri: str) -> list[tuple[Any, ...]]:
@@ -63,7 +65,7 @@ def test_tiap_tabel_milik_pengguna_dilindungi_rls_dan_katalog_sistem_tidak(
           AND c.relname <> 'alembic_version'
         """,
     )
-    assert len(baris) == 23, f"tabel V0 yang terbaca: {len(baris)}"
+    assert len(baris) == 24, f"tabel V0 + V1 yang terbaca: {len(baris)}"
 
     tanpa_rls = sorted(t for t, rls, n, _u in baris if t not in TABEL_SISTEM and not (rls and n))
     sistem_ber_rls = sorted(t for t, rls, _n, _u in baris if t in TABEL_SISTEM and rls)
@@ -118,7 +120,7 @@ def test_isi_tiap_kebijakan_rls_membatasi_pada_pengguna_yang_dilayani(
             salah.append(f"{tabel}: {kebijakan}")
 
     assert set(per_tabel) == {t for t, *_ in baris}
-    assert len(per_tabel) == 21, f"tabel berkebijakan: {sorted(per_tabel)}"
+    assert len(per_tabel) == 22, f"tabel berkebijakan: {sorted(per_tabel)}"
     assert not salah, (
         "kebijakan RLS yang tidak membatasi pada pengguna yang dilayani:\n" + "\n".join(salah)
     )
@@ -190,6 +192,8 @@ def test_hak_akses_peran_aplikasi_sesempit_yang_dinyatakan(v0_bersama: BasisData
             )
         if tabel in TANPA_HAPUS and hapus:
             salah.append(f"{tabel}: DELETE diberikan kepada aplikasi")
+        if tabel in TANPA_UBAH and ubah:
+            salah.append(f"{tabel}: UPDATE diberikan kepada aplikasi")
 
     (peran,) = _katalog(
         v0_bersama.dsn_pemilik,
@@ -215,6 +219,8 @@ DEFINER_DIIZINKAN = {
     "hapus_akun_jatuh_tempo": "hvx_pekerja",  # tahap 5 · 3 · 6 dalam satu transaksi
     # Privacy Center 6.4 (K-42): HAPUS event milik pengguna yang sedang dilayani saja.
     "hapus_event_pengguna": "hvx_app",
+    # Tugas terjadwal spec/08 7.3: SIAPA yang tugasnya jatuh tempo menurut jam lokalnya (baca).
+    "tugas_jatuh_tempo": "hvx_pekerja",
 }
 NL = chr(10)
 
@@ -258,6 +264,7 @@ def test_fungsi_security_definer_hanya_daftar_izin_terpatok_dan_bukan_untuk_publ
         "SELECT * FROM events_untuk_relay('-infinity', '00000000-0000-0000-0000-000000000000', 10)",
         "SELECT * FROM memori_perlu_diselaraskan('bukan-model', 10)",
         "SELECT * FROM akun_jatuh_tempo(10)",
+        "SELECT * FROM tugas_jatuh_tempo('uji', 0, 10)",
         "SELECT kunci_akun_jatuh_tempo('00000000-0000-0000-0000-000000000001')",
         "SELECT hapus_akun_jatuh_tempo("
         "'00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000002')",

@@ -90,6 +90,12 @@ modul — **tidak** ditambahkan ke registry event.
 > terburuk (terbalik, ganda) = bangun ulang; tanpa `events` → kosong. 3 mutasi baru; mutasi 5.1
 > mengikuti `bangun_ulang` yang pindah ke `proyeksi.py`; 39 mutasi terkait berbunyi | Human
 > State **kini** bisa dibangun ulang (dulu tidak ada jalannya); `pola` belum — sampai 9.1 |
+> | 7.3 | migrasi **0014**: tabel `scheduled_runs` (klaim = kunci primer, di transaksi kerjanya) +
+> fungsi `tugas_jatuh_tempo` (`hvx_pekerja`; jam lokal, hari ini & kemarin, tak sebelum akun
+> dibuat, hanya `active`, zona asing dilewati) — **K-48**. `test_tugas_terjadwal.py` 8 uji: tepat
+> sekali · tiga pekerja serentak · kerja gagal membatalkan klaim · dua zona UTC+14/−11 · ganti zona
+> tanpa hari terlewat/ganda. 7 mutasi baru; 72 mutasi terkait berbunyi | `TUGAS_TERJADWAL` masih
+> **kosong** — pengisinya 8.1 · 10.1 · 11.4; pekerja yang mati > 2 hari tidak menyusulkan hari lebih tua |
 
 ## Sprint 8 — Behavior Analytics
 

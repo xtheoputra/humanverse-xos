@@ -16,7 +16,7 @@ Privacy Center) — rinciannya ada di `spec/07` per sprint dan di `docs/99`.
 
 ```
 docker compose                                   arch/09 §1
-├── postgres   PostgreSQL 16         K1 · 23 tabel spec/01
+├── postgres   PostgreSQL 16         K1 · 24 tabel spec/01
 ├── redis      Redis 7               sesi · cache · Streams
 ├── migrate    alembic upgrade head  sekali jalan, SEBELUM api — sebagai PEMILIK skema
 ├── qdrant     Qdrant 1.19           memori vektor (ADR-003) — hanya titik & rujukan, tanpa isi
@@ -64,7 +64,7 @@ HTTP/SDK model hanya di `platform`.
 
 | | Di mana | Penegak |
 |---|---|---|
-| bentuk 23 tabel | [`spec/01`](spec/01-DATABASE-SCHEMA.md) | — sumber |
+| bentuk 24 tabel (23 V0 + 1 V1) | [`spec/01`](spec/01-DATABASE-SCHEMA.md) | — sumber |
 | migrasi | `data/migrations/versions/` — `0001_v0_skema` · `0002_persetujuan_tujuan` (`consents.purpose`, B-22) · `0003_pencarian_masuk` (fungsi login, §12) · `0004_goal_bukan_induk_dirinya` (`CHECK goals_parent_not_self`) · `0005_relay_event` (peran `hvx_pekerja`, fungsi relay §12) · `0006_penyelaras_memori` (`memories.embedding_model`, fungsi penyelaras §12); tiap migrasi `.up.sql` + `.down.sql` | `test_migrasi.py`: katalog migrasi **==** katalog DDL `spec/01` — tabel (persistensi · RLS · opsi · hak akses · komentar) · kolom (tipe · null · bawaan · collation · identity · generated) · hak akses & komentar kolom · constraint · index · pemicu (`pg_get_triggerdef` + menyala/mati) · kebijakan RLS · rule · sequence · fungsi · tipe · ekstensi (+ versi). **Tidak** dibandingkan: statistik, `STORAGE`/`COMPRESSION` kolom, kepemilikan, hak bawaan |
 | naik & turun bersih | idem | `test_migrasi.py`: naik → turun (kosong, kecuali ekstensi — lihat bawah) → naik (identik) |
 | parser P-1..P-3 melihat semua tabel | — | `test_migrasi.py`: nama tabel yang parser baca **==** tabel di katalog basis data sungguhan |

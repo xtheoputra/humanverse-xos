@@ -80,6 +80,7 @@ tools/                 pemeriksa dokumen, uji mutasi, CI lokal
 | citra & aksi CI dipatok digest/SHA | `test_rantai_pasok.py` | patok ke digest (`docker buildx imagetools inspect`) / SHA commit |
 | tiap `CREATE TABLE` membawa `@retention` · `@who-can-set` · `@on-delete` + kolom `data_subject` | `periksa_dokumen.py` P-1 · P-2 | lihat [`arch/06`](arch/06-DATA-ARCHITECTURE.md) §5 §6 |
 | migrasi == `spec/01` | `tests/integration/test_migrasi.py` | ubah `spec/01` dan migrasinya **bersama** |
+| tugas terjadwal = **tepat sekali per pengguna per hari lokal** (spec/08 7.3, K-48) | `test_tugas_terjadwal.py` | `intelligence.TugasTerjadwal` di `TUGAS_TERJADWAL`; `kerjakan` memakai `conn` klaimnya — **jangan** membuka transaksi sendiri |
 | konsumen pekerja baru = **proyeksi terdaftar** (dibangun ulang dari nol, hasilnya sama) atau **bukan proyeksi dengan alasannya** (spec/08 7.2) | `test_proyeksi_daftar.py` (perkabelan `rakit_konsumen`) · `test_proyeksi_terdaftar.py` (generik) | `intelligence.PROYEKSI` dengan `kosongkan` + `potret`, atau `BUKAN_PROYEKSI[grup] = alasan` |
 | jenis event baru = uji admisi lengkap (arch/06 §3, spec/08 7.1) — kalimat *“Anda …”* · templat kunci · sumber sah **per jenis** | `test_admisi_event.py` + `terbitkan` menolak saat terbit | baris *Uji admisi per event* `spec/03` **dan** `events.ADMISI` **bersama** registry; hasil intelligence (pola, prediksi) bukan event |
 | cakupan uji ≥ 70 % | `pytest --cov` | tulis ujinya, jangan turunkan ambangnya |

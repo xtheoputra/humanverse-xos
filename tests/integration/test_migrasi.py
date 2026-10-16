@@ -192,7 +192,7 @@ def test_migrasi_menghasilkan_skema_yang_sama_persis_dengan_spec01(
 
     k_spec, k_mig = katalog(dsn_spec), katalog(dsn_mig)
 
-    assert len({r[0] for r in k_spec["kolom"]}) == 23, "spec/01 wajib memuat 23 tabel V0"
+    assert len({r[0] for r in k_spec["kolom"]}) == 24, "spec/01 wajib memuat 23 tabel V0 + 1 V1"
     assert k_spec == k_mig, "skema migrasi ≠ spec/01:\n" + selisih(k_spec, k_mig)
 
 

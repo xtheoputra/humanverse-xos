@@ -48,6 +48,7 @@ PANGKAS_TIAP = 60  # putaran relay — ±1 menit
 # Tenggang hapus akun 30 hari (spec/01): lima menit telatnya tidak terasa siapa pun, dan
 # sapuan yang sepi hanya satu kueri berbatas.
 JEDA_SAPUAN_HAPUS_S = 300.0
+JEDA_TERJADWAL_S = 60.0  # tugas per jam lokal (spec/08 7.3) — resolusinya satu menit
 _SOKET_S = 10.0  # > BLOCK konsumen (2 dtk), lihat platform/redis_store.py
 
 
@@ -204,6 +205,18 @@ async def jalankan(settings: platform.Settings, berhenti: asyncio.Event) -> None
                 _ulang("sapuan-hapus-akun", sapu_hapus_akun, JEDA_SAPUAN_HAPUS_S, berhenti)
             )
         )
+        # Tugas per jam lokal pengguna (spec/08 7.3) — satu putaran per tugas terdaftar.
+        tugas += [
+            asyncio.create_task(
+                _ulang(
+                    f"terjadwal:{t.nama}",
+                    partial(intelligence.jalankan_jatuh_tempo, engine, t),
+                    JEDA_TERJADWAL_S,
+                    berhenti,
+                )
+            )
+            for t in intelligence.TUGAS_TERJADWAL
+        ]
         if penyelaras:
             tugas.append(
                 asyncio.create_task(
@@ -217,6 +230,7 @@ async def jalankan(settings: platform.Settings, berhenti: asyncio.Event) -> None
             konsumen=[k.grup for k in konsumen],
             vektor=penyelaras is not None,
             sapuan_hapus_akun=True,
+            terjadwal=[t.nama for t in intelligence.TUGAS_TERJADWAL],
         )
         await berhenti.wait()
         for t in tugas:

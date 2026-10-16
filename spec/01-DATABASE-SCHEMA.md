@@ -2,7 +2,8 @@
 
 > ⚠️ **Bukan kata pemilik** — lihat [`README.md`](README.md).
 > Diturunkan dari naskah 5 §31 (19 tabel) + naskah 6 (`events`, `agents`,
-> `agent_tools`) + 1 usulan (`human_states`). Total **23 tabel**.
+> `agent_tools`) + 1 usulan (`human_states`). Total **23 tabel** V0 — ditambah
+> **1 tabel V1** (`scheduled_runs`, [`08`](08-BACKLOG-V1.md) 7.3) = **24**.
 
 Target: **PostgreSQL 16**. Ekstensi: `citext` (email tanpa peduli huruf
 besar-kecil).
@@ -756,6 +757,34 @@ CREATE INDEX recommendation_feedback_user_idx
 > *“Energi 2/5”* di samping skor dari energi 5). Begitu tidak lagi `pending`, barisnya
 > membeku: `context_snapshot` = konteks rekomendasi **yang dilihat** pengguna.
 
+### Tugas terjadwal — V1 (spec/08 7.3)
+
+```sql
+-- @retention   : until-account-deleted
+-- @who-can-set : system
+-- @on-delete   : hard
+CREATE TABLE scheduled_runs (
+  user_id      uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  data_subject text NOT NULL DEFAULT 'user'
+                 CHECK (data_subject IN ('user','bystander','world','system')),
+  task         text NOT NULL CHECK (task ~ '^[a-z][a-z0-9-]{0,39}$'),
+  for_date     date NOT NULL,
+  ran_at       timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (user_id, task, for_date)
+);
+```
+
+> 🔧 **Tabel ke-24, yang pertama sesudah V0** ([`08`](08-BACKLOG-V1.md) 7.3, migrasi
+> 0014). Tugas malam V1 — agregat (8.x), hasil prediksi (10.1), Weekly Review (11.4) —
+> berjalan **tepat sekali per pengguna per hari lokal**, dan *tepat sekali* dijamin
+> kunci primer: proses pekerja mengklaim `(user_id, task, for_date)` di transaksi
+> yang **sama** dengan kerjanya. Kerja yang gagal membatalkan klaimnya; pekerja kedua
+> yang serentak tertahan indeks unik, lalu mendapati klaim itu sudah ada. Siapa yang
+> jatuh tempo dibaca fungsi sempit `tugas_jatuh_tempo` (§12). Milik `intelligence`
+> ([`06`](06-MODULE-BOUNDARIES.md)); terlihat di Privacy Center sebagai turunan
+> *Rekomendasi*, dan terhapus bersamanya — tugasnya lalu berjalan lagi untuk hari
+> yang masih dalam jangkauan.
+
 ---
 
 ## 8 · Agent registry & audit
@@ -1040,6 +1069,10 @@ GRANT SELECT, INSERT, UPDATE ON agent_runs TO hvx_app;
 
 -- katalog sistem: dikelola migrasi
 GRANT SELECT ON agents, agent_tools TO hvx_app;
+
+-- jejak tugas terjadwal (spec/08 7.3): klaim ditulis pekerja di bawah RLS pemiliknya;
+-- dihapus bersama kategori Rekomendasi di Privacy Center. Tidak pernah diubah.
+GRANT SELECT, INSERT, DELETE ON scheduled_runs TO hvx_app;
 ```
 
 > 🛑 **B-40 — ditutup 17 Sep 2026.** Sampai hari itu api tersambung sebagai
@@ -1084,6 +1117,7 @@ ALTER TABLE activities              ENABLE ROW LEVEL SECURITY;
 ALTER TABLE events                  ENABLE ROW LEVEL SECURITY;
 ALTER TABLE memories                ENABLE ROW LEVEL SECURITY;
 ALTER TABLE human_states            ENABLE ROW LEVEL SECURITY;
+ALTER TABLE scheduled_runs          ENABLE ROW LEVEL SECURITY;
 ALTER TABLE ai_conversations        ENABLE ROW LEVEL SECURITY;
 ALTER TABLE ai_messages             ENABLE ROW LEVEL SECURITY;
 ALTER TABLE recommendations         ENABLE ROW LEVEL SECURITY;
@@ -1104,6 +1138,7 @@ CREATE POLICY activities_own_rows              ON activities              USING 
 CREATE POLICY events_own_rows                  ON events                  USING (user_id = app_current_user_id()) WITH CHECK (user_id = app_current_user_id());
 CREATE POLICY memories_own_rows                ON memories                USING (user_id = app_current_user_id()) WITH CHECK (user_id = app_current_user_id());
 CREATE POLICY human_states_own_rows            ON human_states            USING (user_id = app_current_user_id()) WITH CHECK (user_id = app_current_user_id());
+CREATE POLICY scheduled_runs_own_rows          ON scheduled_runs          USING (user_id = app_current_user_id()) WITH CHECK (user_id = app_current_user_id());
 CREATE POLICY ai_conversations_own_rows        ON ai_conversations        USING (user_id = app_current_user_id()) WITH CHECK (user_id = app_current_user_id());
 CREATE POLICY ai_messages_own_rows             ON ai_messages             USING (user_id = app_current_user_id()) WITH CHECK (user_id = app_current_user_id());
 CREATE POLICY recommendations_own_rows         ON recommendations         USING (user_id = app_current_user_id()) WITH CHECK (user_id = app_current_user_id());
@@ -1127,7 +1162,7 @@ CREATE POLICY audit_logs_append ON audit_logs FOR INSERT
 >
 > | Lapis | Menjaga | Penegak |
 > |---|---|---|
-> | **RLS** (§11) | pengguna A tidak pernah **membaca, mengubah, atau menulis** baris pengguna B — bahkan kalau `WHERE user_id = …` terlupa di kueri | `test_kepemilikan_data.py` · 21 tabel |
+> | **RLS** (§11) | pengguna A tidak pernah **membaca, mengubah, atau menulis** baris pengguna B — bahkan kalau `WHERE user_id = …` terlupa di kueri | `test_kepemilikan_data.py` · 22 tabel (21 V0 + `scheduled_runs` V1) |
 > | **FK komposit** (B-41) | baris anak tidak pernah menunjuk **induk milik pengguna lain** — FK PostgreSQL tidak menerapkan RLS, jadi RLS saja tidak cukup | idem · 11 relasi |
 > | **peran aplikasi** (§10, B-40) | tidak ada yang melewati kedua lapis di atas: api bukan superuser, bukan pemilik, tanpa `BYPASSRLS` | idem + api menolak mulai |
 >
@@ -1293,6 +1328,39 @@ CREATE FUNCTION hapus_akun_jatuh_tempo(p_user_id uuid, p_semu uuid)
 REVOKE ALL ON FUNCTION hapus_akun_jatuh_tempo(uuid, uuid) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION hapus_akun_jatuh_tempo(uuid, uuid) TO hvx_pekerja;
 
+-- Tugas terjadwal (spec/08 7.3): SIAPA yang tugas `p_tugas`-nya jatuh tempo menurut jam
+-- LOKAL-nya sendiri (`profiles.timezone`) — hari ini dan kemarin, supaya pekerja yang
+-- berhenti sebentar, atau pengguna yang pindah zona ke timur, tidak melewatkan hari;
+-- tidak pernah sebelum hari akunnya dibuat. Hanya akun aktif. Zona yang tak dikenal
+-- PostgreSQL membuat pengguna itu dilewati — bukan menggagalkan semua pengguna. Hanya
+-- baca: klaimnya ditulis di bawah RLS pemiliknya.
+CREATE FUNCTION tugas_jatuh_tempo(p_tugas text, p_menit integer, p_batas integer)
+  RETURNS TABLE (user_id uuid, for_date date)
+  LANGUAGE sql STABLE SECURITY DEFINER
+  SET search_path = pg_catalog, public, pg_temp
+  AS $$
+    WITH zona AS MATERIALIZED (SELECT name FROM pg_catalog.pg_timezone_names)
+    SELECT u.id, h.for_date
+    FROM public.users u
+    JOIN public.profiles p ON p.user_id = u.id
+    LEFT JOIN zona z ON z.name = p.timezone
+    CROSS JOIN LATERAL (SELECT now() AT TIME ZONE z.name AS lokal) w
+    CROSS JOIN LATERAL (
+      SELECT (w.lokal::date - k) AS for_date FROM generate_series(0, 1) AS k
+    ) h
+    WHERE u.status = 'active'
+      AND h.for_date >= (u.created_at AT TIME ZONE z.name)::date
+      AND w.lokal >= h.for_date + make_interval(mins => p_menit)
+      AND NOT EXISTS (
+        SELECT 1 FROM public.scheduled_runs r
+        WHERE r.user_id = u.id AND r.task = p_tugas AND r.for_date = h.for_date
+      )
+    ORDER BY h.for_date, u.id
+    LIMIT least(greatest(p_batas, 1), 500)
+  $$;
+REVOKE ALL ON FUNCTION tugas_jatuh_tempo(text, integer, integer) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION tugas_jatuh_tempo(text, integer, integer) TO hvx_pekerja;
+
 -- Privacy Center (spec/07 6.4, K-42): hapus per kategori ikut membuang riwayat event
 -- pengguna itu (naskah 11 §7.25). `events` tetap hanya-tambah bagi `hvx_app` (§10) — yang
 -- dibuka hanya PENGHAPUSAN, hanya event milik pengguna yang SEDANG DILAYANI transaksi
@@ -1385,7 +1453,7 @@ Menutup janji *Delete* di Privacy Center (naskah 5 §26) tanpa merusak audit:
 |---|---|
 | 1 | `users.status = 'pending_deletion'`, `deletion_scheduled_at = now()+30 hari` (🔧 8 Okt 2026: tertulis `now()+30h` — **30 jam**; kode, kolom `users`, dan tahap 2 semuanya 30 hari — tinjauan kontrak S5–6 K8), **semua sesi dicabut** (`cabut_semua`), agent berhenti melayani |
 | 2 | Tenggang **30 hari** — pengguna masih bisa membatalkan (`POST /me/restore`) |
-| 3 | `DELETE FROM users` → cascade menghapus profil, goal, habit, jurnal, mood, memori, percakapan, rekomendasi, event, human_states |
+| 3 | `DELETE FROM users` → cascade menghapus profil, goal, habit, jurnal, mood, memori, percakapan, rekomendasi, event, human_states, scheduled_runs |
 | 4 | Titik embedding di Qdrant dihapus berdasarkan `memories.embedding_id` yang dikumpulkan **sebelum** tahap 3 — atau per saringan `user_id` payload (`platform.KlienVektor.hapus_milik`, 3.5), yang juga membuang titik yatim |
 | 5 | `audit_logs` **tetap**, dengan `user_id` diacak jadi id semu satu arah; isinya sudah metadata saja |
 | 6 | Satu baris audit terakhir: `action='account.deleted'` |
@@ -1438,7 +1506,7 @@ Menutup janji *Delete* di Privacy Center (naskah 5 §26) tanpa merusak audit:
 
 ---
 
-## Ringkasan 23 tabel
+## Ringkasan 24 tabel — 23 V0 + 1 V1
 
 | # | Tabel | Sumber | V0 |
 |---|---|---|---|
@@ -1465,9 +1533,10 @@ Menutup janji *Delete* di Privacy Center (naskah 5 §26) tanpa merusak audit:
 | 21 | `recommendations` | §31 | ✅ Sprint 5 |
 | 22 | `recommendation_feedback` | §31 | ✅ Sprint 5 |
 | 23 | `audit_logs` | §31 | ✅ Sprint 1 |
+| 24 | `scheduled_runs` | 🔧 usulan V1 — tugas malam tepat sekali | V1 Sprint 7 (7.3) |
 
 **19** tabel dari daftar pemilik §31 + **3** dari naskah 6 + **1** usulan
-(`human_states`) = **23 tabel**.
+(`human_states`) = **23 tabel** V0. V1 menambah **1** (`scheduled_runs`).
 
 Tidak ada tabel untuk fitur di luar V0. `wardrobe_items`, `outfits`,
 `sleep_records`, `workouts`, `skills`, `projects`, dan `notifications` disebut

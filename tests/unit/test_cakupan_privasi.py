@@ -54,7 +54,7 @@ def _modul(nama: str) -> object:
 
 def test_pembaca_spec01_menemukan_semua_tabel_milik_pengguna() -> None:
     tabel = tabel_milik_pengguna()
-    assert len(tabel) == 21, f"tabel milik pengguna terbaca dari spec/01: {sorted(tabel)}"
+    assert len(tabel) == 22, f"tabel milik pengguna terbaca dari spec/01: {sorted(tabel)}"
     assert {"agents", "agent_tools"}.isdisjoint(tabel), "katalog sistem terbaca milik pengguna"
 
 

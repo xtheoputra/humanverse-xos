@@ -67,7 +67,7 @@ dengan SQL — harus lewat `__init__.py` pemiliknya.
 | `activities` | `activities` |
 | `events` | `events` |
 | `memory` | `memories` |
-| `intelligence` | `recommendations`, `recommendation_feedback` |
+| `intelligence` | `recommendations`, `recommendation_feedback`, `scheduled_runs` |
 | `agents` | `agents`, `agent_tools`, `agent_runs`, `ai_conversations`, `ai_messages` |
 
 ---

@@ -29,6 +29,14 @@ BAGIAN_PRIVASI: tuple[identity.BagianData, ...] = (
         "SELECT count(*) FROM recommendation_feedback WHERE user_id = :u",
         "SELECT * FROM recommendation_feedback WHERE user_id = :u ORDER BY created_at, id",
     ),
+    # Jejak tugas malam (spec/08 7.3): hari apa saja analisisnya sudah dijalankan.
+    identity.bagian_sql(
+        _REKOMENDASI,
+        "scheduled_runs",
+        "SELECT count(*) FROM scheduled_runs WHERE user_id = :u",
+        "SELECT * FROM scheduled_runs WHERE user_id = :u ORDER BY for_date, task",
+        turunan=True,
+    ),
 )
 
 PENGHAPUS_PRIVASI: tuple[identity.Penghapus, ...] = (
@@ -41,6 +49,13 @@ PENGHAPUS_PRIVASI: tuple[identity.Penghapus, ...] = (
     ),
     identity.penghapus_sql(
         _REKOMENDASI, "recommendations", "DELETE FROM recommendations WHERE user_id = :u"
+    ),
+    # Tanpa jejaknya, tugas malam berjalan lagi untuk hari yang masih dalam jangkauan.
+    identity.penghapus_sql(
+        _REKOMENDASI,
+        "scheduled_runs",
+        "DELETE FROM scheduled_runs WHERE user_id = :u",
+        turunan=True,
     ),
     identity.penghapus_sql(
         "habits",
