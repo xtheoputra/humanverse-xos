@@ -41,7 +41,7 @@ from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine
 from hvx.modules import events, platform
 
 from . import repository
-from .rentetan import awal_riwayat, hitung_rentetan
+from .rentetan import Rentetan, awal_riwayat, hitung_rentetan
 from .schemas import (
     BuatHabit,
     CatatPenyelesaian,
@@ -346,6 +346,33 @@ async def _terbitkan_penyelesaian(
 # ── spec/07 2.4 — rentetan ───────────────────────────────────────────────────
 
 
+async def habit_pada(conn: AsyncConnection, habit_id: UUID) -> Habit | None:
+    """Habit itu pada koneksi yang diberikan — pembaca lapisan atas (Behavior Engine, 5.2)
+    yang bekerja di transaksinya sendiri; `habits` ada di bawahnya (M-1)."""
+    return await repository.ambil(conn, habit_id)
+
+
+async def rentetan_pada(
+    conn: AsyncConnection, user_id: UUID, habit_id: UUID, zona: str
+) -> Rentetan | None:
+    """Rentetan dihitung pada koneksi & zona yang diberikan — satu sumber logika rentetan
+    untuk jalur tool (`rentetan`) dan Behavior Engine (5.2). `None` bila habit tak ada."""
+    habit = await repository.ambil(conn, habit_id)
+    if habit is None:
+        return None
+    hari_ini = await platform.hari_ini_di(conn, zona)
+    mulai = await repository.mulai_lokal(conn, habit_id, zona) or hari_ini
+    riwayat = await repository.riwayat(conn, habit_id, sejak=awal_riwayat(hari_ini))
+    return hitung_rentetan(
+        period=habit.period,
+        target_count=habit.target_count,
+        weekdays=habit.schedule.get("weekdays"),
+        mulai=mulai,
+        hari_ini=hari_ini,
+        penyelesaian=riwayat,
+    )
+
+
 async def rentetan(
     engine: AsyncEngine,
     user_id: UUID,
@@ -354,21 +381,10 @@ async def rentetan(
     pembaca_zona_waktu: PembacaZonaWaktu,
 ) -> JawabanRentetan:
     async with platform.transaksi_pengguna(engine, user_id) as conn:
-        habit = await repository.ambil(conn, habit_id)
-        if habit is None:
-            raise _tidak_ditemukan()
         zona = await pembaca_zona_waktu(conn, user_id) or ZONA_BAWAAN
-        hari_ini = await platform.hari_ini_di(conn, zona)
-        mulai = await repository.mulai_lokal(conn, habit_id, zona) or hari_ini
-        riwayat = await repository.riwayat(conn, habit_id, sejak=awal_riwayat(hari_ini))
-    hasil = hitung_rentetan(
-        period=habit.period,
-        target_count=habit.target_count,
-        weekdays=habit.schedule.get("weekdays"),
-        mulai=mulai,
-        hari_ini=hari_ini,
-        penyelesaian=riwayat,
-    )
+        hasil = await rentetan_pada(conn, user_id, habit_id, zona)
+    if hasil is None:
+        raise _tidak_ditemukan()
     return JawabanRentetan(
         current=hasil.current,
         longest=hasil.longest,

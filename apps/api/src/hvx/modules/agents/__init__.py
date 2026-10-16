@@ -48,6 +48,7 @@ from .program_v0 import (
     KEYAKINAN_PASTI,
     KEYAKINAN_SUMBER,
     PROGRAM_V0,
+    TANYA_TANPA_DATA,
 )
 from .registri import (
     AKSI_IZIN,
@@ -89,6 +90,7 @@ __all__ = [
     "KODE_GERBANG",
     "PROGRAM_V0",
     "RUANG_ID_AGENT",
+    "TANYA_TANPA_DATA",
     "UMUR_TOKEN_S",
     "Alat",
     "AlatDitolak",

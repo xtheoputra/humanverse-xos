@@ -811,6 +811,7 @@ async def test_pesan_yang_diputar_ulang_selagi_gilirannya_berjalan_processing(
     `processing`. `completed` menyuruh klien membaca riwayat yang belum memuat balasannya
     alih-alih menyambung ke aliran."""
     _uid, token = await api.pengguna_baru()
+    await buat_habit(api, token, title="Lari pagi")  # satu sumber → giliran sampai ke model (5.4)
     cid = await _percakapan(api, token)
     mulai, lepas = _tahan_model(monkeypatch)
     kunci = {"Idempotency-Key": f"k-{uuid.uuid4().hex}"}
@@ -839,6 +840,7 @@ async def test_api_berhenti_membatalkan_giliran_yang_masih_berjalan(
     berakhir `error cancelled`. Menunggunya selesai menahan api yang berhenti selama model
     menjawab — tanpa batas bila penyedianya menggantung."""
     _uid, token = await api.pengguna_baru()
+    await buat_habit(api, token, title="Lari pagi")  # satu sumber → giliran sampai ke model (5.4)
     cid = await _percakapan(api, token)
     mulai, lepas = _tahan_model(monkeypatch)
     terima = await _kirim(api, token, cid, "halo")
@@ -874,6 +876,7 @@ async def test_lifespan_yang_berhenti_menutup_giliran_yang_berjalan(
                 app=app, klien=klien, db=v0_bersama, awalan_redis=awalan, engine_pekerja=None
             )
             _uid, token = await sendiri.pengguna_baru()
+            await buat_habit(sendiri, token, title="Lari pagi")  # satu sumber → model (5.4)
             cid = await _percakapan(sendiri, token)
             terima = await _kirim(sendiri, token, cid, "halo")
             await asyncio.wait_for(mulai.wait(), 10)

@@ -27,6 +27,7 @@ from hvx.modules import (
     goals,
     habits,
     identity,
+    intelligence,
     journal,
     memory,
     platform,
@@ -160,11 +161,13 @@ def create_app(settings: platform.Settings | None = None) -> FastAPI:
         )
     app.include_router(platform.router)
     app.include_router(identity.router)
+    app.include_router(identity.router_akun)
     app.include_router(profile.router)
     app.include_router(goals.router)
     app.include_router(habits.router)
     app.include_router(checkins.router)
     app.include_router(journal.router)
     app.include_router(activities.router)
+    app.include_router(intelligence.router)
     app.include_router(agents.router)
     return app

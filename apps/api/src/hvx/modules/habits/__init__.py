@@ -14,7 +14,14 @@ Berkas ini satu-satunya pintu keluar modul (spec/06 aturan 1).
 from .rentetan import Rentetan, hitung_rentetan
 from .routes import router
 from .schemas import CatatPenyelesaian, Habit
-from .service import PembacaEnergi, PembacaGoalHidup, PembacaZonaWaktu, lepas_goal
+from .service import (
+    PembacaEnergi,
+    PembacaGoalHidup,
+    PembacaZonaWaktu,
+    habit_pada,
+    lepas_goal,
+    rentetan_pada,
+)
 
 # Jalur tool agent (spec/05 habit.list · habit.streak · habit.complete, spec/07 4.3).
 from .service import catat as catat_penyelesaian
@@ -31,9 +38,11 @@ __all__ = [
     "Rentetan",
     "catat_penyelesaian",
     "daftar_habit",
+    "habit_pada",
     "hitung_rentetan",
     "lepas_goal",
     "rentetan_habit",
+    "rentetan_pada",
     "router",
     "tier_untuk_energi",
 ]

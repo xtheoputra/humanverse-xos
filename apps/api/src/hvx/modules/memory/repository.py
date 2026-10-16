@@ -134,6 +134,42 @@ _SISIP_INGATAN = text(
     """
 )
 
+# Pola perilaku (5.2): id DETERMINISTIK per (pengguna, subjek, jenis pola), jadi
+# menghitung ulang MENGUATKAN baris yang sama — bukan menumpuk baris. Isi/keyakinan/
+# bukti ditimpa; `valid_until` dikosongkan (pola aktif lagi); `embedding_model`
+# direset HANYA bila isinya berubah, supaya penyelaras tidak menyemat ulang sia-sia.
+# Tidak pernah menghidupkan baris yang sudah dihapus (deleted_at).
+_POLA_UPSERT = text(
+    """
+    INSERT INTO memories (id, user_id, kind, scope, content, confidence, evidence_count,
+                          model_version)
+    VALUES (:id, :user_id, 'behavioral', :scope, :content, :confidence, :evidence_count,
+            :model_version)
+    ON CONFLICT (id) DO UPDATE SET
+      content = EXCLUDED.content,
+      confidence = EXCLUDED.confidence,
+      evidence_count = EXCLUDED.evidence_count,
+      model_version = EXCLUDED.model_version,
+      scope = EXCLUDED.scope,
+      valid_until = NULL,
+      last_reinforced_at = now(),
+      updated_at = now(),
+      embedding_model = CASE WHEN memories.content IS DISTINCT FROM EXCLUDED.content
+                             THEN NULL ELSE memories.embedding_model END
+    WHERE memories.deleted_at IS NULL
+    """
+)
+
+# Pola tak lagi terhitung dari data: ditandai TIDAK berlaku, bukan dihapus —
+# "dulu begini" tetap sejarah yang benar (spec/01 §5 valid_until). Idempoten.
+_POLA_LURUH = text(
+    """
+    UPDATE memories SET valid_until = now(), updated_at = now()
+    WHERE id = :id AND user_id = :user_id AND kind = 'behavioral'
+      AND deleted_at IS NULL AND valid_until IS NULL
+    """
+)
+
 
 @dataclass(frozen=True)
 class BarisSelaras:
@@ -227,6 +263,35 @@ async def tandai_tersemat(conn: AsyncConnection, baris: list[BarisSelaras], mode
 async def buang(conn: AsyncConnection, ids: list[UUID]) -> None:
     if ids:
         await conn.execute(_BUANG, {"ids": ids})
+
+
+async def pola_upsert(
+    conn: AsyncConnection,
+    *,
+    id_: UUID,
+    user_id: UUID,
+    scope: str,
+    content: str,
+    confidence: Decimal,
+    evidence_count: int,
+    model_version: str,
+) -> None:
+    await conn.execute(
+        _POLA_UPSERT,
+        {
+            "id": id_,
+            "user_id": user_id,
+            "scope": scope,
+            "content": content,
+            "confidence": confidence,
+            "evidence_count": evidence_count,
+            "model_version": model_version,
+        },
+    )
+
+
+async def pola_luruh(conn: AsyncConnection, *, id_: UUID, user_id: UUID) -> None:
+    await conn.execute(_POLA_LURUH, {"id": id_, "user_id": user_id})
 
 
 async def ingat(

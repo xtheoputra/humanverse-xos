@@ -14,15 +14,21 @@ from .dependensi import PenggunaDiperlukan, penyimpan_sesi
 from .laju import batasi_kredensial_ip, penjaga_gagal_masuk
 from .schemas import (
     JawabanAkun,
+    JawabanHapusDijadwalkan,
+    JawabanRestore,
     JawabanSegarkan,
     JawabanToken,
     PermintaanDaftar,
+    PermintaanHapusAkun,
     PermintaanMasuk,
     PermintaanSegarkan,
 )
 from .sesi import PenyimpanSesi, Token
 
 router = APIRouter(prefix="/v1/auth", tags=["identity"])
+# Rute akun di bawah `/v1/me` — pintu masuk alur hapus akun (6.5). Router terpisah
+# karena `router` berawalan `/v1/auth`; `hvx.main` merakit keduanya.
+router_akun = APIRouter(prefix="/v1", tags=["identity"])
 
 Sesi = Annotated[PenyimpanSesi, Depends(penyimpan_sesi)]
 # Daftar & masuk: batas per IP yang lebih ketat daripada permukaan umum (spec/07 1.7).
@@ -82,3 +88,25 @@ async def keluar(request: Request, pengguna: PenggunaDiperlukan, sesi: Sesi) -> 
         platform.engine_dari(request), sesi, pengguna, ip_hash=platform.sidik_ip(request)
     )
     return Response(status_code=204)
+
+
+@router_akun.delete("/me", status_code=202, response_model=JawabanHapusDijadwalkan)
+async def hapus_akun(
+    request: Request, badan: PermintaanHapusAkun, pengguna: PenggunaDiperlukan, sesi: Sesi
+) -> JawabanHapusDijadwalkan:
+    dijadwalkan = await service.jadwalkan_penghapusan(
+        platform.engine_dari(request),
+        sesi,
+        pengguna,
+        badan.password.get_secret_value(),
+        ip_hash=platform.sidik_ip(request),
+    )
+    return JawabanHapusDijadwalkan(deletion_scheduled_at=dijadwalkan)
+
+
+@router_akun.post("/me/restore", response_model=JawabanRestore)
+async def pulihkan_akun(request: Request, pengguna: PenggunaDiperlukan) -> JawabanRestore:
+    await service.batalkan_penghapusan(
+        platform.engine_dari(request), pengguna.user_id, ip_hash=platform.sidik_ip(request)
+    )
+    return JawabanRestore()

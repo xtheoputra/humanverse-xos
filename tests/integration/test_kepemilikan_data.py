@@ -209,6 +209,10 @@ DEFINER_DIIZINKAN = {
     "auth_lookup_for_login": "hvx_app",  # login: mencari akun per email sebelum dikenali
     "events_untuk_relay": "hvx_pekerja",  # relay 3.3: RUJUKAN event semua pengguna
     "memori_perlu_diselaraskan": "hvx_pekerja",  # penyelaras 3.5–3.7: HANYA user_id berpekerjaan
+    # Sapuan hapus akun 6.5 (K-39): tiga langkah, tiap-tiapnya menolak akun yang belum jatuh tempo.
+    "akun_jatuh_tempo": "hvx_pekerja",  # SIAPA yang tenggang 30 harinya habis (hanya baca)
+    "kunci_akun_jatuh_tempo": "hvx_pekerja",  # kunci barisnya sementara Qdrant dibersihkan
+    "hapus_akun_jatuh_tempo": "hvx_pekerja",  # tahap 5 · 3 · 6 dalam satu transaksi
 }
 NL = chr(10)
 
@@ -251,6 +255,10 @@ def test_fungsi_security_definer_hanya_daftar_izin_terpatok_dan_bukan_untuk_publ
     [
         "SELECT * FROM events_untuk_relay('-infinity', '00000000-0000-0000-0000-000000000000', 10)",
         "SELECT * FROM memori_perlu_diselaraskan('bukan-model', 10)",
+        "SELECT * FROM akun_jatuh_tempo(10)",
+        "SELECT kunci_akun_jatuh_tempo('00000000-0000-0000-0000-000000000001')",
+        "SELECT hapus_akun_jatuh_tempo("
+        "'00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000002')",
     ],
 )
 def test_peran_api_tidak_bisa_memanggil_fungsi_pekerja(

@@ -8,7 +8,10 @@
 * **Event (spec/07 3.2)** — `checkin.logged` hanya bila PUT MENGUBAH isi
   check-in (atau membuatnya): kuncinya `updated_at` baris itu, jadi koreksi
   A → B → A menjadi tiga event dan proyeksinya berakhir di A — sama dengan
-  tabelnya. PUT yang sama persis tidak menerbitkan apa pun. `mood.logged` untuk
+  tabelnya. PUT yang sama persis tidak menerbitkan apa pun. Kunci itu hanya
+  mengidentifikasi VERSI baris karena `updated_at` naik ketat per baris
+  (pemicu `set_updated_at`, migrasi 0012, E-223) — dulu `now()` polos bisa
+  kembar antar transaksi serentak dan `PUT` serentak menjawab 500. `mood.logged` untuk
   tiap mood baru, kuncinya id mood (spec/03 aturan 1, E-177).
 * **2.6** mood DILAPORKAN pengguna (spec/01: bukan ditaksir sistem — E-34).
   `occurred_at` wajib berzona waktu, boleh lampau (dicatat belakangan), dan

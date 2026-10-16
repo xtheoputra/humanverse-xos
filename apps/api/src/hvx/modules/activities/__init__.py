@@ -12,6 +12,13 @@ Berkas ini satu-satunya pintu keluar modul (spec/06 aturan 1).
 
 from .routes import router
 from .schemas import Aktivitas
-from .service import catat_disimpulkan
+from .service import catat_disimpulkan, catat_proyeksi, hapus_proyeksi, kosongkan_proyeksi
 
-__all__ = ["Aktivitas", "catat_disimpulkan", "router"]
+__all__ = [
+    "Aktivitas",
+    "catat_disimpulkan",
+    "catat_proyeksi",
+    "hapus_proyeksi",
+    "kosongkan_proyeksi",
+    "router",
+]

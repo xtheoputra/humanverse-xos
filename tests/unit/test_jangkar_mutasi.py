@@ -5,11 +5,17 @@ jangkarnya saja, jadi penggantinya sama persis dengan jangkarnya — mutasinya t
 mengubah apa pun, dan baru ketahuan sebagai "DIAM" setelah pengujinya lulus. Jangkar
 yang bergeser karena kode berubah juga baru ketahuan di tengah putaran mutasi. Uji
 ini menangkap keduanya dalam hitungan detik, tanpa menjalankan satu mutasi pun.
+
+Gerbang penuh 6 Okt 2026 (E-222): dua mutasi 4.7 menunjuk `test_coach_tanpa_data_
+mengatakannya` — uji yang sudah diganti namanya oleh 5.4. `pytest` menjawab *“not
+found”* (kode keluar 4), yang bagi alat mutasi berarti “diam”, dan baru ketahuan
+di gerbang penuh ±20 menit kemudian. Nama ujinya kini diperiksa di sini juga.
 """
 
 from __future__ import annotations
 
 import importlib.util
+import re
 import sys
 from pathlib import Path
 from types import ModuleType
@@ -44,3 +50,32 @@ def test_tiap_jangkar_mutasi_ada_tepat_sekali_dan_penggantinya_berbeda() -> None
 
     assert len(alat.MUTASI) > 200, "daftar mutasi tidak terbaca"
     assert not buruk, "mutasi yang tidak mengubah apa pun:\n" + "\n".join(buruk)
+
+
+def test_tiap_mutasi_pytest_menunjuk_uji_yang_ada() -> None:
+    """Nama uji di `_pytest(...)` masih ada di berkasnya (E-222).
+
+    Uji yang diganti namanya membuat `pytest` keluar dengan kode 4 (*not found*) —
+    tidak satu pun uji berjalan, dan mutasinya terbaca “diam”.
+    """
+    alat = _alat()
+    buruk: list[str] = []
+    for m in alat.MUTASI:
+        if "pytest" not in m.perintah:
+            continue
+        berkas, _, sisa = m.perintah[-1].partition("::")
+        if berkas in {s.berkas for s in m.suntingan if s.lama is None}:
+            continue  # berkas ujinya dibuat mutasi itu sendiri
+        jalur = AKAR / berkas
+        if not jalur.is_file():
+            buruk.append(f"{m.kode} {m.maksud}: berkas uji tidak ada: {berkas}")
+            continue
+        if not sisa:
+            continue
+        nama = sisa.split("::")[-1].split("[")[0]
+        if not re.search(
+            rf"^\s*(async\s+)?def {re.escape(nama)}\(", jalur.read_text("utf-8"), re.M
+        ):
+            buruk.append(f"{m.kode} {m.maksud}: {berkas} tidak punya uji `{nama}`")
+
+    assert not buruk, "mutasi yang menunjuk uji yang tidak ada:\n" + "\n".join(buruk)

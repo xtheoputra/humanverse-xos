@@ -36,6 +36,35 @@ _AMBIL = text(
     """
 )
 
+# Proyeksi Behavior projector (spec/07 5.1): `id` DETERMINISTIK dari event sumber,
+# jadi event yang sama — disalurkan ulang, atau diputar ulang saat membangun dari
+# nol — tidak pernah melahirkan baris kedua. `ON CONFLICT DO NOTHING`: idempoten,
+# dan karena baris penyelesaian yang DICABUT dihapus (bukan ditulis ulang), tidak
+# ada jalur yang menghidupkannya kembali.
+_SISIP_PROYEKSI = text(
+    """
+    INSERT INTO activities (id, user_id, kind, occurred_at, source, payload)
+    VALUES (:id, :user_id, :kind, :occurred_at, 'inferred', CAST(:payload AS jsonb))
+    ON CONFLICT (id) DO NOTHING
+    """
+)
+
+# Hanya `inferred`: proyeksi tidak pernah menghapus aktivitas yang DICATAT manusia,
+# sekalipun id-nya kebetulan sama. Keras, bukan hapus-lunak — proyeksi dibangun
+# ulang dari `events` (spec/02 aturan D), jadi tidak ada yang hilang dengannya.
+_HAPUS_PROYEKSI = text(
+    """
+    DELETE FROM activities
+    WHERE id = :id AND user_id = :user_id AND source = 'inferred'
+    """
+)
+
+# Buang SELURUH proyeksi satu pengguna — langkah "dari nol" saat membangun ulang
+# (spec/07 5.1). Tak pernah menyentuh baris `manual`/`wearable`/`integration`.
+_KOSONGKAN_PROYEKSI = text(
+    "DELETE FROM activities WHERE user_id = :user_id AND source = 'inferred'"
+)
+
 _DAFTAR = text(
     """
     SELECT id, kind, occurred_at, ended_at, duration_seconds, source, payload, created_at
@@ -56,6 +85,36 @@ _DAFTAR = text(
 async def ambil(conn: AsyncConnection, aktivitas_id: UUID) -> Aktivitas | None:
     baris = (await conn.execute(_AMBIL, {"id": aktivitas_id})).mappings().first()
     return Aktivitas.model_validate(dict(baris)) if baris else None
+
+
+async def sisip_proyeksi(
+    conn: AsyncConnection,
+    *,
+    id_: UUID,
+    user_id: UUID,
+    kind: str,
+    occurred_at: datetime,
+    payload: dict[str, Any],
+) -> None:
+    await conn.execute(
+        _SISIP_PROYEKSI,
+        {
+            "id": id_,
+            "user_id": user_id,
+            "kind": kind,
+            "occurred_at": occurred_at,
+            "payload": json.dumps(payload, sort_keys=True),
+        },
+    )
+
+
+async def hapus_proyeksi(conn: AsyncConnection, *, id_: UUID, user_id: UUID) -> None:
+    await conn.execute(_HAPUS_PROYEKSI, {"id": id_, "user_id": user_id})
+
+
+async def kosongkan_proyeksi(conn: AsyncConnection, *, user_id: UUID) -> int:
+    hasil = await conn.execute(_KOSONGKAN_PROYEKSI, {"user_id": user_id})
+    return hasil.rowcount
 
 
 async def sisip(

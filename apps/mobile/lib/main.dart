@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'api/klien.dart';
+import 'api/luring.dart';
 import 'layar/habit_hari_ini.dart';
 import 'layar/masuk.dart';
 
@@ -12,13 +13,18 @@ const alamatApi = String.fromEnvironment(
 );
 
 void main() {
-  runApp(AplikasiHvx(layanan: KlienApi(dasar: Uri.parse(alamatApi))));
+  // Luring dasar (spec/07 6.6): catatan habit menunggu di antrean selagi jaringan putus.
+  final luring = LayananLuring(KlienApi(dasar: Uri.parse(alamatApi)));
+  runApp(AplikasiHvx(layanan: luring, luring: luring));
 }
 
 class AplikasiHvx extends StatefulWidget {
-  const AplikasiHvx({super.key, required this.layanan});
+  const AplikasiHvx({super.key, required this.layanan, this.luring});
 
   final LayananHabit layanan;
+
+  /// Antrean luring milik [layanan], bila ada — layar habit menampilkannya.
+  final StatusLuring? luring;
 
   @override
   State<AplikasiHvx> createState() => _AplikasiHvxState();
@@ -38,6 +44,7 @@ class _AplikasiHvxState extends State<AplikasiHvx> {
       home: _masuk
           ? LayarHabitHariIni(
               layanan: widget.layanan,
+              luring: widget.luring,
               sesudahKeluar: () => setState(() => _masuk = false),
             )
           : LayarMasuk(

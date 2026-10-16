@@ -13,6 +13,7 @@ from __future__ import annotations
 import json
 from collections.abc import Mapping
 from dataclasses import dataclass
+from datetime import datetime
 from uuid import UUID
 
 from sqlalchemy import text
@@ -224,3 +225,98 @@ async def catat_masuk(conn: AsyncConnection, user_id: UUID) -> None:
     await conn.execute(
         text("UPDATE users SET last_login_at = now() WHERE id = :id"), {"id": user_id}
     )
+
+
+# ── Alur hapus akun (6.5) — tahap 1 & pembatalan, di RLS pemiliknya ──
+
+
+@dataclass(frozen=True)
+class AkunUntukHapus:
+    password_hash: str
+    status: str
+    deletion_scheduled_at: datetime | None
+
+
+_AKUN_HAPUS = text("SELECT password_hash, status, deletion_scheduled_at FROM users WHERE id = :id")
+# Tahap 1: hanya dari `active` (RETURNING kosong kalau sudah pending/suspended).
+_JADWALKAN_HAPUS = text(
+    """
+    UPDATE users
+    SET status = 'pending_deletion',
+        deletion_scheduled_at = now() + make_interval(days => :hari)
+    WHERE id = :id AND status = 'active'
+    RETURNING deletion_scheduled_at
+    """
+)
+# Tenggang BERAKHIR di `deletion_scheduled_at`: sesudahnya tidak ada jalan pulang — sapuan
+# sudah boleh membuang titik Qdrant-nya, dan akun yang dipulihkan sesudah itu hidup
+# tanpa vektor memorinya (K-39).
+_BATALKAN_HAPUS = text(
+    """
+    UPDATE users SET status = 'active', deletion_scheduled_at = NULL
+    WHERE id = :id AND status = 'pending_deletion' AND deletion_scheduled_at > now()
+    RETURNING id
+    """
+)
+_STATUS_AKUN = text("SELECT status FROM users WHERE id = :id")
+
+
+async def akun_untuk_hapus(conn: AsyncConnection, user_id: UUID) -> AkunUntukHapus | None:
+    """Sandi + status + jadwal akun sendiri — untuk verifikasi `DELETE /me` (RLS own-row)."""
+    b = (await conn.execute(_AKUN_HAPUS, {"id": user_id})).mappings().first()
+    return (
+        AkunUntukHapus(b["password_hash"], b["status"], b["deletion_scheduled_at"]) if b else None
+    )
+
+
+async def jadwalkan_hapus(conn: AsyncConnection, user_id: UUID, hari: int) -> datetime | None:
+    """Tandai `pending_deletion` + jadwal; `None` bila bukan dari `active` (idempoten)."""
+    b = (await conn.execute(_JADWALKAN_HAPUS, {"id": user_id, "hari": hari})).first()
+    hasil: datetime | None = b.deletion_scheduled_at if b else None
+    return hasil
+
+
+async def batalkan_hapus(conn: AsyncConnection, user_id: UUID) -> bool:
+    """`True` bila akun yang `pending_deletion` DAN masih dalam tenggang dikembalikan `active`."""
+    b = (await conn.execute(_BATALKAN_HAPUS, {"id": user_id})).first()
+    return b is not None
+
+
+async def status_akun(conn: AsyncConnection, user_id: UUID) -> str | None:
+    """Status akun sendiri (RLS own-row); `None` bila barisnya tidak terlihat."""
+    b = (await conn.execute(_STATUS_AKUN, {"id": user_id})).first()
+    status: str | None = b.status if b else None
+    return status
+
+
+# ── Sapuan hapus akun, tahap 3–6 (6.5 Stage B) ──
+# Tiga fungsi `SECURITY DEFINER` spec/01 §12, hanya untuk `hvx_pekerja` — dipanggil dari
+# transaksi sistem proses pekerja. Tahap 4 (Qdrant) berjalan DI ANTARA kunci dan hapus.
+
+
+@dataclass(frozen=True)
+class AkunJatuhTempo:
+    user_id: UUID
+    punya_titik: bool  # ada memori yang pernah disemat ke Qdrant
+
+
+_AKUN_JATUH_TEMPO = text("SELECT user_id, punya_titik FROM akun_jatuh_tempo(:batas)")
+_KUNCI_JATUH_TEMPO = text("SELECT kunci_akun_jatuh_tempo(:id) AS terkunci")
+_HAPUS_JATUH_TEMPO = text("SELECT hapus_akun_jatuh_tempo(:id, :semu) AS terhapus")
+
+
+async def akun_jatuh_tempo(conn: AsyncConnection, batas: int) -> list[AkunJatuhTempo]:
+    baris = (await conn.execute(_AKUN_JATUH_TEMPO, {"batas": batas})).all()
+    return [AkunJatuhTempo(b.user_id, b.punya_titik) for b in baris]
+
+
+async def kunci_akun_jatuh_tempo(conn: AsyncConnection, user_id: UUID) -> bool:
+    """Kunci baris akun sampai transaksi selesai; `False` bila sudah bukan jatuh tempo."""
+    b = (await conn.execute(_KUNCI_JATUH_TEMPO, {"id": user_id})).one()
+    return bool(b.terkunci)
+
+
+async def hapus_akun_jatuh_tempo(conn: AsyncConnection, user_id: UUID, semu: UUID) -> bool:
+    """Tahap 5 · 3 · 6; `False` bila akunnya sudah bukan jatuh tempo (tidak ada yang berubah)."""
+    b = (await conn.execute(_HAPUS_JATUH_TEMPO, {"id": user_id, "semu": semu})).one()
+    return bool(b.terhapus)

@@ -104,16 +104,27 @@ async def test_coach_menjawab_dari_data_pengguna_tanpa_catatan_bebasnya(
     }
 
 
-async def test_coach_tanpa_data_mengatakannya(api_bersama: ApiUji) -> None:
+async def test_coach_tanpa_data_bertanya_bukan_menyatakan(api_bersama: ApiUji) -> None:
+    """spec/07 5.4 (#34): nol bukti → coach BERTANYA (meminta data pertama), bukan
+    menyatakan kesimpulan kosong. Tetap tanpa mengarang fakta (Pasal 8)."""
     uid, _token = await api_bersama.pengguna_baru()
 
-    b = (await _giliran(api_bersama, uid, "bagaimana hariku?")).keputusan
+    hasil = await _giliran(api_bersama, uid, "bagaimana hariku?")
+    b = hasil.keputusan
 
-    assert b.teks == platform.TANPA_DATA, "coach mengarang jawaban tanpa data (Pasal 8)"
+    assert b.teks == agents.TANYA_TANPA_DATA, "coach tidak bertanya saat nol bukti"
+    assert b.teks.rstrip().endswith("?"), "jawaban nol-bukti bukan pertanyaan"
+    assert b.teks != platform.TANPA_DATA, "coach masih MENYATAKAN, bukan bertanya"
     assert (b.confidence, b.rationale) == (
         agents.KEYAKINAN_SUMBER[0],
         ("Belum ada habit, check-in, mood, goal, atau ingatan yang tercatat.",),
     )
+    assert _anak(api_bersama, hasil.run_id)["decision"] == {
+        "action": "ask",
+        "sumber": 0,
+        "dilewati": 0,
+        "perlu_izin": 0,
+    }
 
 
 async def test_coach_melewati_sumber_yang_ditolak_dan_mengatakannya(api_bersama: ApiUji) -> None:
@@ -460,8 +471,12 @@ async def test_coach_memilih_kelas_model_dari_niat(
     api_bersama: ApiUji, pesan: str, model: str
 ) -> None:
     """4.1 Model Router: niat `simple` → model kecil, `reasoning` → model besar. *“Halo”*
-    tidak membayar model besar yang dinyatakan manifest coach (`model.class: reasoning`)."""
-    uid, _token = await api_bersama.pengguna_baru()
+    tidak membayar model besar yang dinyatakan manifest coach (`model.class: reasoning`).
+
+    Satu habit dibuat lebih dulu: dengan sumber berisi, coach merangkai bahan ke model —
+    bukan jalur nol-bukti yang BERTANYA tanpa model (5.4), yang tidak punya `model_used`."""
+    uid, token = await api_bersama.pengguna_baru()
+    await buat_habit(api_bersama, token, title="Lari pagi")
 
     hasil = await _giliran(api_bersama, uid, pesan)
 

@@ -4,6 +4,79 @@
 
 ---
 
+## Sesi 37 — 6 Oktober 2026
+
+**Pemilik: *“lanjutkan progress”*** — menutup serah-terima Sesi 36 (6.5 Stage B di-commit), lalu
+mengerjakan satu-satunya sisa V0 yang mekanis dan bukan milik pemilik: **6.6 luring dasar**
+(6.2 butuh inferensi · 6.3 spekulatif · 6.4 butir C — dibiarkan).
+
+| Hal | Hasil |
+|---|---|
+| Naskah baru | tidak ada |
+| Keputusan pemilik | tidak ada yang baru |
+| Keputusan didelegasikan | 🆕 **K-40** — luring dasar: antrean penyelesaian habit di memori; hanya tandai selesai/batalkan yang diantre; dikirim ulang bila jawaban hilang (server idempoten) |
+| Temuan | 🆕 **E-220** (klien tanpa batas waktu; galat jaringan tak punya jenis) · **E-221** (mutasi 6.6 pertama salah alasan; dua penjaga tak terbukti dibuang) · **E-222** (gerbang penuh pertama atas Sprint 5–6 merah di mutasi basis data: 2 mutasi 4.7 menunjuk uji yang diganti namanya oleh 5.4 — satu juga mutan setara — dan 1 mutasi 6.1 membuat dashboard crash; dibetulkan + uji penjaga nama uji) · 🔴 **E-223** (`updated_at` = `now()` transaksi bukan identitas versi baris: lima transaksi serentak punya `now()` kembar di 175 dari 400 percobaan → `PUT /checkins` serentak **500** — cacat Sprint 2 yang baru muncul di bawah beban gerbang; dibetulkan di sumbernya, migrasi 0012) · · **E-224** (bandit B608: 3 SQL f-string di `events/proyeksi.py`, Sprint 5 — dibuat literal) · **E-225** (trivy merah palsu: lapisan `apt-get upgrade` dari cache basi — gerbang kini `--no-cache-filter jalan`) · pertanyaan baru **C-35** (antrean & token di penyimpanan perangkat) |
+| `spec/` diubah | `07` (6.6 ✅ + batas yang diakui) · `01` (Awalan: `set_updated_at()` naik ketat, E-223) |
+| Kode | `apps/mobile/lib/api/luring.dart` (`LayananLuring` · `Catatan` · `StatusAntrean` · `StatusLuring`) · `klien.dart` (`JaringanPutus`, `batasWaktu` 15 dtk) · `model.dart` (`Habit.denganPenyelesaian`) · `habit_hari_ini.dart` (spanduk, konfirmasi keluar, pesan jaringan) · `main.dart` · migrasi **0012** (`set_updated_at()` naik ketat per baris, E-223) |
+| Bukti | `luring_test.dart` (17) · `luring_layar_test.dart` (6) · 3 uji klien · `test/ujung/luring_nyata_test.dart` **lawan api sungguhan** (jawaban hilang → kirim ulang → satu penyelesaian) · **31 mutasi `6.6`** · `flutter analyze --fatal-infos` bersih · `flutter test` 68 hijau |
+| Yang ketemu saat menjalankan yang SUNGGUHAN | alat `dart run tool/ujung_ke_ujung.dart` **tak bisa mengompilasi** kode yang memakai `package:flutter/foundation.dart` — skenario luring-nyata dipindah ke `test/ujung/` (`flutter test`). Dan `docker compose up --build` membangun tag citra yang sama dari dua layanan (`migrate`, `api`) → *“already exists”* — gerbang memakai `--no-build` dari citra yang sudah ada |
+| Gerbang penuh | **tiga putaran resmi tak tuntas**: #1 merah di mutasi db (E-222) · #2 dan #4 **dihentikan reaper memori** (bebas 1,6–2,7 GB) · #3 merah di `pytest` (E-223). Diverifikasi **berpotong di latar depan** pada `0349cb5`, semuanya hijau: `lint` · `mypy` · 14 pemeriksa dokumen · `pytest` **1216** (cakupan 92,19 %) · **443/443** mutasi db (4 potongan) · mutasi dokumen 25/25 · `flutter` analyze + 68 uji · `build` + smoke (layar nyata, luring nyata, memori di Qdrant) · `scan` (`pip-audit` · `bandit` · `trivy` citra + rahasia · mutasi pemindai rahasia). Penghentian reaper sekali meninggalkan `habits/tier.py` termutasi — dipulihkan sebelum commit |
+| ⚠️ Belum | **satu putaran resmi `ci_lokal.py --lapor-github`** (status `ci-lokal` di PR) — jalankan di terminal sendiri atau saat memori longgar · **belum ada PR** untuk `v0/sprint-5-intelligence` (branch di-push 6 Okt sore, tip = commit terakhir di branch) · folder `hvx-*` **tidak dihapus** atas permintaan pemilik (isinya sebagian belum terserap: `test_tinjau_*_s4.py` di `hvx-tinjau-1/2`) |
+| ⏸️ Berhenti di | 47 → **48 dari 51 tugas** (±94 %). Sisa V0: **6.2** weekly review · **6.3** notifikasi · **6.4** Privacy Center (butir C, pemilik). Berikutnya yang paling berdampak: satu putaran resmi gerbang + PR Sprint 5, K-33…K-38 di dokumen, serap `test_tinjau_*_s4.py`, jawaban pemilik atas **C-34** · **C-35** |
+
+---
+
+## Sesi 36 — 6 Oktober 2026
+
+**Pemilik: *“sudah berapa % proyek jadi?”*, lalu *“lanjutkan progress”*** — dihitung dari
+`spec/07` dan branch terbaru (`v0/sprint-5-intelligence`, **bukan** `v0/sprint-2-human-core` yang
+sedang di-checkout di folder utama): **46 dari 51 tugas V0 selesai dikodekan (±90 %)**, nol yang
+digabung (PR #163–#167 menunggu HUMAN REVIEW; Sprint 5–6 belum ber-PR). Lalu 6.5 **Stage B**.
+
+| Hal | Hasil |
+|---|---|
+| Naskah baru | tidak ada |
+| Keputusan pemilik | tidak ada yang baru |
+| Keputusan didelegasikan | 🆕 **K-39** — sapuan hapus akun: proses pekerja lewat tiga fungsi `hvx_pekerja`, Qdrant dibuang selagi akun terkunci |
+| Temuan | 🆕 **E-215** (anonimisasi `user_id` meninggalkan id asli di `actor_id`/`subject_id`/`metadata`) · **E-216** (restore tanpa batas tenggang) · **E-217** (penyelaras menulis titik yatim di antara tahap 4 dan 3) · **E-218** (typo `30h`) · **E-219** (mutasi Stage A salah alasan) · pertanyaan baru **C-34** (`ip_hash` di audit yang dipertahankan) |
+| `spec/` diubah | `01` (§12 tiga fungsi + penyelaras, *Prosedur hapus akun*, typo), `04` (`DELETE /me`/restore ✅, `409 deletion_grace_expired`, `403 account_pending_deletion`), `07` (keadaan Sprint 6) |
+| Kode | migrasi **0011** (tiga fungsi + penyelaras melewati `pending_deletion`) · `identity/penghapusan.py` · `memory.buang_titik_pengguna` · `platform.lupakan_idempotensi` · `GalatVektor.status` (koleksi belum ada = sukses) · tugas `sapuan-hapus-akun` di `hvx.pekerja` · restore hanya selama tenggang · asisten berhenti melayani `pending_deletion` |
+| Bukti | `test_sapuan_hapus_akun.py` (13) · `test_id_semu.py` (3) · **20 mutasi `6.5b`** berbunyi · 2 jangkar mutasi 3.5 yang bergeser dibetulkan dan 3 mutasi 3.5 dibuktikan masih berbunyi · **78 mutasi lama** pada berkas yang disentuh dijalankan ulang: 77 berbunyi, 1 (`6.5` *“tanpa verifikasi sandi”*) **salah alasan sejak Stage A** (**E-219**) — dibetulkan, kini berbunyi · suite penuh `pytest --cov`: 1.212 hijau + 1 merah (`test_jangkar_mutasi`, dibetulkan sesudahnya), cakupan **92 %** · `mypy` bersih · `import-linter` 15/15 · `ruff` bersih · 14 pemeriksa dokumen wajib hijau |
+| ⚠️ Belum dijalankan | **gerbang penuh `ci_lokal.py`** (±30 mnt) — langkah pemilik sebelum PR; Flutter tidak disentuh |
+| ✅ Di-commit | semula tertinggal di working tree `hvx-sprint5`; di-commit di awal Sesi 37 (`a44e030`, lokal) sesudah `pytest` penuh 1.213 hijau |
+| Utang yang ketemu | **K-33 … K-38** dirujuk kode Sprint 5 dan Sesi 35 tetapi **belum ditulis** di `KEPUTUSAN-DIDELEGASIKAN.md` · `R-1` (urutan gerbang roadmap) merah sejak sebelum sesi ini — bukan pemeriksa wajib · tes `test_hapus_akun.py` Stage A belum diformat `ruff` (kini sudah) |
+| ⏸️ Berhenti di | 6.5 **selesai kode**. Sisa V0: **6.2** weekly review · **6.3** notifikasi · **6.4** Privacy Center (butir C, pemilik) · **6.6** UX + luring (Flutter). Berikutnya yang paling berdampak: commit per tugas + gerbang penuh + PR Sprint 5, lalu K-33…K-38 di dokumen |
+
+---
+
+## Sesi 35 — 1 Oktober 2026
+
+**Pemilik: *“lanjutkan”*** (berkali-kali) — menuntaskan serah-terima Sesi 34: gerbang
+penuh Sprint 4 → PR, lalu **memulai Sprint 5**.
+
+| Hal | Hasil |
+|---|---|
+| Naskah baru | tidak ada |
+| Keputusan pemilik | tidak ada yang baru |
+| Temuan ditutup | 🆕 **E-214** — putaran mutasi basis data yang untuk pertama kali **tuntas** (415 mutasi) menemukan dua mutasi C-32 (`checkin.get` · `mood.recent`) DIAM/SALAH ALASAN: medan `note` yang tak dinyatakan ditolak gerbang keluaran (E-206) lebih dulu, maka uji C-32 tak pernah menyentuh isinya. Serah-terima Sesi 34 *“0 diam”* hanya atas 84 mutasi (gerbang dihentikan di tengah). Dibetulkan: mutasinya kini menyatakan `note` di skema tool juga (`checkin.get.yaml` · `mood.recent.yaml`) |
+| `spec/` diubah | tidak ada |
+| Kode | 🔧 `v0/sprint-4-ai` commit **24fbcc1** — `tools: mutasi C-32 nyatakan note di skema keluaran` (fix E-214) + catatan audit |
+| Gerbang Sprint 4 | gerbang penuh `ci_lokal.py --lapor-github` **hijau** di `24fbcc1` — **20 langkah wajib, 30 mnt 49 dtk**, 623/623 mutasi berbunyi, jalur memori ujung-ke-ujung di smoke. Sempat di-*reap* **reaper tekanan memori** Claude Code sekali di tengah pytest (status `killed`, bukan gagal) — diulang atas izin pemilik |
+| PR dibuka | 🆕 **#167** Sprint 4 AI, base `v0/sprint-3-memory-event` — melengkapi tumpukan **#163→#167**, semuanya menunggu HUMAN REVIEW |
+| Sprint 5 dimulai | branch `v0/sprint-5-intelligence` dari `24fbcc1`, worktree `E:/xtheoputra/hvx-sprint5`. 🔑 **Tanpa migrasi** — 23 tabel (termasuk `human_states`, `recommendations` lengkap dengan `score`·`score_breakdown`·`scoring_version`, `recommendation_feedback`) sudah ada sejak **migrasi 0001**. Sprint 5 = murni logika aplikasi |
+| ⏸️ Berhenti di | rencana Sprint 5 tersimpan (lihat bawah). **Berikutnya: implementasi 5.1** (behavior projector) **gerbang-dulu** (uji wipe-and-replay sebelum fitur, AGENTS.md §2). Urutan 5.1→5.6, satu commit per tugas (K-18); lalu tinjauan tiga lensa → gerbang penuh `--lapor-github` → PR Sprint 5 (base `v0/sprint-4-ai`) → Sprint 6. PR #163–#167 menunggu HUMAN REVIEW |
+
+### Rencana Sprint 5 — keputusan sendiri, **belum final** (difinalkan di `KEPUTUSAN-DIDELEGASIKAN.md` bersama kodenya)
+
+- **K-33** behavior projector (5.1): konsumen atas **semua** event, wajib-sukses, idempoten; proyeksi = `activities(source='inferred')` lewat `activities.catat_disimpulkan`; dibangun ulang dari `events` = sumber kebenaran (spec/02 aturan D); dibuktikan uji *wipe-and-replay* → baris identik.
+- **K-34** pola (5.2): temporal/hari/rentetan ke `memories(kind='behavioral')` (sudah ber-`confidence`+`evidence_count` per baris) lewat pintu keluar modul `memory`; keluaran **asosiatif, bukan kausal** (docs/54 §7, naskah 4 §7). Tanpa tabel baru.
+- **K-35** `human_states` (5.3): `intelligence` menghitung metrik `{value,confidence,evidence_count}`, ditulis lewat pintu keluar **baru** `profile.simpan_human_state` (tabel milik `profile`, spec/06); `model_version` diisi; `for_date` lokal perangkat (bukan UTC, bukan `profiles.timezone`).
+- **K-36** mesin rekomendasi (5.5): mengisi `score` 0–1, `score_breakdown` (bobot sama, docs/87), `scoring_version='v1'`, `rationale`; dipicu konsumen atas `checkin.logged`/`habit.skipped`; agent tetap pemasok `confidence`+`rationale` (skor bukan karangan agent).
+- **K-37** umpan balik (5.6): peta status — `accepted`→`accepted`, `rejected`→`rejected`, `modified`/`snoozed`/`ignored` → **bukan** `rejected`; `recommendation_feedback` append-only, perubahan `recommendations.status` di transaksi yang sama; `POST …/feedback` berjalur `Idempotency-Key`.
+- **#34** ambang Confidence Layer (5.4) tetap milik pemilik — V0 hanya aturan keras `evidence_count = 0 → sistem bertanya, bukan menyatakan`.
+
+---
+
 ## Sesi 34 — 28 September 2026
 
 **Pemilik: *“lanjutkan”*** — meneruskan catatan serah-terima Sesi 33: tinjauan tiga

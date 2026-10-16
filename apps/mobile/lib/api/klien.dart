@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:http/http.dart' as http;
@@ -19,6 +20,19 @@ class GalatApi implements Exception {
 /// Sesi tidak bisa dipulihkan — token segar ditolak; pengguna harus masuk lagi.
 class SesiBerakhir implements Exception {
   const SesiBerakhir();
+}
+
+/// Permintaan tidak sampai ke server atau jawabannya tidak kembali: sambungan
+/// putus, nama tak terselesaikan, atau tak dijawab dalam `batasWaktu`.
+///
+/// BUKAN jawaban server — beda dengan [GalatApi]. Tidak ada yang diketahui soal
+/// nasib permintaannya (bisa saja sudah diterima), jadi hanya tindakan yang
+/// aman diulang (spec/04) yang boleh menunggu di antrean luring.
+class JaringanPutus implements Exception {
+  const JaringanPutus();
+
+  @override
+  String toString() => 'JaringanPutus';
 }
 
 /// Yang dibutuhkan layar dari API — layar bergantung pada antarmuka ini, bukan
@@ -62,14 +76,20 @@ abstract interface class LayananHabit {
   Future<Checkin?> checkinPada(String tanggal);
 
   Future<Checkin> simpanEnergi(String tanggal, int energi, {Checkin? lama});
+
+  Future<Dasbor> dasbor();
 }
 
 /// Klien HTTP untuk API V0 (`/v1`, spec/04).
 ///
 /// * Token hanya di MEMORI: halaman yang dimuat ulang meminta masuk lagi.
 ///   Menyimpan token segar di penyimpanan web (localStorage) membuatnya bisa
-///   dibaca skrip mana pun di asal yang sama — penyimpanan lokal datang bersama
-///   mode luring (spec/07 6.6), dengan penyimpanan yang aman per platform.
+///   dibaca skrip mana pun di asal yang sama. 6.6 (luring dasar) TIDAK mengubah
+///   ini: antrean luring juga di memori (`luring.dart`, K-40); penyimpanan lokal
+///   yang aman per platform tetap menunggu keputusan pemilik.
+/// * Galat JARINGAN (putus · tak dijawab dalam `batasWaktu`) menjadi
+///   [JaringanPutus], bukan galat umum — pembedanya antrean luring. Token TIDAK
+///   dilupakan karenanya: jaringan yang putus bukan tanda sesi berakhir.
 /// * Token akses kedaluwarsa (401) disegarkan SEKALI lalu permintaannya
 ///   diulang; token segar berotasi (K-21) — pasangan baru menggantikan yang lama.
 ///   Permintaan SERENTAK yang sama-sama menerima 401 menunggu SATU penyegaran
@@ -86,11 +106,18 @@ abstract interface class LayananHabit {
 /// * Penyelesaian tidak butuh kunci: `(habit, tanggal)` unik di server, dan
 ///   kirim ulang tanggal yang sama menjawab `200` dengan baris lama (spec/04).
 class KlienApi implements LayananHabit {
-  KlienApi({required this.dasar, http.Client? klien})
-    : _http = klien ?? http.Client();
+  KlienApi({
+    required this.dasar,
+    http.Client? klien,
+    this.batasWaktu = const Duration(seconds: 15),
+  }) : _http = klien ?? http.Client();
 
   /// Akar API, mis. `http://127.0.0.1:8000`.
   final Uri dasar;
+
+  /// Satu permintaan yang tak dijawab selama ini dianggap [JaringanPutus] —
+  /// tanpa batas, jaringan yang diam (bukan putus) menggantung layar tanpa akhir.
+  final Duration batasWaktu;
   final http.Client _http;
   String? _akses;
   String? _segar;
@@ -107,6 +134,17 @@ class KlienApi implements LayananHabit {
     path: '${dasar.path.replaceAll(RegExp(r'/$'), '')}$jalur',
     queryParameters: kueri,
   );
+
+  /// Galat jaringan menjadi [JaringanPutus] — dibedakan dari jawaban server.
+  Future<T> _jaringan<T>(Future<T> Function() kerja) async {
+    try {
+      return await kerja().timeout(batasWaktu);
+    } on http.ClientException {
+      throw const JaringanPutus();
+    } on TimeoutException {
+      throw const JaringanPutus();
+    }
+  }
 
   Future<http.Response> _kirim(
     String metode,
@@ -126,7 +164,9 @@ class KlienApi implements LayananHabit {
       final permintaan = http.Request(metode, _uri(jalur, kueri))
         ..headers.addAll(kepala);
       if (badan != null) permintaan.body = jsonEncode(badan);
-      return _http.send(permintaan).then(http.Response.fromStream);
+      return _jaringan(
+        () => _http.send(permintaan).then(http.Response.fromStream),
+      );
     }
 
     final dipakai = _akses;
@@ -187,13 +227,17 @@ class KlienApi implements LayananHabit {
   Future<void> _segarkanSekali() async {
     final segar = _segar;
     if (segar == null) throw const SesiBerakhir();
-    final jawaban = await _http.post(
-      _uri('/v1/auth/refresh'),
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-      },
-      body: jsonEncode({'refresh_token': segar}),
+    // Jaringan putus di sini BUKAN penolakan: token segar tetap dipegang, dan
+    // permintaan yang menunggunya gagal sebagai [JaringanPutus], bukan keluar.
+    final jawaban = await _jaringan(
+      () => _http.post(
+        _uri('/v1/auth/refresh'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: jsonEncode({'refresh_token': segar}),
+      ),
     );
     if (jawaban.statusCode != 200) {
       _lupakan();
@@ -348,5 +392,11 @@ class KlienApi implements LayananHabit {
     final badan = lama?.keJsonDenganEnergi(energi) ?? {'energy': energi};
     final jawaban = await _kirim('PUT', '/v1/checkins/$tanggal', badan: badan);
     return Checkin.dariJson(_json(jawaban) as Map<String, dynamic>);
+  }
+
+  @override
+  Future<Dasbor> dasbor() async {
+    final jawaban = await _kirim('GET', '/v1/dashboard');
+    return Dasbor.dariJson(_json(jawaban) as Map<String, dynamic>);
   }
 }

@@ -876,7 +876,7 @@ MUTASI: list[Mutasi] = [
         [
             Sunting(
                 f"{MODUL}/identity/service.py",
-                '        aktif = akun is not None and akun.status == "active"',
+                "        aktif = akun is not None and akun.status in _STATUS_SESI_SAH",
                 "        aktif = True",
             )
         ],
@@ -2024,8 +2024,8 @@ MUTASI: list[Mutasi] = [
         [
             Sunting(
                 f"{MODUL}/habits/service.py",
-                "        hari_ini = await platform.hari_ini_di(conn, zona)",
-                '        hari_ini = await platform.hari_ini_di(conn, "UTC")',
+                "    hari_ini = await platform.hari_ini_di(conn, zona)",
+                '    hari_ini = await platform.hari_ini_di(conn, "UTC")',
             )
         ],
         _pytest(f"{UJI_RENTETAN}::test_hari_ini_menurut_zona_profil_bukan_utc"),
@@ -3065,8 +3065,8 @@ MUTASI: list[Mutasi] = [
         [
             Sunting(
                 f"{MODUL}/habits/service.py",
-                "        mulai = await repository.mulai_lokal(conn, habit_id, zona) or hari_ini",
-                "        mulai = hari_ini",
+                "    mulai = await repository.mulai_lokal(conn, habit_id, zona) or hari_ini",
+                "    mulai = hari_ini",
             )
         ],
         _pytest(f"{UJI_RENTETAN}::test_tingkat_menghitung_hari_sejak_habit_dibuat"),
@@ -3813,8 +3813,8 @@ MUTASI: list[Mutasi] = [
         [
             Sunting(
                 f"{MODUL}/platform/vektor.py",
-                """raise GalatVektor(f"qdrant {metode} {jalur.split('?')[0]} → {r.status_code}")""",
-                """raise GalatVektor(f"qdrant {metode} {jalur.split('?')[0]} → {r.status_code} {r.text}")""",
+                """f"qdrant {metode} {jalur.split('?')[0]} → {r.status_code}", r.status_code""",
+                """f"qdrant {metode} {jalur.split('?')[0]} → {r.status_code} {r.text}", r.status_code""",
             )
         ],
         _pytest(f"{UJI_VEKTOR}::test_galat_qdrant_tidak_memantulkan_isi_permintaan"),
@@ -4141,15 +4141,16 @@ MUTASI: list[Mutasi] = [
         "3.5",
         "memori penyemat lain tidak disemat ulang (spec/01 DAN migrasi)",
         [
+            # Bentuk yang berlaku ada di 0011 (CREATE OR REPLACE) — 0006 tertimpa olehnya.
             Sunting(
                 "spec/01-DATABASE-SCHEMA.md",
-                "    WHERE m.deleted_at IS NOT NULL OR m.embedding_model IS DISTINCT FROM p_model",
-                "    WHERE m.deleted_at IS NOT NULL OR m.model_version IS NULL",
+                "      AND (m.deleted_at IS NOT NULL OR m.embedding_model IS DISTINCT FROM p_model)",
+                "      AND (m.deleted_at IS NOT NULL OR m.model_version IS NULL)",
             ),
             Sunting(
-                f"{MIGRASI}/0006_penyelaras_memori.up.sql",
-                "    WHERE m.deleted_at IS NOT NULL OR m.embedding_model IS DISTINCT FROM p_model",
-                "    WHERE m.deleted_at IS NOT NULL OR m.model_version IS NULL",
+                f"{MIGRASI}/0011_sapuan_hapus_akun.up.sql",
+                "      AND (m.deleted_at IS NOT NULL OR m.embedding_model IS DISTINCT FROM p_model)",
+                "      AND (m.deleted_at IS NOT NULL OR m.model_version IS NULL)",
             ),
         ],
         _pytest(f"{UJI_MEMORI}::test_penyemat_lain_disemat_ulang_bukan_dicampur"),
@@ -6396,7 +6397,7 @@ MUTASI: list[Mutasi] = [
         "4.7",
         "memory.search tidak menyatakan menyaring izinnya sendiri",
         [Sunting(f"{MODUL}/agents/alat/memory.search.yaml", "menyaring_izin: true\n", "")],
-        _pytest(f"{UJI_AGENT_V0}::test_coach_tanpa_data_mengatakannya"),
+        _pytest(f"{UJI_AGENT_V0}::test_coach_tidak_tertahan_scope_ingatan_yang_belum_diputuskan"),
         harus_memuat="memory.search menunggu izin pengguna",
         kelompok="db",
     ),
@@ -6461,8 +6462,8 @@ MUTASI: list[Mutasi] = [
         [
             Sunting(
                 f"{MODUL}/agents/program_v0.py",
-                "        KEYAKINAN_SUMBER[sumber],",
-                "        KEYAKINAN_SUMBER[5],",
+                '        jawaban.teks, KEYAKINAN_SUMBER[sumber], tuple(alasan), {"action": "reply", **jejak}',
+                '        jawaban.teks, KEYAKINAN_SUMBER[5], tuple(alasan), {"action": "reply", **jejak}',
             )
         ],
         _pytest(f"{UJI_AGENT_V0}::test_coach_menjawab_dari_data_pengguna_tanpa_catatan_bebasnya"),
@@ -6483,20 +6484,10 @@ MUTASI: list[Mutasi] = [
         harus_memuat="alasan bukan fakta yang dipakai",
         kelompok="db",
     ),
-    Mutasi(
-        "4.7",
-        "coach mengarang bahan saat tidak ada data (Pasal 8)",
-        [
-            Sunting(
-                f"{MODUL}/agents/program_v0.py",
-                "        bahan=fakta,\n",
-                '        bahan=fakta or ["Kamu baik-baik saja."],\n',
-            )
-        ],
-        _pytest(f"{UJI_AGENT_V0}::test_coach_tanpa_data_mengatakannya"),
-        harus_memuat="coach mengarang jawaban tanpa data (Pasal 8)",
-        kelompok="db",
-    ),
+    # (E-222) "coach mengarang bahan saat tidak ada data (Pasal 8)" dihapus: sejak 5.4 nol sumber
+    # memotong lebih awal (`cukup_untuk_menyatakan` → BERTANYA), jadi `fakta or [...]` tak pernah
+    # tercapai dengan `fakta` kosong — mutan setara, tak mungkin berbunyi. Pasal 8 pada nol data
+    # dijaga mutasi 5.4 di bawah dan `test_coach_tanpa_data_bertanya_bukan_menyatakan`.
     Mutasi(
         "4.7",
         "habit agent menebak di antara beberapa yang cocok",
@@ -9354,6 +9345,1055 @@ MUTASI: list[Mutasi] = [
         kelompok="db",
     ),
     # ── akhir penegak buta G4-program ──
+    # ── Sprint 5 · 5.4 Confidence Layer (#34): nol bukti → BERTANYA, bukan menyatakan ──
+    Mutasi(
+        "5.4",
+        "ambang #34 runtuh: nol bukti dinyatakan, bukan ditanyakan",
+        [
+            Sunting(
+                f"{MODUL}/intelligence/keyakinan.py",
+                "    return Sikap.MENYATAKAN if evidence_count >= BUKTI_MINIMUM else Sikap.BERTANYA",
+                "    return Sikap.MENYATAKAN if evidence_count >= 0 else Sikap.BERTANYA",
+            )
+        ],
+        _pytest("tests/unit/test_keyakinan.py::test_nol_bukti_bertanya"),
+        harus_memuat="nol bukti harus BERTANYA",
+    ),
+    Mutasi(
+        "5.4",
+        "coach menyatakan kesimpulan kosong alih-alih bertanya saat nol sumber",
+        [
+            Sunting(
+                f"{MODUL}/agents/program_v0.py",
+                "    if not intelligence.cukup_untuk_menyatakan(sumber):",
+                "    if intelligence.cukup_untuk_menyatakan(sumber):",
+            )
+        ],
+        _pytest(f"{UJI_AGENT_V0}::test_coach_tanpa_data_bertanya_bukan_menyatakan"),
+        harus_memuat="coach tidak bertanya saat nol bukti",
+        kelompok="db",
+    ),
+    # ── Sprint 5 · 5.5 mesin rekomendasi: skor 0–1 (rata-rata bobot sama), scoring_version, rationale ──
+    Mutasi(
+        "5.5",
+        "skor rekomendasi bukan rata-rata komponen (docs/87)",
+        [
+            Sunting(
+                f"{MODUL}/intelligence/mesin.py",
+                "    rata = sum(komponen.values()) / len(komponen)",
+                "    rata = sum(komponen.values())",
+            )
+        ],
+        _pytest("tests/unit/test_mesin_rekomendasi.py::test_rata_rata_bobot_sama"),
+        harus_memuat="skor bukan rata-rata komponen",
+    ),
+    Mutasi(
+        "5.5",
+        "habit yang dilewati tidak melahirkan rekomendasi berskor",
+        [
+            Sunting(
+                f"{MODUL}/intelligence/mesin.py",
+                "    if skor is None:  # nol bukti → tidak menyarankan (Confidence Layer 5.4)",
+                "    if skor is not None:  # nol bukti → tidak menyarankan (Confidence Layer 5.4)",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_rekomendasi.py::"
+            "test_pekerja_menyekor_rekomendasi_dari_skip_lalu_menyegarkannya_dari_checkin"
+        ),
+        harus_memuat="pekerja tidak menyekor rekomendasi dari habit yang dilewati",
+        kelompok="db",
+    ),
+    # ── Sprint 5 · 5.6 umpan balik: modified/snoozed/ignored bukan penolakan ──
+    Mutasi(
+        "5.6",
+        "modified/snoozed/ignored dihitung sebagai penolakan",
+        [
+            Sunting(
+                f"{MODUL}/intelligence/umpan_balik.py",
+                '_STATUS_BARU: dict[str, str] = {"accepted": "accepted", "rejected": "rejected"}',
+                '_STATUS_BARU: dict[str, str] = {"accepted": "accepted", "rejected": "rejected", "modified": "rejected"}',
+            )
+        ],
+        _pytest(
+            "tests/unit/test_umpan_balik_murni.py::test_modified_snoozed_ignored_bukan_penolakan"
+        ),
+        harus_memuat="diperlakukan sebagai penolakan",
+    ),
+    Mutasi(
+        "5.6",
+        "status rekomendasi tidak mengikuti umpan balik (perubahan tak ditulis)",
+        [
+            Sunting(
+                f"{MODUL}/intelligence/umpan_balik.py",
+                "        if baru != status_kini:",
+                "        if baru == status_kini:",
+            )
+        ],
+        _pytest("tests/integration/test_umpan_balik.py::test_umpan_balik_append_only_banyak_baris"),
+        harus_memuat="status akhir mengikuti umpan balik terakhir",
+        kelompok="db",
+    ),
+    # ── Sprint 6 · 6.1 Dashboard: beberapa dimensi, tiap skor punya Why (naskah 4 §28) ──
+    Mutasi(
+        "6.1",
+        "skor dashboard tanpa Why (Explainable AI §29)",
+        [
+            Sunting(
+                f"{MODUL}/intelligence/dasbor.py",
+                '    return f"{label} yang kamu laporkan sendiri di check-in {for_date.isoformat()}."',
+                '    return ""',
+            )
+        ],
+        _pytest("tests/unit/test_dasbor_murni.py::test_tiap_dimensi_punya_why"),
+        harus_memuat="ada dimensi tanpa Why",
+    ),
+    Mutasi(
+        "6.1",
+        "dashboard tidak membaca human_state (selalu kosong)",
+        [
+            Sunting(
+                f"{MODUL}/intelligence/dasbor.py",
+                '    if terkini is None:  # belum ada check-in — cold start, bukan "satu angka 0"',
+                '    if True:  # belum ada check-in — cold start, bukan "satu angka 0"',
+            )
+        ],
+        _pytest(
+            "tests/integration/test_dashboard.py::"
+            "test_dashboard_menyajikan_dimensi_berwhy_dari_checkin"
+        ),
+        harus_memuat="pekerja tidak menghasilkan dimensi dashboard dari check-in",
+        kelompok="db",
+    ),
+    Mutasi(
+        "6.1",
+        "layar dashboard menampilkan skor tanpa Why",
+        [
+            Sunting(
+                f"{APLIKASI}/lib/layar/dasbor.dart",
+                "                  d.why,",
+                "                  '',",
+            )
+        ],
+        _flutter_uji(
+            "test/layar/dasbor_test.dart",
+            "tiap dimensi yang tampil membawa Why",
+        ),
+        harus_memuat="tampil tanpa Why",
+        cwd=APLIKASI,
+    ),
+    # ── Sprint 6 · 6.5 hapus akun (Stage A): re-auth, cabut semua sesi, login pending_deletion ──
+    Mutasi(
+        "6.5",
+        "hapus akun tanpa verifikasi sandi — sesi dicuri bisa menghapus akun",
+        [
+            Sunting(
+                f"{MODUL}/identity/service.py",
+                "    if not await sandi.cocokkan_async(akun.password_hash, kata_sandi):",
+                "    if False and not await sandi.cocokkan_async(akun.password_hash, kata_sandi):",
+            )
+        ],
+        _pytest("tests/integration/test_hapus_akun.py::test_sandi_salah_tidak_menjadwalkan"),
+        harus_memuat="akun dijadwalkan hapus tanpa sandi benar",
+        kelompok="db",
+    ),
+    Mutasi(
+        "6.5",
+        "hapus akun tidak mencabut sesi — token lama tetap hidup",
+        [
+            Sunting(
+                f"{MODUL}/identity/service.py",
+                "    await sesi.cabut_semua(pengguna.user_id)\n    return dijadwalkan",
+                "    return dijadwalkan",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_hapus_akun.py::test_hapus_menjadwalkan_dan_mencabut_semua_sesi"
+        ),
+        harus_memuat="sesi tidak dicabut seketika saat hapus akun",
+        kelompok="db",
+    ),
+    Mutasi(
+        "6.5",
+        "login pending_deletion diblokir — restore jadi mustahil",
+        [
+            Sunting(
+                f"{MODUL}/identity/service.py",
+                '_STATUS_SESI_SAH = frozenset({"active", "pending_deletion"})',
+                '_STATUS_SESI_SAH = frozenset({"active"})',
+            )
+        ],
+        _pytest("tests/integration/test_hapus_akun.py::test_login_pending_deletion_lalu_restore"),
+        harus_memuat="login pending_deletion ditolak",
+        kelompok="db",
+    ),
+    # ── Sprint 6 · 6.5 hapus akun (Stage B): sapuan tahap 3–6 oleh proses pekerja ──
+    Mutasi(
+        "6.5b",
+        "sapuan menghapus akun tanpa membuang titik Qdrant (tahap 4 dilewati)",
+        [
+            Sunting(
+                f"{MODUL}/identity/penghapusan.py",
+                "                if buang_titik is not None:\n"
+                "                    await buang_titik(akun.user_id)\n",
+                "                if buang_titik is not None:\n                    pass\n",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_sapuan_hapus_akun.py::"
+            "test_sapuan_menghapus_semua_jejak_akun_dan_hanya_akun_itu"
+        ),
+        harus_memuat="titik Qdrant tertinggal",
+        kelompok="db",
+    ),
+    Mutasi(
+        "6.5b",
+        "galat tahap 4 (Qdrant mati) ditelan — akun tetap dihapus, titiknya jadi yatim",
+        [
+            Sunting(
+                f"{MODUL}/identity/penghapusan.py",
+                "                if buang_titik is not None:\n"
+                "                    await buang_titik(akun.user_id)\n",
+                "                if buang_titik is not None:\n"
+                "                    try:\n"
+                "                        await buang_titik(akun.user_id)\n"
+                "                    except Exception:\n"
+                "                        pass\n",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_sapuan_hapus_akun.py::"
+            "test_qdrant_gagal_tidak_mengubah_apa_pun_dan_putaran_berikutnya_menyelesaikan"
+        ),
+        harus_memuat="akun terhapus padahal tahap 4 gagal",
+        kelompok="db",
+    ),
+    Mutasi(
+        "6.5b",
+        "tanpa Qdrant akun bertitik tetap dihapus — titiknya tertinggal selamanya",
+        [
+            Sunting(
+                f"{MODUL}/identity/penghapusan.py",
+                "        if akun.punya_titik and buang_titik is None:",
+                "        if False and akun.punya_titik and buang_titik is None:",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_sapuan_hapus_akun.py::"
+            "test_tanpa_qdrant_akun_bertitik_ditunda_dan_yang_tak_bertitik_dihapus"
+        ),
+        harus_memuat="akun bertitik dihapus tanpa membuang titiknya",
+        kelompok="db",
+    ),
+    Mutasi(
+        "6.5b",
+        "sapuan tidak mengunci akun sebelum membuang titik — yang dipulihkan kehilangan vektornya",
+        [
+            Sunting(
+                f"{MODUL}/identity/penghapusan.py",
+                "                if not await repository.kunci_akun_jatuh_tempo(conn, akun.user_id):",
+                "                if False and not await repository.kunci_akun_jatuh_tempo(\n"
+                "                    conn, akun.user_id\n"
+                "                ):",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_sapuan_hapus_akun.py::"
+            "test_akun_dipulihkan_di_antara_daftar_dan_kunci_tidak_menyentuh_qdrant"
+        ),
+        harus_memuat="titik Qdrant dibuang untuk akun yang sudah dipulihkan",
+        kelompok="db",
+    ),
+    Mutasi(
+        "6.5b",
+        "sesi yang lahir selama tenggang tidak dicabut sesudah akun dihapus",
+        [
+            Sunting(
+                f"{MODUL}/identity/penghapusan.py",
+                "        for bersihkan in (sesi.cabut_semua, *sesudah):",
+                "        for bersihkan in sesudah:",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_sapuan_hapus_akun.py::"
+            "test_sapuan_menghapus_semua_jejak_akun_dan_hanya_akun_itu"
+        ),
+        harus_memuat="sesi yang lahir selama tenggang tidak dicabut",
+        kelompok="db",
+    ),
+    Mutasi(
+        "6.5b",
+        "id semu = sha256 polos id akun (bisa dicocokkan siapa pun yang pernah melihat id itu)",
+        [
+            Sunting(
+                f"{MODUL}/identity/penghapusan.py",
+                '    return UUID(platform.sidik(settings, "akun-terhapus", str(user_id))[:32])',
+                '    return UUID(__import__("hashlib").sha256(str(user_id).encode()).hexdigest()[:32])',
+            )
+        ],
+        _pytest("tests/unit/test_id_semu.py::test_id_semu_berkunci_bukan_hash_polos"),
+        harus_memuat="id semu = sha256 polos",
+    ),
+    Mutasi(
+        "6.5b",
+        "anonimisasi audit melewatkan actor_id — id asli tetap terbaca di jejak",
+        [
+            Sunting(
+                f"{MIGRASI}/0011_sapuan_hapus_akun.up.sql",
+                "          actor_id = replace(a.actor_id, p_user_id::text, p_semu::text),\n",
+                "",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_sapuan_hapus_akun.py::"
+            "test_sapuan_menghapus_semua_jejak_akun_dan_hanya_akun_itu"
+        ),
+        harus_memuat="id asli akun yang dihapus masih terbaca di audit_logs",
+        kelompok="db",
+    ),
+    Mutasi(
+        "6.5b",
+        "fungsi hapus tidak memeriksa jatuh tempo — pekerja yang dibajak menghapus akun aktif",
+        [
+            Sunting(
+                f"{MIGRASI}/0011_sapuan_hapus_akun.up.sql",
+                "      WHERE u.id = p_user_id\n"
+                "        AND u.status = 'pending_deletion' AND u.deletion_scheduled_at <= now()\n"
+                "      FOR UPDATE;",
+                "      WHERE u.id = p_user_id\n      FOR UPDATE;",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_sapuan_hapus_akun.py::"
+            "test_fungsi_basis_data_menolak_akun_yang_belum_jatuh_tempo"
+        ),
+        harus_memuat="fungsi hapus menghapus akun yang belum jatuh tempo",
+        kelompok="db",
+    ),
+    Mutasi(
+        "6.5b",
+        "fungsi kunci tidak memeriksa jatuh tempo — akun aktif ikut terkunci dan 'siap dihapus'",
+        [
+            Sunting(
+                f"{MIGRASI}/0011_sapuan_hapus_akun.up.sql",
+                "        AND u.status = 'pending_deletion' AND u.deletion_scheduled_at <= now()\n"
+                "      FOR NO KEY UPDATE;",
+                "      FOR NO KEY UPDATE;",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_sapuan_hapus_akun.py::"
+            "test_fungsi_basis_data_menolak_akun_yang_belum_jatuh_tempo"
+        ),
+        harus_memuat="fungsi kunci menahan akun yang belum jatuh tempo",
+        kelompok="db",
+    ),
+    Mutasi(
+        "6.5b",
+        "kunci sapuan FOR UPDATE, bukan FOR NO KEY UPDATE — penulis anak ikut tertahan",
+        [
+            Sunting(
+                f"{MIGRASI}/0011_sapuan_hapus_akun.up.sql",
+                "      FOR NO KEY UPDATE;",
+                "      FOR UPDATE;",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_sapuan_hapus_akun.py::"
+            "test_kunci_sapuan_menahan_restore_tetapi_tidak_penulis_anak"
+        ),
+        harus_memuat="kunci sapuan menahan penulis anak",
+        kelompok="db",
+    ),
+    Mutasi(
+        "6.5b",
+        "penyelaras vektor tidak melewati akun yang menunggu dihapus — titik yatim di antara tahap 4 dan 3",
+        [
+            Sunting(
+                f"{MIGRASI}/0011_sapuan_hapus_akun.up.sql",
+                "    WHERE u.status <> 'pending_deletion'\n"
+                "      AND (m.deleted_at IS NOT NULL OR m.embedding_model IS DISTINCT FROM p_model)\n",
+                "    WHERE (m.deleted_at IS NOT NULL OR m.embedding_model IS DISTINCT FROM p_model)\n",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_sapuan_hapus_akun.py::"
+            "test_penyelaras_vektor_melewati_akun_yang_menunggu_dihapus"
+        ),
+        harus_memuat="akun yang menunggu dihapus masih diselaraskan ke Qdrant",
+        kelompok="db",
+    ),
+    Mutasi(
+        "6.5b",
+        "restore diizinkan sesudah tenggang habis — akun hidup kembali tanpa vektornya",
+        [
+            Sunting(
+                f"{MODUL}/identity/repository.py",
+                "    WHERE id = :id AND status = 'pending_deletion' AND deletion_scheduled_at > now()",
+                "    WHERE id = :id AND status = 'pending_deletion'",
+            )
+        ],
+        _pytest("tests/integration/test_sapuan_hapus_akun.py::test_restore_hanya_selama_tenggang"),
+        harus_memuat="restore sesudah tenggang diizinkan",
+        kelompok="db",
+    ),
+    Mutasi(
+        "6.5b",
+        "agent melayani akun pending_deletion lewat kirim pesan",
+        [
+            Sunting(
+                f"{MODUL}/agents/percakapan.py",
+                "    async def kirim(self, user_id: UUID, percakapan_id: UUID, badan: KirimPesan)"
+                " -> TerimaPesan:\n"
+                "        await self._pastikan_melayani(user_id)\n",
+                "    async def kirim(self, user_id: UUID, percakapan_id: UUID, badan: KirimPesan)"
+                " -> TerimaPesan:\n",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_sapuan_hapus_akun.py::"
+            "test_agent_berhenti_melayani_akun_yang_menunggu_dihapus"
+        ),
+        harus_memuat="agent melayani akun yang menunggu dihapus",
+        kelompok="db",
+    ),
+    Mutasi(
+        "6.5b",
+        "agent menerima jawaban konfirmasi dari akun pending_deletion",
+        [
+            Sunting(
+                f"{MODUL}/agents/percakapan.py",
+                "        await self._pastikan_melayani(user_id)\n"
+                "        await self._pastikan_ada(user_id, percakapan_id)\n"
+                "        try:",
+                "        await self._pastikan_ada(user_id, percakapan_id)\n        try:",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_sapuan_hapus_akun.py::"
+            "test_agent_berhenti_melayani_akun_yang_menunggu_dihapus"
+        ),
+        harus_memuat="agent menerima jawaban konfirmasi dari akun itu",
+        kelompok="db",
+    ),
+    Mutasi(
+        "6.5b",
+        "pekerja tidak menyalakan sapuan hapus akun — hanya fungsinya yang ada",
+        [
+            Sunting(
+                "apps/api/src/hvx/pekerja.py",
+                '"sapuan-hapus-akun", sapu_hapus_akun, JEDA_SAPUAN_HAPUS_S, berhenti',
+                '"sapuan-hapus-akun", lambda: asyncio.sleep(0), JEDA_SAPUAN_HAPUS_S, berhenti',
+            )
+        ],
+        _pytest(
+            "tests/integration/test_sapuan_hapus_akun.py::"
+            "test_proses_pekerja_menjalankan_sapuan_sendiri_lalu_berhenti_bersih"
+        ),
+        harus_memuat="pekerja tidak menjalankan sapuan hapus akun",
+        kelompok="db",
+    ),
+    Mutasi(
+        "6.5b",
+        "tabel milik pengguna tanpa ON DELETE CASCADE — datanya tertinggal sesudah akun dihapus",
+        [
+            Sunting(
+                f"{MIGRASI}/0001_v0_skema.up.sql",
+                "CREATE TABLE journal_entries (\n"
+                "  id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),\n"
+                "  user_id     uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,",
+                "CREATE TABLE journal_entries (\n"
+                "  id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),\n"
+                "  user_id     uuid NOT NULL REFERENCES users(id),",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_sapuan_hapus_akun.py::"
+            "test_tiap_tabel_milik_pengguna_ikut_terhapus_bersama_akunnya"
+        ),
+        harus_memuat="tanpa FK ke users(id) ON DELETE CASCADE",
+        kelompok="db",
+    ),
+    Mutasi(
+        "6.5b",
+        "pembersih sesudah commit tidak dijalankan — jejak idempotensi akun yang dihapus tertinggal",
+        [
+            Sunting(
+                f"{MODUL}/identity/penghapusan.py",
+                "        for bersihkan in (sesi.cabut_semua, *sesudah):",
+                "        for bersihkan in (sesi.cabut_semua,):",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_sapuan_hapus_akun.py::"
+            "test_sapuan_menghapus_semua_jejak_akun_dan_hanya_akun_itu"
+        ),
+        harus_memuat="jejak idempotensi akun yang dihapus tertinggal",
+        kelompok="db",
+    ),
+    Mutasi(
+        "6.5b",
+        "pembersihan idempotensi melewatkan jatah kuota akun yang dihapus",
+        [
+            Sunting(
+                f"{MODUL}/platform/idempotensi.py",
+                '    return terhapus + int(await redis.delete(f"{awalan}:idem-kuota:{user_id}"))',
+                "    return terhapus",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_sapuan_hapus_akun.py::"
+            "test_sapuan_menghapus_semua_jejak_akun_dan_hanya_akun_itu"
+        ),
+        harus_memuat="jejak idempotensi akun yang dihapus tertinggal",
+        kelompok="db",
+    ),
+    Mutasi(
+        "6.5b",
+        "pembersihan idempotensi menyapu kunci SEMUA pengguna, bukan hanya akun yang dihapus",
+        [
+            Sunting(
+                f"{MODUL}/platform/idempotensi.py",
+                '    async for kunci in redis.scan_iter(match=f"{awalan}:idem:{user_id}:*", count=500):',
+                '    async for kunci in redis.scan_iter(match=f"{awalan}:idem:*", count=500):',
+            )
+        ],
+        _pytest(
+            "tests/integration/test_sapuan_hapus_akun.py::"
+            "test_sapuan_menghapus_semua_jejak_akun_dan_hanya_akun_itu"
+        ),
+        harus_memuat="jejak idempotensi orang lain ikut terbuang",
+        kelompok="db",
+    ),
+    Mutasi(
+        "6.5b",
+        "pekerja tidak memasang pembersih idempotensi — fungsinya ada, tak pernah dipanggil",
+        [
+            Sunting(
+                "apps/api/src/hvx/pekerja.py",
+                "                sesudah=(partial(platform.lupakan_idempotensi, redis, settings.redis_prefix),),",
+                "                sesudah=(),",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_sapuan_hapus_akun.py::"
+            "test_proses_pekerja_menjalankan_sapuan_sendiri_lalu_berhenti_bersih"
+        ),
+        harus_memuat="pekerja tidak membersihkan jejak idempotensi",
+        kelompok="db",
+    ),
+    # ── Sprint 6 · 6.6 luring dasar: antrean penyelesaian habit (Flutter, K-40) ──
+    Mutasi(
+        "6.6",
+        "catatan dibuang SEBELUM server menjawab — jawaban hilang berarti catatan hilang",
+        [
+            Sunting(
+                f"{APLIKASI}/lib/api/luring.dart",
+                "      final catatan = _antrean.first;\n",
+                "      final catatan = _antrean.removeAt(0);\n",
+            )
+        ],
+        _flutter_uji("test/api/luring_test.dart", "jawaban yang hilang di jalan"),
+        harus_memuat="catatan yang jawabannya hilang harus tetap menunggu",
+        cwd=APLIKASI,
+    ),
+    Mutasi(
+        "6.6",
+        "galat jaringan membuang catatan alih-alih menahannya",
+        [
+            Sunting(
+                f"{APLIKASI}/lib/api/luring.dart",
+                "        _setLuring(true);\n        return;\n      } on GalatApi catch (g) {",
+                "        _setLuring(true);\n      } on GalatApi catch (g) {",
+            )
+        ],
+        _flutter_uji(
+            "test/api/luring_test.dart", "tanpa jaringan: tandai selesai menunggu di antrean"
+        ),
+        harus_memuat="catatan harus menunggu saat jaringan putus",
+        cwd=APLIKASI,
+    ),
+    Mutasi(
+        "6.6",
+        "antrean dikirim dari belakang — urutan terbalik",
+        [
+            Sunting(
+                f"{APLIKASI}/lib/api/luring.dart",
+                "      final catatan = _antrean.first;\n",
+                "      final catatan = _antrean.last;\n",
+            )
+        ],
+        _flutter_uji("test/api/luring_test.dart", "urutan dijaga"),
+        harus_memuat="urutan antrean harus dijaga",
+        cwd=APLIKASI,
+    ),
+    Mutasi(
+        "6.6",
+        "catatan baru masuk di DEPAN antrean",
+        [
+            Sunting(
+                f"{APLIKASI}/lib/api/luring.dart",
+                "    _antrean.add(catatan);\n    _umumkan();",
+                "    _antrean.insert(0, catatan);\n    _umumkan();",
+            )
+        ],
+        _flutter_uji("test/api/luring_test.dart", "urutan dijaga"),
+        harus_memuat="yang terakhir menang di tampilan luring",
+        cwd=APLIKASI,
+    ),
+    Mutasi(
+        "6.6",
+        "batal tidak membuang catatan selesai yang belum terkirim",
+        [
+            Sunting(
+                f"{APLIKASI}/lib/api/luring.dart",
+                "      _antrean.removeWhere(catatan.serumpun);\n",
+                "",
+            )
+        ],
+        _flutter_uji("test/api/luring_test.dart", "batal membuang catatan selesai"),
+        harus_memuat="batal harus membuang selesai yang belum terkirim",
+        cwd=APLIKASI,
+    ),
+    Mutasi(
+        "6.6",
+        "batal membuang SEMUA catatan tanggal itu, bukan hanya habitnya",
+        [
+            Sunting(
+                f"{APLIKASI}/lib/api/luring.dart",
+                "      _antrean.removeWhere(catatan.serumpun);\n",
+                "      _antrean.removeWhere((c) => c.tanggal == catatan.tanggal);\n",
+            )
+        ],
+        _flutter_uji("test/api/luring_test.dart", "batal hanya membuang catatan"),
+        harus_memuat="batal hanya boleh membuang catatan (habit, tanggal) yang sama",
+        cwd=APLIKASI,
+    ),
+    Mutasi(
+        "6.6",
+        "galat 4xx dianggap sementara — satu catatan yang ditolak menahan seluruh antrean",
+        [
+            Sunting(
+                f"{APLIKASI}/lib/api/luring.dart",
+                "      g.status >= 500 || g.status == 429 || g.status == 408;",
+                "      true;",
+            )
+        ],
+        _flutter_uji("test/api/luring_test.dart", "ditolak 4xx"),
+        harus_memuat="catatan yang ditolak tidak boleh menahan yang di belakangnya",
+        cwd=APLIKASI,
+    ),
+    Mutasi(
+        "6.6",
+        "galat 5xx dianggap penolakan — catatan dibuang saat server sakit",
+        [
+            Sunting(
+                f"{APLIKASI}/lib/api/luring.dart",
+                "      g.status >= 500 || g.status == 429 || g.status == 408;",
+                "      false;",
+            )
+        ],
+        _flutter_uji("test/api/luring_test.dart", "server sakit (5xx)"),
+        harus_memuat="server sakit harus menahan antrean, bukan membuangnya",
+        cwd=APLIKASI,
+    ),
+    Mutasi(
+        "6.6",
+        "penolakan server tidak dihitung — catatan hilang tanpa jejak",
+        [
+            Sunting(
+                f"{APLIKASI}/lib/api/luring.dart",
+                "        _ditolak++;\n",
+                "",
+            )
+        ],
+        _flutter_uji("test/api/luring_test.dart", "ditolak 4xx"),
+        harus_memuat="penolakan harus terlihat di status",
+        cwd=APLIKASI,
+    ),
+    Mutasi(
+        "6.6",
+        "status tak membedakan jumlah penolakan — mengakui penolakan tak mengubah apa pun",
+        [
+            Sunting(
+                f"{APLIKASI}/lib/api/luring.dart",
+                "      other.ditolak == ditolak &&\n",
+                "",
+            )
+        ],
+        _flutter_uji("test/api/luring_test.dart", "ditolak 4xx"),
+        harus_memuat="pengakuan harus mengosongkan penolakan di status",
+        cwd=APLIKASI,
+    ),
+    Mutasi(
+        "6.6",
+        "masuk sebagai akun LAIN mewarisi antrean akun sebelumnya",
+        [
+            Sunting(
+                f"{APLIKASI}/lib/api/luring.dart",
+                "    if (_pemilik != pengguna.id) _buang();",
+                "    if (_pemilik != pengguna.id && _pemilik == null) _buang();",
+            )
+        ],
+        _flutter_uji("test/api/luring_test.dart", "masuk sebagai akun LAIN"),
+        harus_memuat="catatan akun lain tidak boleh diwarisi",
+        cwd=APLIKASI,
+    ),
+    Mutasi(
+        "6.6",
+        "masuk lagi sebagai akun yang SAMA membuang antreannya",
+        [
+            Sunting(
+                f"{APLIKASI}/lib/api/luring.dart",
+                "    if (_pemilik != pengguna.id) _buang();",
+                "    _buang();",
+            )
+        ],
+        _flutter_uji("test/api/luring_test.dart", "masuk sebagai akun LAIN"),
+        harus_memuat="akun yang sama harus mempertahankan antreannya",
+        cwd=APLIKASI,
+    ),
+    Mutasi(
+        "6.6",
+        "keluar tidak membuang antrean — akun berikutnya mewarisinya",
+        [
+            Sunting(
+                f"{APLIKASI}/lib/api/luring.dart",
+                "      _pemilik = null;\n      _buang();\n",
+                "      _pemilik = null;\n",
+            )
+        ],
+        _flutter_uji("test/api/luring_test.dart", "keluar membuang antrean"),
+        harus_memuat="keluar harus membuang antrean",
+        cwd=APLIKASI,
+    ),
+    Mutasi(
+        "6.6",
+        "sinkron serentak tidak berbagi satu putaran — catatan terbang berkali-kali",
+        [
+            Sunting(
+                f"{APLIKASI}/lib/api/luring.dart",
+                "      _jalan ??= _kuras().whenComplete(() => _jalan = null);",
+                "      _kuras();",
+            )
+        ],
+        _flutter_uji("test/api/luring_test.dart", "sinkron serentak"),
+        harus_memuat="satu catatan terbang sekali walau sinkron dipanggil serentak",
+        cwd=APLIKASI,
+    ),
+    Mutasi(
+        "6.6",
+        "putaran kirim hanya memegang salinan antrean — catatan yang masuk di tengah tertinggal",
+        [
+            Sunting(
+                f"{APLIKASI}/lib/api/luring.dart",
+                "    while (_antrean.isNotEmpty) {\n      final catatan = _antrean.first;\n",
+                "    for (final catatan in List<Catatan>.of(_antrean)) {\n",
+            )
+        ],
+        _flutter_uji("test/api/luring_test.dart", "catatan yang masuk selagi putaran"),
+        harus_memuat="catatan yang masuk di tengah putaran harus ikut terkirim",
+        cwd=APLIKASI,
+    ),
+    Mutasi(
+        "6.6",
+        "daftar luring tanpa catatan yang menunggu — habit yang baru ditandai tampak belum",
+        [
+            Sunting(
+                f"{APLIKASI}/lib/api/luring.dart",
+                "    if (untukHariIni.isEmpty) return daftar;",
+                "    return daftar;",
+            )
+        ],
+        _flutter_uji(
+            "test/api/luring_test.dart", "tanpa jaringan: tandai selesai menunggu di antrean"
+        ),
+        harus_memuat="daftar luring harus menampilkan catatan yang menunggu",
+        cwd=APLIKASI,
+    ),
+    Mutasi(
+        "6.6",
+        "tampilan luring memakai catatan PERTAMA, bukan terakhir",
+        [
+            Sunting(
+                f"{APLIKASI}/lib/api/luring.dart",
+                "      if (c.habitId == h.id) terakhir = c;",
+                "      if (c.habitId == h.id) terakhir ??= c;",
+            )
+        ],
+        _flutter_uji("test/api/luring_test.dart", "urutan dijaga"),
+        harus_memuat="yang terakhir menang di tampilan luring",
+        cwd=APLIKASI,
+    ),
+    Mutasi(
+        "6.6",
+        "daftar luring tanpa jawaban sebelumnya jadi KOSONG, bukan gagal jujur",
+        [
+            Sunting(
+                f"{APLIKASI}/lib/api/luring.dart",
+                "      if (simpanan == null) rethrow; // tak ada yang bisa ditampilkan jujur",
+                "      if (simpanan == null) return const [];",
+            )
+        ],
+        _flutter_uji("test/api/luring_test.dart", "tanpa jawaban server sebelumnya"),
+        harus_memuat="emitted",
+        cwd=APLIKASI,
+    ),
+    Mutasi(
+        "6.6",
+        "daftar luring menunggu server sekali lagi sesudah sinkron gagal karena jaringan",
+        [
+            Sunting(
+                f"{APLIKASI}/lib/api/luring.dart",
+                "    if (_luring && _tertahan && simpanan != null) {",
+                "    if (false && simpanan != null) {",
+            )
+        ],
+        _flutter_uji("test/api/luring_test.dart", "sinkron baru saja gagal"),
+        harus_memuat="jangan menunggu server sekali lagi sesudah sinkron gagal karena jaringan",
+        cwd=APLIKASI,
+    ),
+    Mutasi(
+        "6.6",
+        "check-in luring gagal alih-alih memakai jawaban terakhir server",
+        [
+            Sunting(
+                f"{APLIKASI}/lib/api/luring.dart",
+                "      if (!_checkinTerakhir.containsKey(tanggal)) rethrow;",
+                "      rethrow;",
+            )
+        ],
+        _flutter_uji(
+            "test/api/luring_test.dart", "check-in luring: jawaban terakhir server dipakai"
+        ),
+        harus_memuat="JaringanPutus",
+        cwd=APLIKASI,
+    ),
+    Mutasi(
+        "6.6",
+        "panggilan yang butuh jaringan tidak menandai keadaan luring",
+        [
+            Sunting(
+                f"{APLIKASI}/lib/api/luring.dart",
+                "      _setLuring(true);\n      rethrow;\n",
+                "      rethrow;\n",
+            )
+        ],
+        _flutter_uji("test/api/luring_test.dart", "habit baru dan energi TIDAK diantre"),
+        harus_memuat="galat jaringan harus menandai keadaan luring",
+        cwd=APLIKASI,
+    ),
+    Mutasi(
+        "6.6",
+        "SesiBerakhir ditelan putaran kirim — layar tak pernah diminta masuk lagi",
+        [
+            Sunting(
+                f"{APLIKASI}/lib/api/luring.dart",
+                "      } on GalatApi catch (g) {\n        if (_sementara(g)) {",
+                "      } on SesiBerakhir {\n        _tertahan = true;\n        return;\n      } on GalatApi catch (g) {\n        if (_sementara(g)) {",
+            )
+        ],
+        _flutter_uji("test/api/luring_test.dart", "sesi berakhir saat mengirim"),
+        harus_memuat="emitted",
+        cwd=APLIKASI,
+    ),
+    Mutasi(
+        "6.6",
+        "klien: ClientException bocor sebagai galat umum, bukan JaringanPutus",
+        [
+            Sunting(
+                f"{APLIKASI}/lib/api/klien.dart",
+                "    } on http.ClientException {\n      throw const JaringanPutus();\n    } on TimeoutException {",
+                "    } on TimeoutException {",
+            )
+        ],
+        _flutter_uji("test/api/klien_test.dart", "BUKAN penolakan"),
+        harus_memuat="ClientException: tak tersambung",
+        cwd=APLIKASI,
+    ),
+    Mutasi(
+        "6.6",
+        "klien: jaringan putus melupakan token — dikira sesi berakhir",
+        [
+            Sunting(
+                f"{APLIKASI}/lib/api/klien.dart",
+                "    } on http.ClientException {\n      throw const JaringanPutus();\n",
+                "    } on http.ClientException {\n      _lupakan();\n      throw const JaringanPutus();\n",
+            )
+        ],
+        _flutter_uji("test/api/klien_test.dart", "BUKAN penolakan"),
+        harus_memuat="jaringan putus bukan sesi berakhir",
+        cwd=APLIKASI,
+    ),
+    Mutasi(
+        "6.6",
+        "klien: tanpa batas waktu — jaringan yang diam menggantung tanpa akhir",
+        [
+            Sunting(
+                f"{APLIKASI}/lib/api/klien.dart",
+                "      return await kerja().timeout(batasWaktu);",
+                "      return await kerja();",
+            )
+        ],
+        _flutter_uji("test/api/klien_test.dart", "tak dijawab dalam batas waktu"),
+        harus_memuat="timed out",
+        cwd=APLIKASI,
+    ),
+    Mutasi(
+        "6.6",
+        "layar: keluar membuang catatan menunggu tanpa bertanya",
+        [
+            Sunting(
+                f"{APLIKASI}/lib/layar/habit_hari_ini.dart",
+                "    if (menunggu == 0 || !mounted) return menunggu == 0;",
+                "    if (menunggu >= 0) return true;",
+            )
+        ],
+        _flutter_uji(
+            "test/layar/luring_layar_test.dart", "keluar dengan catatan yang tak bisa terkirim"
+        ),
+        harus_memuat="keluar harus bertanya dulu bila ada catatan yang tak terkirim",
+        cwd=APLIKASI,
+    ),
+    Mutasi(
+        "6.6",
+        "layar: keluar tidak mencoba mengirim catatan dulu",
+        [
+            Sunting(
+                f"{APLIKASI}/lib/layar/habit_hari_ini.dart",
+                "      await luring.sinkron();\n",
+                "",
+            )
+        ],
+        _flutter_uji(
+            "test/layar/luring_layar_test.dart", "keluar dengan catatan yang BISA terkirim"
+        ),
+        harus_memuat="catatan yang bisa terkirim harus dikirim dulu, tanpa bertanya",
+        cwd=APLIKASI,
+    ),
+    Mutasi(
+        "6.6",
+        "layar: catatan yang ditolak server tak terlihat",
+        [
+            Sunting(
+                f"{APLIKASI}/lib/layar/habit_hari_ini.dart",
+                "            if (s.ditolak > 0)",
+                "            if (s.ditolak > 99)",
+            )
+        ],
+        _flutter_uji("test/layar/luring_layar_test.dart", "catatan yang DITOLAK server"),
+        harus_memuat="catatan yang ditolak harus terlihat",
+        cwd=APLIKASI,
+    ),
+    Mutasi(
+        "6.6",
+        "layar: catatan yang menunggu tak disebut",
+        [
+            Sunting(
+                f"{APLIKASI}/lib/layar/habit_hari_ini.dart",
+                "            if (s.menunggu > 0)",
+                "            if (s.menunggu > 99)",
+            )
+        ],
+        _flutter_uji("test/layar/luring_layar_test.dart", "tanpa jaringan: habit tercentang"),
+        harus_memuat="spanduk harus menyebut catatan yang menunggu",
+        cwd=APLIKASI,
+    ),
+    Mutasi(
+        "6.6",
+        "layar: galat jaringan dilaporkan sebagai server tak terjangkau",
+        [
+            Sunting(
+                f"{APLIKASI}/lib/layar/habit_hari_ini.dart",
+                "      JaringanPutus() => 'Tidak ada jaringan. Coba lagi saat tersambung.',\n",
+                "",
+            )
+        ],
+        _flutter_uji("test/layar/luring_layar_test.dart", "energi tanpa jaringan"),
+        harus_memuat="galat jaringan harus dijelaskan sebagai jaringan",
+        cwd=APLIKASI,
+    ),
+    Mutasi(
+        "6.6",
+        "layar: dialog habit baru tak menjelaskan bahwa jaringan dibutuhkan",
+        [
+            Sunting(
+                f"{APLIKASI}/lib/layar/habit_hari_ini.dart",
+                "    } on JaringanPutus {\n      // Habit baru",
+                "    } on FormatException {\n      // Habit baru",
+            )
+        ],
+        _flutter_uji("test/layar/luring_layar_test.dart", "habit baru tanpa jaringan"),
+        harus_memuat="dialog habit baru harus menjelaskan bahwa jaringan dibutuhkan",
+        cwd=APLIKASI,
+    ),
+    # ── E-223 set_updated_at() naik ketat per baris: kunci event = identitas versi baris ──
+    Mutasi(
+        "E-223",
+        "set_updated_at memakai now() polos — dua versi baris dalam satu transaksi berbagi updated_at",
+        [
+            Sunting(
+                f"{MIGRASI}/0012_updated_at_monoton.up.sql",
+                "NEW.updated_at = GREATEST(now(), OLD.updated_at + interval '1 microsecond');",
+                "NEW.updated_at = now();",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_migrasi.py::"
+            "test_updated_at_naik_ketat_walau_dua_update_dalam_satu_transaksi"
+        ),
+        harus_memuat="updated_at tidak naik di antara dua versi baris",
+        kelompok="db",
+    ),
+    Mutasi(
+        "E-223",
+        "set_updated_at tanpa +1 µs — transaksi yang mulai lebih awal menyamai updated_at yang baru ditulis",
+        [
+            Sunting(
+                f"{MIGRASI}/0012_updated_at_monoton.up.sql",
+                "NEW.updated_at = GREATEST(now(), OLD.updated_at + interval '1 microsecond');",
+                "NEW.updated_at = GREATEST(now(), OLD.updated_at);",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_migrasi.py::"
+            "test_updated_at_tak_mundur_walau_transaksinya_mulai_lebih_awal"
+        ),
+        harus_memuat="versi baris yang lebih baru mendapat updated_at yang lebih lama",
+        kelompok="db",
+    ),
+    Mutasi(
+        "E-223",
+        "set_updated_at memundurkan updated_at — now() polos, transaksi lambat menulis nilai lebih lama",
+        [
+            Sunting(
+                f"{MIGRASI}/0012_updated_at_monoton.up.sql",
+                "NEW.updated_at = GREATEST(now(), OLD.updated_at + interval '1 microsecond');",
+                "NEW.updated_at = now();",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_migrasi.py::"
+            "test_updated_at_tak_mundur_walau_transaksinya_mulai_lebih_awal"
+        ),
+        harus_memuat="versi baris yang lebih baru mendapat updated_at yang lebih lama",
+        kelompok="db",
+    ),
+    # ── alat ini sendiri: mutasi yang menunjuk uji yang sudah diganti namanya (E-222) ──
+    Mutasi(
+        "alat",
+        "mutasi menunjuk uji yang sudah tidak ada — pytest keluar 4, terbaca diam",
+        [
+            Sunting(
+                "tools/uji_mutasi_kode.py",
+                # dipecah: jangkar yang utuh akan cocok dengan literalnya sendiri (2×)
+                "::test_habit_agent_tidak_" + 'menebak"),',
+                "::test_habit_agent_tidak_" + 'menebak_nama_lama"),',
+            )
+        ],
+        _pytest("tests/unit/test_jangkar_mutasi.py::test_tiap_mutasi_pytest_menunjuk_uji_yang_ada"),
+        harus_memuat="tidak punya uji `test_habit_agent_tidak_menebak_nama_lama`",
+    ),
     # ── alat ini sendiri: mutasi yang menggantung dihentikan beserta turunannya ──
     Mutasi(
         "alat",

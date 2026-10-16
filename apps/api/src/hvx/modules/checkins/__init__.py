@@ -11,7 +11,7 @@ deterministik percakapan (`agents`, spec/07 4.1) — `agents` di atas modul doma
 Berkas ini satu-satunya pintu keluar modul (spec/06 aturan 1).
 """
 
-from .repository import energi_pada
+from .repository import checkin_pada, energi_pada
 from .routes import router
 from .schemas import CatatMood, Checkin, Mood
 from .service import catat_mood, daftar_mood, mood_untuk_ekstraksi
@@ -22,6 +22,7 @@ __all__ = [
     "Checkin",
     "Mood",
     "catat_mood",
+    "checkin_pada",
     "daftar_checkin",
     "daftar_mood",
     "energi_pada",
