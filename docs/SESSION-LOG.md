@@ -4,6 +4,27 @@
 
 ---
 
+## Sesi 41 — 16 Oktober 2026 (lanjutan hari yang sama)
+
+**Pemilik: *“171 sudah selesai, lanjutkan”* → *“lanjutkan”* → *“simpan, commit dan push, saya
+akhiri dulu sesi hari ini”*** — cakupan V1 disetujui, **Sprint 7 V1 selesai dikodekan**,
+AI Review dua dari tiga lensa selesai.
+
+| Hal | Hasil |
+|---|---|
+| Cakupan V1 | draf `spec/08` (Sprint 7–11, 23 tugas) → PR **#172** digabung tanpa perubahan → **H-30** (A-39 tertutup); `AGENTS.md` §2 menyebut `spec/08` |
+| Sprint 7 (branch `v1/sprint-7-gerbang`, di-push) | `a6da8d6` **7.1** uji admisi `events` per jenis (`events.ADMISI`, **E-250**) · `db9d8ef` **7.2** proyeksi terdaftar (`intelligence.PROYEKSI`/`BUKAN_PROYEKSI`) · `9efa0ce` **7.3** tugas terjadwal per jam lokal (migrasi **0014**: `scheduled_runs` tabel ke-24 + `tugas_jatuh_tempo`; **K-48**) · `25009d8` **7.4** putar ulang stream mati (`python -m hvx.stream_mati`) |
+| Bukti per tugas | suite penuh hijau tiap commit (622 unit + 807 integrasi di `25009d8`); 20 mutasi baru berbunyi; mutasi LAMA yang menyentuh berkas sama dijalankan ulang tiap tugas — 1 dipensiunkan (ekuivalen sesudah 7.1), 2 diarahkan ulang, 1 hitungan "21 tabel" basi ketahuan |
+| 🔍 AI Review — keamanan | branch lokal+remote `tinjau-s7-keamanan` (`828d2a4` · `0e25dcf` · `4e4fc7d`): **S1** tugas malam tanpa `kunci_turunan` (balapan hapus kategori) · **S2** bangun ulang tanpa kunci · **S3** pengguna yang selalu gagal menahan semua (jatuh tempo kini berkursor, migrasi 0014 + spec/01) |
+| 🔍 AI Review — kontrak | branch `tinjau-s7-kontrak` (`6ec970b`…`b1a60d3`): **K1** isian templat kunci menelan `:retracted` · **K2/K3/K8** = S3/S2/S1 (tumpang tindih — pakai versi keamanan, ambil UJI kontrak) · **K4–K6** dokumen basi sesudah tabel ke-24 · **K7** putar ulang membuang entri rusak |
+| 🔍 AI Review — penegak buta | branch `tinjau-s7-buta` (di atas `tinjau-s7-keamanan`) — **dihentikan di tengah** saat sesi diakhiri; hasil sementara di-commit di branch itu |
+| Butir pemilik baru (belum di `docs/99`) | **(a)** hapus kategori Rekomendasi ikut menghapus `scheduled_runs` → analisis hari ini & kemarin dihitung ulang — boleh? **(b)** akun `pending_deletion`: tugas malam periksa ulang status saat klaim? putar ulang stream mati ikut melewatinya? **(c)** putar ulang entri `memori`/`rekomendasi` sesudah kategori dihapus membuat turunan lagi (jendela 7 hari) |
+| Keputusan cakupan sebelum 8.1 | gerbang 7.2 hanya membaca konsumen pekerja — proyeksi yang dibangun TUGAS TERJADWAL (8.1 `behavior_daily`) belum terjaga; usul: perluas gerbangnya di awal 8.1 |
+| ⏸️ Berhenti di | **penggabungan tiga lensa belum dilakukan.** Langkah berikutnya: (1) lanjutkan/tutup lensa buta di `E:/xtheoputra/hvx-s7-tinjau-buta`; (2) gabung ke `v1/sprint-7-gerbang`: basis = tip buta (sudah memuat keamanan) + cherry-pick kontrak K1 · K4 · K5 · K6 · K7 + UJI K2/K3/K8 saja (kode versi keamanan); migrasi 0014 berubah di tempat (signature `tugas_jatuh_tempo` berkursor) — aman selama belum di `master`; (3) jalankan ulang SEMUA mutasi 7.x + mutasi terkait di pohon gabungan; (4) `docs/99` E-251…, K-48 (kursor + kunci turunan), blok keadaan `spec/08`; (5) gerbang penuh oleh pemilik → PR Sprint 7 ke `master` |
+| Tumpukan & worktree | tumpukan utama `humanverse-xos` (PG 55442 · Redis 55379 · Qdrant 57333) hidup; `hvx-s7-2` (55482) dihentikan. Worktree `hvx-s7-tinjau-keamanan` · `-kontrak` · `-buta` **tidak dihapus** |
+
+---
+
 ## Sesi 40 — 16 Oktober 2026
 
 **Pemilik: *“lanjutkan progress”*, lalu *“sudah saya merged, lanjutkan”*, lalu *“sudah”*** —
