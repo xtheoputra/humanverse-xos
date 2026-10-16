@@ -150,6 +150,14 @@ humanverse-x/
 └── docs/                architecture/  api/  agents/  domain/  security/  decisions/
 ```
 
+> 🔧 **`apps/web` tidak menjadi folder sendiri** (24 Sep 2026, saat tugas 2.7
+> ditulis; **E-176**): aplikasi web V0 adalah target `web` proyek Flutter yang
+> sama di `apps/mobile` (ADR-001, [`05`](05-TECHNOLOGY-STACK.md) §4) — dua folder
+> untuk satu basis kode akan menyimpang tanpa ada yang tahu. Nama `web` di pohon
+> di atas tetap: ia **target** aplikasi, bukan basis kode kedua. Halaman publik
+> ber-SEO tetap di luar `apps/` (B-5). Keadaan folder yang sungguh ada:
+> [`../apps/README.md`](../apps/README.md).
+
 ### ⭐ Kenapa `simulation/` menjadi mesin bersama, bukan salah satu simulator
 
 Nama yang paling banyak berulang di seluruh repo (**13 pohon**) ternyata

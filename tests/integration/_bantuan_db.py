@@ -7,6 +7,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
+from uuid import UUID, uuid4
 
 from alembic.config import Config
 from sqlalchemy.engine import make_url
@@ -20,6 +22,10 @@ ALEMBIC_INI = AKAR / "data" / "migrations" / "alembic.ini"
 # (B-40). Uji yang tersambung sebagai admin (superuser, pemilik tabel) tidak
 # menguji apa pun tentang hak akses dan RLS: superuser melewati keduanya.
 PERAN_APLIKASI_UJI = "hvx_api_uji"
+# Kembaran peran login `pekerja` di compose: anggota `hvx_app` DAN `hvx_pekerja` —
+# hanya peran ini yang boleh memanggil fungsi relay & penyelaras (tinjauan
+# keamanan Sprint 3, S4). Peran api uji sengaja BUKAN anggota `hvx_pekerja`.
+PERAN_PEKERJA_UJI = "hvx_pekerja_uji"
 
 # Sama dengan blok di spec/01 §Awalan — di sini karena peran login uji harus
 # bisa dijadikan anggota `hvx_app` sebelum basis data mana pun dimigrasikan.
@@ -34,6 +40,18 @@ EXCEPTION WHEN duplicate_object THEN
 END $$
 """
 
+# Sama dengan blok migrasi 0005 — peran NOLOGIN pemegang EXECUTE fungsi pekerja.
+BUAT_HVX_PEKERJA = """
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'hvx_pekerja') THEN
+    CREATE ROLE hvx_pekerja NOLOGIN;
+  END IF;
+EXCEPTION WHEN duplicate_object THEN
+  NULL;
+END $$
+"""
+
 
 @dataclass(frozen=True)
 class BasisDataV0:
@@ -41,6 +59,7 @@ class BasisDataV0:
 
     dsn_pemilik: str  # peran migrasi — superuser & pemilik tabel; RLS TIDAK berlaku
     dsn_aplikasi: str  # `hvx_api_uji` — anggota hvx_app; RLS dan GRANT spec/01 berlaku
+    dsn_pekerja: str  # `hvx_pekerja_uji` — anggota hvx_app + hvx_pekerja (relay, penyelaras)
 
 
 def psycopg_dsn(dsn: str) -> str:
@@ -67,3 +86,72 @@ def alembic(dsn: str) -> Config:
     cfg.set_main_option("sqlalchemy.url", dsn)
     cfg.attributes["konfigurasi_log"] = False
     return cfg
+
+
+@dataclass
+class ApiUji:
+    """Aplikasi utuh (create_app + lifespan) sebagai peran APLIKASI, dengan klien HTTP."""
+
+    app: Any
+    klien: Any  # httpx.AsyncClient
+    db: BasisDataV0
+    awalan_redis: str
+    engine_pekerja: Any  # AsyncEngine sebagai peran PEKERJA — relay & penyelaras (S4)
+
+    def penyimpan_sesi(self) -> Any:
+        from hvx.modules.identity import PenyimpanSesi
+
+        s = self.app.state.settings
+        return PenyimpanSesi(
+            self.app.state.redis, s.redis_prefix, s.access_token_ttl_s, s.refresh_token_ttl_s
+        )
+
+    async def pengguna_baru(
+        self, *, display_name: str = "Pengguna Uji", timezone: str = "Asia/Jakarta"
+    ) -> tuple[UUID, str]:
+        """Pengguna + profil ditulis PEMILIK skema (bukan lewat /auth), plus token akses sah."""
+        import psycopg
+
+        with psycopg.connect(psycopg_dsn(self.db.dsn_pemilik), autocommit=True) as k:
+            (uid,) = k.execute(
+                "INSERT INTO users (email, password_hash) VALUES (%s, 'x') RETURNING id",
+                (f"{uuid4().hex}@uji.id",),
+            ).fetchone() or (None,)
+            k.execute(
+                "INSERT INTO profiles (user_id, display_name, timezone) VALUES (%s, %s, %s)",
+                (uid, display_name, timezone),
+            )
+        assert isinstance(uid, UUID)
+        token = await self.penyimpan_sesi().buat(uid)
+        return uid, token.access_token
+
+
+def auth(token: str) -> dict[str, str]:
+    return {"Authorization": f"Bearer {token}"}
+
+
+class PenghitungKueri:
+    """Menghitung pernyataan SQL yang dikirim engine aplikasi — tanpa `set_config` RLS.
+
+    Dipakai untuk bukti *"terbaca dalam satu query"* (spec/07 2.1): jumlah
+    kueri DATA yang benar-benar sampai ke PostgreSQL, bukan jumlah panggilan
+    fungsi di kode.
+    """
+
+    def __init__(self, app: Any) -> None:
+        from sqlalchemy import event
+
+        self._event = event
+        self._engine = app.state.engine.sync_engine
+        self.pernyataan: list[str] = []
+
+    def _catat(self, _conn: Any, _cursor: Any, sql: str, *_: Any) -> None:
+        if "set_config('hvx.user_id'" not in sql:
+            self.pernyataan.append(" ".join(sql.split()))
+
+    def __enter__(self) -> PenghitungKueri:
+        self._event.listen(self._engine, "before_cursor_execute", self._catat)
+        return self
+
+    def __exit__(self, *_: object) -> None:
+        self._event.remove(self._engine, "before_cursor_execute", self._catat)

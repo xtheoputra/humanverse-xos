@@ -1,0 +1,27 @@
+name: memory.search
+version: 1.0.0
+kind: read
+description: Pencarian memori semantik, hanya di scope manifest pemanggil yang diizinkan (3.7)
+scopes: [habits, goals, checkins, mood, coaching_notes, journal_raw]
+risk_level: 0
+# Mesin izin ditanya PER SCOPE oleh pencariannya sendiri (3.7): scope `deny`/`ask`
+# dikeluarkan dan dilaporkan di `perlu_izin` — gerbang tidak menanyakannya lagi (E-193).
+menyaring_izin: true
+input:
+  kueri: { type: string, required: true }
+  batas: { type: integer, required: false, min: 1, max: 50 }  # memory.MAKS_HASIL
+output:
+  items:
+    type: array
+    items:
+      type: object
+      fields:
+        id: uuid
+        kind: string
+        scope: string
+        content: string
+        skor: number
+  perlu_izin: { type: array, items: string }   # scope manifest yang pengguna belum putuskan (3.7)
+side_effects: none
+reaches_third_party: false
+rate_limit: 60/min/user

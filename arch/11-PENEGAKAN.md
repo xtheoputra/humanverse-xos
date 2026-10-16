@@ -99,10 +99,29 @@ $ python tools/uji_mutasi.py
 25 mutasi · 25 terbukti BERBUNYI — tiap mutasi wajib melahirkan temuan BARU
 
 $ uv run python tools/uji_mutasi_kode.py
-42 mutasi · 42 terbukti BERBUNYI — dengan ALASAN yang dimaksud
+217 mutasi · 217 terbukti BERBUNYI — dengan ALASAN yang dimaksud (pytest: dibaca dari baris galat)
    19 import-linter (satu per id kontrak + modul baru, siklus, stdlib, berkas baru)
     1 ruff banned-api · 3 peta penegak §6 · 4 rantai pasok & tanpa-tagihan · 1 pemindai rahasia
    14 basis data — 8 migrasi · 6 kepemilikan data (FK komposit · RLS · isi kebijakan · GRANT · peran api · kebocoran pool)
+   22 Sprint 1 — 1 batas tabel spec/06 · 6 identitas (argon2id · daftar tolak · NFKC · rotasi token · fungsi login · sidik IP)
+                · 1 sesi · 1 profil · 1 persetujuan · 5 mesin izin · 7 batas laju
+   12 tinjauan Sprint 1 — 4 celah sesi (penyegaran · keluar · token bekas · cabut semua) · 2 batas per akun
+                (tebakan serentak · kunci citext) · 1 persetujuan per jenis · 1 margin cache izin
+                · 1 status akun saat penyegaran · 1 kueri gagal masuk setara · 2 galat basis data di log
+   32 tinjauan Sprint 1, lensa kedua — 6 sesi (catatan rusak · umur token · token di hash · TTL)
+                · 13 identitas (status sebelum rotasi · cabut semua · pendengar · jejak keluar · 128 · argon2
+                  tak dikenal · NFKC · event loop ×2 · kerangka · IP mentah · kunci HMAC · NUL)
+                · 3 batas laju · 2 audit satu transaksi · 2 bawaan izin · 1 persetujuan · 1 NUL jsonb
+                · 1 kelompok galat · 2 pemindai spec/06 · 1 alat mutasi itu sendiri
+   33 Sprint 2 — 5 goals (pohon satu kueri · CHECK · kedalaman · anak naik · kursor)
+                · 5 Idempotency-Key · 4 habit & tier · 4 penyelesaian · 6 rentetan · 3 check-in
+                · 3 mood · 3 layar Flutter (flutter test)
+   34 tinjauan Sprint 2 — 7 masukan ketat (E-170) · 8 Idempotency-Key & ukuran badan (E-171)
+                · 7 balapan & batas (E-172) · 3 arti rentetan (E-173) · 5 galat, kursor & zona (E-174)
+                · 3 klien Flutter (E-175) · 1 PUT identik (E-176)
+   42 penegak buta Sprint 2 — 7 pohon & goal · 3 Idempotency-Key · 4 habit & tier · 2 batas for_date
+                · 7 rentetan lewat layanan · 2 habit terhapus · 2 PUT menambal · 2 mood · 1 jam Redis mundur
+                · 1 CORS di dalam batas laju · 11 aplikasi Flutter (dengan TZ=WIB-7)
 ```
 
 > 🔴 **Dua hal yang uji mutasi ajarkan di Sprint 0 — keduanya tentang alat
@@ -345,7 +364,7 @@ sebenarnya.
 | Batas keras tanpa penegak **yang dinyatakan** | **NIHIL** — 6 dari 6 punya baris di blok `penegak` di bawah: 2 jalan, 4 menunggu pemicu yang disebut namanya |
 | Aturan 🔧 di `arch/` tanpa baris di §3 | **NIHIL** |
 | Pemeriksaan yang **benar-benar dijalankan** | **19 dari 26** — di **branch Sprint 0**; di `master` tetap 12 sampai branch itu digabung, sebab ketujuh tambahannya (B-2 · M-1 · M-2 · M-3 · M-4 · E-3 · A-1) lahir di sana |
-| Pemeriksaan yang **terbukti sanggup GAGAL** | **19 dari 19** — [`../tools/uji_mutasi.py`](../tools/README.md) (25 mutasi) · `uji_mutasi_kode.py` (42 mutasi) |
+| Pemeriksaan yang **terbukti sanggup GAGAL** | **19 dari 19** — [`../tools/uji_mutasi.py`](../tools/README.md) (25 mutasi) · `uji_mutasi_kode.py` (108 mutasi) |
 | Pemeriksaan yang menunggu | **7** — B-1 · B-3 · B-4 · B-5 · P-4 · P-5 · P-6; tiap baris menyebut pemicunya |
 | Perkakas yang dibutuhkan | **1** — `import-linter` menangani B-2 · M-1 · M-2 · M-3 hari ini, dan B-1 · B-3 begitu modulnya ada |
 | Roadmap yang lulus R-1 | **2 dari 8** — dan keduanya ditulis untuk dikerjakan |
@@ -379,7 +398,7 @@ P-5     MENUNGGU    —                                                D5 — mo
 P-6     MENUNGGU    —                                                T9 — V0 tidak punya data K3
 E-1     JALAN       periksa_dokumen:E-1
 E-2     JALAN       periksa_dokumen:E-2
-E-3     JALAN       periksa_dokumen:E-3                              separuh DDL; uji admisi saat terbit — tugas 3.1
+E-3     JALAN       periksa_dokumen:E-3                              DDL + uji admisi saat terbit (tugas 3.1, tests/integration/test_event.py)
 E-4     JALAN       periksa_dokumen:E-4
 E-5     JALAN       periksa_dokumen:E-5
 A-1     JALAN       periksa_dokumen:A-1                              skema manifest + DDL; manifest sungguhan — tugas 4.2

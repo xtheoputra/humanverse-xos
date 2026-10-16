@@ -1058,6 +1058,9 @@ def periksa_b6() -> Hasil:
 _ABAIKAN_DIREKTORI = {
     ".git", ".venv", "node_modules", "__pycache__", ".mypy_cache", ".ruff_cache",
     ".pytest_cache", ".import_linter_cache", "htmlcov", ".idea", ".vscode",
+    # keluaran `flutter pub get` / `flutter build` (apps/mobile) — dibuat ulang
+    # tiap pembangunan dan diabaikan git; bukan pohon yang ditulis orang
+    ".dart_tool", "build",
 }
 
 

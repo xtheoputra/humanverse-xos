@@ -1,0 +1,516 @@
+import 'dart:async';
+import 'dart:convert';
+
+import 'package:http/http.dart' as http;
+
+import 'model.dart';
+import 'privasi.dart';
+
+/// Galat beramplop spec/04: `{"error": {"code", "message", "details"?}}`.
+class GalatApi implements Exception {
+  const GalatApi(this.status, this.kode, this.pesan);
+
+  final int status;
+  final String kode;
+  final String pesan;
+
+  @override
+  String toString() => 'GalatApi($status $kode): $pesan';
+}
+
+/// Sesi tidak bisa dipulihkan — token segar ditolak; pengguna harus masuk lagi.
+class SesiBerakhir implements Exception {
+  const SesiBerakhir();
+}
+
+/// Permintaan tidak sampai ke server atau jawabannya tidak kembali: sambungan
+/// putus, nama tak terselesaikan, atau tak dijawab dalam `batasWaktu`.
+///
+/// BUKAN jawaban server — beda dengan [GalatApi]. Tidak ada yang diketahui soal
+/// nasib permintaannya (bisa saja sudah diterima), jadi hanya tindakan yang
+/// aman diulang (spec/04) yang boleh menunggu di antrean luring.
+class JaringanPutus implements Exception {
+  const JaringanPutus();
+
+  @override
+  String toString() => 'JaringanPutus';
+}
+
+/// Yang dibutuhkan layar dari API — layar bergantung pada antarmuka ini, bukan
+/// pada HTTP, supaya uji widget tidak butuh server.
+abstract interface class LayananHabit {
+  bool get sudahMasuk;
+
+  Future<Pengguna> masuk({required String email, required String sandi});
+
+  Future<Pengguna> daftar({
+    required String email,
+    required String sandi,
+    required String namaTampilan,
+    required String zonaWaktu,
+    required String versiKebijakan,
+    required bool izinkanPelatihanModel,
+  });
+
+  Future<void> keluar();
+
+  Future<List<Habit>> habitPada(String tanggal);
+
+  /// `id` dibuat PEMANGGIL sekali per tindakan (`idBaru()`) dan dipakai ulang
+  /// di tiap percobaannya — lihat `KlienApi`.
+  Future<Habit> buatHabit({
+    required String id,
+    required String judul,
+    required String periode,
+    required int target,
+    List<Tier> tier,
+  });
+
+  Future<Penyelesaian> tandaiSelesai(
+    String habitId,
+    String tanggal, {
+    int? tier,
+  });
+
+  Future<void> batalkanSelesai(String habitId, String tanggal);
+
+  Future<Checkin?> checkinPada(String tanggal);
+
+  Future<Checkin> simpanEnergi(String tanggal, int energi, {Checkin? lama});
+
+  Future<Dasbor> dasbor();
+}
+
+/// Klien HTTP untuk API V0 (`/v1`, spec/04).
+///
+/// * Token hanya di MEMORI: halaman yang dimuat ulang meminta masuk lagi.
+///   Menyimpan token segar di penyimpanan web (localStorage) membuatnya bisa
+///   dibaca skrip mana pun di asal yang sama. 6.6 (luring dasar) TIDAK mengubah
+///   ini: antrean luring juga di memori (`luring.dart`, K-40); penyimpanan lokal
+///   yang aman per platform tetap menunggu keputusan pemilik.
+/// * Galat JARINGAN (putus · tak dijawab dalam `batasWaktu`) menjadi
+///   [JaringanPutus], bukan galat umum — pembedanya antrean luring. Token TIDAK
+///   dilupakan karenanya: jaringan yang putus bukan tanda sesi berakhir.
+/// * Token akses kedaluwarsa (401) disegarkan SEKALI lalu permintaannya
+///   diulang; token segar berotasi (K-21) — pasangan baru menggantikan yang lama.
+///   Permintaan SERENTAK yang sama-sama menerima 401 menunggu SATU penyegaran
+///   yang sama. 🔴 Versi pertama menyegarkan per permintaan: yang kedua memakai
+///   token segar yang sudah dirotasi yang pertama — server membacanya sebagai
+///   pencurian token (`session.refresh_reused`) dan mencabut seluruh sesi
+///   (tinjauan keamanan Sprint 2).
+/// * Membuat habit memakai id buatan klien yang SAMA di tiap percobaan satu
+///   tindakan, dan id itu juga `Idempotency-Key`-nya: percobaan ulang sesudah
+///   jaringan putus diputar ulang server, bukan membuat habit kedua; sesudah 24
+///   jam id yang sama menjadi `409 already_exists`, bukan baris kedua.
+///   🔴 Versi pertama mengklaim ini dengan kunci acak BARU per ketukan — yang
+///   tidak melindungi apa pun (tinjauan kontrak Sprint 2, F19).
+/// * Penyelesaian tidak butuh kunci: `(habit, tanggal)` unik di server, dan
+///   kirim ulang tanggal yang sama menjawab `200` dengan baris lama (spec/04).
+class KlienApi implements LayananHabit, LayananPrivasi {
+  KlienApi({
+    required this.dasar,
+    http.Client? klien,
+    this.batasWaktu = const Duration(seconds: 15),
+  }) : _http = klien ?? http.Client();
+
+  /// Akar API, mis. `http://127.0.0.1:8000`.
+  final Uri dasar;
+
+  /// Satu permintaan yang tak dijawab selama ini dianggap [JaringanPutus] —
+  /// tanpa batas, jaringan yang diam (bukan putus) menggantung layar tanpa akhir.
+  final Duration batasWaktu;
+  final http.Client _http;
+  String? _akses;
+  String? _segar;
+  Future<void>? _penyegaran;
+
+  @override
+  bool get sudahMasuk => _akses != null;
+
+  /// Token akses yang sedang dipakai — untuk `tool/ujung_ke_ujung.dart`, yang
+  /// membuktikan SERVER mencabutnya saat keluar (klien sendiri melupakannya).
+  String? get tokenAksesSaatIni => _akses;
+
+  Uri _uri(String jalur, [Map<String, String>? kueri]) => dasar.replace(
+    path: '${dasar.path.replaceAll(RegExp(r'/$'), '')}$jalur',
+    queryParameters: kueri,
+  );
+
+  /// Galat jaringan menjadi [JaringanPutus] — dibedakan dari jawaban server.
+  Future<T> _jaringan<T>(Future<T> Function() kerja) async {
+    try {
+      return await kerja().timeout(batasWaktu);
+    } on http.ClientException {
+      throw const JaringanPutus();
+    } on TimeoutException {
+      throw const JaringanPutus();
+    }
+  }
+
+  Future<http.Response> _kirim(
+    String metode,
+    String jalur, {
+    Object? badan,
+    Map<String, String>? kueri,
+    String? kunciIdempotensi,
+    bool bersesi = true,
+  }) async {
+    Future<http.Response> sekali(String? akses) {
+      final kepala = <String, String>{
+        'Accept': 'application/json',
+        if (badan != null) 'Content-Type': 'application/json',
+        if (bersesi && akses != null) 'Authorization': 'Bearer $akses',
+        'Idempotency-Key': ?kunciIdempotensi,
+      };
+      final permintaan = http.Request(metode, _uri(jalur, kueri))
+        ..headers.addAll(kepala);
+      if (badan != null) permintaan.body = jsonEncode(badan);
+      return _jaringan(
+        () => _http.send(permintaan).then(http.Response.fromStream),
+      );
+    }
+
+    final dipakai = _akses;
+    var jawaban = await sekali(dipakai);
+    if (jawaban.statusCode == 401 && bersesi && _segar != null) {
+      // Token yang ditolak masih token saat ini → segarkan (atau tunggu
+      // penyegaran yang sedang berjalan). Sudah diganti permintaan lain →
+      // langsung ulangi dengan yang baru; menyegarkan lagi tidak perlu.
+      if (_akses == dipakai) await _segarkan();
+      jawaban = await sekali(_akses);
+    }
+    if (jawaban.statusCode >= 400) {
+      if (jawaban.statusCode == 401 && bersesi) {
+        _lupakan();
+        throw const SesiBerakhir();
+      }
+      throw _galat(jawaban);
+    }
+    return jawaban;
+  }
+
+  GalatApi _galat(http.Response jawaban) {
+    try {
+      final isi =
+          jsonDecode(utf8.decode(jawaban.bodyBytes)) as Map<String, dynamic>;
+      final galat = isi['error'] as Map<String, dynamic>;
+      return GalatApi(
+        jawaban.statusCode,
+        galat['code'] as String,
+        galat['message'] as String,
+      );
+    } on Object {
+      return GalatApi(
+        jawaban.statusCode,
+        'http_${jawaban.statusCode}',
+        'Galat tak terduga.',
+      );
+    }
+  }
+
+  dynamic _json(http.Response jawaban) =>
+      jsonDecode(utf8.decode(jawaban.bodyBytes));
+
+  void _simpanToken(Map<String, dynamic> token) {
+    _akses = token['access_token'] as String;
+    _segar = token['refresh_token'] as String;
+  }
+
+  void _lupakan() {
+    _akses = null;
+    _segar = null;
+  }
+
+  /// SATU penyegaran untuk semua permintaan yang menunggunya (lihat docstring kelas).
+  Future<void> _segarkan() =>
+      _penyegaran ??= _segarkanSekali().whenComplete(() => _penyegaran = null);
+
+  Future<void> _segarkanSekali() async {
+    final segar = _segar;
+    if (segar == null) throw const SesiBerakhir();
+    // Jaringan putus di sini BUKAN penolakan: token segar tetap dipegang, dan
+    // permintaan yang menunggunya gagal sebagai [JaringanPutus], bukan keluar.
+    final jawaban = await _jaringan(
+      () => _http.post(
+        _uri('/v1/auth/refresh'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: jsonEncode({'refresh_token': segar}),
+      ),
+    );
+    if (jawaban.statusCode != 200) {
+      _lupakan();
+      throw const SesiBerakhir();
+    }
+    _simpanToken(
+      (_json(jawaban) as Map<String, dynamic>)['tokens']
+          as Map<String, dynamic>,
+    );
+  }
+
+  Pengguna _akun(http.Response jawaban) {
+    final isi = _json(jawaban) as Map<String, dynamic>;
+    _simpanToken(isi['tokens'] as Map<String, dynamic>);
+    return Pengguna.dariJson(isi['user'] as Map<String, dynamic>);
+  }
+
+  @override
+  Future<Pengguna> masuk({
+    required String email,
+    required String sandi,
+  }) async => _akun(
+    await _kirim(
+      'POST',
+      '/v1/auth/login',
+      badan: {'email': email, 'password': sandi},
+      bersesi: false,
+    ),
+  );
+
+  @override
+  Future<Pengguna> daftar({
+    required String email,
+    required String sandi,
+    required String namaTampilan,
+    required String zonaWaktu,
+    required String versiKebijakan,
+    required bool izinkanPelatihanModel,
+  }) async => _akun(
+    await _kirim(
+      'POST',
+      '/v1/auth/register',
+      bersesi: false,
+      badan: {
+        'email': email,
+        'password': sandi,
+        'display_name': namaTampilan,
+        'timezone': zonaWaktu,
+        'consents': {
+          'policy_version': versiKebijakan,
+          'terms': true,
+          'privacy': true,
+          // Persetujuan TERSENDIRI (B-22): menolaknya tidak mengurangi layanan.
+          'model_training': izinkanPelatihanModel
+              ? {
+                  'granted': true,
+                  'data_scopes': ['habits', 'checkins'],
+                }
+              : {'granted': false},
+        },
+      },
+    ),
+  );
+
+  @override
+  Future<void> keluar() async {
+    try {
+      if (_akses != null) await _kirim('POST', '/v1/auth/logout');
+    } on Exception {
+      // Keluar di sisi klien tetap terjadi walau server tak terjangkau.
+    } finally {
+      _lupakan();
+    }
+  }
+
+  @override
+  Future<List<Habit>> habitPada(String tanggal) async {
+    final jawaban = await _kirim(
+      'GET',
+      '/v1/habits',
+      kueri: {'status': 'active', 'for_date': tanggal},
+    );
+    final isi = _json(jawaban) as Map<String, dynamic>;
+    return [
+      for (final h in isi['items'] as List<dynamic>)
+        Habit.dariJson(h as Map<String, dynamic>),
+    ];
+  }
+
+  @override
+  Future<Habit> buatHabit({
+    required String id,
+    required String judul,
+    required String periode,
+    required int target,
+    List<Tier> tier = const [],
+  }) async {
+    final jawaban = await _kirim(
+      'POST',
+      '/v1/habits',
+      kunciIdempotensi: id,
+      badan: {
+        'id': id,
+        'title': judul,
+        'period': periode,
+        'target_count': target,
+        'adaptive_tiers': [for (final t in tier) t.keJson()],
+      },
+    );
+    return Habit.dariJson(_json(jawaban) as Map<String, dynamic>);
+  }
+
+  @override
+  Future<Penyelesaian> tandaiSelesai(
+    String habitId,
+    String tanggal, {
+    int? tier,
+  }) async {
+    final jawaban = await _kirim(
+      'POST',
+      '/v1/habits/$habitId/completions',
+      badan: {'for_date': tanggal, 'status': 'done', 'tier_used': ?tier},
+    );
+    return Penyelesaian.dariJson(_json(jawaban) as Map<String, dynamic>);
+  }
+
+  @override
+  Future<void> batalkanSelesai(String habitId, String tanggal) async {
+    await _kirim('DELETE', '/v1/habits/$habitId/completions/$tanggal');
+  }
+
+  @override
+  Future<Checkin?> checkinPada(String tanggal) async {
+    final jawaban = await _kirim(
+      'GET',
+      '/v1/checkins',
+      kueri: {'from': tanggal, 'to': tanggal},
+    );
+    final items =
+        (_json(jawaban) as Map<String, dynamic>)['items'] as List<dynamic>;
+    return items.isEmpty
+        ? null
+        : Checkin.dariJson(items.first as Map<String, dynamic>);
+  }
+
+  @override
+  Future<Checkin> simpanEnergi(
+    String tanggal,
+    int energi, {
+    Checkin? lama,
+  }) async {
+    final badan = lama?.keJsonDenganEnergi(energi) ?? {'energy': energi};
+    final jawaban = await _kirim('PUT', '/v1/checkins/$tanggal', badan: badan);
+    return Checkin.dariJson(_json(jawaban) as Map<String, dynamic>);
+  }
+
+  @override
+  Future<Dasbor> dasbor() async {
+    final jawaban = await _kirim('GET', '/v1/dashboard');
+    return Dasbor.dariJson(_json(jawaban) as Map<String, dynamic>);
+  }
+
+  // ── Privacy Center (spec/07 6.4) · notifikasi (6.3) · tinjauan mingguan (6.2) ──
+
+  Map<String, dynamic> _objek(http.Response jawaban) =>
+      _json(jawaban) as Map<String, dynamic>;
+
+  @override
+  Future<RingkasanPrivasi> ringkasanPrivasi() async =>
+      RingkasanPrivasi.dariJson(
+        _objek(await _kirim('GET', '/v1/privacy/summary')),
+      );
+
+  @override
+  Future<List<IzinAgent>> izinAgent() async {
+    final isi = _objek(await _kirim('GET', '/v1/privacy/permissions'));
+    return [
+      for (final a in isi['agents'] as List<dynamic>)
+        IzinAgent.dariJson(a as Map<String, dynamic>),
+    ];
+  }
+
+  @override
+  Future<IzinBerlaku> tetapkanIzin(
+    String agent,
+    String scope,
+    String aksi,
+    String keputusan,
+  ) async => IzinBerlaku.dariJson(
+    _objek(
+      await _kirim(
+        'PUT',
+        '/v1/privacy/permissions/agent/${Uri.encodeComponent(agent)}/'
+            '${Uri.encodeComponent(scope)}',
+        badan: {'action': aksi, 'decision': keputusan},
+      ),
+    ),
+  );
+
+  /// Sandi diminta ULANG (OWASP ASVS V3.7.1) — token yang dicuri tidak cukup untuk menyalin
+  /// seluruh data. Tidak diulang otomatis: tiap percobaan memakai jatah tebakan sandi.
+  @override
+  Future<Ekspor> mintaEkspor(String sandi) async => Ekspor.dariJson(
+    _objek(
+      await _kirim('POST', '/v1/privacy/export', badan: {'password': sandi}),
+    ),
+  );
+
+  /// Unduhan butuh sesi pemiliknya — tautan tidak membawa rahasia (ASVS V8.3.1).
+  @override
+  Future<List<int>> unduhEkspor(String id) async =>
+      (await _kirim('GET', '/v1/privacy/export/$id/download')).bodyBytes;
+
+  @override
+  Future<Map<String, int>> hapusData(String kategori, String sandi) async {
+    final isi = _objek(
+      await _kirim(
+        'DELETE',
+        '/v1/privacy/data/${Uri.encodeComponent(kategori)}',
+        badan: {'password': sandi},
+      ),
+    );
+    return {
+      for (final e in (isi['deleted'] as Map<String, dynamic>).entries)
+        e.key: e.value as int,
+    };
+  }
+
+  @override
+  Future<String> hapusAkun(String sandi) async {
+    final isi = _objek(
+      await _kirim('DELETE', '/v1/me', badan: {'password': sandi}),
+    );
+    _lupakan(); // server mencabut SEMUA sesi (6.5) — token ini sudah mati
+    return isi['deletion_scheduled_at'] as String;
+  }
+
+  @override
+  Future<PreferensiNotifikasi> notifikasi() async =>
+      PreferensiNotifikasi.dariJson(
+        _objek(await _kirim('GET', '/v1/me/notifications')),
+      );
+
+  @override
+  Future<PreferensiNotifikasi> ubahNotifikasi({
+    Map<String, bool>? jenis,
+    JamTenang? jamTenang,
+    bool hapusJamTenang = false,
+  }) async => PreferensiNotifikasi.dariJson(
+    _objek(
+      await _kirim(
+        'PATCH',
+        '/v1/me/notifications',
+        badan: {
+          'types': ?jenis,
+          if (hapusJamTenang) 'quiet_hours': null,
+          if (!hapusJamTenang && jamTenang != null)
+            'quiet_hours': jamTenang.keJson(),
+        },
+      ),
+    ),
+  );
+
+  @override
+  Future<TinjauanMingguan> tinjauanMingguan({String? minggu}) async =>
+      TinjauanMingguan.dariJson(
+        _objek(
+          await _kirim(
+            'GET',
+            '/v1/reviews/weekly',
+            kueri: minggu == null ? null : {'week': minggu},
+          ),
+        ),
+      );
+}
