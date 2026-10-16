@@ -5008,6 +5008,24 @@ MUTASI: list[Mutasi] = [
         harus_memuat="grup_tak_dikenal",
         kelompok="db",
     ),
+    # ── tinjauan keamanan Sprint 7 ──
+    Mutasi(
+        "S1",
+        "tugas terjadwal menurunkan data tanpa kunci turunan — hapus kategori tak menunggu",
+        [
+            Sunting(
+                f"{MODUL}/intelligence/terjadwal.py",
+                "                await platform.kunci_turunan(conn, user_id)\n",
+                "",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_privacy_center.py::"
+            "test_hapus_kategori_tidak_balapan_dengan_tugas_terjadwal_yang_menurunkan_datanya"
+        ),
+        harus_memuat="turunan tugas terjadwal dari check-in yang sudah dihapus hidup terus",
+        kelompok="db",
+    ),
     Mutasi(
         "3.1",
         "recorded_at = now() — membeku di awal transaksi, relay melompatinya",

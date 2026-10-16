@@ -23,10 +23,11 @@ import psycopg
 import pytest
 from _bantuan_db import ApiUji, BasisDataV0, auth, psycopg_dsn
 from asgi_lifespan import LifespanManager
+from sqlalchemy import text
 from test_auth import SANDI, _daftar_badan, _email
 
 from hvx.main import create_app
-from hvx.modules import events, identity, intelligence
+from hvx.modules import events, identity, intelligence, profile
 from hvx.modules.platform import Settings, buat_engine
 
 pytestmark = pytest.mark.integration
@@ -877,4 +878,62 @@ async def test_hapus_kategori_tidak_balapan_dengan_konsumen_yang_menurunkan_data
     assert _satu(api, "SELECT count(*) FROM daily_checkins WHERE user_id = %s", uid) == 0
     assert _satu(api, "SELECT count(*) FROM human_states WHERE user_id = %s", uid) == 0, (
         "human state dari check-in yang sudah dihapus hidup terus (konsumen commit sesudahnya)"
+    )
+
+
+async def test_hapus_kategori_tidak_balapan_dengan_tugas_terjadwal_yang_menurunkan_datanya(
+    api_privasi_sendiri: ApiUji,
+) -> None:
+    """Tinjauan keamanan S7 (S1): tugas terjadwal (spec/08 7.3 — agregat malam 8.1, hasil
+    prediksi 10.1, Weekly Review 11.4) MENURUNKAN data di transaksi klaimnya, persis seperti
+    konsumen pekerja (S3 tinjauan S5–6). Tanpa kunci turunan BERSAMA di gerbangnya, hapus
+    kategori yang berjalan selagi kerja itu belum commit tidak melihat turunan yang baru
+    ditulis dan tidak menunggunya: turunan dari check-in yang SUDAH dihapus hidup terus —
+    dan klaim `scheduled_runs` hari itu mencegah tugasnya menghitung ulang."""
+    api = api_privasi_sendiri
+    uid, token = await _daftar(api)
+    r = await api.klien.put(
+        f"/v1/checkins/{TANGGAL}", json={"energy": 2, "focus": 3}, headers=auth(token)
+    )
+    assert r.status_code == 201, r.text
+
+    menurunkan, lanjutkan = asyncio.Event(), asyncio.Event()
+
+    async def agregat_malam(conn: Any, user_id: uuid.UUID, for_date: Any) -> None:
+        if str(user_id) != uid:
+            return
+        (energi,) = (
+            await conn.execute(
+                text("SELECT energy FROM daily_checkins WHERE user_id = :u"), {"u": user_id}
+            )
+        ).one()
+        await profile.simpan_human_state(
+            conn,
+            user_id,
+            for_date=for_date,
+            metrics={"energy": {"value": energi, "confidence": 0.5, "evidence_count": 1}},
+            model_version="uji-s7",
+        )
+        menurunkan.set()
+        await lanjutkan.wait()
+
+    tugas = intelligence.TugasTerjadwal(f"uji-{uuid.uuid4().hex[:8]}", 0, agregat_malam)
+    putaran = asyncio.create_task(intelligence.jalankan_jatuh_tempo(api.engine_pekerja, tugas))
+    try:
+        await asyncio.wait_for(menurunkan.wait(), timeout=15)
+        hapus = asyncio.create_task(_hapus(api, token, "checkins"))
+        # Tunggu sampai penghapusan SELESAI (tanpa penjaga) atau MENUNGGU kunci (dengan).
+        for _ in range(300):
+            if hapus.done() or _ada_yang_menunggu_kunci(api):
+                break
+            await asyncio.sleep(0.02)
+    finally:
+        lanjutkan.set()
+    await asyncio.wait_for(putaran, timeout=15)
+    r = await asyncio.wait_for(hapus, timeout=15)
+    assert r.status_code == 202, r.text
+
+    assert _satu(api, "SELECT count(*) FROM daily_checkins WHERE user_id = %s", uid) == 0
+    assert _satu(api, "SELECT count(*) FROM human_states WHERE user_id = %s", uid) == 0, (
+        "turunan tugas terjadwal dari check-in yang sudah dihapus hidup terus"
     )

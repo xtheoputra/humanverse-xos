@@ -12,6 +12,9 @@ naskah `138` §7.21) — berjalan pada jam **lokal** tiap pengguna, bukan jam se
   dan kemarin menurut `profiles.timezone`, tidak pernah sebelum hari akunnya dibuat.
   Pindah zona ke timur (hari lokal melompat) tidak melewatkan hari; pindah ke barat
   (hari lokal mundur ke yang sudah dikerjakan) tidak menggandakannya — kunci primer.
+* **Kunci turunan bersama sebelum klaim.** 🔴 Versi pertama tidak mengambilnya: hapus
+  kategori yang berjalan selagi kerja belum commit tidak menunggunya, dan turunan dari
+  sumber yang sudah dihapus hidup terus (tinjauan keamanan S7, S1 — sama dengan S3 S5–6).
 * **Satu pengguna yang gagal tidak menahan yang lain.** Galatnya dicatat tanpa isi
   (`platform` menyaring galat basis data), lalu putaran lanjut ke pengguna berikutnya.
 
@@ -85,6 +88,10 @@ async def jalankan_jatuh_tempo(
     for user_id, for_date in jatuh_tempo:
         try:
             async with platform.transaksi_pengguna(engine, user_id) as conn:
+                # Kerja tugas malam MENURUNKAN data (agregat, prediksi, tinjauan) — seperti
+                # konsumen pekerja: hapus kategori Privacy Center menunggu commit-nya, dan
+                # kerja berikutnya menunggu hapusnya (tinjauan keamanan S7, S1).
+                await platform.kunci_turunan(conn, user_id)
                 klaim = await conn.execute(
                     _KLAIM, {"user_id": user_id, "tugas": tugas.nama, "for_date": for_date}
                 )
