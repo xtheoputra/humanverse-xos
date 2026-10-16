@@ -49,7 +49,7 @@ ditulis) dan bukan `V` (urutan produk dirilis) — lihat
 | | Tahap | Isi | Gerbang yang WAJIB lebih dulu | 🛑 Pemblokir |
 |---|---|---|---|---|
 | **T0** | **V0 Foundation** | [`../spec/07`](../spec/07-BACKLOG-V0.md) Sprint 0–6 · 51 tugas · 23 tabel · 4 agent | 0.8 sebelum kode domain · **4.5 sebelum 4.6–4.7** | ✅ **[#3](../../issues/3) terjawab untuk MEMULAI** (16 Sep 2026, **H-25**): AI coding agent mengerjakan di branch + PR, pemilik yang menggabungkan |
-| **T1** | **Behavior Intelligence** (V1) | event · pola · prediksi · weekly review | uji admisi `events` [`07`](07-EVENT-CONTRACTS.md) §3 | — |
+| **T1** | **Behavior Intelligence** (V1) | event · analitik · pola · prediksi habit · goal engine · weekly review — enam butir naskah `75` §58 (**E-249**); draf tugas [`../spec/08`](../spec/08-BACKLOG-V1.md), menunggu **A-39** | uji admisi `events` [`07`](07-EVENT-CONTRACTS.md) §3 | — |
 | **T2** | **PROTECT** (Phase 8) | policy engine · risk engine · permissions · audit · **vault** · kill-switch | — **ia sendiri gerbangnya** | — |
 | **T3** | **Lifestyle AI** (V2) | fashion · wardrobe · trend · grooming · fitness · nutrisi | T2 | — |
 | **T4** | **Multi-Agent** (V3, Phase 11) | registry · SDK · MCP · tool registry · evaluation | rantai gerbang penuh [`04`](04-DEPENDENCY-GRAPH.md) §3 · `agent-identity` · **K-14** | — |
@@ -251,6 +251,7 @@ kode**. Persen tidak bisa dipakai di repo ini.
 | Spesifikasi V0 | ✅ **selesai** — 23 tabel · 23 event ([`../spec/03`](../spec/03-EVENT-CONTRACTS.md), E-178) · 51 tugas |
 | **Kode V0 — di `master`** | ✅ **51 dari 51 tugas** (16 Okt 2026) — PR #163 … #170 digabung pemilik (HUMAN REVIEW); pohon `master` `80ba95c` **identik** dengan `b477074`, commit yang status `ci-lokal`-nya **success** (20 langkah wajib) |
 | **Kode V0 — ditulis, menunggu HUMAN REVIEW** | **0** — tujuh branch bertumpuk `v0/sprint-*` sudah turun seluruhnya. 🔧 Baris ini sempat tertinggal di *“22 dari 51”* sejak Sprint 2 — angka yang ditulis tangan basi begitu sprint berikutnya selesai |
+| **Backlog V1** (T1) | 🟡 **draf** — [`../spec/08`](../spec/08-BACKLOG-V1.md), 5 sprint (7–11) · 23 tugas; **0 kode** sampai pemilik menyetujui (**A-39**) |
 | Penerapan web **gratis** (**H-29**) | ⏳ syarat **D1**, bukan tugas V0 — [`09`](09-DEPLOYMENT-TOPOLOGY.md) §2.1 |
 | Master Architecture v2.0 | ✅ **selesai** — [`README.md`](README.md) 11 butir |
 | Tahap yang tidak diblokir keputusan | **T0–T5** |
