@@ -32,8 +32,13 @@ CREATE POLICY scheduled_runs_own_rows ON scheduled_runs USING (user_id = app_cur
 -- berhenti sebentar, atau pengguna yang pindah zona ke timur, tidak melewatkan hari;
 -- tidak pernah sebelum hari akunnya dibuat. Hanya akun aktif. Zona yang tak dikenal
 -- PostgreSQL membuat pengguna itu dilewati — bukan menggagalkan semua pengguna. Hanya
--- baca: klaimnya ditulis di bawah RLS pemiliknya.
-CREATE FUNCTION tugas_jatuh_tempo(p_tugas text, p_menit integer, p_batas integer)
+-- baca: klaimnya ditulis di bawah RLS pemiliknya. Berhalaman menurut `(for_date,
+-- user_id)` sesudah `p_setelah_*` (NULL = dari awal): pekerja menelusuri SEMUA halaman
+-- tiap putaran, jadi pengguna yang kerjanya selalu gagal — klaimnya batal, ia kembali
+-- di urutan terdepan — tidak menahan yang lain di belakangnya (tinjauan keamanan S7, S3).
+CREATE FUNCTION tugas_jatuh_tempo(p_tugas text, p_menit integer, p_batas integer,
+                                  p_setelah_tanggal date DEFAULT NULL,
+                                  p_setelah_id uuid DEFAULT NULL)
   RETURNS TABLE (user_id uuid, for_date date)
   LANGUAGE sql STABLE SECURITY DEFINER
   SET search_path = pg_catalog, public, pg_temp
@@ -50,6 +55,8 @@ CREATE FUNCTION tugas_jatuh_tempo(p_tugas text, p_menit integer, p_batas integer
     WHERE u.status = 'active'
       AND h.for_date >= (u.created_at AT TIME ZONE z.name)::date
       AND w.lokal >= h.for_date + make_interval(mins => p_menit)
+      AND (p_setelah_id IS NULL
+           OR (h.for_date, u.id) > (p_setelah_tanggal, p_setelah_id))
       AND NOT EXISTS (
         SELECT 1 FROM public.scheduled_runs r
         WHERE r.user_id = u.id AND r.task = p_tugas AND r.for_date = h.for_date
@@ -57,5 +64,6 @@ CREATE FUNCTION tugas_jatuh_tempo(p_tugas text, p_menit integer, p_batas integer
     ORDER BY h.for_date, u.id
     LIMIT least(greatest(p_batas, 1), 500)
   $$;
-REVOKE ALL ON FUNCTION tugas_jatuh_tempo(text, integer, integer) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION tugas_jatuh_tempo(text, integer, integer) TO hvx_pekerja;
+REVOKE ALL ON FUNCTION tugas_jatuh_tempo(text, integer, integer, date, uuid) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION tugas_jatuh_tempo(text, integer, integer, date, uuid)
+  TO hvx_pekerja;

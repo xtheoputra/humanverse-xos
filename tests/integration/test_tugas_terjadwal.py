@@ -152,6 +152,45 @@ async def test_kerja_yang_gagal_membatalkan_klaimnya_dan_dicoba_lagi(api_bersama
     assert berhasil == [_lokal(api_bersama, "Asia/Jakarta")[0]]
 
 
+async def test_pengguna_yang_selalu_gagal_tidak_menahan_yang_lain(api_bersama: ApiUji) -> None:
+    """Tinjauan keamanan S7 (S3): `tugas_jatuh_tempo` berurutan tetap `(for_date, user_id)`
+    dan berbatas. Kerja yang gagal membatalkan klaimnya, jadi pengguna yang SELALU gagal
+    (data yang menjatuhkan tugasnya — sengaja, dari akun-akun buatan, atau karena cacat)
+    selalu kembali di urutan terdepan: begitu jumlahnya ≥ batas, tidak ada pengguna lain yang
+    pernah dikerjakan. Di sini batasnya 1 — satu pengguna beracun cukup."""
+    a = await _pengguna(api_bersama, "Asia/Jakarta")
+    b = await _pengguna(api_bersama, "Asia/Jakarta")
+    sehat = max(a, b)  # urutan uuid Python = urutan uuid PostgreSQL (byte demi byte)
+    berhasil: list[date] = []
+
+    async def kerjakan(_conn: AsyncConnection, user_id: UUID, for_date: date) -> None:
+        if user_id != sehat:
+            raise RuntimeError("data beracun")
+        berhasil.append(for_date)
+
+    tugas = intelligence.TugasTerjadwal(_nama(), 0, kerjakan)
+    for _ in range(3):
+        await intelligence.jalankan_jatuh_tempo(api_bersama.engine_pekerja, tugas, batas=1)
+
+    assert berhasil == [_lokal(api_bersama, "Asia/Jakarta")[0]], (
+        "pengguna yang selalu gagal menahan pengguna lain di belakangnya"
+    )
+
+
+async def test_halaman_berikutnya_mulai_sesudah_kursornya(api_bersama: ApiUji) -> None:
+    """Kursor `(for_date, user_id)` yang diabaikan fungsinya = putaran yang tak pernah selesai."""
+    for _ in range(2):
+        await _pengguna(api_bersama, "Asia/Jakarta", umur_hari=1)
+    nama = _nama()
+    semua = _pemilik(api_bersama, "SELECT * FROM tugas_jatuh_tempo(%s, 0, 500)", nama)
+    assert len(semua) >= 3
+    tgl, uid = semua[0][1], semua[0][0]
+    sisa = _pemilik(
+        api_bersama, "SELECT * FROM tugas_jatuh_tempo(%s, 0, 500, %s, %s)", nama, tgl, uid
+    )
+    assert sisa == semua[1:], "halaman berikutnya tidak mulai sesudah kursornya"
+
+
 async def test_dua_zona_diproses_pada_jam_lokal_masing_masing(api_bersama: ApiUji) -> None:
     """Jam lokal TIMUR selalu 1 jam di depan BARAT (selisih 25 jam). Ambang ditaruh 30 menit
     sesudah jam lokal salah satunya: yang jamnya sudah lewat dikerjakan, yang belum tidak."""

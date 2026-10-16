@@ -4837,8 +4837,8 @@ MUTASI: list[Mutasi] = [
         [
             Sunting(
                 f"{MODUL}/intelligence/terjadwal.py",
-                "                if klaim.first() is None:",
-                "                if klaim.first() is None and False:",
+                "            if klaim.first() is None:",
+                "            if klaim.first() is None and False:",
             )
         ],
         _pytest(
@@ -4853,8 +4853,8 @@ MUTASI: list[Mutasi] = [
         [
             Sunting(
                 f"{MODUL}/intelligence/terjadwal.py",
-                "                await tugas.kerjakan(conn, user_id, for_date)\n",
-                "                try:\n                    await tugas.kerjakan(conn, user_id, for_date)\n                except Exception:\n                    pass\n",
+                "            await tugas.kerjakan(conn, user_id, for_date)\n",
+                "            try:\n                await tugas.kerjakan(conn, user_id, for_date)\n            except Exception:\n                pass\n",
             )
         ],
         _pytest(
@@ -5015,7 +5015,7 @@ MUTASI: list[Mutasi] = [
         [
             Sunting(
                 f"{MODUL}/intelligence/terjadwal.py",
-                "                await platform.kunci_turunan(conn, user_id)\n",
+                "            await platform.kunci_turunan(conn, user_id)\n",
                 "",
             )
         ],
@@ -5024,6 +5024,40 @@ MUTASI: list[Mutasi] = [
             "test_hapus_kategori_tidak_balapan_dengan_tugas_terjadwal_yang_menurunkan_datanya"
         ),
         harus_memuat="turunan tugas terjadwal dari check-in yang sudah dihapus hidup terus",
+        kelompok="db",
+    ),
+    Mutasi(
+        "S3",
+        "tugas terjadwal membaca SATU halaman — pengguna yang selalu gagal menahan sisanya",
+        [
+            Sunting(
+                f"{MODUL}/intelligence/terjadwal.py",
+                "        if len(jatuh_tempo) < halaman:\n",
+                "        if True:\n",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_tugas_terjadwal.py::"
+            "test_pengguna_yang_selalu_gagal_tidak_menahan_yang_lain"
+        ),
+        harus_memuat="pengguna yang selalu gagal menahan pengguna lain di belakangnya",
+        kelompok="db",
+    ),
+    Mutasi(
+        "S3",
+        "kursor halaman diabaikan fungsinya — putaran tak pernah selesai",
+        [
+            Sunting(
+                "data/migrations/versions/0014_tugas_terjadwal.up.sql",
+                "      AND (p_setelah_id IS NULL\n",
+                "      AND (true\n",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_tugas_terjadwal.py::"
+            "test_halaman_berikutnya_mulai_sesudah_kursornya"
+        ),
+        harus_memuat="halaman berikutnya tidak mulai sesudah kursornya",
         kelompok="db",
     ),
     Mutasi(
