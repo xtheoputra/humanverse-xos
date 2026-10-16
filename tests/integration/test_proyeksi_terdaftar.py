@@ -14,6 +14,7 @@ Satu uji untuk SEMUA proyeksi di `intelligence.PROYEKSI` — proyeksi yang didaf
 
 from __future__ import annotations
 
+import asyncio
 from typing import Any
 from uuid import UUID
 
@@ -99,3 +100,26 @@ async def test_proyeksi_terdaftar_dibangun_ulang_dari_nol_dan_hasilnya_sama(
     assert await intelligence.bangun_ulang(engine, uid, nama) == 0
     sisa = await _potret(api_bersama, uid, nama)
     assert not sisa, f"proyeksi {nama!r}: baris basi selamat dari pengosongan: {sisa}"
+
+
+@pytest.mark.parametrize("nama", sorted(intelligence.PROYEKSI))
+async def test_bangun_ulang_menunggu_hapus_kategori_yang_sedang_berjalan(
+    api_bersama: ApiUji, nama: str
+) -> None:
+    """Bangun ulang MENURUNKAN data seperti konsumennya — maka ia mengambil kunci turunan
+    pengguna (`platform.kunci_turunan`, S3) seperti konsumennya. 🔴 Tinjauan kontrak S7
+    (K3): versi pertama tidak; hapus kategori Privacy Center yang berjalan bersamaan tidak
+    ditunggunya, dan turunan dari sumber yang sedang dihapus bisa ditulis ulang."""
+    uid, token = await api_bersama.pengguna_baru()
+    await _skenario(api_bersama, token)
+    engine = api_bersama.app.state.engine
+
+    with psycopg.connect(psycopg_dsn(api_bersama.db.dsn_pemilik)) as k:
+        # = hapus kategori yang sedang berjalan: kunci EKSKLUSIF dipegang sampai commit
+        k.execute("SELECT pg_advisory_xact_lock(hashtextextended(%s, 0))", (f"turunan:{uid}",))
+        tugas = asyncio.ensure_future(intelligence.bangun_ulang(engine, uid, nama))
+        await asyncio.sleep(1.0)
+        menunggu = not tugas.done()
+        k.rollback()  # kunci dilepas
+    assert await asyncio.wait_for(tugas, timeout=30) > 0
+    assert menunggu, f"bangun ulang {nama!r} tidak menunggu hapus kategori yang sedang berjalan"

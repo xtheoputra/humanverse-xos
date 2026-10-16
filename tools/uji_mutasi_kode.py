@@ -4871,6 +4871,24 @@ MUTASI: list[Mutasi] = [
         harus_memuat="baris basi selamat dari pengosongan",
         kelompok="db",
     ),
+    # Tinjauan kontrak S7 (K3): bangun ulang menurunkan data tanpa kunci turunan pengguna —
+    # hapus kategori Privacy Center yang sedang berjalan tidak ditunggunya (S3).
+    Mutasi(
+        "7.2",
+        "bangun ulang proyeksi tanpa kunci turunan pengguna",
+        [
+            Sunting(
+                f"{MODUL}/intelligence/proyeksi.py",
+                "        await platform.kunci_turunan(conn, user_id)\n",
+                "",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_proyeksi_terdaftar.py::test_bangun_ulang_menunggu_hapus_kategori_yang_sedang_berjalan"
+        ),
+        harus_memuat="tidak menunggu hapus kategori yang sedang berjalan",
+        kelompok="db",
+    ),
     # ── spec/08 7.3 tugas terjadwal per jam lokal, tepat sekali per hari lokal ──
     Mutasi(
         "7.3",

@@ -91,9 +91,15 @@ async def bangun_ulang(engine: AsyncEngine, user_id: UUID, nama: str) -> int:
     Mengosongkan, lalu memutar ulang tiap event yang didengar proyeksinya urut tiba — satu
     transaksi, jadi tidak ada jendela saat proyeksinya kosong. Mengembalikan jumlah event
     yang diputar ulang.
+
+    Ia MENURUNKAN data seperti konsumennya, maka memegang kunci turunan pengguna seperti
+    konsumennya (`platform.kunci_turunan`, S3): hapus kategori Privacy Center yang sedang
+    berjalan ditunggu, dan yang dimulai sesudahnya menunggu commit ini. 🔴 Tinjauan
+    kontrak S7 (K3): versi pertama tidak memegangnya.
     """
     proyeksi = PROYEKSI[nama]
     async with platform.transaksi_pengguna(engine, user_id) as conn:
+        await platform.kunci_turunan(conn, user_id)
         await proyeksi.kosongkan(conn, user_id)
         riwayat = [
             e for e in await events.untuk_proyeksi(conn, user_id) if e.event_type in proyeksi.jenis
