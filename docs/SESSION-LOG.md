@@ -4,6 +4,24 @@
 
 ---
 
+## Sesi 40 — 16 Oktober 2026
+
+**Pemilik: *“lanjutkan progress”*, lalu *“sudah saya merged, lanjutkan”*, lalu *“sudah”*** —
+**V0 di `master`: 51 dari 51 tugas.**
+
+| Hal | Hasil |
+|---|---|
+| Gerbang resmi #3 `b477074` (8 Okt, pemilik) | **merah** di *uji_mutasi kode — migrasi*; lognya tidak tersimpan |
+| Diulang berpotong | 536 mutasi db di latar DEPAN (potongan ≤ 150; satu potongan latar dibunuh pengawas memori, mutan `identity/izin.py` tertinggal → dipulihkan): **536/536 berbunyi**. Satu kedipan: mutasi 5.5 (`test_rekomendasi`) sekali gagal 1,29 dtk dengan alasan lain, lalu 8× berbunyi dengan alasan yang benar (sendiri dan bersama mutasi 400–416). Dugaan — **belum terbukti**: `_rekomendasi` membuka koneksi psycopg baru tiap 50 ms → `WSAEADDRINUSE` mesin ini |
+| Gerbang resmi #4 `b477074` (pemilik, terminal) | ✅ **`success` — 20 langkah wajib · 66 mnt 13 dtk**. Pemicu gagal-mulai pertama: `python` pemilik kini Python 3.15 tanpa `uv` → `py -3.12 -m uv …` + `HVX_TEST_*` + `HVX_FLUTTER`/`HVX_DART` |
+| PR | 🆕 **#168** Sprint 5 (+6.1 · 6.5 · 6.6) · 🆕 **#169** Sprint 6 + AI Review S5–6 |
+| 🔴 Urutan penggabungan | #168 digabung **sebelum** #169 → isi #169 mendarat di `v0/sprint-5-intelligence` sesudah branch itu turun, dan **tidak** ikut ke `v0/sprint-4-ai`. 🆕 **#170** penyambung (40 commit, tanpa kode baru; pohon hasil gabung = pohon `b477074`, `98538ad`). Lalu pemilik menggabung #170 → #167 → … → #163 |
+| `master` | `80ba95c` — pohon **identik byte-per-byte** dengan `b477074` (status `ci-lokal` success) |
+| Dokumen | `arch/10` §6 · `README.md` · `ARCHITECTURE.md` · `tools/README.md`: baris keadaan *“menunggu HUMAN REVIEW”* / *“0 dari 51”* → di `master`. Angka lain di README (24 Sep) **belum** dihitung ulang |
+| ⏸️ Berhenti di | T0 selesai. Berikutnya menurut `arch/10` §2: **T1 Behavior Intelligence (V1)** — belum ada backlog V1 setara `spec/07`; menyusunnya = keputusan cakupan pemilik |
+
+---
+
 ## Sesi 39 — 8 Oktober 2026
 
 **Pemilik: *“sudah berapa % proyek ini?”*, lalu *“kedepannya, aplikasi ini dapat dijalankan juga

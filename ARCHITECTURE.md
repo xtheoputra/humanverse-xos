@@ -5,9 +5,10 @@
 > **apa yang sudah dibangun, dan kenapa bentuknya begitu.** Setiap baris di
 > bawah menunjuk penegaknya, supaya tidak ada yang hanya dinyatakan.
 
-Keadaan: **Sprint 0 (Foundation) + Sprint 1 (Identity) + Sprint 2 (Human
-Core) + Sprint 3 (Memory & event)** — 30 dari 51 tugas `spec/07`, di empat
-branch bertumpuk yang menunggu HUMAN REVIEW.
+Keadaan: **V0 Sprint 0–6 di `master`** — 51 dari 51 tugas `spec/07`,
+digabung pemilik 16 Okt 2026 (PR #163 … #170). ⚠️ Bagian di bawah ditulis
+sampai Sprint 3 dan belum menyusul Sprint 4–6 (AI Gateway, agent, rekomendasi,
+Privacy Center) — rinciannya ada di `spec/07` per sprint dan di `docs/99`.
 
 ---
 

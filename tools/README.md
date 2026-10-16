@@ -1,7 +1,7 @@
 # `tools/` — perkakas pemeriksa & gerbang
 
 > ⚠️ **Ini bukan kode produksi.** Kode produksi ada di [`../apps/api`](../apps/api/README.md)
-> (Sprint 0 & 1, branch `v0/sprint-0-foundation` · `v0/sprint-1-identity`, menunggu HUMAN REVIEW). Berkas di
+> (V0 Sprint 0–6, di `master` sejak 16 Okt 2026). Berkas di
 > sini **memeriksa** dokumen, DDL, pohon direktori, dan kode — dan memulangkan
 > kode keluar `1` kalau ada aturan yang dilanggar.
 

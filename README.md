@@ -20,8 +20,8 @@ manusia + agent + data + knowledge + simulation + automation**.
 
 | Hal | Keadaan |
 |---|---|
-| Tahap | 🔨 **Sprint 0 + Sprint 1 + Sprint 2 + Sprint 3 + Sprint 4 dikodekan** (16–24 Sep 2026) — branch `v0/sprint-0-foundation`, di atasnya `v0/sprint-1-identity`, `v0/sprint-2-human-core`, `v0/sprint-3-memory-event`, lalu `v0/sprint-4-ai` — **menunggu HUMAN REVIEW pemilik** |
-| Berkas **kode produksi** | **0 di `master`** · **Sprint 0 + 1 + 2 + 3 + 4 (39 dari 51 tugas `spec/07`) di branch** — api Python + proses pekerja (`hvx.pekerja`) + aplikasi Flutter pertama (`apps/mobile`) — [#3](../../issues/3) dijawab pemilik untuk memulai (**H-25**): AI coding agent di branch + PR, pemilik yang menggabungkan |
+| Tahap | ✅ **T0 V0 Foundation di `master`** (16 Okt 2026) — Sprint 0–6, PR #163 … #170 digabung pemilik sesudah HUMAN REVIEW. Berikutnya menurut [`arch/10`](arch/10-URUTAN-IMPLEMENTASI.md) §2: **T1 Behavior Intelligence (V1)** |
+| Berkas **kode produksi** | **51 dari 51 tugas `spec/07` di `master`** — api Python + proses pekerja (`hvx.pekerja`) + aplikasi Flutter (`apps/mobile`, juga bisa dibangun untuk web — **H-29**). Pohon `master` identik dengan commit yang status `ci-lokal`-nya **success**. [#3](../../issues/3) dijawab pemilik untuk memulai (**H-25**): AI coding agent di branch + PR, pemilik yang menggabungkan |
 | Berkas **perkakas** | **4** — [`tools/`](tools/README.md): `periksa_dokumen.py` · `uji_mutasi.py` · 🆕 `uji_mutasi_kode.py` · 🆕 `ci_lokal.py`. Di branch Sprint 0: **19 dari 26** pemeriksaan [`arch/11`](arch/11-PENEGAKAN.md) jalan (di `master`: 12) |
 | Repo git | privat `xtheoputra/humanverse-xos`, branch `master` |
 | Dokumen | **272 berkas** di `docs/` + **8 berkas** di `spec/` + **12 berkas** di [`arch/`](arch/README.md) |
@@ -33,8 +33,9 @@ manusia + agent + data + knowledge + simulation + automation**.
 | Keputusan terbuka | **26 pertanyaan A** · **39 risiko B** · **167 ketidakcocokan E** · **20 lubang G** — dan **32 butir K** sudah saya putuskan sendiri |
 | Tanggal dokumen | 24 September 2026 |
 
-> ⚠️ **Nol baris kode di `master` itu disengaja sampai 16 Sep 2026 — dan kini
-> tinggal menunggu HUMAN REVIEW Sprint 0.**
+> ⚠️ **Nol baris kode di `master` itu disengaja sampai 16 Sep 2026 — sejak
+> 16 Okt 2026 seluruh V0 (51 tugas) ada di `master`.** Angka lain di tabel di
+> atas (butir H/A/B/E/G/K, berkas, mutasi) ditulis 24 Sep dan belum dihitung ulang.
 > Lima naskah sudah menjawab: **nama** (A-7), **MVP** (A-2), **struktur repo**
 > (E-27), **Weather/Calendar = tool** (E-2/E-28), **empat penyimpanan bukan
 > enam** (A-10), **V0–V6 sebagai rencana kanonik** (A-18), dan **Confidence

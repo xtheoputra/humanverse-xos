@@ -249,8 +249,8 @@ kode**. Persen tidak bisa dipakai di repo ini.
 | Ukuran | Sekarang |
 |---|---|
 | Spesifikasi V0 | ✅ **selesai** — 23 tabel · 23 event ([`../spec/03`](../spec/03-EVENT-CONTRACTS.md), E-178) · 51 tugas |
-| **Kode V0 — di `master`** | 🛑 **0 dari 51 tugas** — sampai PR Sprint 0 digabung pemilik |
-| **Kode V0 — ditulis, menunggu HUMAN REVIEW** | ⏳ **51 dari 51** (8 Okt 2026) — Sprint 0–4 ber-PR #163 → #167 · Sprint 5 + 6.1 · 6.5 · 6.6 di `v0/sprint-5-intelligence` · 6.2 · 6.3 · 6.4 di `v0/sprint-6-product`, tujuh branch bertumpuk. 🔧 Baris ini sempat tertinggal di *“22 dari 51”* sejak Sprint 2 — angka yang ditulis tangan basi begitu sprint berikutnya selesai |
+| **Kode V0 — di `master`** | ✅ **51 dari 51 tugas** (16 Okt 2026) — PR #163 … #170 digabung pemilik (HUMAN REVIEW); pohon `master` `80ba95c` **identik** dengan `b477074`, commit yang status `ci-lokal`-nya **success** (20 langkah wajib) |
+| **Kode V0 — ditulis, menunggu HUMAN REVIEW** | **0** — tujuh branch bertumpuk `v0/sprint-*` sudah turun seluruhnya. 🔧 Baris ini sempat tertinggal di *“22 dari 51”* sejak Sprint 2 — angka yang ditulis tangan basi begitu sprint berikutnya selesai |
 | Penerapan web **gratis** (**H-29**) | ⏳ syarat **D1**, bukan tugas V0 — [`09`](09-DEPLOYMENT-TOPOLOGY.md) §2.1 |
 | Master Architecture v2.0 | ✅ **selesai** — [`README.md`](README.md) 11 butir |
 | Tahap yang tidak diblokir keputusan | **T0–T5** |
