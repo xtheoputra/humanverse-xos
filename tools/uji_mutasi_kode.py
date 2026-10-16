@@ -4878,8 +4878,8 @@ MUTASI: list[Mutasi] = [
         [
             Sunting(
                 f"{MODUL}/intelligence/terjadwal.py",
-                "                if klaim.first() is None:",
-                "                if klaim.first() is None and False:",
+                "            if klaim.first() is None:",
+                "            if klaim.first() is None and False:",
             )
         ],
         _pytest(
@@ -4894,8 +4894,8 @@ MUTASI: list[Mutasi] = [
         [
             Sunting(
                 f"{MODUL}/intelligence/terjadwal.py",
-                "                await tugas.kerjakan(conn, user_id, for_date)\n",
-                "                try:\n                    await tugas.kerjakan(conn, user_id, for_date)\n                except Exception:\n                    pass\n",
+                "            await tugas.kerjakan(conn, user_id, for_date)\n",
+                "            try:\n                await tugas.kerjakan(conn, user_id, for_date)\n            except Exception:\n                pass\n",
             )
         ],
         _pytest(
@@ -4982,6 +4982,40 @@ MUTASI: list[Mutasi] = [
             "tests/integration/test_tugas_terjadwal.py::test_akun_menunggu_dihapus_dan_zona_tak_dikenal_dilewati"
         ),
         harus_memuat="Bukan/Zona",
+        kelompok="db",
+    ),
+    # Tinjauan kontrak S7 (K2): satu halaman `LIMIT batas` — `batas` pengguna yang selalu
+    # gagal kembali di depan tiap putaran dan menahan semua yang di belakangnya.
+    Mutasi(
+        "7.3",
+        "jatuh tempo dibaca satu halaman saja — yang gagal menahan yang di belakangnya",
+        [
+            Sunting(
+                f"{MODUL}/intelligence/terjadwal.py",
+                "        setelah = berikut\n",
+                "        return selesai\n",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_tugas_terjadwal.py::test_pengguna_yang_selalu_gagal_tidak_menahan_yang_lain"
+        ),
+        harus_memuat="pengguna yang gagal menahan pengguna di belakangnya",
+        kelompok="db",
+    ),
+    Mutasi(
+        "7.3",
+        "kursor halaman jatuh tempo diabaikan fungsinya",
+        [
+            Sunting(
+                "data/migrations/versions/0014_tugas_terjadwal.up.sql",
+                "      AND (h.for_date, u.id) > (p_setelah_tanggal, p_setelah_user)\n",
+                "",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_tugas_terjadwal.py::test_pengguna_yang_selalu_gagal_tidak_menahan_yang_lain"
+        ),
+        harus_memuat="pengguna yang gagal menahan pengguna di belakangnya",
         kelompok="db",
     ),
     # ── spec/08 7.4 putar ulang stream mati ──

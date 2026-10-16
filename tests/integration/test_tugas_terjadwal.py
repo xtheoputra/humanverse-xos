@@ -152,6 +152,28 @@ async def test_kerja_yang_gagal_membatalkan_klaimnya_dan_dicoba_lagi(api_bersama
     assert berhasil == [_lokal(api_bersama, "Asia/Jakarta")[0]]
 
 
+async def test_pengguna_yang_selalu_gagal_tidak_menahan_yang_lain(api_bersama: ApiUji) -> None:
+    """K-48 (5): *“satu pengguna yang gagal tidak menahan yang lain”* — juga bila yang gagal
+    sebanyak `batas` satu putaran. Tinjauan kontrak S7 (K2): jatuh tempo dibaca urut
+    `(for_date, user_id)` dengan `LIMIT`; klaim yang gagal batal, jadi baris yang SAMA
+    kembali di depan tiap putaran — dan pengguna di belakangnya tak pernah dikerjakan."""
+    a = await _pengguna(api_bersama, "Asia/Jakarta")
+    b = await _pengguna(api_bersama, "Asia/Jakarta")
+    sah = max(a, b)  # yang gagal (dan semua pengguna lain berkas ini) di depannya
+    dikerjakan: list[UUID] = []
+
+    async def kerjakan(_conn: AsyncConnection, user_id: UUID, _for_date: date) -> None:
+        if user_id != sah:
+            raise RuntimeError("kerja gagal untuk pengguna ini, tiap kali")
+        dikerjakan.append(user_id)
+
+    tugas = intelligence.TugasTerjadwal(_nama(), 0, kerjakan)
+    for _ in range(3):  # tiga putaran pekerja
+        await intelligence.jalankan_jatuh_tempo(api_bersama.engine_pekerja, tugas, batas=1)
+
+    assert dikerjakan == [sah], "pengguna yang gagal menahan pengguna di belakangnya"
+
+
 async def test_dua_zona_diproses_pada_jam_lokal_masing_masing(api_bersama: ApiUji) -> None:
     """Jam lokal TIMUR selalu 1 jam di depan BARAT (selisih 25 jam). Ambang ditaruh 30 menit
     sesudah jam lokal salah satunya: yang jamnya sudah lewat dikerjakan, yang belum tidak."""

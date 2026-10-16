@@ -13,7 +13,11 @@ naskah `138` §7.21) — berjalan pada jam **lokal** tiap pengguna, bukan jam se
   Pindah zona ke timur (hari lokal melompat) tidak melewatkan hari; pindah ke barat
   (hari lokal mundur ke yang sudah dikerjakan) tidak menggandakannya — kunci primer.
 * **Satu pengguna yang gagal tidak menahan yang lain.** Galatnya dicatat tanpa isi
-  (`platform` menyaring galat basis data), lalu putaran lanjut ke pengguna berikutnya.
+  (`platform` menyaring galat basis data), lalu putaran lanjut ke pengguna berikutnya —
+  dan ke HALAMAN berikutnya: jatuh tempo dibaca per halaman dengan kursor
+  `(for_date, user_id)`. 🔴 Versi pertama membaca satu halaman `LIMIT batas`; klaim yang
+  gagal batal, jadi baris yang sama kembali di depan tiap putaran, dan `batas` pengguna
+  yang selalu gagal menahan semua pengguna di belakangnya (tinjauan kontrak S7, K2).
 
 Daftar tugasnya `TUGAS_TERJADWAL` — dirakit `hvx.pekerja`, satu putaran per tugas.
 """
@@ -36,7 +40,9 @@ log = structlog.get_logger("hvx.terjadwal")
 
 _POLA_NAMA = re.compile(r"^[a-z][a-z0-9-]{0,39}$")  # = CHECK scheduled_runs.task
 
-_JATUH_TEMPO = text("SELECT user_id, for_date FROM tugas_jatuh_tempo(:tugas, :menit, :batas)")
+_JATUH_TEMPO = text(
+    "SELECT user_id, for_date FROM tugas_jatuh_tempo(:tugas, :menit, :batas, :tanggal, :user)"
+)
 _KLAIM = text(
     "INSERT INTO scheduled_runs (user_id, task, for_date) VALUES (:user_id, :tugas, :for_date) "
     "ON CONFLICT DO NOTHING RETURNING for_date"
@@ -73,26 +79,49 @@ async def jalankan_jatuh_tempo(
     """Kerjakan `tugas` untuk tiap (pengguna, hari lokal) yang jatuh tempo — jumlah yang selesai.
 
     `engine` = engine proses pekerja (anggota `hvx_pekerja`): hanya peran itu yang boleh
-    memanggil `tugas_jatuh_tempo`.
+    memanggil `tugas_jatuh_tempo`. `batas` = ukuran satu halaman; satu panggilan membaca
+    halaman demi halaman sampai habis, jadi yang gagal tidak menutupi yang di belakangnya.
     """
-    async with platform.transaksi_sistem(engine) as conn:
-        hasil = await conn.execute(
-            _JATUH_TEMPO, {"tugas": tugas.nama, "menit": tugas.menit_lokal, "batas": batas}
-        )
-        jatuh_tempo = [(b.user_id, b.for_date) for b in hasil]
-
     selesai = 0
-    for user_id, for_date in jatuh_tempo:
-        try:
-            async with platform.transaksi_pengguna(engine, user_id) as conn:
-                klaim = await conn.execute(
-                    _KLAIM, {"user_id": user_id, "tugas": tugas.nama, "for_date": for_date}
-                )
-                if klaim.first() is None:  # pekerja lain lebih dulu — dan sudah commit
-                    continue
-                await tugas.kerjakan(conn, user_id, for_date)
-        except Exception:
-            log.exception("terjadwal.gagal", tugas=tugas.nama, user_id=str(user_id))
-            continue
-        selesai += 1
-    return selesai
+    setelah: tuple[date, UUID] | None = None
+    while True:
+        async with platform.transaksi_sistem(engine) as conn:
+            hasil = await conn.execute(
+                _JATUH_TEMPO,
+                {
+                    "tugas": tugas.nama,
+                    "menit": tugas.menit_lokal,
+                    "batas": batas,
+                    "tanggal": setelah[0] if setelah else date.min,
+                    "user": setelah[1] if setelah else UUID(int=0),
+                },
+            )
+            halaman = [(b.user_id, b.for_date) for b in hasil]
+        for user_id, for_date in halaman:
+            if await _kerjakan_satu(engine, tugas, user_id, for_date):
+                selesai += 1
+        if len(halaman) < max(1, min(batas, 500)):  # = LIMIT fungsi
+            return selesai
+        berikut = (halaman[-1][1], halaman[-1][0])
+        if setelah is not None and berikut <= setelah:  # kursor tak maju: jangan berputar
+            log.error("terjadwal.kursor_macet", tugas=tugas.nama)
+            return selesai
+        setelah = berikut
+
+
+async def _kerjakan_satu(
+    engine: AsyncEngine, tugas: TugasTerjadwal, user_id: UUID, for_date: date
+) -> bool:
+    """Klaim + kerja satu (pengguna, hari) dalam SATU transaksi — `True` bila selesai di sini."""
+    try:
+        async with platform.transaksi_pengguna(engine, user_id) as conn:
+            klaim = await conn.execute(
+                _KLAIM, {"user_id": user_id, "tugas": tugas.nama, "for_date": for_date}
+            )
+            if klaim.first() is None:  # pekerja lain lebih dulu — dan sudah commit
+                return False
+            await tugas.kerjakan(conn, user_id, for_date)
+    except Exception:
+        log.exception("terjadwal.gagal", tugas=tugas.nama, user_id=str(user_id))
+        return False
+    return True
