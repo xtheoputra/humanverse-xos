@@ -11,7 +11,16 @@ dan grup konsumen yang membaca isi event di bawah RLS pemiliknya (3.3).
 Berkas ini satu-satunya pintu keluar modul (spec/06 aturan 1).
 """
 
-from .kontrak import REGISTRY, SUMBER, EventTidakSah, Sumber, payload_sah
+from .kontrak import (
+    ADMISI,
+    REGISTRY,
+    SUMBER,
+    Admisi,
+    EventTidakSah,
+    Sumber,
+    admisi_sah,
+    payload_sah,
+)
 from .penerbit import HasilTerbit, terbitkan
 from .privasi import (
     BAGIAN_PRIVASI,
@@ -26,6 +35,7 @@ from .relay import LIHAT_BELAKANG_S, Relay, Rujukan, kunci_stream
 from .stream import UMUR_MATI_S, EventMasuk, KonsumenStream, Penangan, kunci_mati, pangkas_mati
 
 __all__ = [
+    "ADMISI",
     "BAGIAN_PRIVASI",
     "KATEGORI_EVENT",
     "LIHAT_BELAKANG_S",
@@ -33,6 +43,7 @@ __all__ = [
     "REGISTRY",
     "SUMBER",
     "UMUR_MATI_S",
+    "Admisi",
     "EventMasuk",
     "EventTidakSah",
     "HasilTerbit",
@@ -41,6 +52,7 @@ __all__ = [
     "Relay",
     "Rujukan",
     "Sumber",
+    "admisi_sah",
     "cari_penyelesaian",
     "hapus_riwayat",
     "hapus_riwayat_subjek",

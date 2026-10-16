@@ -299,6 +299,36 @@ Tiga ketidakcocokan lain **tetap terbuka**, dan masing-masing punya tugas di dra
 | pola sebagai tabel sendiri | `arch/02`: `patterns` | **K-34**: `memories(kind='behavioral')` | `spec/08` 9.1 |
 | domain penerbit `intelligence` | `arch/02`: tiga | `arch/07` §2: lima | V1 tidak menerbitkan event baru — pola & prediksi gagal uji admisi syarat 1 |
 
+#### E-250 — uji admisi `events` hanya separuh: `mood.logged` dari agent dan kunci jenis lain lolos
+
+Ditemukan saat menulis **spec/08 7.1** (16 Okt 2026). Uji admisi
+([`../arch/06`](../arch/06-DATA-ARCHITECTURE.md) §3) punya tiga syarat; V0 menegakkan syarat 3
+terhadap **empat sumber sekaligus** dan syarat 2 hanya sebagai bentuk `jenis:identitas`:
+
+| Yang lolos sebelum 7.1 | Kenapa salah |
+|---|---|
+| `mood.logged` bersumber `agent` | tak satu agent pun mencatat mood — sumbernya ada di `CHECK`, jadi E-3 diam |
+| `mood.logged` dengan kunci `goal:<id>:created` | lulus `jenis:identitas`, tetapi menelan mood berikutnya dengan kunci yang sama |
+| jenis baru di `REGISTRY` + baris ✅ spec/03 | syarat 1 (*pengguna mengenalinya*) tak pernah ditulis, apalagi diperiksa |
+
+✅ `events.ADMISI` per jenis (templat kunci + sumber sah), ditegakkan `terbitkan` sebelum basis
+data; tabel *Uji admisi per event* spec/03 memuat kalimat syarat 1; `test_admisi_event.py`
+menuntut registry = tabel = `ADMISI` = blok aturan 1.
+
+**Akibat pada mutasi lama:**
+* 🪦 3.1 *“kunci yang sama untuk JENIS lain ditelan”* — **dipensiunkan, ekuivalen**: dua jenis
+  kini hanya berbagi kunci bila templatnya sama, dan satu-satunya pasangan (`habit.completed` ·
+  `habit.skipped`) tak pernah berpayload sama. Pemeriksaan `event_type` di penerbit dibiarkan
+  sebagai lapis kedua; kasus ujinya kini menuntut penolakan **admisi**.
+* 🔁 E-3 *“`sensor` sampai ke basis data”* — **diam** sesudah 7.1, karena admisi per jenis
+  menolak `sensor` lebih dulu. Pemeriksaan empat-sumber di penerbit **dihapus** (selalu tercakup:
+  sumber per jenis ⊆ `SUMBER`, dijaga `Admisi.__post_init__`); mutasinya diarahkan ke pemeriksaan
+  sumber per jenis — alasannya tetap `IntegrityError` dari `CHECK`.
+
+> 🔴 Pola yang sama dengan E-231 · E-247 · E-248: penjaga BARU mengubah apa yang dibuktikan
+> mutasi LAMA. Ditangkap karena 28 mutasi yang menyentuh berkas event dijalankan ulang, bukan
+> hanya 6 mutasi 7.1.
+
 
 > **B2 lensa buta = E-236 lensa kontrak** (check-in yang diganti tanpa metrik meninggalkan human
 > state lama): kode E-236 dipakai, uji dan mutasi B2 disimpan.

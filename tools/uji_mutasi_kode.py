@@ -3449,10 +3449,11 @@ MUTASI: list[Mutasi] = [
         "E-3",
         "uji admisi tidak memeriksa sumber — `sensor` sampai ke basis data",
         [
+            # sejak spec/08 7.1 sumber diperiksa PER JENIS di uji admisi (kontrak.py)
             Sunting(
-                f"{MODUL}/events/penerbit.py",
-                "    if source not in SUMBER:",
-                '    if source not in SUMBER | {"sensor"}:',
+                f"{MODUL}/events/kontrak.py",
+                "    if source not in admisi.sumber:",
+                '    if source not in admisi.sumber | {"sensor"}:',
             )
         ],
         _pytest(f"{UJI_EVENT}::test_uji_admisi_menolak_sebelum_menyentuh_basis_data"),
@@ -4687,22 +4688,99 @@ MUTASI: list[Mutasi] = [
         harus_memuat="DID NOT RAISE",
         kelompok="db",
     ),
+    # 🪦 Mutasi 3.1 *"kunci yang sama untuk JENIS lain (dilewati → dicabut) ditelan"*
+    # (hapus `lama.event_type == event_type`) DIPENSIUNKAN di spec/08 7.1 — EKUIVALEN:
+    # sejak uji admisi per jenis, dua jenis hanya berbagi kunci bila templatnya sama, dan
+    # satu-satunya pasangan (`habit.completed` · `habit.skipped`) tak pernah berpayload sama
+    # (`status` wajib di satu, ditolak di yang lain). Kasus "dicabut" kini ditolak ADMISI —
+    # mutasi 7.1 di bawah yang membuktikannya.
     Mutasi(
-        "3.1",
-        "kunci yang sama untuk JENIS lain (dilewati → dicabut) ditelan",
+        "7.1",
+        "penerbit tidak menjalankan uji admisi per jenis",
         [
             Sunting(
                 f"{MODUL}/events/penerbit.py",
-                "        lama.event_type == event_type"
-                + NL
-                + "        and lama.subject_type == subject_type"
-                + NL,
-                "        lama.subject_type == subject_type" + NL,
+                "    admisi_sah(event_type, idempotency_key, source)" + NL,
+                "",
             )
         ],
-        _pytest(f"{UJI_EVENT}::test_kunci_sama_untuk_subjek_atau_jenis_lain_ditolak_keras"),
+        _pytest(
+            "tests/unit/test_admisi_event.py::test_penerbit_menolak_sebelum_menyentuh_basis_data"
+        ),
+        harus_memuat="penerbit menyentuh basis data sebelum uji admisi",
+    ),
+    Mutasi(
+        "7.1",
+        "jenis baru masuk registry tanpa baris uji admisi spec/03",
+        [
+            Sunting(
+                f"{MODUL}/events/kontrak.py",
+                '    "checkin.logged": (1, CheckinDicatat),' + NL + "}",
+                '    "checkin.logged": (1, CheckinDicatat),'
+                + NL
+                + '    "journal.updated": (1, JurnalDibuat),'
+                + NL
+                + "}",
+            )
+        ],
+        _pytest(
+            "tests/unit/test_admisi_event.py::test_tiap_jenis_registry_punya_baris_admisi_dan_sebaliknya"
+        ),
+        harus_memuat="terbit tanpa baris admisi",
+    ),
+    Mutasi(
+        "7.1",
+        "syarat 1 kosong — jenis tanpa kalimat yang dikenali pengguna",
+        [
+            Sunting(
+                "spec/03-EVENT-CONTRACTS.md",
+                "| *“Anda menulis jurnal 240 kata”* |",
+                "| — |",
+            )
+        ],
+        _pytest("tests/unit/test_admisi_event.py::test_syarat_1_kalimat_yang_dikenali_pengguna"),
+        harus_memuat="kalimat syarat 1 kosong",
+    ),
+    Mutasi(
+        "7.1",
+        "templat kunci di kode menyimpang dari spec/03",
+        [
+            Sunting(
+                f"{MODUL}/events/kontrak.py",
+                '"goal.created": Admisi("goal:<goal_id>:created", _APP),',
+                '"goal.created": Admisi("goal:<goal_id>", _APP),',
+            )
+        ],
+        _pytest(
+            "tests/unit/test_admisi_event.py::test_syarat_2_kunci_sama_di_aturan_1_tabel_dan_kode"
+        ),
+        harus_memuat="templat idempotency_key berbeda",
+    ),
+    Mutasi(
+        "7.1",
+        "sumber sah di kode melebar dari spec/03 (mood bersumber agent)",
+        [
+            Sunting(
+                f"{MODUL}/events/kontrak.py",
+                '"mood.logged": Admisi("mood:<mood_id>", _APP),',
+                '"mood.logged": Admisi("mood:<mood_id>", frozenset({"app", "agent"})),',
+            )
+        ],
+        _pytest("tests/unit/test_admisi_event.py::test_syarat_3_sumber_sama_di_tabel_dan_kode"),
+        harus_memuat="sumber sah tabel ≠ kode",
+    ),
+    Mutasi(
+        "7.1",
+        "kunci hanya dicocokkan AWALANNYA dengan templat",
+        [
+            Sunting(
+                f"{MODUL}/events/kontrak.py",
+                "    if not admisi.pola.fullmatch(idempotency_key):",
+                "    if not admisi.pola.match(idempotency_key):",
+            )
+        ],
+        _pytest("tests/unit/test_admisi_event.py::test_kunci_atau_sumber_yang_tidak_sah_ditolak"),
         harus_memuat="DID NOT RAISE",
-        kelompok="db",
     ),
     Mutasi(
         "3.1",

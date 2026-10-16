@@ -71,6 +71,18 @@ modul — **tidak** ditambahkan ke registry event.
 
 > **7.1 sebelum event baru apa pun, 7.2 sebelum proyeksi baru apa pun** — gerbang
 > lebih dulu daripada yang dijaganya ([`../arch/10`](../arch/10-URUTAN-IMPLEMENTASI.md) §1).
+>
+> 🔨 **Sprint 7 dikodekan mulai 16 Okt 2026** — branch `v1/sprint-7-gerbang`, satu commit per
+> tugas (**K-18**). Keadaan tiap "Selesai bila", tanpa dibulatkan:
+>
+> | | Dibuktikan | Yang BELUM |
+> |---|---|---|
+> | 7.1 | `events.ADMISI` per jenis: templat `idempotency_key` (syarat 2) + sumber sah (syarat 3),
+> ditegakkan `terbitkan` **sebelum** basis data; tabel *Uji admisi per event*
+> [`03`](03-EVENT-CONTRACTS.md) memuat kalimat syarat 1. `tests/unit/test_admisi_event.py`:
+> registry = tabel = `ADMISI` = blok aturan 1. 6 mutasi baru berbunyi; 1 mutasi lama dipensiunkan
+> (ekuivalen), 1 diarahkan ulang (**E-250**) | syarat 1 dibuktikan **ada & khas**, bukan
+> **benar** — apakah kalimatnya sungguh kejadian tetap dinilai HUMAN REVIEW |
 
 ## Sprint 8 — Behavior Analytics
 

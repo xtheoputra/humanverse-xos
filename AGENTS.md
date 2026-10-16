@@ -80,6 +80,7 @@ tools/                 pemeriksa dokumen, uji mutasi, CI lokal
 | citra & aksi CI dipatok digest/SHA | `test_rantai_pasok.py` | patok ke digest (`docker buildx imagetools inspect`) / SHA commit |
 | tiap `CREATE TABLE` membawa `@retention` · `@who-can-set` · `@on-delete` + kolom `data_subject` | `periksa_dokumen.py` P-1 · P-2 | lihat [`arch/06`](arch/06-DATA-ARCHITECTURE.md) §5 §6 |
 | migrasi == `spec/01` | `tests/integration/test_migrasi.py` | ubah `spec/01` dan migrasinya **bersama** |
+| jenis event baru = uji admisi lengkap (arch/06 §3, spec/08 7.1) — kalimat *“Anda …”* · templat kunci · sumber sah **per jenis** | `test_admisi_event.py` + `terbitkan` menolak saat terbit | baris *Uji admisi per event* `spec/03` **dan** `events.ADMISI` **bersama** registry; hasil intelligence (pola, prediksi) bukan event |
 | cakupan uji ≥ 70 % | `pytest --cov` | tulis ujinya, jangan turunkan ambangnya |
 | **data tiap pengguna milik pribadinya** (H-27) — RLS di tiap tabel milik pengguna, FK `(induk_id, user_id)`, hak akses `hvx_app` sesempit spec/01 §10 | `tests/integration/test_kepemilikan_data.py` | tabel baru: `user_id` + `ENABLE ROW LEVEL SECURITY` + kebijakan §11 + `GRANT` §10 + FK komposit ke induk ber-`user_id` — di `spec/01` **dan** migrasinya |
 | api tidak pernah tersambung sebagai superuser, pemilik tabel, atau `BYPASSRLS` (B-40) | `platform.pastikan_peran_aplikasi` + `test_aplikasi_hidup.py` | api memakai peran anggota `hvx_app`; migrasi memakai `HVX_MIGRATION_DATABASE_URL` |

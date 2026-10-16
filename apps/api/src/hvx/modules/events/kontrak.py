@@ -19,6 +19,8 @@ diam-diam dari dokumennya.
 
 from __future__ import annotations
 
+import re
+from dataclasses import dataclass
 from datetime import date
 from typing import Annotated, Any, Literal
 from uuid import UUID
@@ -104,8 +106,71 @@ REGISTRY: dict[str, tuple[int, type[_Payload]]] = {
 }
 
 
+@dataclass(frozen=True)
+class Admisi:
+    """Uji admisi `events` (arch/06 §3) untuk SATU jenis — bagian yang bisa dibaca mesin.
+
+    Syarat 1 (*pengguna bisa mengenalinya*) ditulis sebagai kalimat di tabel *Uji admisi
+    per event* spec/03; syarat 2 dan 3 di sini, supaya penerbit menegakkannya saat terbit:
+
+    * `kunci` — templat `idempotency_key` aturan 1 spec/03 (`<…>` = identitas). Kunci yang
+      berbentuk lain bukan *“pengiriman ulang berarti hal yang sama”*: `goal:<id>:created`
+      untuk `mood.logged` lolos `jenis:identitas`, tetapi menelan mood berikutnya.
+    * `sumber` — himpunan `source` yang sah untuk jenis ini, bagian dari `SUMBER`.
+
+    🔴 Sebelum V1 7.1 hanya syarat 3 yang dijaga (E-3), dan hanya terhadap empat sumber
+    sekaligus — `mood.logged` bersumber `agent` lolos padahal tak satu agent pun mencatat
+    mood. Jenis baru yang ditambahkan ke `REGISTRY` tanpa baris di sini ditolak saat
+    terbit, dan `tests/unit/test_admisi_event.py` menuntut tabel ini sama dengan spec/03.
+    """
+
+    kunci: str
+    sumber: frozenset[str]
+
+    def __post_init__(self) -> None:
+        if not self.sumber or not self.sumber <= SUMBER:
+            raise ValueError(f"sumber admisi di luar spec/03: {sorted(self.sumber)}")
+
+    @property
+    def pola(self) -> re.Pattern[str]:
+        """Templat → regex: bagian harfiah wajib sama, tiap `<…>` satu identitas."""
+        bagian = re.split(r"<[a-z_]+>", self.kunci)
+        return re.compile(_IDENTITAS.join(re.escape(b) for b in bagian))
+
+
+_IDENTITAS = "[A-Za-z0-9:._+-]+"
+_APP = frozenset({"app"})
+
+# event_type → uji admisi. Sama dengan aturan 1 + tabel *Uji admisi per event* spec/03.
+ADMISI: dict[str, Admisi] = {
+    "habit.created": Admisi("habit:<habit_id>:created", _APP),
+    # habit-agent menandai selesai lewat tool `habit.complete` (E-205: event bersumber agent)
+    "habit.completed": Admisi("habit-completion:<completion_id>", frozenset({"app", "agent"})),
+    "habit.skipped": Admisi("habit-completion:<completion_id>", frozenset({"app", "agent"})),
+    "habit.completion_retracted": Admisi("habit-completion:<completion_id>:retracted", _APP),
+    "mood.logged": Admisi("mood:<mood_id>", _APP),
+    "journal.created": Admisi("journal:<journal_id>", _APP),
+    "goal.created": Admisi("goal:<goal_id>:created", _APP),
+    "goal.completed": Admisi("goal:<goal_id>:completed:<achieved_at>", _APP),
+    "checkin.logged": Admisi("checkin:<for_date>:<updated_at>", _APP),
+}
+
+
 class EventTidakSah(ValueError):
     """Event yang tidak lulus uji admisi — ditolak sebelum menyentuh basis data."""
+
+
+def admisi_sah(event_type: str, idempotency_key: str, source: str) -> None:
+    """Syarat 2 dan 3 uji admisi untuk jenis ini — atau `EventTidakSah`.
+
+    Pesan galat tidak mengutip kuncinya: kunci memuat id dan tanggal milik pengguna."""
+    admisi = ADMISI.get(event_type)
+    if admisi is None:
+        raise EventTidakSah(f"event_type tanpa uji admisi spec/03: {event_type!r}")
+    if source not in admisi.sumber:
+        raise EventTidakSah(f"source {source!r} tidak sah untuk {event_type} (spec/03)")
+    if not admisi.pola.fullmatch(idempotency_key):
+        raise EventTidakSah(f"idempotency_key {event_type} wajib `{admisi.kunci}` (spec/03)")
 
 
 def payload_sah(event_type: str, payload: dict[str, Any]) -> tuple[int, dict[str, Any]]:

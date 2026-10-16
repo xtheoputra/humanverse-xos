@@ -147,6 +147,45 @@ menyusul — supaya nama dan bentuknya tidak berubah nanti.
 
 ---
 
+## Uji admisi per event — [`../arch/06`](../arch/06-DATA-ARCHITECTURE.md) §3
+
+Satu baris per event yang **diterbitkan** (tanda ✅ di atas). Sebuah jenis
+tidak boleh masuk registry `events/kontrak.py` tanpa baris lengkap di sini
+(**spec/08 7.1**) — `tests/unit/test_admisi_event.py` membaca tabel ini dan
+menuntutnya sama dengan registry dan dengan `events.ADMISI`:
+
+* **Dikenali pengguna** — syarat 1: kalimat yang akan **dikenali** pengguna
+  kalau ditunjukkan kepadanya. Kalimatnya tidak harus ditampilkan; ia bukti
+  bahwa yang dicatat adalah *kejadian*, bukan *pengukuran*. Jenis yang tidak
+  bisa ditulis kalimatnya bukan event.
+* **Kunci** — syarat 2: templat aturan 1 di atas.
+* **Sumber sah** — syarat 3, **per jenis**: bagian dari `CHECK events.source`
+  yang benar-benar menerbitkan jenis ini. Penerbit menolak sumber lain.
+
+| Event | Dikenali pengguna | Kunci | Sumber sah |
+|---|---|---|---|
+| `habit.created` | *“Anda membuat habit «Lari pagi»”* | `habit:<habit_id>:created` | `app` |
+| `habit.completed` | *“Anda menyelesaikan «Lari pagi» untuk 3 Sep”* | `habit-completion:<completion_id>` | `app` · `agent` |
+| `habit.skipped` | *“Anda melewatkan «Lari pagi» pada 3 Sep”* | `habit-completion:<completion_id>` | `app` · `agent` |
+| `habit.completion_retracted` | *“Anda membatalkan catatan «Lari pagi» 3 Sep”* | `habit-completion:<completion_id>:retracted` | `app` |
+| `mood.logged` | *“Anda mencatat mood 2 (cemas) pukul 21.10”* | `mood:<mood_id>` | `app` |
+| `journal.created` | *“Anda menulis jurnal 240 kata”* | `journal:<journal_id>` | `app` |
+| `goal.created` | *“Anda menetapkan goal «Lari 10 km»”* | `goal:<goal_id>:created` | `app` |
+| `goal.completed` | *“Anda mencapai «Lari 10 km» setelah 41 hari”* | `goal:<goal_id>:completed:<achieved_at>` | `app` |
+| `checkin.logged` | *“Anda check-in 3 Sep: energi 4, fokus 3”* | `checkin:<for_date>:<updated_at>` | `app` |
+
+> `agent` hanya untuk penyelesaian habit — tool penyelesaian habit milik habit-agent adalah satu-satunya
+> tool V0 yang menulis kejadian atas nama pengguna, dan tulisannya bersumber
+> `agent` (**E-205**). `integration` dan `backfill` sah di `CHECK`, tetapi
+> belum ada penerbitnya: sumber baru untuk satu jenis ditambahkan di baris ini
+> **bersama** penerbitnya.
+>
+> 🔑 **Keluaran intelligence bukan event** (spec/08): pola dan prediksi tidak
+> lulus syarat 1 — pengguna tidak *melakukan* “pola terdeteksi” — maka tidak
+> ada baris untuknya di sini.
+
+---
+
 ## Consumer V0
 
 | Consumer | Mendengarkan | Wajib? |

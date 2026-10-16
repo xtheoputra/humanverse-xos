@@ -132,14 +132,16 @@ async def test_kunci_sama_untuk_kejadian_lain_ditolak_keras(
 
 
 @pytest.mark.parametrize(
-    "lain",
+    ("lain", "alasan"),
     [
-        {"subject_id": UUID("00000000-0000-4000-8000-000000000002")},
-        {"event_type": "habit.completion_retracted"},  # payload yang SAMA sah bagi keduanya
+        ({"subject_id": UUID("00000000-0000-4000-8000-000000000002")}, "kejadian yang berbeda"),
+        # payload yang SAMA sah bagi keduanya. Sejak spec/08 7.1 kunci `habit-completion:<id>`
+        # bukan templat `habit.completion_retracted` — ditolak uji admisi, sebelum basis data
+        ({"event_type": "habit.completion_retracted"}, "idempotency_key habit.completion_ret"),
     ],
 )
 async def test_kunci_sama_untuk_subjek_atau_jenis_lain_ditolak_keras(
-    engine: AsyncEngine, v0_bersama: BasisDataV0, lain: dict[str, Any]
+    engine: AsyncEngine, v0_bersama: BasisDataV0, lain: dict[str, Any], alasan: str
 ) -> None:
     """Payload yang sama tidak cukup untuk menelan: subjek lain, atau jenis lain (dilewati
     lalu DICABUT), adalah kejadian lain — tinjauan penegak buta Sprint 3."""
@@ -154,7 +156,7 @@ async def test_kunci_sama_untuk_subjek_atau_jenis_lain_ditolak_keras(
     }
     await _terbit(engine, uid, **isi)
 
-    with pytest.raises(events.EventTidakSah, match="kejadian yang berbeda"):
+    with pytest.raises(events.EventTidakSah, match=alasan):
         await _terbit(engine, uid, **{**isi, **lain})
 
     assert len(_baris(v0_bersama, uid)) == 1
@@ -199,6 +201,9 @@ async def test_recorded_at_saat_event_masuk_bukan_awal_transaksinya(
         {"occurred_at": datetime(2026, 9, 24, 6, 30)},
         {"idempotency_key": "tanpa-jenis"},
         {"subject_type": "Habit"},
+        # spec/08 7.1 — uji admisi PER JENIS: kunci & sumber yang sah untuk jenis lain
+        {"idempotency_key": "goal:x:created"},
+        {"source": "agent"},
     ],
 )
 async def test_uji_admisi_menolak_sebelum_menyentuh_basis_data(

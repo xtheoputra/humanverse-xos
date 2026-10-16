@@ -25,7 +25,7 @@ from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncConnection
 
 from . import repository
-from .kontrak import SUMBER, EventTidakSah, Sumber, payload_sah
+from .kontrak import EventTidakSah, Sumber, admisi_sah, payload_sah
 
 # `habit-completion:<uuid>` · `goal:<uuid>:created` · `checkin:2026-09-24:<sidik>`
 _POLA_KUNCI = re.compile(r"^[a-z][a-z0-9-]{0,39}:[A-Za-z0-9:._+-]{1,200}$")
@@ -54,8 +54,9 @@ async def terbitkan(
         raise TypeError(f"user_id wajib uuid.UUID, bukan {type(user_id).__name__}")
     if occurred_at.utcoffset() is None:
         raise EventTidakSah("occurred_at wajib berzona waktu (spec/03: UTC)")
-    if source not in SUMBER:
-        raise EventTidakSah(f"source di luar spec/03: {source!r}")
+    # arch/06 §3 syarat 2 · 3 per jenis — sumber per jenis selalu bagian dari `SUMBER`
+    # (E-3), jadi pemeriksaan empat sumber sekaligus yang dulu di sini tercakup olehnya.
+    admisi_sah(event_type, idempotency_key, source)
     if not _POLA_KUNCI.fullmatch(idempotency_key):
         raise EventTidakSah("idempotency_key wajib `jenis:identitas` (spec/03 aturan 1)")
     if subject_type is not None and not _POLA_SUBJEK.fullmatch(subject_type):
