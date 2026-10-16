@@ -30,7 +30,7 @@ from __future__ import annotations
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, cast
+from typing import Any, Literal, cast
 from uuid import UUID
 
 import structlog
@@ -206,3 +206,73 @@ class KonsumenStream:
         # Event yang sudah tidak ada (akun dihapus) juga selesai: tidak ada yang diulang.
         await self._r.xack(self.stream, self.grup, id_pesan)
         return 1 if baris is not None else 0
+
+
+# ─────────────────────────────────────────── putar ulang stream mati (spec/08 7.4) ──
+
+HasilPutarUlang = Literal["diputar", "tidak_ada", "grup_tak_dikenal", "event_hilang", "gagal"]
+
+
+async def daftar_mati(
+    redis: Redis, awalan: str, *, batas: int = 100
+) -> list[tuple[str, dict[str, Any]]]:
+    """Entri stream mati, terlama dulu — `(id entri, rujukan)`; rujukan tidak memuat isi event."""
+    entri = cast(
+        "list[tuple[str, dict[str, str]]]",
+        await redis.xrange(kunci_mati(awalan), count=max(1, min(batas, 1000))),
+    )
+    return [(str(i), dict(isi)) for i, isi in entri]
+
+
+async def putar_ulang_mati(
+    engine: AsyncEngine,
+    redis: Redis,
+    awalan: str,
+    id_mati: str,
+    konsumen: dict[str, KonsumenStream],
+) -> HasilPutarUlang:
+    """Serahkan SATU entri stream mati kembali ke penangan grupnya — spec/08 7.4.
+
+    Stream mati (V0 3.3) menampung event yang penangannya gagal `maks_kirim` kali; sampai
+    7.4 tidak ada jalan mengembalikannya, jadi konsumen yang dibetulkan tidak pernah
+    melihat event yang dulu menjatuhkannya.
+
+    * **Satu pemutar menang.** Entri diklaim dengan `XDEL` lebih dulu — pemutar kedua
+      (dua operator, atau perintah yang diulang) mendapati `tidak_ada`: efeknya tidak
+      ganda. Penangan yang gagal mengembalikan entrinya ke stream mati (id baru), jadi
+      tidak ada yang hilang.
+    * **Isi dibaca ulang dari PostgreSQL, di bawah RLS pemiliknya** — seperti aliran
+      biasa. Event yang sudah tidak ada (akunnya dihapus, atau kategorinya dihapus di
+      Privacy Center) TIDAK diputar: `event_hilang`, dan entrinya dibuang.
+    * **Grup yang tidak dirakit lagi** (konsumen dipensiunkan) → `grup_tak_dikenal`,
+      entrinya dibiarkan untuk diperiksa.
+    """
+    kunci = kunci_mati(awalan)
+    # klien Redis proses ini `decode_responses=True` (platform.buat_redis) — teks, bukan bytes
+    entri = cast(
+        "list[tuple[str, dict[str, str]]]",
+        await redis.xrange(kunci, min=id_mati, max=id_mati, count=1),
+    )
+    if not entri:
+        return "tidak_ada"
+    isi: dict[str, str] = dict(entri[0][1])
+    k = konsumen.get(str(isi.get("grup")))
+    if k is None:
+        return "grup_tak_dikenal"
+    if not await redis.xdel(kunci, id_mati):
+        return "tidak_ada"  # pemutar lain lebih dulu
+    user_id = UUID(isi["user_id"])
+    try:
+        async with platform.transaksi_pengguna(engine, user_id) as conn:
+            await platform.kunci_turunan(conn, user_id)
+            baris = (await conn.execute(_MENURUT_ID, {"id": UUID(isi["id"])})).first()
+            if baris is None:
+                return "event_hilang"
+            if baris.event_type in k.jenis:
+                await k.tangani(conn, EventMasuk(**baris._asdict()))
+    except Exception:
+        await redis.xadd(kunci, cast("dict[Any, Any]", isi))
+        log.exception("konsumen.putar_ulang_gagal", grup=k.grup, mati=id_mati)
+        return "gagal"
+    log.info("konsumen.putar_ulang", grup=k.grup, mati=id_mati)
+    return "diputar"

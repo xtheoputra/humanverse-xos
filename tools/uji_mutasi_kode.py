@@ -4943,6 +4943,71 @@ MUTASI: list[Mutasi] = [
         harus_memuat="Bukan/Zona",
         kelompok="db",
     ),
+    # ── spec/08 7.4 putar ulang stream mati ──
+    Mutasi(
+        "7.4",
+        "putar ulang tanpa klaim XDEL — pemutar serentak semuanya menjalankan penangan",
+        [
+            Sunting(
+                f"{MODUL}/events/stream.py",
+                '    if not await redis.xdel(kunci, id_mati):\n        return "tidak_ada"  # pemutar lain lebih dulu\n',
+                "    await redis.xdel(kunci, id_mati)\n",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_stream_mati.py::test_memutar_ulang_dua_kali_tidak_menggandakan_efek"
+        ),
+        harus_memuat="efek putar ulang tergandakan",
+        kelompok="db",
+    ),
+    Mutasi(
+        "7.4",
+        "event yang sudah tidak ada tidak dibedakan — dilaporkan gagal, bukan hilang",
+        [
+            Sunting(
+                f"{MODUL}/events/stream.py",
+                '            if baris is None:\n                return "event_hilang"\n',
+                "",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_stream_mati.py::test_event_milik_akun_yang_terhapus_tidak_diputar"
+        ),
+        harus_memuat="'event_hilang'",
+        kelompok="db",
+    ),
+    Mutasi(
+        "7.4",
+        "penangan yang masih gagal membuang entrinya",
+        [
+            Sunting(
+                f"{MODUL}/events/stream.py",
+                '        await redis.xadd(kunci, cast("dict[Any, Any]", isi))\n',
+                "",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_stream_mati.py::test_penangan_yang_masih_gagal_mengembalikan_entrinya"
+        ),
+        harus_memuat="entri yang gagal diputar HILANG",
+        kelompok="db",
+    ),
+    Mutasi(
+        "7.4",
+        "alat operator tidak merakit konsumen pekerja",
+        [
+            Sunting(
+                "apps/api/src/hvx/stream_mati.py",
+                "        konsumen = {k.grup: k for k in pekerja.rakit_konsumen(engine, redis, settings)}\n",
+                "        konsumen: dict[str, events.KonsumenStream] = {}\n",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_stream_mati.py::test_alat_operator_memutar_ulang_dengan_konsumen_pekerja"
+        ),
+        harus_memuat="grup_tak_dikenal",
+        kelompok="db",
+    ),
     Mutasi(
         "3.1",
         "recorded_at = now() — membeku di awal transaksi, relay melompatinya",

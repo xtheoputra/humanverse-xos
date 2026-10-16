@@ -96,6 +96,13 @@ modul — **tidak** ditambahkan ke registry event.
 > sekali · tiga pekerja serentak · kerja gagal membatalkan klaim · dua zona UTC+14/−11 · ganti zona
 > tanpa hari terlewat/ganda. 7 mutasi baru; 72 mutasi terkait berbunyi | `TUGAS_TERJADWAL` masih
 > **kosong** — pengisinya 8.1 · 10.1 · 11.4; pekerja yang mati > 2 hari tidak menyusulkan hari lebih tua |
+> | 7.4 | `events.putar_ulang_mati` + alat operator `python -m hvx.stream_mati daftar · putar <id>`
+> (konsumen dari `rakit_konsumen` pekerja): klaim `XDEL` lebih dulu, isi dibaca ulang di bawah RLS,
+> gagal → entri kembali. `test_stream_mati.py` 6 uji — tiga pemutar serentak dengan `XDEL`
+> tertunda (balapan yang dipaksa terjadi), akun terhapus → `event_hilang`. 4 mutasi baru; 20
+> mutasi terkait berbunyi | memutar ulang **semua** entri sekaligus tidak ada — sengaja per id,
+> sesudah penangannya dibetulkan; pekerja yang mati di antara `XDEL` dan commit kehilangan
+> entri itu (event-nya tetap di `events`; proyeksi bisa dibangun ulang, 7.2) |
 
 ## Sprint 8 — Behavior Analytics
 

@@ -210,6 +210,14 @@ menuntutnya sama dengan registry dan dengan `events.ADMISI`:
 > Habit streak dengan bawaan *boleh gagal*: basis data yang mati ±3 menit membuang event
 > ke stream mati, dan proyeksinya diam-diam berbeda dari yang dibangun ulang dari
 > `events` (5.1). Konsumen wajib karena itu juga wajib idempoten.
+>
+> 🔧 **Stream mati bisa diputar ulang (spec/08 7.4).** Alat operator `stream_mati` di paket
+> `hvx` (`python -m …stream_mati daftar`) menampilkan entri (id · grup · jenis — tanpa isi);
+> `… putar <id>` menyerahkannya kembali ke penangan grupnya yang dirakit pekerja (fungsi
+> `putar_ulang_mati` modul `events`). Entri diklaim dengan
+> `XDEL` lebih dulu — satu pemutar menang, efeknya tidak ganda; isi dibaca ulang di bawah RLS
+> pemiliknya, jadi event akun atau kategori yang sudah dihapus **tidak** diputar
+> (`event_hilang`); penangan yang masih gagal mengembalikan entrinya.
 
 > 🔧 **Bentuk V0-nya (spec/07 3.3 · 3.6, K-25).** Tabel `events` adalah kotak
 > keluar: relay di proses pekerja (`hvx/pekerja.py`) menyalin **rujukan** tiap event yang

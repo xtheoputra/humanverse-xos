@@ -32,7 +32,17 @@ from .privasi import (
 )
 from .proyeksi import cari_penyelesaian, riwayat_habit, untuk_proyeksi
 from .relay import LIHAT_BELAKANG_S, Relay, Rujukan, kunci_stream
-from .stream import UMUR_MATI_S, EventMasuk, KonsumenStream, Penangan, kunci_mati, pangkas_mati
+from .stream import (
+    UMUR_MATI_S,
+    EventMasuk,
+    HasilPutarUlang,
+    KonsumenStream,
+    Penangan,
+    daftar_mati,
+    kunci_mati,
+    pangkas_mati,
+    putar_ulang_mati,
+)
 
 __all__ = [
     "ADMISI",
@@ -46,6 +56,7 @@ __all__ = [
     "Admisi",
     "EventMasuk",
     "EventTidakSah",
+    "HasilPutarUlang",
     "HasilTerbit",
     "KonsumenStream",
     "Penangan",
@@ -54,6 +65,7 @@ __all__ = [
     "Sumber",
     "admisi_sah",
     "cari_penyelesaian",
+    "daftar_mati",
     "hapus_riwayat",
     "hapus_riwayat_subjek",
     "jenis_untuk",
@@ -61,6 +73,7 @@ __all__ = [
     "kunci_stream",
     "pangkas_mati",
     "payload_sah",
+    "putar_ulang_mati",
     "riwayat_habit",
     "terbitkan",
     "untuk_proyeksi",
