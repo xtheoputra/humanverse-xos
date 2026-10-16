@@ -102,7 +102,9 @@ modul — **tidak** ditambahkan ke registry event.
 > tertunda (balapan yang dipaksa terjadi), akun terhapus → `event_hilang`. 4 mutasi baru; 20
 > mutasi terkait berbunyi | memutar ulang **semua** entri sekaligus tidak ada — sengaja per id,
 > sesudah penangannya dibetulkan; pekerja yang mati di antara `XDEL` dan commit kehilangan
-> entri itu (event-nya tetap di `events`; proyeksi bisa dibangun ulang, 7.2) |
+> entri itu — event-nya tetap di `events`, tetapi dari tiga grup yang punya stream mati
+> (yang *boleh gagal*) hanya `human-state` proyeksi yang bisa dibangun ulang (7.2);
+> `rekomendasi` dan `memori` `BUKAN_PROYEKSI` — efeknya hilang (🔧 tinjauan kontrak S7, K6) |
 
 ## Sprint 8 — Behavior Analytics
 
