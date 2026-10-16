@@ -59,6 +59,10 @@
   ┌──────────────┐        ┌────────────┐
   │ human_states │        │ audit_logs │  user_id TANPA FK (disengaja)
   └──────────────┘        └────────────┘
+
+  ┌────────────────┐  V1 (08 7.3): klaim tugas terjadwal (user_id, task, for_date)
+  │ scheduled_runs │  FK ke users saja — tak menunjuk baris lain
+  └────────────────┘
 ```
 
 ---
@@ -73,7 +77,7 @@
 | **D. Tabel domain adalah proyeksi** | `habit_completions` dll. boleh dibangun ulang dari `events`. Kalau keduanya berbeda, **event yang benar**. |
 | **E. Agent tidak memiliki data** | Agent hanya menulis lewat `agent_runs`, `recommendations`, dan `memories`. Tidak ada agent yang menulis langsung ke `goals`, `habits`, atau `journal_entries`. |
 | **F. Audit tidak menyimpan isi** | `audit_logs.metadata` boleh memuat id dan nama aksi, **tidak pernah** isi jurnal, isi pesan, atau isi memori. |
-| **G. Baris hanya terlihat oleh pemiliknya** 🆕 | Peran aplikasi hanya membaca, mengubah, dan menulis baris pengguna yang sedang dilayani transaksi — RLS di 21 tabel ([`01`](01-DATABASE-SCHEMA.md) §11). Pemilik, 17 Sep 2026 (**H-27**): *“data masing-masing pengguna milik pribadi user.”* |
+| **G. Baris hanya terlihat oleh pemiliknya** 🆕 | Peran aplikasi hanya membaca, mengubah, dan menulis baris pengguna yang sedang dilayani transaksi — RLS di 22 tabel, 21 V0 + `scheduled_runs` V1 ([`01`](01-DATABASE-SCHEMA.md) §11). Pemilik, 17 Sep 2026 (**H-27**): *“data masing-masing pengguna milik pribadi user.”* |
 | **H. Anak dan induk satu pemilik** 🆕 | FK antara dua tabel milik pengguna selalu **pasangan** `(induk_id, user_id)` — baris anak milik B tidak bisa menunjuk induk milik A (**B-41**). RLS saja tidak cukup: pemeriksaan FK PostgreSQL tidak menerapkan RLS. |
 | **I. Aplikasi bukan pemilik tabel** 🆕 | api tersambung sebagai anggota `hvx_app` — bukan superuser, bukan pemilik, tanpa `BYPASSRLS` — dan menolak mulai kalau tidak (**B-40**). Tanpa ini, G dan H hanya berlaku bagi yang mau mematuhinya. |
 

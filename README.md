@@ -125,7 +125,7 @@ alternatif versi gratis, jangan ada tagihan”* (**H-26**).
 
 | Lapis | Menjaga | Bukti mesin |
 |---|---|---|
-| **RLS** di 21 tabel | aplikasi yang melayani pengguna A **tidak bisa** membaca, mengubah, atau menulis baris pengguna B — bahkan kalau `WHERE user_id` terlupa; tanpa pengguna → nol baris | `test_kepemilikan_data.py` |
+| **RLS** di 22 tabel (21 V0 + `scheduled_runs` V1) | aplikasi yang melayani pengguna A **tidak bisa** membaca, mengubah, atau menulis baris pengguna B — bahkan kalau `WHERE user_id` terlupa; tanpa pengguna → nol baris | `test_kepemilikan_data.py` |
 | **FK komposit** — B-41 ✅ | baris anak milik B tidak bisa menunjuk induk milik A (11 relasi); menghapus induk tidak menyentuh baris orang lain | idem |
 | **peran aplikasi** — B-40 ✅ | api bukan superuser, bukan pemilik tabel, tanpa `BYPASSRLS`; audit & event hanya-tambah; api **menolak mulai** kalau perannya salah | idem + `test_aplikasi_hidup.py` |
 | **CI gratis** — H-26 | gerbang lokal menempelkan status `ci-lokal` ke PR; alur Actions hanya bisa dijalankan manual | `test_rantai_pasok.py` · `test_ci_lokal.py` |
@@ -587,7 +587,7 @@ pemilik** — sengaja di luar `docs/` supaya berkas naskah tetap murni.
 
 | Berkas | Isi |
 |---|---|
-| [`spec/01-DATABASE-SCHEMA.md`](spec/01-DATABASE-SCHEMA.md) | DDL PostgreSQL — **23 tabel**, tipe, PK, FK, index, constraint, prosedur hapus akun |
+| [`spec/01-DATABASE-SCHEMA.md`](spec/01-DATABASE-SCHEMA.md) | DDL PostgreSQL — **23 tabel V0 + 1 V1** (`scheduled_runs`), tipe, PK, FK, index, constraint, prosedur hapus akun |
 | [`spec/02-ERD.md`](spec/02-ERD.md) | Relasi + 6 aturan kepemilikan data |
 | [`spec/03-EVENT-CONTRACTS.md`](spec/03-EVENT-CONTRACTS.md) | Envelope, **versi · urutan · idempotensi**, 22 event, consumer |
 | [`spec/04-API-CONTRACTS.md`](spec/04-API-CONTRACTS.md) | Endpoint REST V0 + Privacy Center |

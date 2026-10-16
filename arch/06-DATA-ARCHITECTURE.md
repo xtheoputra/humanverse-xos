@@ -341,8 +341,8 @@ tanpa itu **tidak bisa melatih model apa pun** di Phase 5.
 | Kelas penyimpanan | **4**, dan uji admisinya mekanis (§2) |
 | `source='sensor'` di `events` | ❌ **sengaja tidak ada** |
 | Tabel tanpa `retention` | ditolak CI — [`11`](11-PENEGAKAN.md) P-1 |
-| Tabel tanpa `data_subject` | **NIHIL** — 23 dari 23 tabel V0, dipasang **K-16** 11 Sep 2026; ditolak CI — P-2 ✅ **jalan** |
-| Tabel tanpa tiga anotasi retensi | **NIHIL** — 23 dari 23; ditolak CI — P-1 ✅ **jalan** |
+| Tabel tanpa `data_subject` | **NIHIL** — 24 dari 24 (23 tabel V0, dipasang **K-16** 11 Sep 2026, + `scheduled_runs` V1); ditolak CI — P-2 ✅ **jalan** |
+| Tabel tanpa tiga anotasi retensi | **NIHIL** — 24 dari 24; ditolak CI — P-1 ✅ **jalan** |
 | `user_id` nullable tanpa penjaga | **NIHIL** — `audit_logs` memakai CHECK §6; ditolak CI — P-3 ✅ **jalan** |
 | Tabel `user_id NULL` | ditolak CI — P-3; kolomnya absen, bukan null |
 | Tabel `sensitivity ≥ 3` di luar vault | ditolak CI — P-4 |

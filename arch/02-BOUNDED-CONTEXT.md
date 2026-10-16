@@ -130,7 +130,7 @@ lengkap beserta larangannya di [`04`](04-DEPENDENCY-GRAPH.md).
 | | **`intelligence`** |
 |---|---|
 | menjawab | **apa yang disimpulkan tentang orang ini** |
-| memiliki tabel | `human_states` · `recommendations` · `recommendation_feedback` · `patterns` · `predictions` |
+| memiliki tabel | `human_states` · `recommendations` · `recommendation_feedback` · `patterns` · `predictions` · `scheduled_runs` (V1 7.3, **K-48** — jejak tugas malam) |
 | menerbitkan | `insight.*` · `recommendation.*` · `prediction.*` |
 | kata lokal | **`simulation`** = simulasi **perilaku** · **`planning`** = perencanaan **tugas** · **`registry`** = model registry |
 | 🛑 **TIDAK BOLEH** | bertindak. Ia mengeluarkan **usul berangka**; yang mengeksekusi `agents`, lewat gerbang |

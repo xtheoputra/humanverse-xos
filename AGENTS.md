@@ -56,7 +56,9 @@ Coding Agent → Implementation → Unit Test → Integration Test
 ```
 apps/api/src/hvx/
 ├── main.py            titik rakit — satu-satunya yang menyambung 12 modul
-├── pekerja.py         proses kedua: relay event → Redis Streams, konsumen, penyelaras memories → Qdrant
+├── pekerja.py         proses kedua: relay event → Redis Streams, konsumen, penyelaras memories → Qdrant,
+│                      sapuan hapus akun, tugas terjadwal per jam lokal (spec/08 7.3)
+├── stream_mati.py     alat operator pekerja: daftar · putar ulang stream mati per id (spec/08 7.4)
 └── modules/           spec/06 — satu tabel dimiliki tepat satu modul
     ├── platform/      config · db · redis · log · galat · batas laju · /health (tanpa aturan domain)
     ├── identity/      users · consents · permissions · audit_logs — sesi · sandi · izin · audit
