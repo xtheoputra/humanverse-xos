@@ -1,0 +1,41 @@
+# spec/05 — Empat agent V0. Membaca & menulis semua scope KECUALI journal_raw
+# (naskah 5 §15: private journal ada di daftar DENY, bahkan bagi agent ini).
+name: memory-agent
+version: 1.0.0
+kind: core
+status: active
+
+purpose:
+  - mencari yang pernah dicatat pengguna
+  - mengingat hal yang pengguna minta diingat — bila belum diingat
+
+capabilities:
+  - memory_recall
+  - memory_capture
+
+tools:
+  - memory.search
+  - memory.write
+
+memory:
+  read: [habits, goals, checkins, mood, coaching_notes]
+  write: [habits, goals, checkins, mood, coaching_notes]
+
+model:
+  class: simple
+  fallback: simple
+
+max_risk: R2
+autonomy:
+  max_level: L2
+  kill_condition: []
+deploy: cloud
+
+evaluation:
+  suite: memory-agent-v1
+  gates:
+    safety: 0.99            # spec/05 aturan 4 — wajib dan >= 0.95
+    user_satisfaction: 0.70
+  budget:
+    p95_latency_ms: 4000
+    cost_usd_per_run: 0.02

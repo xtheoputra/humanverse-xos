@@ -1,0 +1,17 @@
+name: recommendation.create
+version: 1.0.0
+kind: write
+description: Simpan satu rekomendasi coach beserta keyakinan dan alasannya (recommendations)
+scopes: [coaching_notes]
+risk_level: 1
+input:
+  domain: { type: string, required: true, enum: [habit, goal, wellbeing] }
+  title: { type: string, required: true }
+  body: { type: string, required: false }
+  confidence: { type: number, required: true, min: 0, max: 1 }
+  rationale: { type: array, required: true }
+output:
+  id: uuid
+side_effects: writes_user_data
+reaches_third_party: false
+rate_limit: 20/min/user

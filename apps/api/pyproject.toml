@@ -1,0 +1,36 @@
+[project]
+name = "hvx-api"
+version = "0.0.1"
+description = "HumanVerse XOS — API V0: satu proses, dua belas modul (spec/06)."
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+  "fastapi>=0.115",
+  "uvicorn[standard]>=0.30",
+  "pydantic>=2.8",
+  "pydantic-settings>=2.4",
+  "sqlalchemy[asyncio]>=2.0.32",
+  "asyncpg>=0.29",
+  # Alembic menjalankan migrasi secara sinkron lewat psycopg 3: satu berkas
+  # SQL berisi banyak pernyataan hanya bisa dikirim lewat protokol kueri
+  # sederhana, dan asyncpg selalu memakai prepared statement.
+  "alembic>=1.13",
+  "psycopg[binary]>=3.2",
+  "redis>=5.0",
+  "structlog>=24.4",
+  # Sprint 1 — identity (spec/07 1.1–1.3)
+  "argon2-cffi>=23.1",       # argon2id untuk sandi
+  "email-validator>=2.2",    # EmailStr pydantic; pemeriksaan DNS tidak dipakai
+  "tzdata>=2024.1",          # zona waktu IANA yang sama di Windows dan di citra Linux
+  # Sprint 3 — memori (spec/07 3.5): klien REST Qdrant, HANYA di `platform` (B-2)
+  "httpx>=0.27",
+  # Sprint 4 — registry agent & tool (spec/07 4.2): manifest YAML spec/05, `safe_load` saja
+  "pyyaml>=6.0.2",
+]
+
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/hvx"]

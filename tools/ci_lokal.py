@@ -1,0 +1,547 @@
+#!/usr/bin/env python3
+"""CI HumanVerse XOS — SATU sumber urutan tahap, untuk mesin lokal DAN Actions.
+
+spec/07 tugas 0.7: `lint → typecheck → test → build → scan`, dan PR gagal
+kalau salah satunya merah.
+
+Kenapa urutannya hidup di sini dan bukan di `.github/workflows/ci.yml`:
+pemilik memutuskan CI **tanpa tagihan** (H-26, 17 Sep 2026) — GitHub Actions
+untuk repo privat memakai menit berbayar, dan akun ini sudah terhalang
+tagihan (#160). Gerbang yang sungguh berjalan adalah mesin pengembang, dan
+hasilnya ditempel ke commit sebagai status `ci-lokal` (`--lapor-github`).
+Kalau daftar perintahnya ditulis dua kali — sekali di YAML, sekali untuk
+lokal — keduanya akan menyimpang tanpa ada yang tahu, persis pola yang
+arch/11 §1 daftar enam kali. Karena itu `ci.yml` hanya memanggil berkas ini.
+
+    uv run --locked python tools/ci_lokal.py                 # kelima tahap
+    uv run --locked python tools/ci_lokal.py lint typecheck  # sebagian
+    uv run --locked python tools/ci_lokal.py --daftar        # cetak perintahnya saja
+    uv run --locked python tools/ci_lokal.py --lapor-github  # kelima tahap + status di PR
+
+`--locked` di perintah di atas bukan hiasan: `uv run` biasa MENULIS ULANG
+`uv.lock` yang basi sebelum berkas ini sempat memeriksanya.
+
+Tahap `test` butuh HVX_TEST_DATABASE_URL · HVX_TEST_REDIS_URL · HVX_TEST_QDRANT_URL
+(`docker compose up -d --wait postgres redis qdrant`). Tahap `build`
+dan `scan` butuh Docker; `scan` selalu didahului `build` di pemanggilan yang
+sama, supaya yang dipindai adalah citra yang baru dibangun dan diuji asap —
+bukan tag yang kebetulan sedang ada. Tahap pertama yang merah menghentikan
+sisanya.
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import re
+import shutil
+import subprocess
+import sys
+import tempfile
+import time
+import urllib.error
+import urllib.request
+import uuid
+from collections.abc import Callable
+from pathlib import Path
+from typing import Any
+
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")
+
+AKAR = Path(__file__).resolve().parent.parent
+PY = sys.executable
+# Tag KHUSUS CI — terpisah dari `hvx-api:local` milik tumpukan pengembangan,
+# yang bisa berpindah kapan saja oleh `docker compose build` lain.
+CITRA = "hvx-api:ci"
+TRIVY = (
+    "aquasec/trivy:0.74.0@sha256:62b1e65e8869bc4b4c6aa4fa2b21595256c7c2f6018a9d9ad61caf87187c1969"
+)
+# `uv run` mengisi UV dengan jalur binernya sendiri; di luar itu cari di PATH.
+_UV = [os.environ.get("UV") or shutil.which("uv") or "uv"]
+# Aplikasi Flutter (ADR-001, spec/07 2.7). `HVX_FLUTTER` menunjuk biner `flutter`
+# kalau tidak ada di PATH. Tanpa Flutter tahapnya GAGAL — tidak dilewati.
+APLIKASI = AKAR / "apps" / "mobile"
+_FLUTTER = os.environ.get("HVX_FLUTTER") or shutil.which("flutter") or "flutter"
+# `dart` ikut Flutter (flutter/bin); `flutter format` sudah tidak ada.
+_DART = os.environ.get("HVX_DART") or shutil.which("dart") or "dart"
+# Direktori yang tidak dipindai rahasia: lingkungan terpasang, cache alat, dan
+# keluaran bangun Flutter.
+_LEWATI_PINDAI = [
+    ".git", ".venv", "node_modules", ".mypy_cache", ".ruff_cache", ".pytest_cache",
+    "apps/mobile/.dart_tool", "apps/mobile/build",
+]  # fmt: skip
+
+# Kecuali R-1: enam roadmap fase GAGAL R-1 hari ini, dan mengurutkannya ulang
+# adalah keputusan CAKUPAN milik pemilik (#99 #111 #116 #121 #131 #144).
+# R-1 dilaporkan, tidak menggagalkan — sama seperti periksa-dokumen.yml.
+PERIKSA_WAJIB = [
+    "B-6", "M-4", "P-1", "P-2", "P-3", "E-1", "E-2", "E-3", "E-4", "E-5",
+    "A-1", "A-2", "A-3", "G-1",
+]  # fmt: skip
+
+Langkah = tuple[str, list[str] | Callable[[], int], bool]  # (nama, perintah, wajib)
+
+
+def _smoke_compose() -> int:
+    """Jalankan tumpukan compose penuh DARI CITRA CI, tuntut /health 200, lalu bongkar.
+
+    Sesudah sehat, klien aplikasi Flutter yang SAMA dengan layar (spec/07 2.7)
+    menjalankan alur manusia — daftar, check-in, habit, tandai selesai, batal,
+    keluar — terhadap api dari citra itu (`apps/mobile/tool/ujung_ke_ujung.dart`);
+    lalu sebuah mood harus sampai ke Qdrant sebagai memori lewat wadah `pekerja`
+    (`_memori_ujung_ke_ujung`).
+    🔴 Dibuat karena layar pertama yang dicoba lawan tumpukan compose menemui
+    `500` yang tidak satu pun uji tangkap: uji api memakai basis data yang baru
+    dimigrasi, uji widget memakai layanan palsu — tidak ada yang mempertemukan
+    klien dengan api sungguhan.
+    """
+    proyek = ["docker", "compose", "-p", "hvx-ci-smoke"]
+    env = {
+        **os.environ,
+        "HVX_API_IMAGE": CITRA,
+        "HVX_API_PORT": os.environ.get("HVX_CI_API_PORT", "18000"),
+        "HVX_POSTGRES_PORT": os.environ.get("HVX_CI_POSTGRES_PORT", "15432"),
+        "HVX_REDIS_PORT": os.environ.get("HVX_CI_REDIS_PORT", "16379"),
+        "HVX_QDRANT_PORT": os.environ.get("HVX_CI_QDRANT_PORT", "16333"),
+    }
+    try:
+        r = subprocess.run(
+            [*proyek, "up", "-d", "--no-build", "--wait", "--wait-timeout", "180"],
+            cwd=AKAR,
+            env=env,
+        )
+        if r.returncode != 0:
+            subprocess.run([*proyek, "logs", "--no-color", "--tail", "80"], cwd=AKAR, env=env)
+            return r.returncode
+        url = f"http://127.0.0.1:{env['HVX_API_PORT']}/health"
+        for _ in range(10):
+            try:
+                with urllib.request.urlopen(url, timeout=3) as jawab:
+                    badan = jawab.read().decode()
+                    print(f"  {url} → {jawab.status} {badan}")
+                    if jawab.status == 200 and '"status":"ok"' in badan.replace(" ", ""):
+                        dasar = f"http://127.0.0.1:{env['HVX_API_PORT']}"
+                        return _ujung_ke_ujung(dasar) or _memori_ujung_ke_ujung(
+                            dasar, f"http://127.0.0.1:{env['HVX_QDRANT_PORT']}"
+                        )
+            except OSError as galat:
+                print(f"  {url} → {galat}")
+            time.sleep(2)
+        return 1
+    finally:
+        subprocess.run([*proyek, "down", "-v", "--remove-orphans"], cwd=AKAR, env=env)
+
+
+def _ujung_ke_ujung(dasar: str) -> int:
+    """Alur manusia layar V0 pertama lawan api hidup — lihat `_smoke_compose`.
+
+    Dua bukti: klien asli TANPA layar (`tool/ujung_ke_ujung.dart`), lalu LAYAR
+    yang diketuk seperti manusia (`test/ujung/`, spec/07 2.7 — tinjauan kontrak
+    Sprint 2: tidak ada yang menjalankan layar terhadap api nyata).
+    """
+    print(f"  ujung ke ujung (apps/mobile) → {dasar}", flush=True)
+    klien = _flutter("run", "tool/ujung_ke_ujung.dart", dasar, biner=_DART)()
+    if klien != 0:
+        return klien
+    print(f"  layar diketuk lawan api hidup (apps/mobile/test/ujung) → {dasar}", flush=True)
+    return _flutter("test", "test/ujung", f"--dart-define=HVX_API_UJI={dasar}")()
+
+
+def _json_post(url: str, isi: dict[str, Any], token: str | None = None) -> dict[str, Any]:
+    kepala = {"Content-Type": "application/json"}
+    if token:
+        kepala["Authorization"] = f"Bearer {token}"
+    minta = urllib.request.Request(  # noqa: S310 - URL tumpukan lokal buatan sendiri
+        url, data=json.dumps(isi).encode(), headers=kepala, method="POST"
+    )
+    with urllib.request.urlopen(minta, timeout=10) as jawab:  # noqa: S310
+        hasil: dict[str, Any] = json.loads(jawab.read().decode())
+        return hasil
+
+
+def _memori_ujung_ke_ujung(dasar: str, qdrant: str) -> int:
+    """Mood lewat api hidup → relay → konsumen → memori → Qdrant, di WADAH `pekerja`.
+
+    🔴 `tests/integration/test_pekerja.py` menjalankan `pekerja.jalankan()` di
+    proses uji — wadah compose yang tidak pernah bekerja (perintah salah, Qdrant
+    tak terjangkau, `HVX_SEMATAN_KEY` hilang) tidak terlihat di sana. Tumpukan
+    compose penuh dari citra CI adalah satu-satunya tempat ketiganya bertemu.
+    """
+    print(f"  mood → pekerja → memori di Qdrant → {qdrant}", flush=True)
+    akun = _json_post(
+        f"{dasar}/v1/auth/register",
+        {
+            "email": f"ci-{uuid.uuid4().hex}@uji.id",
+            "password": uuid.uuid4().hex,
+            "display_name": "CI",
+            "timezone": "Asia/Jakarta",
+            "consents": {"policy_version": "ci", "terms": True, "privacy": True},
+        },
+    )
+    token = str(akun["tokens"]["access_token"])
+    uid = str(akun["user"]["id"])
+    _json_post(f"{dasar}/v1/moods", {"valence": 3, "note": "ujung ke ujung"}, token)
+    saring = {"filter": {"must": [{"key": "user_id", "match": {"value": uid}}]}, "exact": True}
+    for _ in range(60):
+        try:
+            jawab = _json_post(f"{qdrant}/collections/memories/points/count", saring)
+            jumlah = int(jawab["result"]["count"])
+        except urllib.error.HTTPError:
+            jumlah = 0  # koleksi belum dibuat penyelaras
+        if jumlah >= 1:
+            print(f"  memori tersemat: {jumlah} titik milik pengguna CI")
+            return 0
+        time.sleep(1)
+    print("🛑 mood tidak sampai ke Qdrant sebagai memori dalam 60 detik — wadah pekerja?")
+    return 1
+
+
+# Zona mesin untuk perintah Flutter (tinjauan penegak buta Sprint 2): `tanggalLokal`
+# hanya bisa dibedakan dari tanggal UTC di mesin yang TIDAK berzona UTC — di runner
+# UTC, mutasi `toUtc()` lolos seluruh uji. POSIX `WIB-7` = UTC+7, dibaca Dart di
+# Linux dan Windows. `tools/uji_mutasi_kode.py` memakai angka yang sama.
+TZ_FLUTTER = "WIB-7"
+
+
+def _flutter(*argumen: str, biner: str | None = None) -> Callable[[], int]:
+    """Satu perintah di `apps/mobile` — dependensi dari `pubspec.lock` apa adanya."""
+    program = biner or _FLUTTER
+
+    def jalankan() -> int:
+        for alat, variabel in ((_FLUTTER, "HVX_FLUTTER"), (program, "HVX_DART")):
+            if not (Path(alat).exists() or shutil.which(alat)):
+                print(f"🛑 {alat} tidak ditemukan — isi PATH atau {variabel}")
+                return 127
+        env = {**os.environ, "PYTHONIOENCODING": "utf-8", "TZ": TZ_FLUTTER}
+        # --enforce-lockfile: kunci yang tidak cocok lagi GAGAL, sama dengan `uv --locked`.
+        siap = subprocess.run([_FLUTTER, "pub", "get", "--enforce-lockfile"], cwd=APLIKASI, env=env)
+        if siap.returncode != 0:
+            return siap.returncode
+        return subprocess.run([program, *argumen], cwd=APLIKASI, env=env).returncode
+
+    jalankan.__name__ = f"{Path(program).stem} " + " ".join(argumen)
+    return jalankan
+
+
+def _pip_audit() -> int:
+    """Audit dependensi PRODUKSI yang terkunci — bukan lingkungan pengembang.
+
+    🔴 Penanda lingkungan (`; sys_platform != 'win32'`) DIBUANG sebelum audit.
+    pip-audit menilai penanda terhadap mesin yang menjalankannya dan membuang
+    paket yang tidak cocok TANPA jejak: di mesin Windows, `uvloop` — yang ikut
+    ke citra Linux — tidak pernah diaudit.
+    """
+    with tempfile.TemporaryDirectory() as tmp:
+        keluar = Path(tmp) / "persyaratan.txt"
+        r = subprocess.run(
+            [
+                *_UV,
+                "export",
+                "--locked",
+                "--no-dev",
+                "--package",
+                "hvx-api",
+                "--no-emit-workspace",
+                "--format",
+                "requirements-txt",
+                "-o",
+                str(keluar),
+            ],
+            cwd=AKAR,
+        )
+        if r.returncode != 0:
+            return r.returncode
+        teks = keluar.read_text(encoding="utf-8")
+        keluar.write_text(re.sub(r" ; [^\\\n]*?(?= \\$|$)", "", teks, flags=re.M), encoding="utf-8")
+        return subprocess.run(
+            [PY, "-m", "pip_audit", "--strict", "--disable-pip", "--no-deps", "-r", str(keluar)],
+            cwd=AKAR,
+        ).returncode
+
+
+def _trivy_citra() -> int:
+    """Pindai citra CI TANPA memberi pemindai soket Docker.
+
+    🔴 Versi pertama me-mount `/var/run/docker.sock` ke kontainer trivy —
+    kendali penuh atas daemon Docker, diberikan kepada citra pihak ketiga yang
+    dipatok TAG. Kini citra disimpan ke tar dan diberikan hanya-baca.
+    """
+    with tempfile.TemporaryDirectory() as tmp:
+        tar = Path(tmp) / "citra.tar"
+        r = subprocess.run(["docker", "save", CITRA, "-o", str(tar)], cwd=AKAR)
+        if r.returncode != 0:
+            return r.returncode
+        return subprocess.run(
+            [
+                "docker", "run", "--rm",
+                "-v", f"{tmp}:/pindai:ro",
+                "-v", "hvx-trivy-cache:/root/.cache/trivy",
+                TRIVY, "image", "--input", "/pindai/citra.tar",
+                "--exit-code", "1", "--severity", "HIGH,CRITICAL", "--ignore-unfixed",
+                "--no-progress",
+            ],
+            cwd=AKAR,
+        ).returncode  # fmt: skip
+
+
+def perintah_pindai_rahasia(akar: Path) -> list[str]:
+    lewati = [a for d in _LEWATI_PINDAI for a in ("--skip-dirs", f"/src/{d}")]
+    return [
+        "docker", "run", "--rm",
+        "-v", f"{akar}:/src:ro",
+        "-v", "hvx-trivy-cache:/root/.cache/trivy",
+        TRIVY, "fs", "--scanners", "secret", "--exit-code", "1", "--no-progress",
+        *lewati, "/src",
+    ]  # fmt: skip
+
+
+TAHAP: dict[str, list[Langkah]] = {
+    "lint": [
+        ("uv.lock cocok dengan pyproject", [*_UV, "lock", "--check"], True),
+        ("ruff check", [PY, "-m", "ruff", "check", "."], True),
+        ("ruff format", [PY, "-m", "ruff", "format", "--check", "."], True),
+        ("import-linter (M-1 M-2 M-3 B-2)", ["lint-imports", "--no-cache"], True),
+        ("periksa_dokumen (wajib hijau)", [PY, "tools/periksa_dokumen.py", *PERIKSA_WAJIB], True),
+        ("uji_mutasi dokumen", [PY, "tools/uji_mutasi.py"], True),
+        (
+            "uji_mutasi kode — tanpa basis data",
+            [PY, "tools/uji_mutasi_kode.py", "--tanpa-db"],
+            True,
+        ),
+        (
+            "dart format (apps/mobile)",
+            _flutter(
+                "format", "--output=none", "--set-exit-if-changed", "lib", "test", biner=_DART
+            ),
+            True,
+        ),
+        ("flutter analyze (apps/mobile)", _flutter("analyze", "--fatal-infos"), True),
+        (
+            "R-1 (dilaporkan, keputusan cakupan pemilik)",
+            [PY, "tools/periksa_dokumen.py", "R-1"],
+            False,
+        ),
+    ],
+    "typecheck": [
+        ("mypy --strict", [PY, "-m", "mypy"], True),
+    ],
+    "test": [
+        ("pytest + cakupan ≥ 70 %", [PY, "-m", "pytest", "--cov", "--cov-report=term"], True),
+        ("uji_mutasi kode — migrasi", [PY, "tools/uji_mutasi_kode.py", "--hanya-db"], True),
+        ("flutter test (apps/mobile)", _flutter("test"), True),
+    ],
+    "build": [
+        (
+            "docker build (citra CI)",
+            # --pull: patokan digest diperiksa ulang ke registry.
+            # --no-cache-filter jalan (E-224): lapisan `apt-get upgrade` tahap akhir
+            # TIDAK boleh dipakai dari cache — ia membeku pada paket Debian saat pertama
+            # dibangun, sehingga `scan` memindai citra yang bukan lagi yang akan dibangun
+            # CI/produksi dan merah oleh CVE yang perbaikannya sudah terpasang di build
+            # segar (6 Okt 2026: perl-base, libpcre2). Lapisan dependensi tetap ber-cache.
+            [
+                "docker",
+                "build",
+                "--pull",
+                "--no-cache-filter",
+                "jalan",
+                "-f",
+                "infrastructure/docker/api.Dockerfile",
+                "-t",
+                CITRA,
+                ".",
+            ],
+            True,
+        ),
+        ("compose up → /health 200", _smoke_compose, True),
+    ],
+    "scan": [
+        ("pip-audit (dependensi produksi, semua platform)", _pip_audit, True),
+        ("bandit", [PY, "-m", "bandit", "-q", "-r", "apps/api/src", "-c", "pyproject.toml"], True),
+        ("trivy citra (HIGH/CRITICAL yang sudah ada perbaikannya)", _trivy_citra, True),
+        ("trivy rahasia di berkas repo", perintah_pindai_rahasia(AKAR), True),
+        (
+            "uji_mutasi kode — pemindai rahasia",
+            [PY, "tools/uji_mutasi_kode.py", "--hanya-docker"],
+            True,
+        ),
+    ],
+}
+
+
+def _jalankan(perintah: list[str] | Callable[[], int]) -> int:
+    if callable(perintah):
+        return perintah()
+    env = {**os.environ, "PYTHONIOENCODING": "utf-8"}
+    return subprocess.run(perintah, cwd=AKAR, env=env).returncode
+
+
+# ──────────────────────────────────────────── laporan status ke GitHub ──
+#
+# 🔑 Pengganti GitHub Actions yang TIDAK PERNAH menagih (H-26). Gerbangnya
+#    berjalan di mesin ini; hasilnya ditempel ke commit sebagai *commit status*
+#    `ci-lokal` lewat API GitHub — fitur dasar repo, bukan Actions, jadi tidak
+#    memakai menit dan tidak bergantung pada tagihan akun. PR menampilkan
+#    hijau/merahnya di samping commit, seperti cek CI biasa.
+#
+# 🛑 Status hanya bermakna kalau ia menempel pada pohon yang BENAR-BENAR diuji.
+#    Maka laporan ditolak untuk gerbang sebagian, pohon kerja yang kotor, dan
+#    commit yang belum ada di remote — dan keadaan repo diperiksa ULANG sesudah
+#    gerbang selesai, sebab uji mutasi merusak lalu memulihkan berkas di tempat.
+
+KONTEKS_STATUS = "ci-lokal"
+
+
+def _git(*argumen: str) -> str:
+    return subprocess.run(
+        ["git", *argumen], cwd=AKAR, capture_output=True, text=True, encoding="utf-8", check=True
+    ).stdout.strip()
+
+
+def keadaan_repo() -> tuple[str, str]:
+    """(sha HEAD, keluaran `git status --porcelain`) — berkas yang diabaikan git tidak dihitung."""
+    return _git("rev-parse", "HEAD"), _git("status", "--porcelain")
+
+
+def alasan_menolak_lapor(sha: str, kotor: str, sha_remote: str | None, cabang: str) -> str | None:
+    """Kenapa hasil gerbang TIDAK boleh ditempel ke `sha` — atau None kalau boleh."""
+    if kotor:
+        return "pohon kerja kotor — yang diuji bukan isi commit mana pun:\n" + kotor
+    if sha_remote != sha:
+        return (
+            f"{sha[:7]} belum menjadi ujung origin/{cabang} — push dulu, supaya status "
+            "menempel pada commit yang dilihat PR"
+        )
+    return None
+
+
+def prasyarat_lapor() -> tuple[str, str]:
+    """(slug repo `pemilik/nama`, sha HEAD) — atau SystemExit dengan alasannya."""
+    sha, kotor = keadaan_repo()
+    cabang = _git("rev-parse", "--abbrev-ref", "HEAD")
+    remote = _git("ls-remote", "origin", f"refs/heads/{cabang}").split()
+    alasan = alasan_menolak_lapor(sha, kotor, remote[0] if remote else None, cabang)
+    if alasan:
+        raise SystemExit(f"🛑 --lapor-github ditolak: {alasan}")
+    slug = subprocess.run(
+        ["gh", "repo", "view", "--json", "nameWithOwner", "--jq", ".nameWithOwner"],
+        cwd=AKAR, capture_output=True, text=True, encoding="utf-8", check=True,
+    ).stdout.strip()  # fmt: skip
+    return slug, sha
+
+
+def perintah_lapor_status(slug: str, sha: str, keadaan: str, uraian: str) -> list[str]:
+    """Batas GitHub untuk `description` 140 karakter — dipotong di sini, bukan ditolak di sana."""
+    if keadaan not in {"pending", "success", "failure", "error"}:
+        raise ValueError(f"keadaan status tak dikenal: {keadaan}")
+    return [
+        "gh", "api", "--method", "POST", f"repos/{slug}/statuses/{sha}",
+        "-f", f"state={keadaan}",
+        "-f", f"context={KONTEKS_STATUS}",
+        "-f", f"description={uraian[:140]}",
+    ]  # fmt: skip
+
+
+def lapor_status(slug: str, sha: str, keadaan: str, uraian: str) -> None:
+    subprocess.run(
+        perintah_lapor_status(slug, sha, keadaan, uraian),
+        cwd=AKAR, capture_output=True, text=True, encoding="utf-8", check=True,
+    )  # fmt: skip
+    print(f"📮 status `{KONTEKS_STATUS}` → {sha[:7]}: {keadaan} — {uraian[:140]}", flush=True)
+
+
+# ──────────────────────────────────────────────────────────── gerbang ──
+
+
+def _jalankan_gerbang(pilih: list[str], daftar: bool) -> tuple[int, str | None, int]:
+    """(kode keluar, langkah wajib pertama yang merah, jumlah langkah wajib yang hijau)."""
+    ringkas: list[tuple[str, str, str]] = []
+    hijau = 0
+    for tahap in pilih:
+        for nama, perintah, wajib in TAHAP[tahap]:
+            teks = perintah.__name__ if callable(perintah) else " ".join(perintah)
+            if daftar:
+                print(f"{tahap:10s} {'wajib ' if wajib else 'lapor '} {nama:52s} {teks}")
+                continue
+            print(f"\n━━━ {tahap} · {nama}\n    $ {teks}", flush=True)
+            mulai = time.monotonic()
+            kembali = _jalankan(perintah)
+            lama = f"{time.monotonic() - mulai:5.1f} dtk"
+            if kembali == 0:
+                if wajib:
+                    hijau += 1
+                ringkas.append((tahap, nama, f"✅ {lama}"))
+            elif wajib:
+                ringkas.append((tahap, nama, f"🛑 keluar {kembali} · {lama}"))
+                _cetak(ringkas)
+                return 1, f"{tahap} · {nama}", hijau
+            else:
+                ringkas.append((tahap, nama, f"⚠️ keluar {kembali} (dilaporkan) · {lama}"))
+    if not daftar:
+        _cetak(ringkas)
+    return 0, None, hijau
+
+
+def main(argv: list[str] | None = None) -> int:
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawTextHelpFormatter)
+    ap.add_argument("tahap", nargs="*", help=" · ".join(TAHAP) + " (kosong = semua, berurutan)")
+    ap.add_argument("--daftar", action="store_true", help="cetak langkah tanpa menjalankan")
+    ap.add_argument(
+        "--lapor-github",
+        action="store_true",
+        help=f"tempel hasil gerbang PENUH ke commit HEAD sebagai status `{KONTEKS_STATUS}` "
+        "(gratis — API status commit, bukan Actions)",
+    )
+    a = ap.parse_args(argv)
+    tak_dikenal = [t for t in a.tahap if t not in TAHAP]
+    if tak_dikenal:
+        ap.error(f"tahap tak dikenal: {' '.join(tak_dikenal)}")
+    pilih = [t for t in TAHAP if t in a.tahap] or list(TAHAP)
+    if a.lapor_github and (a.daftar or pilih != list(TAHAP)):
+        ap.error(
+            "--lapor-github hanya untuk gerbang PENUH (kelima tahap, tanpa --daftar): "
+            "status hijau dari gerbang sebagian akan terbaca sebagai lulus penuh"
+        )
+    if "scan" in pilih and "build" not in pilih:
+        pilih.insert(pilih.index("scan"), "build")
+        print("ℹ️  `scan` didahului `build` — yang dipindai wajib citra yang baru dibangun.")
+
+    lapor = prasyarat_lapor() if a.lapor_github else None
+    if lapor:
+        lapor_status(*lapor, "pending", "gerbang lint → typecheck → test → build → scan berjalan")
+    mulai = time.monotonic()
+    selesai = False
+    try:
+        kembali, merah, hijau = _jalankan_gerbang(pilih, a.daftar)
+        selesai = True
+    finally:
+        if lapor and not selesai:
+            lapor_status(*lapor, "error", "gerbang terhenti sebelum selesai — tidak ada hasil")
+    if not lapor:
+        return kembali
+
+    slug, sha = lapor
+    sha_kini, kotor = keadaan_repo()
+    if sha_kini != sha or kotor:
+        lapor_status(slug, sha, "error", "repo berubah selama gerbang berjalan — hasil tidak sah")
+        print("🛑 repo berubah selama gerbang berjalan:\n" + (kotor or f"HEAD kini {sha_kini}"))
+        return 1
+    menit, detik = divmod(round(time.monotonic() - mulai), 60)
+    if kembali == 0:
+        lapor_status(slug, sha, "success", f"{hijau} langkah wajib hijau · {menit} mnt {detik} dtk")
+    else:
+        lapor_status(slug, sha, "failure", f"merah di {merah}")
+    return kembali
+
+
+def _cetak(ringkas: list[tuple[str, str, str]]) -> None:
+    print("\n" + "═" * 84)
+    for tahap, nama, hasil in ringkas:
+        print(f"  {tahap:10s} {nama:56s} {hasil}")
+    print("═" * 84)
+
+
+if __name__ == "__main__":
+    sys.exit(main())

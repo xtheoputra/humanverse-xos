@@ -1,8 +1,9 @@
 name: periksa-dokumen
 
-# Menjalankan lima dari dua puluh enam pemeriksaan `arch/11` yang tidak
-# membutuhkan kode produksi. Ini BUKAN CI kode — CI kode adalah tugas 0.7
-# `spec/07`, dan ia menunggu #3.
+# Menjalankan pemeriksaan `arch/11` yang membaca dokumen, DDL, dan pohon
+# direktori — tanpa dependensi, untuk perubahan yang HANYA menyentuh dokumen.
+# CI kode adalah `ci.yml` (spec/07 tugas 0.7), yang tahap `lint`-nya juga
+# menjalankan pemeriksaan yang sama.
 #
 # 🔑 Alur ini ada supaya aturan repo berhenti menjadi sesuatu yang harus
 #    DIINGAT seseorang. Sebuah skrip yang bisa dijalankan tetapi tidak
@@ -13,36 +14,43 @@ name: periksa-dokumen
 #    gerbang sesudah hal yang dijaganya (#99 #111 #116 #121 #131 #144).
 #    Mengurutkannya ulang adalah keputusan CAKUPAN, milik pemilik. Karena
 #    itu R-1 dijalankan terpisah dan TIDAK menggagalkan alur — ia
-#    melaporkan. Yang menggagalkan alur adalah sebelas pemeriksaan lain,
-#    yang kesebelasnya hijau dan harus tetap hijau.
+#    melaporkan. Yang menggagalkan alur adalah empat belas pemeriksaan lain,
+#    yang keempat belasnya hijau dan harus tetap hijau.
 #
-# 🔑 Langkah uji mutasi ada supaya "sebelas hijau" tidak bisa berarti
-#    "sebelas pemeriksaan yang tidak melihat apa pun": ia merusak satu
+# 🔑 Langkah uji mutasi ada supaya "empat belas hijau" tidak bisa berarti
+#    "pemeriksaan yang tidak melihat apa pun": ia merusak satu
 #    hal yang tiap pemeriksaan KLAIM deteksi dan menuntut merahnya.
+#
+# 🛑 PEMICU OTOMATIS DIMATIKAN — H-26, CI tanpa tagihan (lihat ci.yml). Semua
+#    pemeriksaan di bawah juga dijalankan tahap `lint` tools/ci_lokal.py, yang
+#    melapor ke PR sebagai status `ci-lokal`.
 
 on:
-  push:
-    paths: ['docs/**', 'spec/**', 'arch/**', 'tools/**', '.github/workflows/**']
-  pull_request:
-    paths: ['docs/**', 'spec/**', 'arch/**', 'tools/**']
   workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
   periksa:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: '3.12'
 
-      - name: Sebelas pemeriksaan dokumen — wajib hijau
+      # Daftar kode WAJIB dibaca dari tools/ci_lokal.py — bukan disalin ke sini,
+      # supaya kedua gerbang tidak bisa menyimpang.
+      - name: Pemeriksaan dokumen wajib — sama persis dengan tahap lint ci_lokal
         run: >
           python tools/periksa_dokumen.py
-          B-6 P-1 P-2 P-3 E-1 E-2 E-4 E-5 A-2 A-3 G-1
+          $(python -c "import sys; sys.path.insert(0, 'tools'); import ci_lokal; print(' '.join(ci_lokal.PERIKSA_WAJIB))")
 
-      - name: Uji mutasi — buktikan kedua belasnya sanggup GAGAL
+      - name: Uji mutasi — buktikan tiap pemeriksaan sanggup GAGAL
         run: python tools/uji_mutasi.py
 
       - name: R-1 — dilaporkan, tidak menggagalkan (keputusan cakupan pemilik)

@@ -1,0 +1,7 @@
+# Berkas yang dibaca di dalam kontainer Linux wajib LF, apa pun pengaturan
+# `core.autocrlf` mesin pengembangnya (repo ini dikerjakan di Windows).
+*.sh          text eol=lf
+*.sql         text eol=lf
+*.Dockerfile  text eol=lf
+Dockerfile    text eol=lf
+docker-compose.yml text eol=lf

@@ -1,0 +1,260 @@
+"""Koneksi PostgreSQL.
+
+Satu DSN di konfigurasi (`postgresql://…`), dua driver:
+
+* aplikasi memakai **asyncpg** (`postgresql+asyncpg://`);
+* migrasi memakai **psycopg 3** sinkron (`postgresql+psycopg://`), sebab
+  berkas migrasi berisi banyak pernyataan sekaligus dan hanya protokol kueri
+  sederhana yang menerimanya.
+
+🔴 **DSN tidak boleh membawa parameter kueri** (`?sslmode=…`,
+`?connect_timeout=…`). Kedua driver menafsirkannya berbeda: asyncpg menolak
+nama libpq seperti `sslmode` (`TypeError` di kueri pertama), psycopg menolak
+`ssl` milik asyncpg. Diukur: migrasi berhasil, api mulai, lalu setiap kueri
+gagal — dan `/health` hanya melaporkan `db: down`. Maka DSN berparameter
+ditolak **saat mulai**. Opsi koneksi (TLS pada PostgreSQL terkelola, tahap D2)
+diberikan lewat variabel libpq (`PGSSLMODE`, `PGSSLROOTCERT`, `PGCONNECT_TIMEOUT`,
+`PGAPPNAME`), yang dihormati kedua driver.
+
+🔑 **Dua DSN, dua peran (B-40).** `HVX_DATABASE_URL` milik api — peran login
+anggota `hvx_app`, BUKAN pemilik tabel. `HVX_MIGRATION_DATABASE_URL` milik
+migrasi — pemilik skema. api menolak mulai dengan peran yang melewati RLS
+(`pastikan_peran_aplikasi`), dan tiap kueri berjalan di dalam
+`transaksi_pengguna`, sebab RLS spec/01 §11 hanya meloloskan baris pengguna
+yang sedang dilayani.
+"""
+
+from __future__ import annotations
+
+from collections.abc import AsyncIterator, Awaitable, Callable
+from contextlib import asynccontextmanager
+from dataclasses import dataclass
+from uuid import UUID
+
+from sqlalchemy import text
+from sqlalchemy.exc import DBAPIError
+from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine, create_async_engine
+
+_SKEMA_POLOS = ("postgresql://", "postgres://")
+
+
+def _ganti_driver(dsn: str, driver: str) -> str:
+    if "?" in dsn:
+        raise ValueError(
+            "DSN basis data tidak boleh membawa parameter kueri (?…): asyncpg dan psycopg "
+            "menafsirkannya berbeda. Pakai variabel libpq — PGSSLMODE, PGSSLROOTCERT, "
+            "PGCONNECT_TIMEOUT, PGAPPNAME."
+        )
+    for awalan in _SKEMA_POLOS:
+        if dsn.startswith(awalan):
+            return f"postgresql+{driver}://" + dsn[len(awalan) :]
+    if dsn.startswith("postgresql+"):
+        _, sisa = dsn.split("://", 1)
+        return f"postgresql+{driver}://" + sisa
+    raise ValueError("DSN basis data wajib berskema postgresql:// atau postgres://")
+
+
+def url_async(dsn: str) -> str:
+    return _ganti_driver(dsn, "asyncpg")
+
+
+def url_sync(dsn: str) -> str:
+    return _ganti_driver(dsn, "psycopg")
+
+
+def buat_engine(dsn: str) -> AsyncEngine:
+    return create_async_engine(
+        url_async(dsn),
+        pool_pre_ping=True,
+        pool_size=5,
+        max_overflow=5,
+        pool_timeout=5,
+        # 🔴 Tanpa ini SQLAlchemy menempelkan `[parameters: (email, hash sandi…)]`
+        # ke teks tiap galat basis data — dan teks itu sampai ke log
+        # `request.failed` (tinjauan Sprint 1, `test_galat_basis_data.py`).
+        hide_parameters=True,
+    )
+
+
+async def ping_db(engine: AsyncEngine) -> None:
+    async with engine.connect() as conn:
+        await conn.execute(text("SELECT 1"))
+
+
+class PeranTidakAman(RuntimeError):
+    """B-40 — peran basis data api melewati RLS atau memiliki tabel; api menolak mulai."""
+
+
+# `pg_has_role(..., 'USAGE')` juga menangkap peran yang MEWARISI pemilik tabel
+# lewat keanggotaan — pemilik tidak terkena RLS, dan pewarisnya pun tidak.
+_KUERI_PERAN = text(
+    """
+    SELECT r.rolname,
+           r.rolsuper,
+           r.rolbypassrls,
+           ARRAY(
+             SELECT c.relname::text FROM pg_class c
+             WHERE c.relnamespace = 'public'::regnamespace
+               AND c.relkind IN ('r', 'p')
+               AND pg_has_role(current_user, c.relowner, 'USAGE')
+             ORDER BY c.relname
+           ) AS tabel_dimiliki,
+           EXISTS (
+             SELECT 1 FROM pg_roles p
+             WHERE p.rolname = 'hvx_pekerja' AND pg_has_role(current_user, p.oid, 'MEMBER')
+           ) AS anggota_pekerja
+    FROM pg_roles r
+    WHERE r.rolname = current_user
+    """
+)
+
+
+async def pastikan_peran_aplikasi(engine: AsyncEngine, *, pekerja: bool = False) -> None:
+    """Tolak peran yang membuat RLS dan hak akses spec/01 §10–§12 tidak berlaku.
+
+    🔴 B-40: sampai 17 Sep 2026 api tersambung sebagai superuser pemilik tabel,
+    dan `REVOKE UPDATE, DELETE ON audit_logs` tidak menghalangi apa pun. Aturan
+    yang bergantung pada peran yang benar wajib memeriksa perannya sendiri —
+    konfigurasi yang keliru harus gagal saat mulai, bukan diam-diam lolos.
+
+    🔴 S4 (tinjauan keamanan Sprint 3): peran yang bisa memanggil fungsi relay &
+    penyelaras (`hvx_pekerja`) membaca linimasa SEMUA pengguna di luar RLS. Api
+    menghadap internet — ia menolak mulai sebagai anggotanya; pekerja
+    (`pekerja=True`) sebaliknya menolak mulai TANPA peran itu, alih-alih gagal di
+    tiap putaran relay.
+    """
+    async with engine.connect() as conn:
+        peran = (await conn.execute(_KUERI_PERAN)).one()
+    masalah = []
+    if peran.rolsuper:
+        masalah.append("superuser")
+    if peran.rolbypassrls:
+        masalah.append("BYPASSRLS")
+    if peran.tabel_dimiliki:
+        contoh = ", ".join(peran.tabel_dimiliki[:3])
+        masalah.append(f"pemilik {len(peran.tabel_dimiliki)} tabel ({contoh}, …)")
+    if masalah:
+        raise PeranTidakAman(
+            f"peran basis data `{peran.rolname}` tidak boleh dipakai api — {'; '.join(masalah)}. "
+            "Keduanya melewati RLS. Pakai peran login anggota `hvx_app` "
+            "(B-40, spec/01 §10); peran pemilik hanya untuk HVX_MIGRATION_DATABASE_URL."
+        )
+    if pekerja and not peran.anggota_pekerja:
+        raise PeranTidakAman(
+            f"peran basis data `{peran.rolname}` bukan anggota `hvx_pekerja` — relay dan "
+            "penyelaras tidak bisa memanggil fungsinya (spec/01 §12). Pakai peran login "
+            "pekerja (HVX_PEKERJA_DB_USER di compose)."
+        )
+    if not pekerja and peran.anggota_pekerja:
+        raise PeranTidakAman(
+            f"peran basis data `{peran.rolname}` anggota `hvx_pekerja` — api menghadap "
+            "internet dan tidak boleh memanggil fungsi relay & penyelaras (S4, spec/01 §12). "
+            "Pakai peran login api yang hanya anggota `hvx_app`."
+        )
+
+
+_SETEL_PENGGUNA = text("SELECT set_config('hvx.user_id', :user_id, true)")
+
+# Jejak sebuah tulisan — mis. audit tulisan agent (spec/05 *Risk gate*). Dijalankan modul
+# PEMILIK datanya di transaksi tulisannya, hanya bila sesuatu sungguh berubah: modul
+# pemilik tidak perlu mengenal siapa yang mencatat, dan tulisan tanpa jejaknya — atau
+# jejak tanpa tulisannya — tidak bisa terjadi.
+JejakTulisan = Callable[[AsyncConnection], Awaitable[None]]
+
+
+@asynccontextmanager
+async def transaksi_pengguna(
+    engine: AsyncEngine, user_id: UUID, *, satu_potret: bool = False
+) -> AsyncIterator[AsyncConnection]:
+    """Satu transaksi atas nama SATU pengguna — RLS spec/01 §11 membatasi tiap kueri di dalamnya.
+
+    `set_config(..., true)` hanya berlaku sampai transaksi selesai: koneksi yang
+    kembali ke pool tidak membawa pengguna ini ke permintaan berikutnya. Kueri
+    di luar transaksi ini tidak melihat satu baris pun milik pengguna mana pun.
+
+    `satu_potret=True` → `REPEATABLE READ`: tiap kueri di dalamnya membaca potret yang
+    SAMA. Untuk bacaan berlapis yang harus saling cocok — ekspor Privacy Center (6.4)
+    membaca belasan tabel, dan pada `READ COMMITTED` tulisan yang commit di tengahnya
+    menghasilkan salinan yang tidak pernah ada sebagai satu keadaan (penyelesaian
+    tanpa habitnya). Tingkat isolasinya dipulihkan pool saat koneksi kembali.
+    """
+    if not isinstance(user_id, UUID):
+        # str "semua" atau "" di sini akan menjadi galat cast di basis data —
+        # ditolak lebih awal, dengan nama yang jelas.
+        raise TypeError(f"user_id wajib uuid.UUID, bukan {type(user_id).__name__}")
+    if satu_potret:
+        async with engine.connect() as koneksi:
+            await koneksi.execution_options(isolation_level="REPEATABLE READ")
+            async with koneksi.begin():
+                await koneksi.execute(_SETEL_PENGGUNA, {"user_id": str(user_id)})
+                yield koneksi
+        return
+    async with engine.begin() as conn:
+        await conn.execute(_SETEL_PENGGUNA, {"user_id": str(user_id)})
+        yield conn
+
+
+# Satu kunci per pengguna antara yang MENURUNKAN data (bersama) dan yang menghapus kategori
+# beserta turunannya (eksklusif) — lihat `kunci_turunan`.
+_KUNCI_TURUNAN_BERSAMA = text("SELECT pg_advisory_xact_lock_shared(hashtextextended(:kunci, 0))")
+_KUNCI_TURUNAN_EKSKLUSIF = text("SELECT pg_advisory_xact_lock(hashtextextended(:kunci, 0))")
+
+
+async def kunci_turunan(conn: AsyncConnection, user_id: UUID, *, eksklusif: bool = False) -> None:
+    """Kunci transaksi atas data TURUNAN seorang pengguna — dipegang sampai commit/rollback.
+
+    🔴 Tinjauan keamanan S5–6 (S3): konsumen pekerja (human state, pola, rekomendasi,
+    proyeksi) menyisipkan turunan di transaksinya sendiri; hapus kategori Privacy Center
+    yang berjalan sebelum transaksi itu commit tidak melihat baris barunya dan tidak
+    menunggunya — turunan dari sumber yang sudah dihapus hidup terus, tanpa event yang
+    memicu pembersihannya lagi. Konsumen mengambil kunci ini BERSAMA (tidak saling
+    menahan); penghapus mengambilnya EKSKLUSIF sebagai pernyataan pertamanya — ia
+    menunggu konsumen yang sedang berjalan, dan konsumen berikutnya menunggu commit-nya
+    lalu tidak lagi menemukan event sumbernya.
+    """
+    kueri = _KUNCI_TURUNAN_EKSKLUSIF if eksklusif else _KUNCI_TURUNAN_BERSAMA
+    await conn.execute(kueri, {"kunci": f"turunan:{user_id}"})
+
+
+@asynccontextmanager
+async def transaksi_sistem(engine: AsyncEngine) -> AsyncIterator[AsyncConnection]:
+    """Satu transaksi TANPA pengguna — hanya baris sistem (`user_id` NULL) yang terjangkau.
+
+    Bentuknya SENGAJA sama dengan `transaksi_pengguna` — pernyataan `set_config`
+    yang sama, lalu kueri: jalur yang membedakan "akun ada" dari "akun tidak ada"
+    (gagal masuk, tugas 1.1) menjalankan kerja basis data yang sama banyak,
+    supaya waktu jawaban tidak membocorkannya (tinjauan Sprint 1). `''` dibaca
+    `app_current_user_id()` sebagai NULL — RLS tetap gagal-tertutup.
+    """
+    async with engine.begin() as conn:
+        await conn.execute(_SETEL_PENGGUNA, {"user_id": ""})
+        yield conn
+
+
+@dataclass(frozen=True)
+class Pelanggaran:
+    """SQLSTATE dan nama constraint dari galat basis data — tanpa pesannya.
+
+    Pesan PostgreSQL membawa isi baris (`DETAIL: Key (email)=(…)`); keputusan
+    kode — "409 atau 422?" — dibuat dari pengenal ini, bukan dari teks galat
+    (SECURITY.md, tinjauan Sprint 1).
+    """
+
+    sqlstate: str | None
+    constraint: str | None
+
+
+UNIQUE_VIOLATION = "23505"
+FOREIGN_KEY_VIOLATION = "23503"
+CHECK_VIOLATION = "23514"
+
+
+def rincian_pelanggaran(galat: DBAPIError) -> Pelanggaran:
+    sqlstate: str | None = None
+    constraint: str | None = None
+    g: BaseException | None = galat.orig
+    while g is not None and (sqlstate is None or constraint is None):
+        sqlstate = sqlstate or getattr(g, "sqlstate", None) or getattr(g, "pgcode", None)
+        constraint = constraint or getattr(g, "constraint_name", None)
+        g = g.__cause__
+    return Pelanggaran(sqlstate, constraint)

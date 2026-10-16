@@ -1,0 +1,21 @@
+name: mood.recent
+version: 1.0.0
+kind: read
+description: Mood yang dilaporkan beberapa hari terakhir — valensi, label, waktu (tanpa catatan)
+scopes: [mood]
+risk_level: 0
+input:
+  hari: { type: integer, required: false, min: 1, max: 30 }   # bawaan 7
+output:                     # tanpa `note` — tulisan pengguna bukan bahan coach (C-32)
+  items:
+    type: array
+    items:
+      type: object
+      fields:
+        valence: integer
+        label: string | null
+        occurred_at: string
+  terpotong: boolean       # ada lebih banyak daripada yang dikembalikan
+side_effects: none
+reaches_third_party: false
+rate_limit: 60/min/user
