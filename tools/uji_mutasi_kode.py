@@ -5036,6 +5036,23 @@ MUTASI: list[Mutasi] = [
         harus_memuat="pengguna yang gagal menahan pengguna di belakangnya",
         kelompok="db",
     ),
+    # Tinjauan kontrak S7 (K8): tugas malam menurunkan data tanpa kunci turunan pengguna.
+    Mutasi(
+        "7.3",
+        "tugas malam tanpa kunci turunan pengguna",
+        [
+            Sunting(
+                f"{MODUL}/intelligence/terjadwal.py",
+                "            await platform.kunci_turunan(conn, user_id)\n",
+                "",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_tugas_terjadwal.py::test_kerja_menunggu_hapus_kategori_yang_sedang_berjalan"
+        ),
+        harus_memuat="tugas malam tidak menunggu hapus kategori yang sedang berjalan",
+        kelompok="db",
+    ),
     # ── spec/08 7.4 putar ulang stream mati ──
     Mutasi(
         "7.4",

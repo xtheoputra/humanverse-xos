@@ -112,9 +112,14 @@ async def jalankan_jatuh_tempo(
 async def _kerjakan_satu(
     engine: AsyncEngine, tugas: TugasTerjadwal, user_id: UUID, for_date: date
 ) -> bool:
-    """Klaim + kerja satu (pengguna, hari) dalam SATU transaksi — `True` bila selesai di sini."""
+    """Klaim + kerja satu (pengguna, hari) dalam SATU transaksi — `True` bila selesai di sini.
+
+    Tugas malam MENURUNKAN data, maka memegang kunci turunan pengguna seperti konsumen
+    (`platform.kunci_turunan`, S3): hapus kategori Privacy Center yang sedang berjalan
+    ditunggu. 🔴 Tinjauan kontrak S7 (K8): versi pertama tidak memegangnya."""
     try:
         async with platform.transaksi_pengguna(engine, user_id) as conn:
+            await platform.kunci_turunan(conn, user_id)
             klaim = await conn.execute(
                 _KLAIM, {"user_id": user_id, "tugas": tugas.nama, "for_date": for_date}
             )

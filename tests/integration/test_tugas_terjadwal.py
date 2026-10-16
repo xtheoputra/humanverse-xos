@@ -174,6 +174,30 @@ async def test_pengguna_yang_selalu_gagal_tidak_menahan_yang_lain(api_bersama: A
     assert dikerjakan == [sah], "pengguna yang gagal menahan pengguna di belakangnya"
 
 
+async def test_kerja_menunggu_hapus_kategori_yang_sedang_berjalan(api_bersama: ApiUji) -> None:
+    """Tugas malam MENURUNKAN data (agregat 8.x, prediksi 10.1, tinjauan 11.4) — maka klaim
+    dan kerjanya memegang kunci turunan pengguna seperti konsumen (`platform.kunci_turunan`,
+    S3): hapus kategori Privacy Center yang sedang berjalan ditunggu. 🔴 Tinjauan kontrak S7
+    (K8): versi pertama tidak memegangnya."""
+    uid = await _pengguna(api_bersama, "Asia/Jakarta")
+    kerja = _Pencatat()
+    tugas = intelligence.TugasTerjadwal(_nama(), 0, kerja)
+
+    with psycopg.connect(psycopg_dsn(api_bersama.db.dsn_pemilik)) as k:
+        # = hapus kategori yang sedang berjalan: kunci EKSKLUSIF dipegang sampai commit
+        k.execute("SELECT pg_advisory_xact_lock(hashtextextended(%s, 0))", (f"turunan:{uid}",))
+        putaran = asyncio.ensure_future(
+            intelligence.jalankan_jatuh_tempo(api_bersama.engine_pekerja, tugas)
+        )
+        await asyncio.sleep(1.0)
+        selagi_terkunci = kerja.milik(uid)
+        k.rollback()  # kunci dilepas
+    await asyncio.wait_for(putaran, timeout=30)
+
+    assert selagi_terkunci == [], "tugas malam tidak menunggu hapus kategori yang sedang berjalan"
+    assert kerja.milik(uid) == [_lokal(api_bersama, "Asia/Jakarta")[0]]
+
+
 async def test_dua_zona_diproses_pada_jam_lokal_masing_masing(api_bersama: ApiUji) -> None:
     """Jam lokal TIMUR selalu 1 jam di depan BARAT (selisih 25 jam). Ambang ditaruh 30 menit
     sesudah jam lokal salah satunya: yang jamnya sudah lewat dikerjakan, yang belum tidak."""
