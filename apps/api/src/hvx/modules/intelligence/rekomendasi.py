@@ -18,14 +18,13 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 from hvx.modules import platform
 
 from . import repository
-from .schemas import RekomendasiRingkas
+from .schemas import DaftarRekomendasi
 
 # spec/01 `recommendations.domain` — contoh kolomnya: 'habit','goal','wellbeing'.
 DOMAIN = frozenset({"habit", "goal", "wellbeing"})
 JUDUL_MAKS = 200
 ISI_MAKS = 2_000
 ALASAN_MAKS = 10
-DAFTAR_MAKS = 50  # GET /recommendations: daftar terbatas, terbaru dulu (bukan berkursor)
 _BERISI = re.compile(r"\S")
 
 
@@ -92,13 +91,24 @@ async def daftar_rekomendasi(
     *,
     status: str | None = None,
     domain: str | None = None,
-    limit: int = DAFTAR_MAKS,
-) -> list[RekomendasiRingkas]:
-    """`GET /recommendations` — terbaru dulu, disaring opsional per status/domain."""
+    batas: int = platform.BATAS_BAWAAN,
+    kursor: str | None = None,
+) -> DaftarRekomendasi:
+    """`GET /recommendations` — terbaru dulu, disaring opsional per status/domain, BERKURSOR.
+
+    🔴 Versi pertama mengembalikan 50 terbaru tanpa kursor: rekomendasi tidak dibatasi saat
+    menulis (satu per habit per hari dilewati, plus saran agent), jadi sisanya terpotong
+    diam-diam — yang dilarang aturan *Halaman* spec/04 (tinjauan kontrak S5–6, K5)."""
+    sesudah = platform.baca_kursor_waktu("recommendations", kursor)
     async with platform.transaksi_pengguna(engine, user_id) as conn:
-        return await repository.daftar_rekomendasi(
-            conn, user_id, status=status, domain=domain, limit=limit
+        items = await repository.daftar_rekomendasi(
+            conn, user_id, status=status, domain=domain, batas=batas + 1, sesudah=sesudah
         )
+    lanjut = None
+    if len(items) > batas:
+        items = items[:batas]
+        lanjut = platform.kursor_waktu("recommendations", items[-1].created_at, items[-1].id)
+    return DaftarRekomendasi(items=items, next_cursor=lanjut)
 
 
 async def tandai_terlihat(engine: AsyncEngine, user_id: UUID, rekomendasi_id: UUID) -> None:

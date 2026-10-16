@@ -34,6 +34,9 @@ dependencies:
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
   http: ^1.6.0
+  # Unduhan berkas ekspor Privacy Center di web (spec/07 6.4) — sudah terkunci sebagai
+  # dependensi transitif `http`; kini dipakai langsung (`lib/api/simpan_berkas_web.dart`).
+  web: ^1.1.1
 
 dev_dependencies:
   flutter_test:

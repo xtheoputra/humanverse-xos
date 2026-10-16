@@ -37,7 +37,8 @@ SCOPE_RESMI: Mapping[str, Scope] = MappingProxyType(
         "habits": Scope("habit dan penyelesaiannya", sensitif=False),
         "goals": Scope("goal dan milestone", sensitif=False),
         "checkins": Scope("check-in harian: energi, fokus, jam tidur", sensitif=False),
-        "mood": Scope("mood yang dilaporkan, dan memori episodiknya (3.6)", sensitif=False),
+        # C-32 (K-46): mood = data kesehatan jiwa (GDPR Art. 9, UU PDP Pasal 4(2)) — sensitif.
+        "mood": Scope("mood yang dilaporkan, dan memori episodiknya (3.6)", sensitif=True),
         "coaching_notes": Scope(
             "catatan coaching: ditulis coach-agent, atau diminta pengguna untuk diingat",
             sensitif=False,

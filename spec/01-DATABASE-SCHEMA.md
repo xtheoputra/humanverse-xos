@@ -745,6 +745,16 @@ CREATE INDEX recommendation_feedback_user_idx
 >
 > `action='modified'` dan `'snoozed'` melengkapi naskah 4 §24: memilih B
 > setelah disarankan A **bukan** penolakan, dan menunda **bukan** mengabaikan.
+>
+> 🔧 **Rekomendasi mesin yang masih `pending` disegarkan — dan alasannya ikut (8 Okt
+> 2026, tinjauan kontrak Sprint 5–6 K2 · K3).** `checkin.logged` menghitung ulang
+> komponen `context` (K-36 (5)) dari check-in **otoritatif**, bukan `payload` event —
+> event lama yang diserahkan ulang sesudah yang baru tidak memutar konteksnya mundur
+> (aturan 2 [`03`](03-EVENT-CONTRACTS.md)). `score` · `score_breakdown` ·
+> `context_snapshot` · `body` · `rationale` ditulis **bersama**: alasan yang tertampil
+> selalu menyebut komponen yang dipakai skornya (versi pertama hanya mengganti skor —
+> *“Energi 2/5”* di samping skor dari energi 5). Begitu tidak lagi `pending`, barisnya
+> membeku: `context_snapshot` = konteks rekomendasi **yang dilihat** pengguna.
 
 ---
 
@@ -1269,7 +1279,8 @@ CREATE FUNCTION hapus_akun_jatuh_tempo(p_user_id uuid, p_semu uuid)
       SET user_id = p_semu,
           actor_id = replace(a.actor_id, p_user_id::text, p_semu::text),
           subject_id = replace(a.subject_id, p_user_id::text, p_semu::text),
-          metadata = replace(a.metadata::text, p_user_id::text, p_semu::text)::jsonb
+          metadata = replace(a.metadata::text, p_user_id::text, p_semu::text)::jsonb,
+          ip_hash = NULL
       WHERE a.user_id = p_user_id;
     DELETE FROM public.users WHERE id = p_user_id;
     INSERT INTO public.audit_logs (data_subject, actor_type, actor_id, user_id, action,
@@ -1281,6 +1292,39 @@ CREATE FUNCTION hapus_akun_jatuh_tempo(p_user_id uuid, p_semu uuid)
   $$;
 REVOKE ALL ON FUNCTION hapus_akun_jatuh_tempo(uuid, uuid) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION hapus_akun_jatuh_tempo(uuid, uuid) TO hvx_pekerja;
+
+-- Privacy Center (spec/07 6.4, K-42): hapus per kategori ikut membuang riwayat event
+-- pengguna itu (naskah 11 §7.25). `events` tetap hanya-tambah bagi `hvx_app` (§10) — yang
+-- dibuka hanya PENGHAPUSAN, hanya event milik pengguna yang SEDANG DILAYANI transaksi
+-- (`app_current_user_id()`), hanya jenis yang disebut, dan bila diminta satu subjek.
+-- Tanpa pengguna yang dilayani: galat, bukan nol baris. Untuk `hvx_app`.
+CREATE FUNCTION hapus_event_pengguna(p_jenis text[], p_subjek_tipe text, p_subjek_id uuid)
+  RETURNS integer
+  LANGUAGE plpgsql VOLATILE SECURITY DEFINER
+  SET search_path = pg_catalog, public, pg_temp
+  AS $$
+  DECLARE
+    v_pengguna uuid := public.app_current_user_id();
+    v_jumlah integer;
+  BEGIN
+    IF v_pengguna IS NULL THEN
+      RAISE EXCEPTION 'hapus_event_pengguna: tidak ada pengguna yang dilayani transaksi ini'
+        USING ERRCODE = 'insufficient_privilege';
+    END IF;
+    IF (p_subjek_tipe IS NULL) <> (p_subjek_id IS NULL) THEN
+      RAISE EXCEPTION 'hapus_event_pengguna: subjek wajib tipe DAN id, atau keduanya kosong';
+    END IF;
+    DELETE FROM public.events e
+      WHERE e.user_id = v_pengguna
+        AND e.event_type = ANY(p_jenis)
+        AND (p_subjek_id IS NULL
+             OR (e.subject_type = p_subjek_tipe AND e.subject_id = p_subjek_id));
+    GET DIAGNOSTICS v_jumlah = ROW_COUNT;
+    RETURN v_jumlah;
+  END
+  $$;
+REVOKE ALL ON FUNCTION hapus_event_pengguna(text[], text, uuid) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION hapus_event_pengguna(text[], text, uuid) TO hvx_app;
 ```
 
 > 🔑 **Kenapa fungsi, bukan kebijakan RLS yang lebih longgar** (17 Sep 2026,
@@ -1339,7 +1383,7 @@ Menutup janji *Delete* di Privacy Center (naskah 5 §26) tanpa merusak audit:
 
 | Tahap | Tindakan |
 |---|---|
-| 1 | `users.status = 'pending_deletion'`, `deletion_scheduled_at = now()+30h`, **semua sesi dicabut** (`cabut_semua`), agent berhenti melayani |
+| 1 | `users.status = 'pending_deletion'`, `deletion_scheduled_at = now()+30 hari` (🔧 8 Okt 2026: tertulis `now()+30h` — **30 jam**; kode, kolom `users`, dan tahap 2 semuanya 30 hari — tinjauan kontrak S5–6 K8), **semua sesi dicabut** (`cabut_semua`), agent berhenti melayani |
 | 2 | Tenggang **30 hari** — pengguna masih bisa membatalkan (`POST /me/restore`) |
 | 3 | `DELETE FROM users` → cascade menghapus profil, goal, habit, jurnal, mood, memori, percakapan, rekomendasi, event, human_states |
 | 4 | Titik embedding di Qdrant dihapus berdasarkan `memories.embedding_id` yang dikumpulkan **sebelum** tahap 3 — atau per saringan `user_id` payload (`platform.KlienVektor.hapus_milik`, 3.5), yang juga membuang titik yatim |
@@ -1378,8 +1422,9 @@ Menutup janji *Delete* di Privacy Center (naskah 5 §26) tanpa merusak audit:
 >   `str(user_id)` ke `actor_id` pada tiap aksi pengguna; menganonimkan `user_id` saja
 >   meninggalkan id asli di sana). Id semu = HMAC-SHA256 berkunci (`HVX_IP_HASH_KEY`, label
 >   `akun-terhapus`) dipotong 128 bit: baris audit satu akun tetap bisa dipertemukan,
->   tetapi tak bisa dibalik tanpa kunci. `ip_hash` **tidak** diubah — pertanyaan pemilik
->   (**C-34**).
+>   tetapi tak bisa dibalik tanpa kunci. 🔧 `ip_hash` **dikosongkan** (`NULL`) sejak migrasi
+>   `0013` — **C-34** diputuskan atas delegasi pemilik (**K-46**); kalimat lama *“`ip_hash`
+>   tidak diubah”* tertinggal sesudah fungsi §12 berubah (tinjauan kontrak S5–6 K8, 8 Okt 2026).
 > * **Restore hanya selama tenggang (E-216).** `POST /me/restore` sesudah
 >   `deletion_scheduled_at` → `409 deletion_grace_expired`: sapuan boleh membuang titik
 >   Qdrant-nya kapan saja, dan akun yang dipulihkan di antaranya hidup kembali tanpa

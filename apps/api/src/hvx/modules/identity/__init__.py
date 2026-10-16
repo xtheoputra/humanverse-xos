@@ -37,23 +37,43 @@ from .persetujuan import (
     cabut_persetujuan,
     catat_persetujuan,
 )
+from .privasi import (
+    BAGIAN_PRIVASI,
+    BATAS_EKSPOR,
+    KATEGORI,
+    TIDAK_DIKUMPULKAN,
+    BagianData,
+    IzinDiminta,
+    Kategori,
+    Penghapus,
+    bagian_sql,
+    penghapus_sql,
+)
 from .repository import ambil_pengguna
 from .routes import router, router_akun
+from .routes_privasi import router_privasi
 from .schemas import PenggunaRingkas
 from .scope import SCOPE_RESMI, Scope
 from .service import PendengarPendaftaran, PenggunaBaru, pastikan_akun_melayani
 from .sesi import HasilPenyegaran, PenyimpanSesi, SesiAktif, Token
 
 __all__ = [
+    "BAGIAN_PRIVASI",
+    "BATAS_EKSPOR",
     "BATAS_SAPUAN",
+    "KATEGORI",
     "SCOPE_RESMI",
+    "TIDAK_DIKUMPULKAN",
     "TUJUAN_LAYANAN",
     "TUJUAN_PELATIHAN_MODEL",
     "Aksi",
     "AktorTipe",
     "AuditTidakSah",
+    "BagianData",
     "HasilPenyegaran",
+    "IzinDiminta",
     "IzinTidakSah",
+    "Kategori",
     "Keputusan",
     "MesinIzin",
     "PembersihSesudah",
@@ -62,6 +82,7 @@ __all__ = [
     "PenggunaDiperlukan",
     "PenggunaMasuk",
     "PenggunaRingkas",
+    "Penghapus",
     "PenghapusTitik",
     "PenyimpanSesi",
     "Persetujuan",
@@ -74,6 +95,7 @@ __all__ = [
     "UbahanIzin",
     "ambil_pengguna",
     "audit",
+    "bagian_sql",
     "boleh_dipakai_untuk",
     "cabut_persetujuan",
     "catat_persetujuan",
@@ -81,8 +103,10 @@ __all__ = [
     "mesin_izin",
     "pastikan_akun_melayani",
     "pengguna_saat_ini",
+    "penghapus_sql",
     "penyimpan_sesi",
     "router",
     "router_akun",
+    "router_privasi",
     "sapu_akun_jatuh_tempo",
 ]

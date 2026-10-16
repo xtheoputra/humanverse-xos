@@ -75,7 +75,7 @@ aktif, dengan `risk_level` = `max_risk`-nya):
 | 3 🔧 | **Setiap tool di `tools:` wajib punya `risk_level <= max_risk`.** Manifest yang mendaftarkan tool lebih berisiko daripada pagunya **ditolak**. (Menggantikan aturan lama *“`risk_level >= 3` wajib punya `requires_confirmation`”* — [#52](../../issues/52) sudah memindahkan `requires_confirmation` ke Policy Engine.) |
 | 4 | `evaluation.gates.safety` **wajib** ada dan `>= 0.95`. |
 | 5 | Satu `name` hanya boleh punya **satu** baris `status: active`. |
-| 6 | `kind: third_party` **tidak boleh** meminta scope `journal`, `journal_raw` 🔧, `finance`, atau `health` — 🔧 lewat `memory.read`/`write` **maupun** lewat `scopes` tool yang didaftarkannya (E-207: dulu hanya yang pertama diperiksa, padahal scope tool-lah yang ditanyakan gerbang). |
+| 6 | `kind: third_party` **tidak boleh** meminta scope `journal`, `journal_raw` 🔧, `mood` 🔧 (C-32), `finance`, atau `health` — 🔧 lewat `memory.read`/`write` **maupun** lewat `scopes` tool yang didaftarkannya (E-207: dulu hanya yang pertama diperiksa, padahal scope tool-lah yang ditanyakan gerbang). |
 | 7 🔧 | Tool yang akibatnya sampai kepada **orang selain pemegang akun** (`reaches_third_party: true`) **wajib** `risk_level >= 3`. Manifest yang menurunkannya **ditolak**. |
 | 8 🔧 | Tool **tanpa** `risk_level` **ditolak** saat registrasi. **Tidak ada bawaan** — kelalaian berhenti di validator, bukan di produksi. |
 | 9 🔧 | Perluasan aturan 6: `kind: third_party` juga **tidak boleh** meminta scope `spatial`, `location`, `people`, atau `csi`. |
@@ -99,9 +99,19 @@ aktif, dengan `risk_level` = `max_risk`-nya):
 | `habits` | habit dan penyelesaiannya | — | coach · habit · memory |
 | `goals` | goal dan milestone | — | coach · memory |
 | `checkins` | check-in harian: energi, fokus, jam tidur | — | coach · memory |
-| `mood` | mood yang dilaporkan, dan memori episodiknya (3.6) | — | coach · memory |
+| `mood` | mood yang dilaporkan, dan memori episodiknya (3.6) | ✅ 🔧 C-32 | coach · memory |
 | `coaching_notes` | catatan coaching: ditulis `coach-agent`, atau diminta pengguna untuk diingat (`memory-agent`, 4.7) | — | coach · memory |
 | `journal_raw` | isi jurnal apa adanya, dan memori episodiknya (3.6) | ✅ | **tidak satu pun** |
+
+> 🔧 **`mood` sensitif sejak 7 Okt 2026 — C-32 diputuskan (K-46, delegasi pemilik).**
+> Mood yang dilaporkan — valensi, label *“cemas”*, catatan bebas — adalah data tentang
+> keadaan jiwa: **data kesehatan** menurut GDPR Art. 4(15) · Art. 9 dan **data pribadi
+> spesifik** menurut UU PDP No. 27/2022 Pasal 4 ayat (2) huruf a. Akibatnya: coach-agent
+> membaca mood (`mood.recent`, `memory.search`) hanya sesudah pengguna menyimpan `allow`
+> di Privacy Center (6.4) — bawaan risk 0 tidak lagi membukanya — dan agent pihak ketiga
+> dilarang memintanya (aturan 6). Check-in harian (energi, fokus, jam tidur) **tidak**
+> ikut: penilaian diri gaya hidup, bukan status kesehatan — garis yang sama dengan
+> lampiran WP29 (Feb 2015) tentang data aplikasi gaya hidup.
 
 ⁽¹⁾ **Sensitif = tidak pernah `allow` karena bawaan.** Hanya keputusan `allow`
 yang disimpan pengguna sendiri (`PUT /privacy/permissions/…`, 6.x) yang

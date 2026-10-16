@@ -164,8 +164,10 @@ async def test_jurnal_masa_depan_422(api_bersama: ApiUji) -> None:
     assert ubah.json()["error"]["code"] == "occurred_at_in_future"
 
 
-async def test_hapus_lunak_dan_jurnal_orang_lain_tidak_terlihat(api_bersama: ApiUji) -> None:
-    _a, token_a = await api_bersama.pengguna_baru()
+async def test_hapus_keras_dan_jurnal_orang_lain_tidak_terlihat(api_bersama: ApiUji) -> None:
+    """C-31 (K-46): hapus = hapus KERAS — barisnya DAN event `journal.created`-nya, bukan arsip
+    yang menyimpan tulisan paling pribadi sampai akun dihapus."""
+    a, token_a = await api_bersama.pengguna_baru()
     _b, token_b = await api_bersama.pengguna_baru()
     j = await _tulis(api_bersama, token_a)
     k = api_bersama.klien
@@ -179,6 +181,13 @@ async def test_hapus_lunak_dan_jurnal_orang_lain_tidak_terlihat(api_bersama: Api
     assert (orang_lain.status_code, ubah_lain.status_code, daftar_lain) == (404, 404, [])
     assert (hapus.status_code, sesudah.status_code) == (204, 404)
     assert (await k.get("/v1/journal", headers=auth(token_a))).json()["items"] == []
+    with psycopg.connect(psycopg_dsn(api_bersama.db.dsn_pemilik)) as p:
+        sisa = p.execute("SELECT count(*) FROM journal_entries WHERE id = %s", (j["id"],))
+        assert sisa.fetchone() == (0,), "jurnal yang dihapus menginap sebagai arsip (C-31)"
+        ev = p.execute(
+            "SELECT count(*) FROM events WHERE user_id = %s AND subject_id = %s", (a, j["id"])
+        )
+        assert ev.fetchone() == (0,), "event jurnal yang dihapus tetap di riwayat (C-31)"
 
 
 async def test_id_buatan_klien_409_dan_kunci_idempotensi(api_bersama: ApiUji) -> None:

@@ -30,7 +30,10 @@ _UBAH = text(
       display_name = CASE WHEN :ubah_display_name THEN :display_name ELSE display_name END,
       timezone     = CASE WHEN :ubah_timezone THEN :timezone ELSE timezone END,
       locale       = CASE WHEN :ubah_locale THEN :locale ELSE locale END,
-      preferences  = CASE WHEN :ubah_preferences THEN CAST(:preferences AS jsonb)
+      preferences  = CASE WHEN :ubah_preferences
+                          THEN CAST(:preferences AS jsonb)
+                               || jsonb_strip_nulls(jsonb_build_object(
+                                    'notifications', preferences -> 'notifications'))
                           ELSE preferences END
     WHERE user_id = :user_id
     RETURNING display_name, timezone, locale, birth_year, avatar_url, preferences, updated_at
@@ -39,6 +42,23 @@ _UBAH = text(
 _BISA_DIUBAH = ("display_name", "timezone", "locale", "preferences")
 
 _ZONA_WAKTU = text("SELECT timezone FROM profiles WHERE user_id = :user_id")
+
+# 6.3 (K-44): `preferences.notifications` dibaca lalu ditulis di bawah kunci baris — dua
+# `PATCH /me/notifications` serentak untuk jenis berbeda tidak saling menimpa.
+_NOTIFIKASI_UNTUK_UBAH = text(
+    "SELECT preferences -> 'notifications' AS n FROM profiles WHERE user_id = :user_id "
+    "FOR NO KEY UPDATE"
+)
+_NOTIFIKASI = text(
+    "SELECT preferences -> 'notifications' AS n FROM profiles WHERE user_id = :user_id"
+)
+_SIMPAN_NOTIFIKASI = text(
+    """
+    UPDATE profiles
+    SET preferences = jsonb_set(preferences, '{notifications}', CAST(:n AS jsonb), true)
+    WHERE user_id = :user_id
+    """
+)
 
 # human_states (§6): satu baris per (pengguna, tanggal lokal, versi model). Behavior
 # Engine (5.3) menghitung ulang → upsert pada kunci unik itu, bukan baris kedua.
@@ -54,6 +74,10 @@ _SIMPAN_HUMAN_STATE = text(
     """
 )
 _MEDAN_METRIK = frozenset({"value", "confidence", "evidence_count"})
+_HAPUS_HUMAN_STATE = text(
+    "DELETE FROM human_states "
+    "WHERE user_id = :user_id AND for_date = :for_date AND model_version = :model_version"
+)
 
 # Human state terkini (Dashboard 6.1): baris paling baru per pengguna. `for_date`
 # lebih dulu (keadaan HARI mana), lalu `computed_at` sebagai pemecah seri.
@@ -132,6 +156,17 @@ async def simpan_human_state(
     )
 
 
+async def hapus_human_state(
+    conn: AsyncConnection, user_id: UUID, *, for_date: date, model_version: str
+) -> None:
+    """Buang `human_state` satu hari satu versi — check-in yang menjadi dasarnya tidak lagi
+    memuat metrik (K-35: tanpa metrik, tanpa baris). Di transaksi pemanggil."""
+    await conn.execute(
+        _HAPUS_HUMAN_STATE,
+        {"user_id": user_id, "for_date": for_date, "model_version": model_version},
+    )
+
+
 async def human_state_terkini(conn: AsyncConnection, user_id: UUID) -> Mapping[str, Any] | None:
     """Human state paling baru pengguna — `{for_date, metrics, model_version}` atau `None`.
 
@@ -151,3 +186,21 @@ async def zona_waktu(conn: AsyncConnection, user_id: UUID) -> str | None:
     """
     nilai = (await conn.execute(_ZONA_WAKTU, {"user_id": user_id})).scalar_one_or_none()
     return str(nilai) if nilai is not None else None
+
+
+# ── spec/07 6.3 — preferensi notifikasi (K-44) ───────────────────────────────
+
+
+async def notifikasi(conn: AsyncConnection, user_id: UUID) -> dict[str, Any] | None:
+    """`preferences.notifications` yang tersimpan — `None` bila belum pernah dipilih."""
+    nilai = (await conn.execute(_NOTIFIKASI, {"user_id": user_id})).scalar_one_or_none()
+    return dict(nilai) if isinstance(nilai, dict) else None
+
+
+async def notifikasi_untuk_ubah(conn: AsyncConnection, user_id: UUID) -> dict[str, Any] | None:
+    nilai = (await conn.execute(_NOTIFIKASI_UNTUK_UBAH, {"user_id": user_id})).scalar_one_or_none()
+    return dict(nilai) if isinstance(nilai, dict) else None
+
+
+async def simpan_notifikasi(conn: AsyncConnection, user_id: UUID, isi: dict[str, Any]) -> None:
+    await conn.execute(_SIMPAN_NOTIFIKASI, {"user_id": user_id, "n": json.dumps(isi)})

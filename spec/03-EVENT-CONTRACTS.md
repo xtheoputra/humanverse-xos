@@ -155,11 +155,22 @@ menyusul — supaya nama dan bentuknya tidak berubah nanti.
 | **Habit streak** | `habit.*` | ✅ wajib |
 | **Memory extractor** | `journal.created`, `mood.logged` | boleh gagal & diulang |
 | **Recommendation trigger** | `checkin.logged`, `habit.skipped` | boleh gagal |
+| **Human State** 🔧 | `checkin.logged` | boleh gagal & diulang |
 | **Analytics** | semua | boleh gagal |
 
 > Consumer yang "boleh gagal" wajib **idempoten**, karena akan diulang.
 > Di V0 antreannya Redis Streams dengan consumer group; Kafka baru bila
 > skalanya menuntut (naskah 5 §5).
+>
+> 🔧 **"Wajib" = tanpa stream mati (8 Okt 2026, tinjauan kontrak Sprint 5–6, K6).**
+> Konsumen *boleh gagal* memindahkan pesan ke stream mati sesudah 5 kali diserahkan
+> (K-25). Konsumen **wajib** tidak: pesannya tetap di daftar tunggu grupnya dan dicoba
+> tiap 30 dtk menganggur sampai berhasil — *“kegagalannya menahan event”*, bukan
+> membuangnya — sementara pesan lain grup itu tetap mengalir
+> (`KonsumenStream(wajib=True)`). Versi pertama Sprint 5 memasang Behavior projector dan
+> Habit streak dengan bawaan *boleh gagal*: basis data yang mati ±3 menit membuang event
+> ke stream mati, dan proyeksinya diam-diam berbeda dari yang dibangun ulang dari
+> `events` (5.1). Konsumen wajib karena itu juga wajib idempoten.
 
 > 🔧 **Bentuk V0-nya (spec/07 3.3 · 3.6, K-25).** Tabel `events` adalah kotak
 > keluar: relay di proses pekerja (`hvx/pekerja.py`) menyalin **rujukan** tiap event yang
@@ -167,11 +178,22 @@ menyusul — supaya nama dan bentuknya tidak berubah nanti.
 > stream Redis. Tiap consumer adalah satu **grup**; ia membaca isi event dari
 > PostgreSQL di transaksi **pemiliknya** (RLS berlaku) dan meng-ACK **sesudah**
 > commit. Pesan yang menganggur 30 dtk diklaim anggota grup lain; sesudah 5 kali
-> diserahkan ia pindah ke stream **mati**. Yang terpasang di V0: **Memory
-> extractor** (grup `memori`, 3.6). Behavior projector, Habit streak,
-> Recommendation trigger, dan Analytics menyusul bersama tugasnya (5.1, 5.5) —
-> grup baru membaca stream **dari awal**, jadi tidak ada event yang terlewat
+> diserahkan ia pindah ke stream **mati** (konsumen *boleh gagal* saja — lihat K6 di
+> atas). Grup baru membaca stream **dari awal**, jadi tidak ada event yang terlewat
 > selama stream belum dipangkas melewatinya.
+>
+> 🔧 **Yang terpasang di V0 — diselaraskan 8 Okt 2026 dengan `rakit_konsumen` di `hvx/pekerja.py`
+> (tinjauan kontrak Sprint 5–6, K7).** Kalimat sebelumnya (*“yang terpasang: Memory
+> extractor; sisanya menyusul (5.1, 5.5)”*) tertinggal sesudah Sprint 5 memasangnya:
+>
+> | Consumer | Grup | Mendengarkan (sungguhan) | Tugas |
+> |---|---|---|---|
+> | Behavior projector | `proyektor` — **wajib** | semua jenis V0 (`REGISTRY`); V0 memproyeksikan siklus penyelesaian habit | 5.1 |
+> | Habit streak | `pola` — **wajib** | `habit.completed` · `habit.skipped` · `habit.completion_retracted` — `habit.created` tidak mengubah riwayat penyelesaian. Rentetan sendiri dihitung **saat dibaca** (`rentetan_pada` modul habits, 2.4); grup ini menghitung pola perilaku habit | 5.2 |
+> | Human State | `human-state` | `checkin.logged` — baris tabel di atas ditambahkan bersama kalimat ini; konsumen ini lahir di 5.3 tanpa pernah dicatat di sini | 5.3 |
+> | Recommendation trigger | `rekomendasi` | `checkin.logged` · `habit.skipped` | 5.5 |
+> | Memory extractor | `memori` | `journal.created` · `mood.logged` | 3.6 |
+> | Analytics | — | **tidak terpasang**: tidak ada tugas [`07`](07-BACKLOG-V0.md) untuknya | — |
 
 ---
 

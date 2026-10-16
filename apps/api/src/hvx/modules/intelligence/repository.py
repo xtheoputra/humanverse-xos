@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Mapping, Sequence
+from datetime import datetime
 from decimal import Decimal
 from typing import Any
 from uuid import UUID
@@ -89,7 +90,9 @@ _PERBARUI_SKOR = text(
     UPDATE recommendations
     SET score = :score,
         score_breakdown = CAST(:score_breakdown AS jsonb),
-        context_snapshot = CAST(:context_snapshot AS jsonb)
+        context_snapshot = CAST(:context_snapshot AS jsonb),
+        body = :body,
+        rationale = CAST(:rationale AS jsonb)
     WHERE id = :id AND user_id = :user_id AND status = 'pending'
     """
 )
@@ -154,8 +157,11 @@ async def perbarui_skor(
     score: Decimal,
     score_breakdown: Mapping[str, Any],
     context_snapshot: Mapping[str, Any],
+    body: str | None,
+    rationale: Sequence[str],
 ) -> None:
-    """Hitung ulang skor sebuah rekomendasi yang masih pending — status tidak disentuh."""
+    """Hitung ulang skor sebuah rekomendasi yang masih pending — beserta saran & alasannya
+    (yang tertampil harus menyebut komponen yang dipakai skor, K3); status tidak disentuh."""
     await conn.execute(
         _PERBARUI_SKOR,
         {
@@ -164,6 +170,8 @@ async def perbarui_skor(
             "score": score,
             "score_breakdown": json.dumps(score_breakdown, ensure_ascii=False),
             "context_snapshot": json.dumps(context_snapshot, ensure_ascii=False),
+            "body": body,
+            "rationale": json.dumps(list(rationale), ensure_ascii=False),
         },
     )
 
@@ -254,8 +262,10 @@ _DAFTAR_REKOMENDASI = text(
     WHERE user_id = :user_id
       AND (CAST(:status AS text) IS NULL OR status = :status)
       AND (CAST(:domain AS text) IS NULL OR domain = :domain)
+      AND (CAST(:k_waktu AS timestamptz) IS NULL
+           OR (created_at, id) < (CAST(:k_waktu AS timestamptz), CAST(:k_id AS uuid)))
     ORDER BY created_at DESC, id DESC
-    LIMIT :limit
+    LIMIT :batas
     """
 )
 
@@ -274,12 +284,20 @@ async def daftar_rekomendasi(
     *,
     status: str | None,
     domain: str | None,
-    limit: int,
+    batas: int,
+    sesudah: tuple[datetime, UUID] | None,
 ) -> list[RekomendasiRingkas]:
     baris = (
         await conn.execute(
             _DAFTAR_REKOMENDASI,
-            {"user_id": user_id, "status": status, "domain": domain, "limit": limit},
+            {
+                "user_id": user_id,
+                "status": status,
+                "domain": domain,
+                "k_waktu": sesudah[0] if sesudah else None,
+                "k_id": sesudah[1] if sesudah else None,
+                "batas": batas,
+            },
         )
     ).all()
     return [_rekomendasi_ringkas(b) for b in baris]

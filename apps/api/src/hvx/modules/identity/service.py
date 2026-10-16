@@ -222,16 +222,22 @@ async def segarkan(
     if hasil.dipakai_ulang is not None:
         curian = hasil.dipakai_ulang
         async with platform.transaksi_pengguna(engine, curian.user_id) as conn:
-            await audit(
-                conn,
-                aksi="session.refresh_reused",
-                aktor_tipe="system",
-                aktor_id="auth",
-                user_id=curian.user_id,
-                subjek_tipe="session",
-                subjek_id=str(curian.sesi_id),
-                ip_hash=ip_hash,
-            )
+            # Penanda token bekas hidup 30 hari di Redis dan membawa `user_id` ASLI. Akun yang
+            # sudah dihapus tidak mendapat jejak baru atas id aslinya — sapuan sudah
+            # menganonimkannya (K-39) dan membuang jejak jaringannya (C-34); tanpa pemeriksaan
+            # ini tiap pengiriman ulang token lama menghidupkan keduanya (tinjauan keamanan
+            # S5–6, S4).
+            if await repository.kunci_akun_ada(conn, curian.user_id):
+                await audit(
+                    conn,
+                    aksi="session.refresh_reused",
+                    aktor_tipe="system",
+                    aktor_id="auth",
+                    user_id=curian.user_id,
+                    subjek_tipe="session",
+                    subjek_id=str(curian.sesi_id),
+                    ip_hash=ip_hash,
+                )
     if hasil.token is None:
         raise _galat(401, "invalid_refresh_token", "Token segar tidak sah atau sudah dipakai.")
     return hasil.token
@@ -242,7 +248,8 @@ async def _masih_aktif(engine: AsyncEngine, pemilik: SesiAktif, *, ip_hash: str 
     async with platform.transaksi_pengguna(engine, pemilik.user_id) as conn:
         akun = await repository.ambil_pengguna(conn, pemilik.user_id)
         aktif = akun is not None and akun.status in _STATUS_SESI_SAH
-        if not aktif:
+        # Akun yang barisnya sudah dihapus sapuan: tanpa jejak atas id aslinya (S4, K-39).
+        if not aktif and await repository.kunci_akun_ada(conn, pemilik.user_id):
             await audit(
                 conn,
                 aksi="session.revoked",
@@ -262,16 +269,58 @@ async def keluar(
 ) -> None:
     await sesi.cabut(pengguna.sesi_id)
     async with platform.transaksi_pengguna(engine, pengguna.user_id) as conn:
-        await audit(
-            conn,
-            aksi="session.logged_out",
-            aktor_tipe="user",
-            aktor_id=str(pengguna.user_id),
-            user_id=pengguna.user_id,
-            subjek_tipe="session",
-            subjek_id=str(pengguna.sesi_id),
-            ip_hash=ip_hash,
-        )
+        # Token akses yang lolos pencabutan sapuan (Redis jatuh sesudah commit): akun sudah
+        # tiada — tanpa jejak atas id aslinya (S4, K-39).
+        if await repository.kunci_akun_ada(conn, pengguna.user_id):
+            await audit(
+                conn,
+                aksi="session.logged_out",
+                aktor_tipe="user",
+                aktor_id=str(pengguna.user_id),
+                user_id=pengguna.user_id,
+                subjek_tipe="session",
+                subjek_id=str(pengguna.sesi_id),
+                ip_hash=ip_hash,
+            )
+
+
+async def verifikasi_sandi_ulang(
+    engine: AsyncEngine,
+    user_id: UUID,
+    kata_sandi: str,
+    *,
+    penjaga: PenjagaGagalMasuk,
+    aksi_ditolak: str,
+    ip_hash: str | None,
+) -> repository.AkunUntukHapus:
+    """Re-autentikasi sebelum tindakan yang tak bisa dibatalkan (OWASP ASVS 4.0.3 V3.7.1):
+    hapus akun, ekspor dan hapus data Privacy Center.
+
+    🔴 Versi pertama (`DELETE /me`, 6.5) mencocokkan sandi tanpa batas apa pun selain batas
+    per pengguna (300/menit): token akses yang dicuri cukup untuk menebak sandi ratusan kali
+    per menit lewat pintu ini, sementara pintu login dijaga per akun (E-226). Kini tebakan
+    di sini memakai jatah YANG SAMA dengan login gagal akun itu — kuncinya email sebagaimana
+    `citext` mengenalinya — dipakai SEBELUM argon2, dan dikosongkan bila cocok.
+    Penolakan dicatat `aksi_ditolak` di jejak audit pemiliknya."""
+    async with platform.transaksi_pengguna(engine, user_id) as conn:
+        akun = await repository.akun_untuk_hapus(conn, user_id)
+    if akun is None:  # pragma: no cover - pemegang sesi sah selalu ada
+        raise _galat(404, "user_not_found", "Akun tidak ditemukan.")
+    await penjaga.pakai(akun.kunci)
+    if not await sandi.cocokkan_async(akun.password_hash, kata_sandi):
+        async with platform.transaksi_pengguna(engine, user_id) as conn:
+            await audit(
+                conn,
+                aksi=aksi_ditolak,
+                aktor_tipe="user",
+                aktor_id=str(user_id),
+                user_id=user_id,
+                ip_hash=ip_hash,
+                metadata={"alasan": "sandi_salah"},
+            )
+        raise _galat(403, "invalid_credentials", "Sandi salah.")
+    await penjaga.berhasil(akun.kunci)
+    return akun
 
 
 async def jadwalkan_penghapusan(
@@ -280,6 +329,7 @@ async def jadwalkan_penghapusan(
     pengguna: PenggunaMasuk,
     kata_sandi: str,
     *,
+    penjaga: PenjagaGagalMasuk,
     ip_hash: str | None,
 ) -> datetime:
     """Tahap 1 hapus akun (spec/01): `pending_deletion` + jadwal 30 hari, SEMUA sesi dicabut.
@@ -288,22 +338,14 @@ async def jadwalkan_penghapusan(
     Perubahan status & jejaknya satu transaksi; pencabutan sesi (Redis) sesudah commit.
     Idempoten: DELETE /me saat sudah `pending_deletion` mengembalikan jadwal yang ada,
     tanpa menyetel ulang jam tenggang."""
-    async with platform.transaksi_pengguna(engine, pengguna.user_id) as conn:
-        akun = await repository.akun_untuk_hapus(conn, pengguna.user_id)
-    if akun is None:  # pragma: no cover - pemegang sesi sah selalu ada
-        raise _galat(404, "user_not_found", "Akun tidak ditemukan.")
-    if not await sandi.cocokkan_async(akun.password_hash, kata_sandi):
-        async with platform.transaksi_pengguna(engine, pengguna.user_id) as conn:
-            await audit(
-                conn,
-                aksi="account.deletion_rejected",
-                aktor_tipe="user",
-                aktor_id=str(pengguna.user_id),
-                user_id=pengguna.user_id,
-                ip_hash=ip_hash,
-                metadata={"alasan": "sandi_salah"},
-            )
-        raise _galat(403, "invalid_credentials", "Sandi salah.")
+    await verifikasi_sandi_ulang(
+        engine,
+        pengguna.user_id,
+        kata_sandi,
+        penjaga=penjaga,
+        aksi_ditolak="account.deletion_rejected",
+        ip_hash=ip_hash,
+    )
 
     async with platform.transaksi_pengguna(engine, pengguna.user_id) as conn:
         dijadwalkan = await repository.jadwalkan_hapus(conn, pengguna.user_id, TENGGANG_HAPUS_HARI)
@@ -317,10 +359,17 @@ async def jadwalkan_penghapusan(
                 ip_hash=ip_hash,
                 metadata={"tenggang_hari": TENGGANG_HAPUS_HARI},
             )
-    if dijadwalkan is None:  # sudah `pending_deletion` sebelumnya — kembalikan jadwalnya
-        dijadwalkan = akun.deletion_scheduled_at
-        if dijadwalkan is None:  # status tak bisa dihapus (mis. `suspended`)
-            raise _galat(409, "deletion_not_possible", "Akun tidak bisa dijadwalkan hapus.")
+        else:
+            # Sudah `pending_deletion` — kembalikan jadwalnya, dibaca ULANG sesudah UPDATE di
+            # atas (yang menunggu kunci baris penulis serentak). 🔴 Versi pertama memakai
+            # `akun` yang dibaca SEBELUM sandi dicocokkan: dua `DELETE /me` serentak (ketukan
+            # ganda) sama-sama membaca `active`, dan yang kalah balapan menjawab
+            # `409 deletion_not_possible` untuk akun yang SUDAH dijadwalkan dihapus
+            # (tinjauan kontrak S5–6, K10).
+            kini = await repository.akun_untuk_hapus(conn, pengguna.user_id)
+            dijadwalkan = kini.deletion_scheduled_at if kini is not None else None
+    if dijadwalkan is None:  # status tak bisa dihapus (mis. `suspended`)
+        raise _galat(409, "deletion_not_possible", "Akun tidak bisa dijadwalkan hapus.")
     # Semua sesi dicabut SEKETIKA — termasuk yang sedang dipakai memanggil ini.
     await sesi.cabut_semua(pengguna.user_id)
     return dijadwalkan
@@ -333,6 +382,11 @@ async def batalkan_penghapusan(engine: AsyncEngine, user_id: UUID, *, ip_hash: s
     Hanya SELAMA tenggang (K-39): sesudah `deletion_scheduled_at` sapuan boleh membuang titik
     Qdrant-nya kapan saja, dan akun yang dipulihkan sesudah itu kehilangan memori
     vektornya diam-diam — jadi `409 deletion_grace_expired`, bukan `200`.
+
+    🔴 Versi pertama menjawab `200 {"status": "active"}` untuk akun `suspended` — atau yang
+    barisnya sudah tiada — selama token aksesnya masih hidup: `UPDATE`-nya tidak menyentuh
+    status lain, jadi jawabannya bohong (tinjauan S5–6, E-245). Kini `403 account_not_active`,
+    sama dengan pintu yang lain.
     """
     async with platform.transaksi_pengguna(engine, user_id) as conn:
         dibatalkan = await repository.batalkan_hapus(conn, user_id)
@@ -346,12 +400,15 @@ async def batalkan_penghapusan(engine: AsyncEngine, user_id: UUID, *, ip_hash: s
                 ip_hash=ip_hash,
             )
             return
-        if await repository.status_akun(conn, user_id) == "pending_deletion":
+        status = await repository.status_akun(conn, user_id)
+        if status == "pending_deletion":
             raise _galat(
                 409,
                 "deletion_grace_expired",
                 "Masa tenggang penghapusan sudah berakhir; akun tidak bisa dipulihkan.",
             )
+        if status != "active":
+            raise _galat(403, "account_not_active", "Akun tidak aktif.")
 
 
 async def pastikan_akun_melayani(conn: AsyncConnection, user_id: UUID) -> None:
