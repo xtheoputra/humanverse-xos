@@ -78,6 +78,16 @@ _HAPUS_HUMAN_STATE = text(
     "DELETE FROM human_states "
     "WHERE user_id = :user_id AND for_date = :for_date AND model_version = :model_version"
 )
+# Satu VERSI model, semua hari — langkah "dari nol" membangun ulang (spec/08 7.2). Versi
+# lain tak disentuh: dua versi hidup berdampingan (§23), masing-masing dibangun sendiri.
+_KOSONGKAN_HUMAN_STATE = text(
+    "DELETE FROM human_states WHERE user_id = :user_id AND model_version = :model_version"
+)
+# Pembanding bangun ulang — tanpa `computed_at`, yang berubah tiap kali dihitung ulang.
+_POTRET_HUMAN_STATE = text(
+    "SELECT for_date, metrics FROM human_states "
+    "WHERE user_id = :user_id AND model_version = :model_version ORDER BY for_date"
+)
 
 # Human state terkini (Dashboard 6.1): baris paling baru per pengguna. `for_date`
 # lebih dulu (keadaan HARI mana), lalu `computed_at` sebagai pemecah seri.
@@ -165,6 +175,24 @@ async def hapus_human_state(
         _HAPUS_HUMAN_STATE,
         {"user_id": user_id, "for_date": for_date, "model_version": model_version},
     )
+
+
+async def kosongkan_human_state(conn: AsyncConnection, user_id: UUID, *, model_version: str) -> int:
+    """Buang seluruh `human_states` satu versi model milik pengguna, di transaksi pemanggil."""
+    hasil = await conn.execute(
+        _KOSONGKAN_HUMAN_STATE, {"user_id": user_id, "model_version": model_version}
+    )
+    return hasil.rowcount
+
+
+async def potret_human_state(
+    conn: AsyncConnection, user_id: UUID, *, model_version: str
+) -> list[dict[str, Any]]:
+    """`human_states` satu versi model, urut tanggal — pembanding bangun ulang (spec/08 7.2)."""
+    hasil = await conn.execute(
+        _POTRET_HUMAN_STATE, {"user_id": user_id, "model_version": model_version}
+    )
+    return [dict(b) for b in hasil.mappings()]
 
 
 async def human_state_terkini(conn: AsyncConnection, user_id: UUID) -> Mapping[str, Any] | None:

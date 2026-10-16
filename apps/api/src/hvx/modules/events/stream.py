@@ -127,6 +127,16 @@ class KonsumenStream:
     def stream(self) -> str:
         return kunci_stream(self._awalan)
 
+    @property
+    def jenis(self) -> frozenset[str]:
+        """Jenis event yang didengar — dibaca daftar proyeksi (spec/08 7.2)."""
+        return self._jenis
+
+    @property
+    def tangani(self) -> Penangan:
+        """Penangan tiap event — dibaca daftar proyeksi (spec/08 7.2)."""
+        return self._tangani
+
     async def siapkan(self) -> None:
         """Grup dibuat dari AWAL stream (`0`): konsumen baru memproses riwayat yang ada."""
         try:

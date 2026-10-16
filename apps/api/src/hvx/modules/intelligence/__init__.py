@@ -21,7 +21,8 @@ from .pola import (
     tanpa_klaim_kausal,
 )
 from .privasi import BAGIAN_PRIVASI, PENGHAPUS_PRIVASI
-from .proyektor import JENIS_EVENT, bangun_ulang_proyeksi, proyeksikan_perilaku
+from .proyeksi import BUKAN_PROYEKSI, PROYEKSI, Proyeksi, bangun_ulang, bangun_ulang_proyeksi
+from .proyektor import JENIS_EVENT, proyeksikan_perilaku
 from .rekomendasi import (
     DOMAIN,
     buat_rekomendasi,
@@ -44,6 +45,7 @@ from .umpan_balik import baca_umpan_balik, catat_umpan_balik, status_sesudah
 
 __all__ = [
     "BAGIAN_PRIVASI",
+    "BUKAN_PROYEKSI",
     "BUKTI_MINIMUM",
     "DOMAIN",
     "JENIS_EVENT",
@@ -51,18 +53,21 @@ __all__ = [
     "JENIS_POLA",
     "JENIS_REKOMENDASI",
     "PENGHAPUS_PRIVASI",
+    "PROYEKSI",
     "SKOR_VERSI",
     "VERSI_TINJAUAN",
     "CatatUmpanBalik",
     "DaftarRekomendasi",
     "Dasbor",
     "Dimensi",
+    "Proyeksi",
     "RekomendasiRingkas",
     "Sikap",
     "Skor",
     "UmpanBalik",
     "awal_minggu",
     "baca_umpan_balik",
+    "bangun_ulang",
     "bangun_ulang_proyeksi",
     "buat_rekomendasi",
     "catat_umpan_balik",

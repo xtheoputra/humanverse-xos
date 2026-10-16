@@ -121,6 +121,11 @@ async def kosongkan_proyeksi(conn: AsyncConnection, user_id: UUID) -> int:
     return await repository.kosongkan_proyeksi(conn, user_id=user_id)
 
 
+async def potret_proyeksi(conn: AsyncConnection, user_id: UUID) -> list[dict[str, Any]]:
+    """Seluruh proyeksi `inferred` pengguna, urut `id` — pembanding bangun ulang (spec/08 7.2)."""
+    return await repository.potret_proyeksi(conn, user_id=user_id)
+
+
 async def daftar(
     engine: AsyncEngine,
     user_id: UUID,

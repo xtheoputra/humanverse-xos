@@ -83,6 +83,13 @@ modul — **tidak** ditambahkan ke registry event.
 > registry = tabel = `ADMISI` = blok aturan 1. 6 mutasi baru berbunyi; 1 mutasi lama dipensiunkan
 > (ekuivalen), 1 diarahkan ulang (**E-250**) | syarat 1 dibuktikan **ada & khas**, bukan
 > **benar** — apakah kalimatnya sungguh kejadian tetap dinilai HUMAN REVIEW |
+> | 7.2 | `intelligence.PROYEKSI` (`proyektor` · `human-state`) + `BUKAN_PROYEKSI` beralasan
+> (`pola` → wajib didaftarkan 9.1 · `rekomendasi` · `memori`); `test_proyeksi_daftar.py` membaca
+> konsumen dari `hvx.pekerja.rakit_konsumen` — konsumen tanpa keputusan, atau penangan/jenis
+> berbeda dari pekerja → merah. `test_proyeksi_terdaftar.py` generik per proyeksi: aliran
+> terburuk (terbalik, ganda) = bangun ulang; tanpa `events` → kosong. 3 mutasi baru; mutasi 5.1
+> mengikuti `bangun_ulang` yang pindah ke `proyeksi.py`; 39 mutasi terkait berbunyi | Human
+> State **kini** bisa dibangun ulang (dulu tidak ada jalannya); `pola` belum — sampai 9.1 |
 
 ## Sprint 8 — Behavior Analytics
 

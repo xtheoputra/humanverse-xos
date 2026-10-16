@@ -13,7 +13,13 @@ Berkas ini satu-satunya pintu keluar modul (spec/06 aturan 1).
 from .privasi import BAGIAN_PRIVASI, PENGHAPUS_PRIVASI
 from .routes import router
 from .schemas import Aktivitas
-from .service import catat_disimpulkan, catat_proyeksi, hapus_proyeksi, kosongkan_proyeksi
+from .service import (
+    catat_disimpulkan,
+    catat_proyeksi,
+    hapus_proyeksi,
+    kosongkan_proyeksi,
+    potret_proyeksi,
+)
 
 __all__ = [
     "BAGIAN_PRIVASI",
@@ -23,5 +29,6 @@ __all__ = [
     "catat_proyeksi",
     "hapus_proyeksi",
     "kosongkan_proyeksi",
+    "potret_proyeksi",
     "router",
 ]

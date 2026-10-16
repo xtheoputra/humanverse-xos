@@ -4782,6 +4782,54 @@ MUTASI: list[Mutasi] = [
         _pytest("tests/unit/test_admisi_event.py::test_kunci_atau_sumber_yang_tidak_sah_ditolak"),
         harus_memuat="DID NOT RAISE",
     ),
+    # ── spec/08 7.2 proyeksi terdaftar: perkabelan pekerja ⟷ PROYEKSI · BUKAN_PROYEKSI ──
+    Mutasi(
+        "7.2",
+        "konsumen pekerja tanpa keputusan proyeksi/bukan",
+        [
+            Sunting(
+                f"{MODUL}/intelligence/proyeksi.py",
+                '    "memori": (' + NL,
+                '    "memori-lama": (' + NL,
+            )
+        ],
+        _pytest(
+            "tests/unit/test_proyeksi_daftar.py::test_tiap_konsumen_diputuskan_proyeksi_atau_bukan"
+        ),
+        harus_memuat="konsumen tanpa keputusan proyeksi/bukan",
+    ),
+    Mutasi(
+        "7.2",
+        "proyeksi terdaftar memakai penangan lain dari konsumennya di pekerja",
+        [
+            Sunting(
+                f"{MODUL}/intelligence/proyeksi.py",
+                "        tangani=hitung_human_state," + NL,
+                "        tangani=proyeksikan_perilaku," + NL,
+            )
+        ],
+        _pytest(
+            "tests/unit/test_proyeksi_daftar.py::test_proyeksi_terdaftar_sama_dengan_konsumennya"
+        ),
+        harus_memuat="proyeksi terdaftar ≠ konsumen di pekerja",
+    ),
+    Mutasi(
+        "7.2",
+        "bangun ulang tidak mengosongkan — baris basi selamat",
+        [
+            Sunting(
+                f"{MODUL}/intelligence/proyeksi.py",
+                "        await proyeksi.kosongkan(conn, user_id)" + NL,
+                "",
+            )
+        ],
+        _pytest(
+            "tests/integration/test_proyeksi_terdaftar.py::"
+            "test_proyeksi_terdaftar_dibangun_ulang_dari_nol_dan_hasilnya_sama"
+        ),
+        harus_memuat="baris basi selamat dari pengosongan",
+        kelompok="db",
+    ),
     Mutasi(
         "3.1",
         "recorded_at = now() — membeku di awal transaksi, relay melompatinya",
@@ -11692,9 +11740,10 @@ MUTASI: list[Mutasi] = [
         "5.1",
         "bangun ulang tidak mengosongkan dulu — proyeksi basi/yatim bertahan",
         [
+            # sejak spec/08 7.2 bangun ulang 5.1 = `proyeksi.bangun_ulang("proyektor")`
             Sunting(
-                f"{MODUL}/intelligence/proyektor.py",
-                "        await activities.kosongkan_proyeksi(conn, user_id)\n",
+                f"{MODUL}/intelligence/proyeksi.py",
+                "        await proyeksi.kosongkan(conn, user_id)\n",
                 "",
             )
         ],

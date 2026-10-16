@@ -14,6 +14,8 @@ from .repository import (
     buat_profil,
     hapus_human_state,
     human_state_terkini,
+    kosongkan_human_state,
+    potret_human_state,
     simpan_human_state,
     zona_waktu,
 )
@@ -35,6 +37,8 @@ __all__ = [
     "hapus_human_state",
     "human_state_terkini",
     "keputusan_kirim",
+    "kosongkan_human_state",
+    "potret_human_state",
     "preferensi_notifikasi",
     "router",
     "simpan_human_state",

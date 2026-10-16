@@ -11,7 +11,7 @@ Dua sifat yang mengikat (K-33):
 
 * **Idempoten & bisa dibangun ulang.** `id` tiap baris proyeksi DETERMINISTIK
   dari penyelesaian sumbernya (`uuid5`), jadi event yang sama — disalurkan ulang
-  stream, atau diputar ulang `bangun_ulang_proyeksi` — tidak pernah melahirkan
+  stream, atau diputar ulang `proyeksi.bangun_ulang` — tidak pernah melahirkan
   baris kedua.
 * **Konvergen, bukan bergantung urutan tiba.** Alih-alih "sisip saat selesai,
   hapus saat dicabut" — yang bisa menghidupkan kembali baris dicabut kalau event
@@ -34,9 +34,9 @@ from __future__ import annotations
 import uuid
 from uuid import UUID
 
-from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine
+from sqlalchemy.ext.asyncio import AsyncConnection
 
-from hvx.modules import activities, events, platform
+from hvx.modules import activities, events
 
 # Namespace tetap untuk id proyeksi — bukan rahasia, hanya pembeda ruang nama.
 _NS = uuid.UUID("7c0a1b2c-3d4e-5f60-8a1b-2c3d4e5f6071")
@@ -104,19 +104,3 @@ async def proyeksikan_perilaku(conn: AsyncConnection, event: events.EventMasuk) 
     proyektor = _PROYEKSI.get(event.event_type)
     if proyektor is not None:
         await proyektor(conn, event)
-
-
-async def bangun_ulang_proyeksi(engine: AsyncEngine, user_id: UUID) -> int:
-    """Bangun proyeksi perilaku seorang pengguna DARI NOL dari `events` (spec/02 aturan D).
-
-    Mengosongkan seluruh baris `inferred`, lalu memutar ulang setiap event urut
-    tiba — satu transaksi, jadi tidak ada jendela saat proyeksi kosong. Karena
-    proyektornya konvergen & idempoten, hasilnya sama dengan aliran langsung.
-    Mengembalikan jumlah event yang diputar ulang.
-    """
-    async with platform.transaksi_pengguna(engine, user_id) as conn:
-        await activities.kosongkan_proyeksi(conn, user_id)
-        riwayat = await events.untuk_proyeksi(conn, user_id)
-        for event in riwayat:
-            await proyeksikan_perilaku(conn, event)
-    return len(riwayat)

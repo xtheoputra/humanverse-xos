@@ -65,6 +65,13 @@ _KOSONGKAN_PROYEKSI = text(
     "DELETE FROM activities WHERE user_id = :user_id AND source = 'inferred'"
 )
 
+# Keadaan proyeksi untuk DIBANDINGKAN (spec/08 7.2) — tanpa `created_at`, yang berbeda
+# tiap kali baris ditulis ulang walau isinya sama.
+_POTRET_PROYEKSI = text(
+    "SELECT id, kind, occurred_at, payload FROM activities "
+    "WHERE user_id = :user_id AND source = 'inferred' ORDER BY id"
+)
+
 _DAFTAR = text(
     """
     SELECT id, kind, occurred_at, ended_at, duration_seconds, source, payload, created_at
@@ -115,6 +122,11 @@ async def hapus_proyeksi(conn: AsyncConnection, *, id_: UUID, user_id: UUID) -> 
 async def kosongkan_proyeksi(conn: AsyncConnection, *, user_id: UUID) -> int:
     hasil = await conn.execute(_KOSONGKAN_PROYEKSI, {"user_id": user_id})
     return hasil.rowcount
+
+
+async def potret_proyeksi(conn: AsyncConnection, *, user_id: UUID) -> list[dict[str, Any]]:
+    hasil = await conn.execute(_POTRET_PROYEKSI, {"user_id": user_id})
+    return [dict(b) for b in hasil.mappings()]
 
 
 async def sisip(
